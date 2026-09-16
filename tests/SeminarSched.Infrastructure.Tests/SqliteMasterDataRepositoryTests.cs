@@ -22,10 +22,16 @@ public sealed class SqliteMasterDataRepositoryTests : IDisposable
         var subject = await repository.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "数学", "数", "中学", 1));
         await repository.SaveQualificationAsync(path, new TeacherQualification(teacher.Id, subject.Id, true));
         await repository.SaveRegularLessonAsync(path, new RegularLessonProfile(0, student.Id, subject.Id, teacher.Id, 4, true));
+        await repository.SaveStudentAsync(path, new Student(student.Id, "S-001", "架空 生徒・更新", "中3", 2, true, "更新", false));
+        await repository.SaveTeacherAsync(path, new Teacher(teacher.Id, "T-001", "架空 講師・更新", true, "更新", false));
+        await repository.SaveSubjectAsync(path, new Subject(subject.Id, "JH_MATH", "数学・更新", "数", "中学", 2, false));
 
-        Assert.Equal("架空 生徒", Assert.Single(await repository.GetStudentsAsync(path)).Name);
-        Assert.Equal("架空 講師", Assert.Single(await repository.GetTeachersAsync(path)).Name);
-        Assert.Equal("JH_MATH", Assert.Single(await repository.GetSubjectsAsync(path)).Code);
+        var storedStudent=Assert.Single(await repository.GetStudentsAsync(path));Assert.Equal("架空 生徒・更新",storedStudent.Name);Assert.False(storedStudent.Active);Assert.True(storedStudent.AllowGap);
+        var storedTeacher=Assert.Single(await repository.GetTeachersAsync(path));Assert.Equal("架空 講師・更新",storedTeacher.Name);Assert.False(storedTeacher.Active);
+        var storedSubject=Assert.Single(await repository.GetSubjectsAsync(path));Assert.Equal("JH_MATH",storedSubject.Code);Assert.False(storedSubject.Active);Assert.Equal(2,storedSubject.SortOrder);
+        Assert.Empty(await repository.GetStudentsAsync(path,includeInactive:false));
+        var qualification=Assert.Single(await repository.GetQualificationsAsync(path));Assert.Equal(teacher.Id,qualification.TeacherId);Assert.True(qualification.CanTeach);
+        var regular=Assert.Single(await repository.GetRegularLessonsAsync(path));Assert.Equal(student.Id,regular.StudentId);Assert.Equal(4,regular.RegularTeacherPriority);Assert.True(regular.OneToOneRequired);
         Assert.True((await new SqliteProjectRepository().CheckIntegrityAsync(path)).IsValid);
     }
 

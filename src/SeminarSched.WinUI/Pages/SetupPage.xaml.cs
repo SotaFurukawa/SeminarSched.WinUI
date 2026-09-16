@@ -11,6 +11,12 @@ namespace SeminarSched_WinUI.Pages;
 
 public sealed partial class SetupPage : WorkflowPageBase
 {
+    private long _studentEditId;
+    private long _teacherEditId;
+    private long _subjectEditId;
+    private long _slotEditId;
+    private bool _loading;
+
     public SetupPage() => InitializeComponent();
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
@@ -24,29 +30,72 @@ public sealed partial class SetupPage : WorkflowPageBase
 
     private async void AddStudent_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
     {
-        await App.MasterData.SaveStudentAsync(path, new Student(0, StudentId.Text, StudentName.Text, StudentGrade.Text));
-        StudentId.Text = StudentName.Text = StudentGrade.Text = "";
-    }, "生徒を追加しました");
+        await App.MasterData.SaveStudentAsync(path, new Student(_studentEditId, StudentId.Text, StudentName.Text, StudentGrade.Text, checked((int)StudentMaximum.Value), StudentAllowGap.IsChecked == true, StudentNote.Text, StudentActive.IsChecked == true));
+        ResetStudent();
+    }, "生徒を保存しました");
 
     private async void AddTeacher_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
     {
-        await App.MasterData.SaveTeacherAsync(path, new Teacher(0, TeacherId.Text, TeacherName.Text));
-        TeacherId.Text = TeacherName.Text = "";
-    }, "講師を追加しました");
+        await App.MasterData.SaveTeacherAsync(path, new Teacher(_teacherEditId, TeacherId.Text, TeacherName.Text, TeacherAllowGap.IsChecked == true, TeacherNote.Text, TeacherActive.IsChecked == true));
+        ResetTeacher();
+    }, "講師を保存しました");
 
     private async void AddSubject_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
     {
-        await App.MasterData.SaveSubjectAsync(path, new Subject(0, SubjectCode.Text, SubjectName.Text, SubjectShort.Text, SubjectLevel.Text, checked((int)SubjectOrder.Value)));
-        SubjectCode.Text = SubjectName.Text = SubjectShort.Text = SubjectLevel.Text = "";
-        SubjectOrder.Value++;
-    }, "科目を追加しました");
+        var nextOrder = SubjectOrder.Value + 1;
+        await App.MasterData.SaveSubjectAsync(path, new Subject(_subjectEditId, SubjectCode.Text, SubjectName.Text, SubjectShort.Text, SubjectLevel.Text, checked((int)SubjectOrder.Value), SubjectActive.IsChecked == true));
+        ResetSubject(); SubjectOrder.Value = nextOrder;
+    }, "科目を保存しました");
 
     private async void AddSlot_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
     {
-        await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(0, SlotCode.Text, SlotName.Text,
-            TimeOnly.FromTimeSpan(SlotStart.Time), TimeOnly.FromTimeSpan(SlotEnd.Time), checked((int)SlotOrder.Value)));
-        SlotCode.Text = SlotName.Text = ""; SlotOrder.Value++;
-    }, "コマを追加しました");
+        var nextOrder = SlotOrder.Value + 1;
+        await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(_slotEditId, SlotCode.Text, SlotName.Text,
+            TimeOnly.FromTimeSpan(SlotStart.Time), TimeOnly.FromTimeSpan(SlotEnd.Time), checked((int)SlotOrder.Value), SlotActive.IsChecked == true));
+        ResetSlot(); SlotOrder.Value = nextOrder;
+    }, "コマを保存しました");
+
+    private void Students_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading || Students.SelectedItem is not MasterItem<Student> selected) return;
+        var value=selected.Value;_studentEditId=value.Id;StudentId.Text=value.ExternalId;StudentName.Text=value.Name;StudentGrade.Text=value.Grade;StudentMaximum.Value=value.DefaultMaxConsecutiveSlots;StudentAllowGap.IsChecked=value.AllowGap;StudentNote.Text=value.Note;StudentActive.IsChecked=value.Active;
+    }
+    private void Teachers_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading || Teachers.SelectedItem is not MasterItem<Teacher> selected) return;
+        var value=selected.Value;_teacherEditId=value.Id;TeacherId.Text=value.ExternalId;TeacherName.Text=value.Name;TeacherAllowGap.IsChecked=value.AllowGap;TeacherNote.Text=value.Note;TeacherActive.IsChecked=value.Active;
+    }
+    private void Subjects_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading || Subjects.SelectedItem is not MasterItem<Subject> selected) return;
+        var value=selected.Value;_subjectEditId=value.Id;SubjectCode.Text=value.Code;SubjectName.Text=value.DisplayName;SubjectShort.Text=value.ShortName;SubjectLevel.Text=value.SchoolLevel;SubjectOrder.Value=value.SortOrder;SubjectActive.IsChecked=value.Active;
+    }
+    private void TimeSlots_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading || TimeSlots.SelectedItem is not MasterItem<TimeSlot> selected) return;
+        var value=selected.Value;_slotEditId=value.Id;SlotCode.Text=value.Code;SlotName.Text=value.DisplayName;SlotStart.Time=value.StartTime.ToTimeSpan();SlotEnd.Time=value.EndTime.ToTimeSpan();SlotOrder.Value=value.SortOrder;SlotActive.IsChecked=value.Active;
+    }
+    private void NewStudent_Click(object sender,RoutedEventArgs e)=>ResetStudent();
+    private void NewTeacher_Click(object sender,RoutedEventArgs e)=>ResetTeacher();
+    private void NewSubject_Click(object sender,RoutedEventArgs e)=>ResetSubject();
+    private void NewSlot_Click(object sender,RoutedEventArgs e)=>ResetSlot();
+    private void ResetStudent(){_studentEditId=0;Students.SelectedItem=null;StudentId.Text=StudentName.Text=StudentGrade.Text=StudentNote.Text="";StudentMaximum.Value=2;StudentAllowGap.IsChecked=false;StudentActive.IsChecked=true;}
+    private void ResetTeacher(){_teacherEditId=0;Teachers.SelectedItem=null;TeacherId.Text=TeacherName.Text=TeacherNote.Text="";TeacherAllowGap.IsChecked=false;TeacherActive.IsChecked=true;}
+    private void ResetSubject(){_subjectEditId=0;Subjects.SelectedItem=null;SubjectCode.Text=SubjectName.Text=SubjectShort.Text=SubjectLevel.Text="";SubjectOrder.Value=1;SubjectActive.IsChecked=true;}
+    private void ResetSlot(){_slotEditId=0;TimeSlots.SelectedItem=null;SlotCode.Text=SlotName.Text="";SlotStart.Time=new TimeSpan(9,0,0);SlotEnd.Time=new TimeSpan(10,0,0);SlotOrder.Value=1;SlotActive.IsChecked=true;}
+
+    private async void SaveQualification_Click(object sender,RoutedEventArgs e)=>await ExecuteAsync(async path=>
+    {
+        if(QualificationTeacher.SelectedItem is not MasterItem<Teacher> teacher||QualificationSubject.SelectedItem is not MasterItem<Subject> subject)throw new ArgumentException("講師と科目を選択してください。");
+        await App.MasterData.SaveQualificationAsync(path,new TeacherQualification(teacher.Value.Id,subject.Value.Id,QualificationCanTeach.IsChecked==true,QualificationNote.Text));
+    },"講師対応科目を保存しました");
+
+    private async void SaveRegularLesson_Click(object sender,RoutedEventArgs e)=>await ExecuteAsync(async path=>
+    {
+        if(RegularStudent.SelectedItem is not MasterItem<Student> student||RegularSubject.SelectedItem is not MasterItem<Subject> subject)throw new ArgumentException("生徒と科目を選択してください。");
+        var teacher=(RegularTeacher.SelectedItem as MasterItem<Teacher?>)?.Value;
+        await App.MasterData.SaveRegularLessonAsync(path,new RegularLessonProfile(0,student.Value.Id,subject.Value.Id,teacher?.Id,checked((int)RegularPriority.Value),RegularOneToOne.IsChecked==true,RegularNote.Text));
+    },"通常授業の担当設定を保存しました");
 
     private async void ExportMasterWorkbook_Click(object sender, RoutedEventArgs e)
     {
@@ -131,7 +180,7 @@ public sealed partial class SetupPage : WorkflowPageBase
             await action(path); await ReloadAsync();
             Show(InfoBarSeverity.Success, success, "");
         }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or SqliteException)
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or SqliteException or OverflowException)
         {
             Show(InfoBarSeverity.Error, "保存できませんでした", exception is SqliteException { SqliteErrorCode: 19 } ? "IDまたはコードが重複しています。" : exception.Message);
         }
@@ -141,15 +190,27 @@ public sealed partial class SetupPage : WorkflowPageBase
     private async Task ReloadAsync()
     {
         var path = App.ProjectService.Current!.Path;
-        Students.ItemsSource = (await App.MasterData.GetStudentsAsync(path)).Select(x => $"{x.ExternalId}　{x.Name}　{x.Grade}").ToArray();
-        Teachers.ItemsSource = (await App.MasterData.GetTeachersAsync(path)).Select(x => $"{x.ExternalId}　{x.Name}").ToArray();
-        Subjects.ItemsSource = (await App.MasterData.GetSubjectsAsync(path)).Select(x => $"{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}").ToArray();
-        var slots = await App.CourseSettings.GetTimeSlotsAsync(path);
-        TimeSlots.ItemsSource = slots.Select(x => $"{x.SortOrder}　{x.Code}　{x.DisplayName}　{x.StartTime:HH\\:mm}～{x.EndTime:HH\\:mm}").ToArray();
-        CourseDays.ItemsSource = (await App.CourseSettings.GetCourseDaysAsync(path)).Select(x => new CourseDayItem(x.Date, x.IsOpen ? "開校" : "休校", x.IsOpen ? $"{x.EnabledTimeSlotIds.Count}コマ" : "-")).ToArray();
+        _loading=true;
+        try
+        {
+            var studentValues=await App.MasterData.GetStudentsAsync(path);var teacherValues=await App.MasterData.GetTeachersAsync(path);var subjectValues=await App.MasterData.GetSubjectsAsync(path);
+            var studentItems=studentValues.Select(x => new MasterItem<Student>(x,$"{(x.Active?"":"[停止] ")}{x.ExternalId}　{x.Name}　{x.Grade}")).ToArray();
+            var teacherItems=teacherValues.Select(x => new MasterItem<Teacher>(x,$"{(x.Active?"":"[停止] ")}{x.ExternalId}　{x.Name}")).ToArray();
+            var subjectItems=subjectValues.Select(x => new MasterItem<Subject>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}")).ToArray();
+            Students.ItemsSource=studentItems;Teachers.ItemsSource=teacherItems;Subjects.ItemsSource=subjectItems;
+            QualificationTeacher.ItemsSource=teacherItems;QualificationSubject.ItemsSource=subjectItems;RegularStudent.ItemsSource=studentItems;RegularSubject.ItemsSource=subjectItems;
+            RegularTeacher.ItemsSource=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[停止] ")}{x.ExternalId}　{x.Name}"))).ToArray();if(RegularTeacher.SelectedIndex<0)RegularTeacher.SelectedIndex=0;
+            var qualifications=await App.MasterData.GetQualificationsAsync(path);Qualifications.ItemsSource=qualifications.Select(value=>$"{teacherValues.Single(x=>x.Id==value.TeacherId).ExternalId}　{subjectValues.Single(x=>x.Id==value.SubjectId).Code}　{(value.CanTeach?"指導可能":"不可")}　{value.Note}").ToArray();
+            var regularLessons=await App.MasterData.GetRegularLessonsAsync(path);RegularLessons.ItemsSource=regularLessons.Select(value=>$"{studentValues.Single(x=>x.Id==value.StudentId).ExternalId}　{subjectValues.Single(x=>x.Id==value.SubjectId).Code}　通常担当: {(value.RegularTeacherId is long id?teacherValues.Single(x=>x.Id==id).ExternalId:"指定なし")}　優先度{value.RegularTeacherPriority}　{(value.OneToOneRequired?"1対1":"通常")}").ToArray();
+            var slots = await App.CourseSettings.GetTimeSlotsAsync(path);
+            TimeSlots.ItemsSource = slots.Select(x => new MasterItem<TimeSlot>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}　{x.StartTime:HH\\:mm}～{x.EndTime:HH\\:mm}")).ToArray();
+            CourseDays.ItemsSource = (await App.CourseSettings.GetCourseDaysAsync(path)).Select(x => new CourseDayItem(x.Date, x.IsOpen ? "開校" : "休校", x.IsOpen ? $"{x.EnabledTimeSlotIds.Count}コマ" : "-")).ToArray();
+        }
+        finally{_loading=false;}
     }
 
     private void Show(InfoBarSeverity severity, string title, string message) { Status.Severity = severity; Status.Title = title; Status.Message = message; Status.IsOpen = true; }
 
     private sealed record CourseDayItem(DateOnly Date, string StatusLabel, string SlotSummary);
+    private sealed record MasterItem<T>(T Value,string Display){public override string ToString()=>Display;}
 }

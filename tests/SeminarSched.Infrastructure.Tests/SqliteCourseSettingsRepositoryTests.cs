@@ -19,8 +19,9 @@ public sealed class SqliteCourseSettingsRepositoryTests : IDisposable
         var day = new CourseDay(new DateOnly(2026, 7, 21), true, "短縮日", [first.Id, second.Id]);
 
         await repository.SaveCourseDayAsync(path, day);
+        await repository.SaveTimeSlotAsync(path, new TimeSlot(first.Id,"1","1限・更新",new TimeOnly(9,15),new TimeOnly(10,15),3,false));
 
-        Assert.Equal(2, (await repository.GetTimeSlotsAsync(path)).Count);
+        var slots=await repository.GetTimeSlotsAsync(path);Assert.Equal(2,slots.Count);var updated=Assert.Single(slots,item=>item.Id==first.Id);Assert.Equal("1限・更新",updated.DisplayName);Assert.False(updated.Active);
         var stored = Assert.Single(await repository.GetCourseDaysAsync(path), x => x.Date == day.Date);
         Assert.Equal("短縮日", stored.Note);
         Assert.Equal([first.Id, second.Id], stored.EnabledTimeSlotIds);
