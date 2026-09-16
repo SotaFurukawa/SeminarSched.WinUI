@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `c7848c0`（v0.1.0 scheduling hard constraints）
+Latest Development Checkpoint: `3453c05`（v0.1.0 master data workbook）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Next Version Rule:
 
@@ -30,7 +30,7 @@ Next Version Rule:
 ### 検証済み
 
 - `dotnet build SeminarSched.WinUI.sln --configuration Release -p:Platform=x64`: warning 0 / error 0
-- `dotnet test ... --no-build -p:Platform=x64`: 59 tests passed
+- `dotnet test ... --no-build -p:Platform=x64`: 63 tests passed
 - `scripts/Test-RepositoryPrivacy.ps1`: passed
 - Python参照repoはcommit `1d323a4`のまま。WinUI作業による変更なし
 
@@ -213,6 +213,14 @@ Next Version Rule:
 - 事前確定授業にも資格・可用性・必要回数・同時2名/1対1規則を適用し、SessionIndexを保存。
 - OptimizationRunへ時間制限、input/result概要、未配置数、経過時間を保存し、未固定配置と同一transactionで確定。
 - commit `c7848c0`。Release/x64 build: warning 0 / error 0。全59 tests passed。Privacy gate passed。
+
+### v0.1.0 checkpoint 21
+
+- ①設定へ共通基本情報Excelの出力・検証preview・確認後取込みUIを追加。
+- Python版と同じ生徒・講師・科目・講師対応科目・受講希望の5シートを扱い、例示行、必須列、空欄既定値、型/範囲、重複、参照、通常担当資格を検証。
+- preview後の原本SHA-256を再確認し、全masterを単一transactionでupsert。途中DB失敗時は全変更をrollback。
+- ImportBatch、原本BLOB/SHA-256 snapshot、個人情報を含めないAuditLogを同一transactionで保存。
+- commit `3453c05`。Release/x64 build: warning 0 / error 0。全63 tests passed。Privacy gate passed。
 
 ### 次回最初に確認するファイル
 
