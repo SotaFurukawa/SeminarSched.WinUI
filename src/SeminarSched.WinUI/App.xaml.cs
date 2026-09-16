@@ -46,6 +46,8 @@ public partial class App : Application
 
     public static IMasterDataRepository MasterData { get; } = new SqliteMasterDataRepository();
 
+    public static IMasterDataWorkbookService MasterDataWorkbook { get; } = new MasterDataWorkbookService();
+
     public static ICourseSettingsRepository CourseSettings { get; } = new SqliteCourseSettingsRepository();
 
     public static QuestionnaireKitService QuestionnaireKit { get; } = new(CourseSettings, MasterData);

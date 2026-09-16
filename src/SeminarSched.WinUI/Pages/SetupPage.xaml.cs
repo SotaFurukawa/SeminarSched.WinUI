@@ -3,6 +3,9 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using SeminarSched.Domain.MasterData;
 using SeminarSched.Domain.CourseSettings;
+using SeminarSched.Application.MasterData;
+using Windows.Storage.Pickers;
+using WinRT.Interop;
 
 namespace SeminarSched_WinUI.Pages;
 
@@ -44,6 +47,67 @@ public sealed partial class SetupPage : WorkflowPageBase
             TimeOnly.FromTimeSpan(SlotStart.Time), TimeOnly.FromTimeSpan(SlotEnd.Time), checked((int)SlotOrder.Value)));
         SlotCode.Text = SlotName.Text = ""; SlotOrder.Value++;
     }, "コマを追加しました");
+
+    private async void ExportMasterWorkbook_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new FileSavePicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary, SuggestedFileName = "共通基本情報" };
+            picker.FileTypeChoices.Add("Excelブック", [".xlsx"]);
+            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow!));
+            var file = await picker.PickSaveFileAsync(); if (file is null) return;
+            IsEnabled = false; await App.MasterDataWorkbook.ExportAsync(App.ProjectService.Current!.Path, file.Path);
+            Show(InfoBarSeverity.Success, "共通基本情報を出力しました", file.Path);
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or SqliteException)
+        {
+            Show(InfoBarSeverity.Error, "Excelを出力できませんでした", exception.Message);
+        }
+        finally { IsEnabled = true; }
+    }
+
+    private async void ImportMasterWorkbook_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
+            picker.FileTypeFilter.Add(".xlsx"); InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow!));
+            var file = await picker.PickSingleFileAsync(); if (file is null) return;
+            IsEnabled = false; var preview = await App.MasterDataWorkbook.PreviewAsync(App.ProjectService.Current!.Path, file.Path);
+            var summary = BuildPreviewSummary(preview);
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = preview.HasErrors ? "取込エラーがあります" : "共通基本情報を反映しますか？",
+                Content = new ScrollViewer { MaxHeight = 520, Content = new TextBlock { Text = summary, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true } },
+                CloseButtonText = preview.HasErrors ? "閉じる" : "キャンセル",
+                PrimaryButtonText = preview.HasErrors ? null : "反映する",
+                DefaultButton = preview.HasErrors ? ContentDialogButton.Close : ContentDialogButton.Primary,
+            };
+            IsEnabled = true;
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+            IsEnabled = false; var result = await App.MasterDataWorkbook.ApplyAsync(App.ProjectService.Current!.Path, preview); await ReloadAsync();
+            Show(InfoBarSeverity.Success, "共通基本情報を反映しました", $"{result.ImportedRows}行（警告{result.WarningCount}件）");
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException or SqliteException)
+        {
+            Show(InfoBarSeverity.Error, "Excelを取り込めませんでした", exception.Message);
+        }
+        finally { IsEnabled = true; }
+    }
+
+    private static string BuildPreviewSummary(MasterWorkbookPreview preview)
+    {
+        var lines = new List<string> { "シート                         新規  更新" };
+        foreach (var name in new[] { "生徒", "講師", "科目", "講師対応科目", "受講希望" }) lines.Add($"{name,-14} {preview.NewCounts.GetValueOrDefault(name),4} {preview.UpdateCounts.GetValueOrDefault(name),5}");
+        if (preview.Issues.Count != 0)
+        {
+            lines.Add(""); lines.Add($"検証結果（エラー{preview.Issues.Count(issue => issue.Severity == MasterWorkbookIssueSeverity.Error)}件・警告{preview.WarningCount}件）");
+            lines.AddRange(preview.Issues.Take(100).Select(issue => $"{issue.SheetName} {(issue.RowNumber is null ? "" : $"{issue.RowNumber}行 ")}{issue.ColumnName}: {issue.Message}"));
+            if (preview.Issues.Count > 100) lines.Add($"ほか{preview.Issues.Count - 100}件");
+        }
+        return string.Join(Environment.NewLine, lines);
+    }
 
     private async void SetOpenDay_Click(object sender, RoutedEventArgs e) => await SaveSelectedDayAsync(true);
     private async void SetClosedDay_Click(object sender, RoutedEventArgs e) => await SaveSelectedDayAsync(false);
