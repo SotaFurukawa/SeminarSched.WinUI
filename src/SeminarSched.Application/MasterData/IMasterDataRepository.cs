@@ -1,0 +1,15 @@
+using SeminarSched.Domain.MasterData;
+
+namespace SeminarSched.Application.MasterData;
+
+public interface IMasterDataRepository
+{
+    Task<IReadOnlyList<Student>> GetStudentsAsync(string projectPath, bool includeInactive = true, CancellationToken cancellationToken = default);
+    Task<Student> SaveStudentAsync(string projectPath, Student student, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Teacher>> GetTeachersAsync(string projectPath, bool includeInactive = true, CancellationToken cancellationToken = default);
+    Task<Teacher> SaveTeacherAsync(string projectPath, Teacher teacher, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Subject>> GetSubjectsAsync(string projectPath, bool includeInactive = true, CancellationToken cancellationToken = default);
+    Task<Subject> SaveSubjectAsync(string projectPath, Subject subject, CancellationToken cancellationToken = default);
+    Task SaveQualificationAsync(string projectPath, TeacherQualification qualification, CancellationToken cancellationToken = default);
+    Task SaveRegularLessonAsync(string projectPath, RegularLessonProfile profile, CancellationToken cancellationToken = default);
+}

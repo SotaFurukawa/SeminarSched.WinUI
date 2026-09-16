@@ -113,6 +113,14 @@ Next Version Rule:
 - 実CP-SATの複数strategyは未実装。ユーザー方針によりPython v1.9.5 parityを先に進め、後段へ保留する。
 - Release/x64 build: warning 0 / error 0。全29 tests passed。
 
+### v0.1.0 checkpoint 8
+
+- Python v1.9.5の定義に合わせてStudent、Teacher、Subject、TeacherQualification、RegularLessonProfileを追加。
+- external ID/code一意性、blank禁止、連続上限正数、科目順正数、担当優先度1〜5、外部キーをSQLiteでも強制する。
+- master data CRUDと指導可否・通常担当upsertを追加。旧v0.1.0開発DBには不足tableだけを加算作成する。
+- 管理UIは次checkpoint。実在データを使わず架空fixtureのみで検証。
+- Release/x64 build: warning 0 / error 0。全34 tests passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

@@ -14,10 +14,10 @@
 | migration・整合性確認 | Alembic / project service | 未実装 | 未実装 | migration前backup必須 |
 | 自動backup・世代管理 | recovery service | UIからのSQLite backup API検証付きsnapshot | 実装中 | 自動実行と世代管理は未実装 |
 | 復元・復元前backup | recovery service | 確認UI・復元前3世代backup・検証・rollback付きatomic restore | 実装中 | failure injection拡充は未実装 |
-| 生徒基本情報 | master repository/service | 未実装 | 未実装 | 有効/退席、wizard |
-| 講師基本情報 | master repository/service | 未実装 | 未実装 | 資格・勤務条件 |
-| 科目・略称 | master repository/service | 未実装 | 未実装 | 校種/学年対応 |
-| 通常授業・担当優先度 | regular lesson profile | 未実装 | 未実装 | 1対1必須を含む |
+| 生徒基本情報 | master repository/service | domain validation・SQLite CRUD | 実装中 | 管理UI・ID wizardは未実装 |
+| 講師基本情報 | master repository/service | domain validation・SQLite CRUD | 実装中 | 管理UIは未実装 |
+| 科目・略称 | master repository/service | domain validation・SQLite CRUD | 実装中 | 管理UI・校種presetは未実装 |
+| 通常授業・担当優先度 | regular lesson profile | SQLite upsert・優先度1〜5・1対1必須 | 実装中 | 管理UIは未実装 |
 | 共通基本情報Excel | master Excel service | 未実装 | 未実装 | 5sheet、preview、transaction |
 | 講習設定 | phase2 models/view model | 未実装 | 未実装 | 期間、開校日、休校日 |
 | コマ設定・並べ替え | phase2 UI/service | 未実装 | 未実装 | 日別使用コマを含む |
