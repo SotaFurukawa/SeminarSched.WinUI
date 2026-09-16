@@ -14,4 +14,14 @@ public interface IProjectRepository
     Task<ProjectIntegrityResult> CheckIntegrityAsync(
         string path,
         CancellationToken cancellationToken = default);
+
+    Task CreateBackupAsync(
+        string sourcePath,
+        string backupPath,
+        CancellationToken cancellationToken = default);
+
+    Task RestoreBackupAsync(
+        string backupPath,
+        string targetPath,
+        CancellationToken cancellationToken = default);
 }

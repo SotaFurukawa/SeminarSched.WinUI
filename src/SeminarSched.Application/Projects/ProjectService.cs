@@ -47,6 +47,32 @@ public sealed class ProjectService
 
     public void Close() => Current = null;
 
+    public async Task<string> CreateBackupAsync(
+        string backupPath,
+        CancellationToken cancellationToken = default)
+    {
+        var current = Current ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
+        var normalized = NormalizeProjectPath(backupPath);
+        if (File.Exists(normalized))
+        {
+            throw new IOException("同名のバックアップが既に存在します。上書きは行いません。");
+        }
+
+        await _repository.CreateBackupAsync(current.Path, normalized, cancellationToken).ConfigureAwait(false);
+        return normalized;
+    }
+
+    public async Task<ProjectSummary> RestoreBackupAsync(
+        string backupPath,
+        CancellationToken cancellationToken = default)
+    {
+        var current = Current ?? throw new InvalidOperationException("復元先のプロジェクトが開かれていません。");
+        var source = NormalizeProjectPath(backupPath);
+        await _repository.RestoreBackupAsync(source, current.Path, cancellationToken).ConfigureAwait(false);
+        Current = await _repository.OpenAsync(current.Path, cancellationToken).ConfigureAwait(false);
+        return Current;
+    }
+
     public static string NormalizeProjectPath(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);

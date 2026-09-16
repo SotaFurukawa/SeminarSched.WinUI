@@ -105,6 +105,97 @@ public sealed class SqliteProjectRepository : IProjectRepository
         }
     }
 
+    public async Task CreateBackupAsync(
+        string sourcePath,
+        string backupPath,
+        CancellationToken cancellationToken = default)
+    {
+        var source = Path.GetFullPath(sourcePath);
+        var target = Path.GetFullPath(backupPath);
+        if (!File.Exists(source))
+        {
+            throw new FileNotFoundException("The source project does not exist.", source);
+        }
+
+        if (File.Exists(target))
+        {
+            throw new IOException("The backup target already exists.");
+        }
+
+        var directory = Path.GetDirectoryName(target)
+            ?? throw new InvalidOperationException("The backup path has no parent directory.");
+        Directory.CreateDirectory(directory);
+        var temporary = Path.Combine(directory, $".{Path.GetFileName(target)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            await BackupDatabaseAsync(source, temporary, cancellationToken).ConfigureAwait(false);
+            var integrity = await CheckIntegrityAsync(temporary, cancellationToken).ConfigureAwait(false);
+            if (!integrity.IsValid)
+            {
+                throw new InvalidDataException(integrity.Message);
+            }
+
+            await OpenAsync(temporary, cancellationToken).ConfigureAwait(false);
+            File.Move(temporary, target, overwrite: false);
+        }
+        finally
+        {
+            if (File.Exists(temporary))
+            {
+                File.Delete(temporary);
+            }
+        }
+    }
+
+    public async Task RestoreBackupAsync(
+        string backupPath,
+        string targetPath,
+        CancellationToken cancellationToken = default)
+    {
+        var source = Path.GetFullPath(backupPath);
+        var target = Path.GetFullPath(targetPath);
+        await OpenAsync(source, cancellationToken).ConfigureAwait(false);
+
+        var directory = Path.GetDirectoryName(target)
+            ?? throw new InvalidOperationException("The target path has no parent directory.");
+        var replacement = Path.Combine(directory, $".{Path.GetFileName(target)}.{Guid.NewGuid():N}.restore.tmp");
+        var rollback = Path.Combine(directory, $".{Path.GetFileName(target)}.{Guid.NewGuid():N}.rollback");
+        try
+        {
+            await BackupDatabaseAsync(source, replacement, cancellationToken).ConfigureAwait(false);
+            var integrity = await CheckIntegrityAsync(replacement, cancellationToken).ConfigureAwait(false);
+            if (!integrity.IsValid)
+            {
+                throw new InvalidDataException(integrity.Message);
+            }
+
+            File.Replace(replacement, target, rollback, ignoreMetadataErrors: true);
+            var restored = await CheckIntegrityAsync(target, cancellationToken).ConfigureAwait(false);
+            if (!restored.IsValid)
+            {
+                File.Replace(rollback, target, null, ignoreMetadataErrors: true);
+                throw new InvalidDataException("Restored project failed validation; the original was restored.");
+            }
+        }
+        finally
+        {
+            if (File.Exists(replacement)) File.Delete(replacement);
+            if (File.Exists(rollback)) File.Delete(rollback);
+        }
+    }
+
+    private static async Task BackupDatabaseAsync(
+        string sourcePath,
+        string targetPath,
+        CancellationToken cancellationToken)
+    {
+        await using var source = CreateConnection(sourcePath, SqliteOpenMode.ReadOnly);
+        await using var target = CreateConnection(targetPath, SqliteOpenMode.ReadWriteCreate);
+        await source.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await target.OpenAsync(cancellationToken).ConfigureAwait(false);
+        source.BackupDatabase(target);
+    }
+
     private static async Task CreateDatabaseAsync(
         string path,
         CourseProjectDefinition definition,

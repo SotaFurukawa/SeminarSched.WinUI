@@ -84,6 +84,13 @@ Next Version Rule:
 - Python版`.jukuschedule`はその場でmigration・上書きせず拒否する。copy-first import設計が完成するまで保留。
 - Release/x64 build: warning 0 / error 0。全22 tests passed。
 
+### v0.1.0 checkpoint 4
+
+- SQLite backup APIを使用し、WAL状態でも一貫したproject snapshotを作成するrepository APIを追加。
+- backupは一時fileへ作成し、integrityとWinUI schemaを検証後に上書きなしで配置する。
+- restoreは置換用DBを先に検証し、`File.Replace`とrollback copyで原子的に差し替える。置換後検証失敗時は元DBへ戻す。
+- Release/x64 build: warning 0 / error 0。全24 tests passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

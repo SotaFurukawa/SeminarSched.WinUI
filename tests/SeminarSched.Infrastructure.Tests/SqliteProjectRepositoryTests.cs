@@ -54,6 +54,40 @@ public sealed class SqliteProjectRepositoryTests : IDisposable
         Assert.Equal("keep-me", await File.ReadAllTextAsync(path));
     }
 
+    [Fact]
+    public async Task CreateBackupAsync_ProducesValidatedIndependentSnapshot()
+    {
+        var repository = new SqliteProjectRepository();
+        var source = Path.Combine(_directory, "source.jukuschedule");
+        var backup = Path.Combine(_directory, "backups", "snapshot.jukuschedule");
+        await repository.CreateAsync(source, CourseProjectDefinition.Create(
+            2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 22)));
+
+        await repository.CreateBackupAsync(source, backup);
+
+        Assert.True(File.Exists(backup));
+        Assert.True((await repository.CheckIntegrityAsync(backup)).IsValid);
+        Assert.Equal("2026夏期講習", (await repository.OpenAsync(backup)).Title);
+    }
+
+    [Fact]
+    public async Task RestoreBackupAsync_AtomicallyReplacesTarget()
+    {
+        var repository = new SqliteProjectRepository();
+        var target = Path.Combine(_directory, "active.jukuschedule");
+        var backup = Path.Combine(_directory, "winter.jukuschedule");
+        await repository.CreateAsync(target, CourseProjectDefinition.Create(
+            2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 22)));
+        await repository.CreateAsync(backup, CourseProjectDefinition.Create(
+            2026, CourseSeason.Winter, new DateOnly(2026, 12, 20), new DateOnly(2026, 12, 22)));
+
+        await repository.RestoreBackupAsync(backup, target);
+
+        Assert.Equal("2026冬期講習", (await repository.OpenAsync(target)).Title);
+        Assert.Empty(Directory.GetFiles(_directory, "*.rollback", SearchOption.AllDirectories));
+        Assert.Empty(Directory.GetFiles(_directory, "*.tmp", SearchOption.AllDirectories));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_directory))
