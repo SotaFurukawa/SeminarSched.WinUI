@@ -158,6 +158,11 @@ public sealed class SqliteProjectRepository : IProjectRepository
 
         var directory = Path.GetDirectoryName(target)
             ?? throw new InvalidOperationException("The target path has no parent directory.");
+        var baseName = Path.GetFileNameWithoutExtension(target);
+        var safetyBackup = Path.Combine(
+            directory,
+            $"{baseName}_before_restore_{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}{Path.GetExtension(target)}");
+        await CreateBackupAsync(target, safetyBackup, cancellationToken).ConfigureAwait(false);
         var replacement = Path.Combine(directory, $".{Path.GetFileName(target)}.{Guid.NewGuid():N}.restore.tmp");
         var rollback = Path.Combine(directory, $".{Path.GetFileName(target)}.{Guid.NewGuid():N}.rollback");
         try
@@ -181,6 +186,19 @@ public sealed class SqliteProjectRepository : IProjectRepository
         {
             if (File.Exists(replacement)) File.Delete(replacement);
             if (File.Exists(rollback)) File.Delete(rollback);
+        }
+
+        PruneRestoreBackups(directory, baseName, Path.GetExtension(target), keep: 3);
+    }
+
+    private static void PruneRestoreBackups(string directory, string baseName, string extension, int keep)
+    {
+        var pattern = $"{baseName}_before_restore_*{extension}";
+        foreach (var obsolete in Directory.EnumerateFiles(directory, pattern, SearchOption.TopDirectoryOnly)
+                     .OrderByDescending(File.GetLastWriteTimeUtc)
+                     .Skip(keep))
+        {
+            File.Delete(obsolete);
         }
     }
 

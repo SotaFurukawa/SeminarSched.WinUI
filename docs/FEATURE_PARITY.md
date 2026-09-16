@@ -13,7 +13,7 @@
 | 最近使用・非表示 | workspace view model | 最大10件の履歴・再open・欠損時自動除去 | 実装中 | 手動非表示操作は未実装 |
 | migration・整合性確認 | Alembic / project service | 未実装 | 未実装 | migration前backup必須 |
 | 自動backup・世代管理 | recovery service | UIからのSQLite backup API検証付きsnapshot | 実装中 | 自動実行と世代管理は未実装 |
-| 復元・復元前backup | recovery service | 確認UI・検証・rollback付きatomic restore | 実装中 | 復元前自動backupとfailure injection拡充は未実装 |
+| 復元・復元前backup | recovery service | 確認UI・復元前3世代backup・検証・rollback付きatomic restore | 実装中 | failure injection拡充は未実装 |
 | 生徒基本情報 | master repository/service | 未実装 | 未実装 | 有効/退席、wizard |
 | 講師基本情報 | master repository/service | 未実装 | 未実装 | 資格・勤務条件 |
 | 科目・略称 | master repository/service | 未実装 | 未実装 | 校種/学年対応 |

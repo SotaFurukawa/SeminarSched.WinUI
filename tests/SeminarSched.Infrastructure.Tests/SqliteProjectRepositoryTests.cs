@@ -84,6 +84,8 @@ public sealed class SqliteProjectRepositoryTests : IDisposable
         await repository.RestoreBackupAsync(backup, target);
 
         Assert.Equal("2026冬期講習", (await repository.OpenAsync(target)).Title);
+        var safetyBackup = Assert.Single(Directory.GetFiles(_directory, "active_before_restore_*.jukuschedule"));
+        Assert.Equal("2026夏期講習", (await repository.OpenAsync(safetyBackup)).Title);
         Assert.Empty(Directory.GetFiles(_directory, "*.rollback", SearchOption.AllDirectories));
         Assert.Empty(Directory.GetFiles(_directory, "*.tmp", SearchOption.AllDirectories));
     }

@@ -99,6 +99,12 @@ Next Version Rule:
 - 品質level保存時にrecent project設定を失わないmerge保存へ修正。
 - Release/x64 build: warning 0 / error 0。全26 tests passed。
 
+### v0.1.0 checkpoint 6
+
+- restore直前の現行projectを自動snapshotし、`*_before_restore_*`として新しい3世代を保持する。
+- 自動snapshotにもSQLite backup API、integrity検証、WinUI schema検証を適用する。
+- Release/x64 build: warning 0 / error 0。全26 tests passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`
