@@ -22,11 +22,48 @@ public sealed class PdfScheduleReportRenderer
     }
     private static void AddDistribution(Section section,IEnumerable<(string Date,string Slot,string Item,string Detail)> rows){var table=section.AddTable();table.Borders.Width=.5;foreach(var width in new[]{3.0,3.8,4.0,4.0})table.AddColumn(Unit.FromCentimeter(width));var header=table.AddRow();string[] names=["日付","コマ","対象","詳細"];for(var i=0;i<4;i++){header.Cells[i].AddParagraph(names[i]);header.Cells[i].Format.Font.Bold=true;}foreach(var value in rows.OrderBy(x=>x.Date).ThenBy(x=>x.Slot)){var row=table.AddRow();string[] cells=[value.Date,value.Slot,value.Item,value.Detail];for(var i=0;i<4;i++)row.Cells[i].AddParagraph(cells[i]);}}
     private static void EnsureFont(){lock(FontGate){if(GlobalFontSettings.FontResolver is null)GlobalFontSettings.FontResolver=new WindowsJapaneseFontResolver();}}
-    private sealed class WindowsJapaneseFontResolver:IFontResolver
+    private sealed class WindowsJapaneseFontResolver : IFontResolver
     {
-        private readonly byte[] _font;
-        public WindowsJapaneseFontResolver(){var dir=Environment.GetFolderPath(Environment.SpecialFolder.Fonts);var path=new[]{"HGRSMP.TTF","HGRSKP.TTF","YuGothM.ttc","meiryo.ttc"}.Select(x=>Path.Combine(dir,x)).FirstOrDefault(File.Exists)??throw new FileNotFoundException("日本語PDF用fontが見つかりません。");_font=File.ReadAllBytes(path);}
-        public byte[]? GetFont(string faceName)=>faceName=="jp"?_font:null;
-        public FontResolverInfo? ResolveTypeface(string familyName,bool isBold,bool isItalic)=>new("jp");
+        private readonly IReadOnlyDictionary<string, byte[]> _fonts;
+
+        public WindowsJapaneseFontResolver()
+        {
+            var directory = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
+            var latinPath = FindFont(directory, "arial.ttf", "segoeui.ttf")
+                ?? throw new FileNotFoundException("PDF用のTrueType fontが見つかりません。");
+            var courierPath = FindFont(directory, "cour.ttf", "consola.ttf") ?? latinPath;
+
+            // PDFsharp Core cannot reliably consume every Windows TTC collection. Prefer a
+            // Japanese TrueType face and use a guaranteed TTF fallback on minimal CI images.
+            var japanesePath = FindFont(directory, "HGRSMP.TTF", "HGRSKP.TTF") ?? latinPath;
+            _fonts = new Dictionary<string, byte[]>(StringComparer.Ordinal)
+            {
+                ["jp"] = File.ReadAllBytes(japanesePath),
+                ["sans"] = File.ReadAllBytes(latinPath),
+                ["mono"] = File.ReadAllBytes(courierPath),
+            };
+        }
+
+        public byte[]? GetFont(string faceName) =>
+            _fonts.TryGetValue(faceName, out var font) ? font : null;
+
+        public FontResolverInfo? ResolveTypeface(string familyName, bool isBold, bool isItalic)
+        {
+            if (string.Equals(familyName, "SeminarSchedJapanese", StringComparison.OrdinalIgnoreCase))
+            {
+                return new FontResolverInfo("jp", isBold, isItalic);
+            }
+
+            if (familyName.Contains("Courier", StringComparison.OrdinalIgnoreCase)
+                || familyName.Contains("Mono", StringComparison.OrdinalIgnoreCase))
+            {
+                return new FontResolverInfo("mono", isBold, isItalic);
+            }
+
+            return new FontResolverInfo("sans", isBold, isItalic);
+        }
+
+        private static string? FindFont(string directory, params string[] names) =>
+            names.Select(name => Path.Combine(directory, name)).FirstOrDefault(File.Exists);
     }
 }

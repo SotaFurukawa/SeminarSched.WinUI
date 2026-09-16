@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using SeminarSched.Application.MasterData;
 using SeminarSched.Domain.MasterData;
+using SeminarSched.Infrastructure.Projects;
 
 namespace SeminarSched.Infrastructure.MasterData;
 
@@ -101,17 +102,6 @@ public sealed class SqliteMasterDataRepository : IMasterDataRepository
 
     private static async Task EnsureSchemaAsync(SqliteConnection connection, CancellationToken token)
     {
-        await using var command = connection.CreateCommand(); command.CommandText = "SELECT COUNT(*) FROM ApplicationMetadata WHERE Id=1 AND Product='SeminarSched.WinUI' AND SchemaVersion=1;";
-        if (Convert.ToInt64(await command.ExecuteScalarAsync(token)) != 1) throw new InvalidDataException("現在のWinUI projectではありません。");
-        // v0.1.0 development databases created before master-data support are upgraded additively.
-        command.CommandText = MasterSchemaSql; await command.ExecuteNonQueryAsync(token);
+        await SqliteProjectSchema.EnsureCurrentAsync(connection, token).ConfigureAwait(false);
     }
-
-    private const string MasterSchemaSql = """
-        CREATE TABLE IF NOT EXISTS Student (Id INTEGER PRIMARY KEY AUTOINCREMENT, ExternalId TEXT NOT NULL UNIQUE CHECK(length(trim(ExternalId))>0), Name TEXT NOT NULL CHECK(length(trim(Name))>0), Grade TEXT NOT NULL, DefaultMaxConsecutiveSlots INTEGER NOT NULL DEFAULT 2 CHECK(DefaultMaxConsecutiveSlots>0), AllowGap INTEGER NOT NULL DEFAULT 0 CHECK(AllowGap IN(0,1)), Note TEXT NOT NULL DEFAULT '', Active INTEGER NOT NULL DEFAULT 1 CHECK(Active IN(0,1)));
-        CREATE TABLE IF NOT EXISTS Teacher (Id INTEGER PRIMARY KEY AUTOINCREMENT, ExternalId TEXT NOT NULL UNIQUE CHECK(length(trim(ExternalId))>0), Name TEXT NOT NULL CHECK(length(trim(Name))>0), AllowGap INTEGER NOT NULL DEFAULT 0 CHECK(AllowGap IN(0,1)), Note TEXT NOT NULL DEFAULT '', Active INTEGER NOT NULL DEFAULT 1 CHECK(Active IN(0,1)));
-        CREATE TABLE IF NOT EXISTS Subject (Id INTEGER PRIMARY KEY AUTOINCREMENT, Code TEXT NOT NULL UNIQUE CHECK(length(trim(Code))>0), DisplayName TEXT NOT NULL CHECK(length(trim(DisplayName))>0), ShortName TEXT NOT NULL DEFAULT '', SchoolLevel TEXT NOT NULL CHECK(length(trim(SchoolLevel))>0), SortOrder INTEGER NOT NULL CHECK(SortOrder>=1), Active INTEGER NOT NULL DEFAULT 1 CHECK(Active IN(0,1)));
-        CREATE TABLE IF NOT EXISTS TeacherQualification (TeacherId INTEGER NOT NULL REFERENCES Teacher(Id) ON DELETE CASCADE, SubjectId INTEGER NOT NULL REFERENCES Subject(Id) ON DELETE CASCADE, CanTeach INTEGER NOT NULL DEFAULT 0 CHECK(CanTeach IN(0,1)), Note TEXT NOT NULL DEFAULT '', PRIMARY KEY(TeacherId,SubjectId));
-        CREATE TABLE IF NOT EXISTS RegularLessonProfile (Id INTEGER PRIMARY KEY AUTOINCREMENT, ProjectId INTEGER NOT NULL REFERENCES CourseProject(Id) ON DELETE CASCADE, StudentId INTEGER NOT NULL REFERENCES Student(Id) ON DELETE CASCADE, SubjectId INTEGER NOT NULL REFERENCES Subject(Id) ON DELETE CASCADE, RegularTeacherId INTEGER REFERENCES Teacher(Id) ON DELETE SET NULL, RegularTeacherPriority INTEGER NOT NULL DEFAULT 3 CHECK(RegularTeacherPriority BETWEEN 1 AND 5), OneToOneRequired INTEGER NOT NULL DEFAULT 0 CHECK(OneToOneRequired IN(0,1)), Note TEXT NOT NULL DEFAULT '', UNIQUE(ProjectId,StudentId,SubjectId));
-        """;
 }

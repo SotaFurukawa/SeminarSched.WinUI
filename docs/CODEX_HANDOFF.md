@@ -189,6 +189,14 @@ Next Version Rule:
 - 元projectが不変であること、既存の複製先を保護することをapplication testで固定。
 - Release/x64 build: warning 0 / error 0。49 tests passed。
 
+### v0.1.0 checkpoint 18
+
+- CI 19〜22の帳票test失敗を調査。Windows runnerにHG系日本語TTFがなく、従来resolverがMigraDoc内部のCourier NewまでTTCへ誤mappingしていたことが原因。
+- 帳票用日本語face、sans、monoを分離し、最小CI imageでもTrueType fontに解決できるfallbackを追加。配布用日本語fontの同梱は別途ライセンス確認後に行う。
+- project schemaをv2へ更新し、Import、Validation、AuditLog、OptimizationRun、OutputSettingと可用性の共通tableを一元管理。個別serviceの無検証DDLを廃止。
+- v1を開く際はSQLite backup APIで`*_before_migration_v1_*`を作成してからtransaction migrationし、失敗時はbackupから復元する。
+- Release/x64 build: warning 0 / error 0。50 tests passed。Privacy gate passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

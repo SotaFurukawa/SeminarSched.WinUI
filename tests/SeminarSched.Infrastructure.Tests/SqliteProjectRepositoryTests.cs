@@ -90,6 +90,35 @@ public sealed class SqliteProjectRepositoryTests : IDisposable
         Assert.Empty(Directory.GetFiles(_directory, "*.tmp", SearchOption.AllDirectories));
     }
 
+    [Fact]
+    public async Task OpenAsync_V1Project_CreatesSafetyBackupAndMigratesToV2()
+    {
+        var repository = new SqliteProjectRepository();
+        var path = Path.Combine(_directory, "legacy.jukuschedule");
+        await repository.CreateAsync(path, CourseProjectDefinition.Create(
+            2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 22)));
+        await using (var connection = new SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using var seedCommand = connection.CreateCommand();
+            seedCommand.CommandText = "UPDATE ApplicationMetadata SET SchemaVersion=1 WHERE Id=1; PRAGMA user_version=1;";
+            await seedCommand.ExecuteNonQueryAsync();
+        }
+
+        var summary = await repository.OpenAsync(path);
+
+        Assert.Equal("2026夏期講習", summary.Title);
+        var backup = Assert.Single(Directory.GetFiles(_directory, "legacy_before_migration_v1_*.jukuschedule"));
+        Assert.True((await repository.CheckIntegrityAsync(backup)).IsValid);
+        await using var verify = new SqliteConnection($"Data Source={path};Mode=ReadOnly;Pooling=False");
+        await verify.OpenAsync();
+        await using var command = verify.CreateCommand();
+        command.CommandText = "SELECT SchemaVersion FROM ApplicationMetadata WHERE Id=1;";
+        Assert.Equal(2L, Convert.ToInt64(await command.ExecuteScalarAsync()));
+        command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='AuditLog';";
+        Assert.Equal(1L, Convert.ToInt64(await command.ExecuteScalarAsync()));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_directory))

@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Data.Sqlite;
 using SeminarSched.Application.CourseSettings;
 using SeminarSched.Domain.CourseSettings;
+using SeminarSched.Infrastructure.Projects;
 
 namespace SeminarSched.Infrastructure.CourseSettings;
 
@@ -52,18 +53,6 @@ public sealed class SqliteCourseSettingsRepository : ICourseSettingsRepository
     private static async Task<SqliteConnection> OpenAsync(string path,CancellationToken token){var c=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.GetFullPath(path),Mode=SqliteOpenMode.ReadWrite,ForeignKeys=true,Pooling=false}.ToString());await c.OpenAsync(token);return c;}
     private static async Task EnsureSchemaAsync(SqliteConnection connection, CancellationToken token)
     {
-        await using (var validation = connection.CreateCommand())
-        {
-            validation.CommandText = "SELECT COUNT(*) FROM ApplicationMetadata WHERE Id=1 AND Product='SeminarSched.WinUI' AND SchemaVersion=1;";
-            if (Convert.ToInt64(await validation.ExecuteScalarAsync(token)) != 1)
-                throw new InvalidDataException("現在のWinUI projectではありません。");
-        }
-
-        await using var transaction = await connection.BeginTransactionAsync(token);
-        await using var command = connection.CreateCommand();
-        command.Transaction = (SqliteTransaction)transaction;
-        command.CommandText = "CREATE TABLE IF NOT EXISTS TimeSlot(Id INTEGER PRIMARY KEY AUTOINCREMENT,Code TEXT NOT NULL UNIQUE CHECK(length(trim(Code))>0),DisplayName TEXT NOT NULL CHECK(length(trim(DisplayName))>0),StartTime TEXT NOT NULL,EndTime TEXT NOT NULL,SortOrder INTEGER NOT NULL CHECK(SortOrder>=1),Active INTEGER NOT NULL DEFAULT 1 CHECK(Active IN(0,1))); CREATE TABLE IF NOT EXISTS OpenDateTimeSlot(OpenDateId INTEGER NOT NULL REFERENCES OpenDate(Id) ON DELETE CASCADE,TimeSlotId INTEGER NOT NULL REFERENCES TimeSlot(Id) ON DELETE CASCADE,PRIMARY KEY(OpenDateId,TimeSlotId));";
-        await command.ExecuteNonQueryAsync(token);
-        await transaction.CommitAsync(token);
+        await SqliteProjectSchema.EnsureCurrentAsync(connection, token).ConfigureAwait(false);
     }
 }

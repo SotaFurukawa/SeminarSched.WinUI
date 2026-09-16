@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using SeminarSched.Application.Scheduling;
+using SeminarSched.Infrastructure.Projects;
 
 namespace SeminarSched.Infrastructure.Scheduling;
 
@@ -15,5 +16,6 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
         await using var add=c.CreateCommand();add.Transaction=(SqliteTransaction)tx;add.CommandText="INSERT INTO Assignment(LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source) VALUES(@r,@t,@d,@s,1,'preconfirmed');";add.Parameters.AddWithValue("@r",request);add.Parameters.AddWithValue("@t",teacher);add.Parameters.AddWithValue("@d",date);add.Parameters.AddWithValue("@s",slot);await add.ExecuteNonQueryAsync(t);await tx.CommitAsync(t);}
     public async Task RemoveAsync(string p,long id,CancellationToken t=default){await using var c=await Open(p,t);await Ensure(c,t);await using var q=c.CreateCommand();q.CommandText="DELETE FROM Assignment WHERE Id=@id AND IsLocked=1;";q.Parameters.AddWithValue("@id",id);await q.ExecuteNonQueryAsync(t);}
     private static async Task<SqliteConnection> Open(string p,CancellationToken t){var c=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.GetFullPath(p),Mode=SqliteOpenMode.ReadWrite,ForeignKeys=true,Pooling=false}.ToString());await c.OpenAsync(t);return c;}
-    private static async Task Ensure(SqliteConnection c,CancellationToken t){await using var q=c.CreateCommand();q.CommandText="CREATE TABLE IF NOT EXISTS Assignment(Id INTEGER PRIMARY KEY AUTOINCREMENT,LessonRequestId INTEGER NOT NULL REFERENCES LessonRequest(Id) ON DELETE CASCADE,TeacherId INTEGER NOT NULL REFERENCES Teacher(Id),OpenDateId INTEGER NOT NULL REFERENCES OpenDate(Id),TimeSlotId INTEGER NOT NULL REFERENCES TimeSlot(Id),IsLocked INTEGER NOT NULL DEFAULT 0 CHECK(IsLocked IN(0,1)),Source TEXT NOT NULL,UNIQUE(LessonRequestId,OpenDateId,TimeSlotId));";await q.ExecuteNonQueryAsync(t);}
+    private static Task Ensure(SqliteConnection connection, CancellationToken cancellationToken) =>
+        SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken);
 }

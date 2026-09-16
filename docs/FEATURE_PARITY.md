@@ -11,7 +11,7 @@
 | `.jukuschedule` open | project service / SQLite | WinUI schema v1の検証付きread/open | 実装中 | Python版は直接変更せず、copy-first importを別途設計 |
 | 別名保存・複製 | project service | SQLite backup APIで検証付き複製を作成し、複製先へ切り替え | 実装済み | 元DB不変・上書き拒否を自動テスト |
 | 最近使用・非表示 | workspace view model | 最大10件の履歴・再open・欠損時自動除去 | 実装中 | 手動非表示操作は未実装 |
-| migration・整合性確認 | Alembic / project service | 未実装 | 未実装 | migration前backup必須 |
+| migration・整合性確認 | Alembic / project service | schema v2・自動backup付きv1→v2 migration・共通製品識別 | 実装中 | rollback failure injectionと今後のversion追加testを継続 |
 | 自動backup・世代管理 | recovery service | UIからのSQLite backup API検証付きsnapshot | 実装中 | 自動実行と世代管理は未実装 |
 | 復元・復元前backup | recovery service | 確認UI・復元前3世代backup・検証・rollback付きatomic restore | 実装中 | failure injection拡充は未実装 |
 | 生徒基本情報 | master repository/service | 追加・一覧UI、domain validation・SQLite CRUD | 実装中 | 編集・無効化・ID wizardは未実装 |

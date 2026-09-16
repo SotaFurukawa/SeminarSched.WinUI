@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using SeminarSched.Application.Scheduling;
+using SeminarSched.Infrastructure.Projects;
 using SeminarSched.Optimization.Core;
 
 namespace SeminarSched.Infrastructure.Scheduling;
@@ -42,5 +43,6 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
             """;var invalid=Convert.ToInt64(await validate.ExecuteScalarAsync(t));if(invalid>0)throw new InvalidDataException("保存前validatorが制約違反を検出しました。");await tx.CommitAsync(t);
     }
     private static async Task<SqliteConnection> Open(string p,CancellationToken t){var c=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.GetFullPath(p),Mode=SqliteOpenMode.ReadWrite,ForeignKeys=true,Pooling=false}.ToString());await c.OpenAsync(t);return c;}
-    private static async Task EnsureSchema(SqliteConnection c,CancellationToken t){await using var q=c.CreateCommand();q.CommandText="CREATE TABLE IF NOT EXISTS TeacherUnavailability(TeacherId INTEGER NOT NULL,OpenDateId INTEGER NOT NULL,TimeSlotId INTEGER NOT NULL,PRIMARY KEY(TeacherId,OpenDateId,TimeSlotId));CREATE TABLE IF NOT EXISTS Assignment(Id INTEGER PRIMARY KEY AUTOINCREMENT,LessonRequestId INTEGER NOT NULL REFERENCES LessonRequest(Id) ON DELETE CASCADE,TeacherId INTEGER NOT NULL REFERENCES Teacher(Id),OpenDateId INTEGER NOT NULL REFERENCES OpenDate(Id),TimeSlotId INTEGER NOT NULL REFERENCES TimeSlot(Id),IsLocked INTEGER NOT NULL DEFAULT 0,Source TEXT NOT NULL,UNIQUE(LessonRequestId,OpenDateId,TimeSlotId));";await q.ExecuteNonQueryAsync(t);}
+    private static Task EnsureSchema(SqliteConnection connection, CancellationToken cancellationToken) =>
+        SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken);
 }

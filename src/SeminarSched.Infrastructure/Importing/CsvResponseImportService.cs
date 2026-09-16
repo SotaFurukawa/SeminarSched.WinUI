@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Data.Sqlite;
 using Microsoft.VisualBasic.FileIO;
 using SeminarSched.Application.Importing;
+using SeminarSched.Infrastructure.Projects;
 
 namespace SeminarSched.Infrastructure.Importing;
 
@@ -53,6 +54,7 @@ public sealed class CsvResponseImportService : IResponseImportService
     private static CsvData Read(string path){using var parser=new TextFieldParser(path,Encoding.UTF8){TextFieldType=FieldType.Delimited,HasFieldsEnclosedInQuotes=true,TrimWhiteSpace=true};parser.SetDelimiters(",");var headers=parser.ReadFields()??[];var rows=new List<string[]>();while(!parser.EndOfData)rows.Add(parser.ReadFields()??[]);return new(headers,rows);}
     private static string Hash(string path){using var stream=File.OpenRead(path);return Convert.ToHexString(SHA256.HashData(stream));}
     private static async Task<SqliteConnection> OpenAsync(string p,CancellationToken t){var c=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.GetFullPath(p),Mode=SqliteOpenMode.ReadWrite,ForeignKeys=true,Pooling=false}.ToString());await c.OpenAsync(t);return c;}
-    private static async Task EnsureSchemaAsync(SqliteConnection c,CancellationToken t){await using var cmd=c.CreateCommand();cmd.CommandText="CREATE TABLE IF NOT EXISTS LessonRequest(Id INTEGER PRIMARY KEY AUTOINCREMENT,ProjectId INTEGER NOT NULL REFERENCES CourseProject(Id) ON DELETE CASCADE,StudentId INTEGER NOT NULL REFERENCES Student(Id) ON DELETE CASCADE,SubjectId INTEGER NOT NULL REFERENCES Subject(Id) ON DELETE CASCADE,RequiredSessions INTEGER NOT NULL CHECK(RequiredSessions>0),UNIQUE(ProjectId,StudentId,SubjectId));CREATE TABLE IF NOT EXISTS TeacherUnavailability(TeacherId INTEGER NOT NULL REFERENCES Teacher(Id) ON DELETE CASCADE,OpenDateId INTEGER NOT NULL REFERENCES OpenDate(Id) ON DELETE CASCADE,TimeSlotId INTEGER NOT NULL REFERENCES TimeSlot(Id) ON DELETE CASCADE,PRIMARY KEY(TeacherId,OpenDateId,TimeSlotId));";await cmd.ExecuteNonQueryAsync(t);}
+    private static Task EnsureSchemaAsync(SqliteConnection connection, CancellationToken cancellationToken) =>
+        SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken);
     private sealed record CsvData(string[] Headers,List<string[]> Rows);
 }

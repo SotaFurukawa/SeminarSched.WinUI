@@ -7,8 +7,8 @@ namespace SeminarSched.Infrastructure.Projects;
 
 public sealed class SqliteProjectRepository : IProjectRepository
 {
-    private const int CurrentSchemaVersion = 1;
-    private const string ProductMarker = "SeminarSched.WinUI";
+    private const int CurrentSchemaVersion = SqliteProjectSchema.CurrentVersion;
+    private const string ProductMarker = SqliteProjectSchema.ProductMarker;
 
     public async Task<ProjectSummary> CreateAsync(
         string path,
@@ -52,6 +52,7 @@ public sealed class SqliteProjectRepository : IProjectRepository
     public async Task<ProjectSummary> OpenAsync(string path, CancellationToken cancellationToken = default)
     {
         var fullPath = Path.GetFullPath(path);
+        await UpgradeIfNeededAsync(fullPath, cancellationToken).ConfigureAwait(false);
         await using var connection = CreateConnection(fullPath, SqliteOpenMode.ReadOnly);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
@@ -348,9 +349,48 @@ public sealed class SqliteProjectRepository : IProjectRepository
         }
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
         await using var checkpoint = connection.CreateCommand();
         checkpoint.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
         await checkpoint.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task UpgradeIfNeededAsync(string path, CancellationToken cancellationToken)
+    {
+        await using var inspection = CreateConnection(path, SqliteOpenMode.ReadOnly);
+        await inspection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var version = await SqliteProjectSchema.ReadVersionAsync(inspection, cancellationToken).ConfigureAwait(false);
+        if (version == CurrentSchemaVersion)
+        {
+            return;
+        }
+
+        if (version != 1)
+        {
+            throw new InvalidDataException($"対応していないproject schema versionです: {version}");
+        }
+
+        await inspection.CloseAsync().ConfigureAwait(false);
+
+        var directory = Path.GetDirectoryName(path)
+            ?? throw new InvalidOperationException("The project path has no parent directory.");
+        var migrationBackup = Path.Combine(
+            directory,
+            $"{Path.GetFileNameWithoutExtension(path)}_before_migration_v1_{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}{Path.GetExtension(path)}");
+        await BackupDatabaseAsync(path, migrationBackup, cancellationToken).ConfigureAwait(false);
+
+        await using var writable = CreateConnection(path, SqliteOpenMode.ReadWrite);
+        await writable.OpenAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await SqliteProjectSchema.MigrateV1ToV2Async(writable, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            await writable.CloseAsync().ConfigureAwait(false);
+            File.Copy(migrationBackup, path, overwrite: true);
+            throw;
+        }
     }
 
     private static SqliteConnection CreateConnection(string path, SqliteOpenMode mode)
