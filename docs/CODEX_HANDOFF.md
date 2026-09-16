@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `53add44`（v0.1.0 master data persistence）
+Latest Development Checkpoint: `c7848c0`（v0.1.0 scheduling hard constraints）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Next Version Rule:
 
@@ -30,7 +30,7 @@ Next Version Rule:
 ### 検証済み
 
 - `dotnet build SeminarSched.WinUI.sln --configuration Release -p:Platform=x64`: warning 0 / error 0
-- `dotnet test ... --no-build -p:Platform=x64`: 8 tests passed
+- `dotnet test ... --no-build -p:Platform=x64`: 59 tests passed
 - `scripts/Test-RepositoryPrivacy.ps1`: passed
 - Python参照repoはcommit `1d323a4`のまま。WinUI作業による変更なし
 
@@ -40,7 +40,7 @@ Next Version Rule:
 - Repository: `https://github.com/SotaFurukawa/SeminarSched.WinUI`（private）
 - `main`と`v0.0.0`はpush済み。
 - `v0.0.0 (beta)` Draft Release作成済み。公開していない。
-- CI workflowはpushを受理し、run `35118906674`が開始されたことだけ確認済み。完了までの長時間監視は行っていない。
+- 直近push `e43fd9e`のCI run `35132344985`は成功。今後もpush直後にrun受付と即時失敗だけ確認し、長時間監視は行わない。
 
 ### 未完了・blocker
 
@@ -204,6 +204,15 @@ Next Version Rule:
 - 日付・コマ検証を`OpenDateTimeSlot`まで含むよう修正し、日別に無効なコマを拒否。
 - 取込原本のBLOB/SHA-256 snapshot、ImportBatch、個人情報をメッセージに含めないAuditLogを可用性反映と同一transactionで保存。
 - CP932講師CSVとXLSX生徒回答の混在取込みtestで可用性・希望講師・snapshot・監査履歴を検証。
+
+### v0.1.0 checkpoint 20
+
+- CP-SATへ生徒/講師availability、講師同時2名、1対1授業の2枠消費、通常担当優先度1〜5の最低担当率、最大連続コマ、空き時間禁止を追加。
+- 全開講コマと固定配置をsolver inputへ明示し、固定授業を含む講師容量・生徒連続コマ・空き時間を制約化。
+- solverとは独立したvalidatorで候補外配置、回数超過、生徒衝突、講師容量、通常担当最低数、最大連続、空き時間を再検証。
+- 事前確定授業にも資格・可用性・必要回数・同時2名/1対1規則を適用し、SessionIndexを保存。
+- OptimizationRunへ時間制限、input/result概要、未配置数、経過時間を保存し、未固定配置と同一transactionで確定。
+- commit `c7848c0`。Release/x64 build: warning 0 / error 0。全59 tests passed。Privacy gate passed。
 
 ### 次回最初に確認するファイル
 

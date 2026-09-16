@@ -27,21 +27,21 @@
 | import preview/diff | importing diff | 全行参照検証・issue一覧・件数preview | 実装中 | 詳細diff・warning・削除候補は未実装 |
 | import transaction/AuditLog | availability import service | SHA-256再検証・単一transaction反映・ImportBatch・原本BLOB snapshot・AuditLog | 実装中 | 詳細diff表示とmapping保存は未実装 |
 | availability一括編集 | phase3 UI/service | 生徒/講師の日付・コマ別0/1/2取込、講師不可と同期 | 実装中 | 手動matrix UIは未実装 |
-| candidate生成 | optimization candidates | SQLite正本から資格・開校・勤務不可・固定衝突を除く候補 | 実装中 | 生徒availability・容量2等を拡張中 |
+| candidate生成 | optimization candidates | 資格・開校・生徒/講師availability・固定生徒衝突を検証し、希望講師penalty付き候補を生成 | 実装中 | Python版の全診断理由codeは未移植 |
 | greedy初期解・complete hint | initial solution | 未実装 | 未実装 | v0.2.0複数strategy側で実装 |
-| CP-SAT hard constraints | OR-Tools optimizer | 単一CP-SAT、要求回数・生徒/講師衝突・固定保持 | 実装中 | Python版全hard/soft objectiveは未移植 |
-| 通常担当優先度1〜5 | objectives/constraints | 未実装 | 未実装 | v1.9.5挙動を正本とする |
+| CP-SAT hard constraints | OR-Tools optimizer | 要求回数・生徒衝突・講師同時2名/1対1・固定保持・最大連続・空き時間禁止 | 実装中 | 学年別/日別上限等の残制約を継続移植 |
+| 通常担当優先度1〜5 | objectives/constraints | 0/25/50/75/100%最低担当と候補不足時緩和・希望講師penalty | 実装中 | 辞書式soft objectiveと公平性は未完了 |
 | 辞書式目的・公平性 | objectives | 未実装 | 未実装 | 未配置、分散、講師公平性 |
 | 高速/標準/高品質 | optimization view model | 未実装 | 未実装 | 30/120/600秒 |
 | 5段階の最適化品質profile | 追加仕様 | profile catalog / slider / JSON設定 | 実装中 | strategy実装・実行中UIは未完了 |
 | 高品質トーナメント探索 | 追加仕様 | 共通optimizer orchestration・候補選抜 | 実装中 | 実CP-SAT複数戦略とbenchmarkは後段へ保留 |
 | 現在best採用/キャンセル分離 | 追加仕様 | execution API上で分離・部分結果test | 実装中 | UI接続とvalidator・transaction境界は未実装 |
 | progress/cancel | worker / solver callback | 非同期progress DTO・cancel API | 実装中 | 実solverとUIへの接続は未実装 |
-| solver独立validator | result validation | 純粋validator＋DB保存前validator | 実装中 | Python版全診断codeは未移植 |
-| optimization transaction保存 | optimization run service | 固定保持・未固定atomic置換 | 実装中 | input fingerprint永続化は未実装 |
+| solver独立validator | result validation | 候補外・回数・衝突・容量・通常担当最低数・連続/空き時間をsolver外で再検証 | 実装中 | Python版全診断codeは未移植 |
+| optimization transaction保存 | optimization run service | 固定保持・未固定atomic置換・OptimizationRun入出力概要保存 | 実装中 | 安定したinput fingerprintと詳細penalty内訳は未実装 |
 | 時間割grid | schedule editor QML | 未実装 | 未実装 | virtualization必須 |
 | drag/drop手動配置 | schedule edit service | 未実装 | 未実装 | hard violation拒否 |
-| manual/lock semantics | manual edit tests | ④固定Assignment追加・解除UI | 実装中 | ⑤手動配置・再最適化保持は未実装 |
+| manual/lock semantics | manual edit tests | ④固定Assignment追加・解除UI、可否/資格/同時2名/1対1/必要回数検証 | 実装中 | ⑤手動配置・再最適化保持は未実装 |
 | Undo/Redo | command stack | 未実装 | 未実装 | process内のみ |
 | 講師一時表示・availability編集 | editor UI/service | 未実装 | 未実装 | 不可コマgray |
 | 検索・scroll同期 | editor QML | 未実装 | 未実装 | header/row/grid同期 |
