@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using SeminarSched.Domain.MasterData;
+using SeminarSched.Domain.CourseSettings;
 
 namespace SeminarSched_WinUI.Pages;
 
@@ -37,6 +38,26 @@ public sealed partial class SetupPage : WorkflowPageBase
         SubjectOrder.Value++;
     }, "科目を追加しました");
 
+    private async void AddSlot_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
+    {
+        await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(0, SlotCode.Text, SlotName.Text,
+            TimeOnly.FromTimeSpan(SlotStart.Time), TimeOnly.FromTimeSpan(SlotEnd.Time), checked((int)SlotOrder.Value)));
+        SlotCode.Text = SlotName.Text = ""; SlotOrder.Value++;
+    }, "コマを追加しました");
+
+    private async void SetOpenDay_Click(object sender, RoutedEventArgs e) => await SaveSelectedDayAsync(true);
+    private async void SetClosedDay_Click(object sender, RoutedEventArgs e) => await SaveSelectedDayAsync(false);
+
+    private async Task SaveSelectedDayAsync(bool isOpen)
+    {
+        if (CourseDays.SelectedItem is not CourseDayItem selected) { Show(InfoBarSeverity.Warning, "日付を選択してください", ""); return; }
+        await ExecuteAsync(async path =>
+        {
+            var slots = await App.CourseSettings.GetTimeSlotsAsync(path);
+            await App.CourseSettings.SaveCourseDayAsync(path, new CourseDay(selected.Date, isOpen, isOpen ? "" : "休校", isOpen ? slots.Where(x => x.Active).Select(x => x.Id).ToArray() : []));
+        }, isOpen ? "開校日に設定しました" : "休校日に設定しました");
+    }
+
     private async Task ExecuteAsync(Func<string, Task> action, string success)
     {
         try
@@ -59,7 +80,12 @@ public sealed partial class SetupPage : WorkflowPageBase
         Students.ItemsSource = (await App.MasterData.GetStudentsAsync(path)).Select(x => $"{x.ExternalId}　{x.Name}　{x.Grade}").ToArray();
         Teachers.ItemsSource = (await App.MasterData.GetTeachersAsync(path)).Select(x => $"{x.ExternalId}　{x.Name}").ToArray();
         Subjects.ItemsSource = (await App.MasterData.GetSubjectsAsync(path)).Select(x => $"{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}").ToArray();
+        var slots = await App.CourseSettings.GetTimeSlotsAsync(path);
+        TimeSlots.ItemsSource = slots.Select(x => $"{x.SortOrder}　{x.Code}　{x.DisplayName}　{x.StartTime:HH\\:mm}～{x.EndTime:HH\\:mm}").ToArray();
+        CourseDays.ItemsSource = (await App.CourseSettings.GetCourseDaysAsync(path)).Select(x => new CourseDayItem(x.Date, x.IsOpen ? "開校" : "休校", x.IsOpen ? $"{x.EnabledTimeSlotIds.Count}コマ" : "-")).ToArray();
     }
 
     private void Show(InfoBarSeverity severity, string title, string message) { Status.Severity = severity; Status.Title = title; Status.Message = message; Status.IsOpen = true; }
+
+    private sealed record CourseDayItem(DateOnly Date, string StatusLabel, string SlotSummary);
 }

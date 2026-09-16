@@ -254,6 +254,20 @@ public sealed class SqliteProjectRepository : IProjectRepository
                     IsOpen INTEGER NOT NULL DEFAULT 1 CHECK (IsOpen IN (0, 1)),
                     Note TEXT NOT NULL DEFAULT ''
                 );
+                CREATE TABLE TimeSlot (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Code TEXT NOT NULL UNIQUE CHECK (length(trim(Code)) > 0),
+                    DisplayName TEXT NOT NULL CHECK (length(trim(DisplayName)) > 0),
+                    StartTime TEXT NOT NULL,
+                    EndTime TEXT NOT NULL,
+                    SortOrder INTEGER NOT NULL CHECK (SortOrder >= 1),
+                    Active INTEGER NOT NULL DEFAULT 1 CHECK (Active IN (0, 1))
+                );
+                CREATE TABLE OpenDateTimeSlot (
+                    OpenDateId INTEGER NOT NULL REFERENCES OpenDate(Id) ON DELETE CASCADE,
+                    TimeSlotId INTEGER NOT NULL REFERENCES TimeSlot(Id) ON DELETE CASCADE,
+                    PRIMARY KEY (OpenDateId, TimeSlotId)
+                );
                 CREATE TABLE Student (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     ExternalId TEXT NOT NULL UNIQUE CHECK (length(trim(ExternalId)) > 0),

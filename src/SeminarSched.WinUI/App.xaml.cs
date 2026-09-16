@@ -9,6 +9,8 @@ using SeminarSched.Application.Settings;
 using SeminarSched.Infrastructure.Projects;
 using SeminarSched.Application.MasterData;
 using SeminarSched.Infrastructure.MasterData;
+using SeminarSched.Application.CourseSettings;
+using SeminarSched.Infrastructure.CourseSettings;
 using SeminarSched.Infrastructure.Settings;
 
 // To learn more about WinUI, the WinUI project structure,
@@ -36,6 +38,8 @@ public partial class App : Application
     public static RecentProjectService RecentProjects { get; } = new(SettingsStore);
 
     public static IMasterDataRepository MasterData { get; } = new SqliteMasterDataRepository();
+
+    public static ICourseSettingsRepository CourseSettings { get; } = new SqliteCourseSettingsRepository();
 
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code

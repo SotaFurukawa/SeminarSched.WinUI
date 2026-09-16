@@ -129,6 +129,14 @@ Next Version Rule:
 - ①のコマ・開校日詳細編集、②〜④、⑥の実処理は未実装であり、完成扱いにしない。
 - Release/x64 build: warning 0 / error 0。全34 tests passed。privacy gate passed。
 
+### v0.1.0 checkpoint 10
+
+- ①設定へコマ追加、表示順、開始・終了時刻と、期間内日付の開校/休校・日別有効コマ設定を追加。
+- schema準備前にWinUI product markerを検証し、追加table作成をtransaction内で実行するよう精査修正。
+- 休校日に変更すると日別コマ対応を同一transactionで削除する。
+- Release/x64 build: warning 0 / error 0。全39 tests passed。
+- Release境界を更新: Python v1.9.5 parity完成=`v0.1.0` Draft、追加の複数strategy最適化完成=`v0.2.0` Draft。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

@@ -19,8 +19,8 @@
 | 科目・略称 | master repository/service | 追加・一覧UI、domain validation・SQLite CRUD | 実装中 | 編集・無効化・校種presetは未実装 |
 | 通常授業・担当優先度 | regular lesson profile | SQLite upsert・優先度1〜5・1対1必須 | 実装中 | 管理UIは未実装 |
 | 共通基本情報Excel | master Excel service | 未実装 | 未実装 | 5sheet、preview、transaction |
-| 講習設定 | phase2 models/view model | 未実装 | 未実装 | 期間、開校日、休校日 |
-| コマ設定・並べ替え | phase2 UI/service | 未実装 | 未実装 | 日別使用コマを含む |
+| 講習設定 | phase2 models/view model | 期間内日付・開校/休校・日別有効コマの保存UI | 実装中 | note編集・一括操作拡充は未実装 |
+| コマ設定・並べ替え | phase2 UI/service | コマ追加・表示順・時刻範囲・一覧UI | 実装中 | 編集・無効化・drag並べ替えは未実装 |
 | Google Forms作成kit | questionnaire script service | 未実装 | 未実装 | 外部通信なし |
 | 生徒回答・講師回答2file選択 | import UI/service | 未実装 | 未実装 | CSV/XLSX |
 | CSV UTF-8/CP932・旧形式 | importing readers | 未実装 | 未実装 | 正規化mapping |
