@@ -75,6 +75,15 @@ Next Version Rule:
 - settings書込は一時file成功後のreplaceで、slider連続操作は250ms debounceする。
 - Release/x64 build: warning 0 / error 0。全18 tests passed。
 
+### v0.1.0 checkpoint 3
+
+- Home画面へ年度・講習区分・期間を指定する新規project作成、既存projectのopen、closeを追加。
+- WinUI schema v1としてmetadata、project定義、全開講日をSQLiteへ保存するproject repositoryを追加。
+- 新規作成は一時DBでschema作成・整合性検証を完了してから、上書きなしで目的地へ移動する。
+- open時はSQLite integrity、product marker、schema version、project定義と開講日の整合性を検証する。
+- Python版`.jukuschedule`はその場でmigration・上書きせず拒否する。copy-first import設計が完成するまで保留。
+- Release/x64 build: warning 0 / error 0。全22 tests passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

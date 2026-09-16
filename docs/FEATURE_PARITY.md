@@ -6,9 +6,9 @@
 |---|---|---|---|---|
 | アプリ起動・version/About表示 | UI / release metadata | WinUI shell / assembly metadata | 実装済み | v0.0.0。UI実機確認は未完了 |
 | NavigationView業務導線 | QML workflow shell | 初期Home/About/Settingsのみ | 実装中 | W1で6段階flowへ拡張 |
-| Home dashboard | workspace view model / QML | 未実装 | 未実装 | project有無で導線を制御 |
-| 新規project作成 | project service | 未実装 | 未実装 | 年度・講習区分・期間 |
-| `.jukuschedule` open | project service / SQLite | 未実装 | 未実装 | 互換方針ADRが先 |
+| Home dashboard | workspace view model / QML | project作成・open・close UI | 実装中 | recent projectと主要導線は未実装 |
+| 新規project作成 | project service | 年度・講習区分・期間・開講日を持つWinUI schema v1 | 実装中 | SQLite整合性確認後にatomic move |
+| `.jukuschedule` open | project service / SQLite | WinUI schema v1の検証付きread/open | 実装中 | Python版は直接変更せず、copy-first importを別途設計 |
 | 別名保存・複製 | project service | 未実装 | 未実装 | 原子的処理 |
 | 最近使用・非表示 | workspace view model | 未実装 | 未実装 | 進行step復元を含む |
 | migration・整合性確認 | Alembic / project service | 未実装 | 未実装 | migration前backup必須 |

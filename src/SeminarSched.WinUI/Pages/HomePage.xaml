@@ -4,19 +4,64 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:local="using:SeminarSched_WinUI.Pages"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Loaded="Page_Loaded"
     mc:Ignorable="d">
 
-    <Grid Padding="24,16,24,16" RowSpacing="24">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-        <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="ホーム" />
-        <StackPanel Grid.Row="1" Spacing="8">
-            <TextBlock FontSize="20" FontWeight="SemiBold" Text="SeminarSched.WinUIへようこそ" />
-            <TextBlock Text="プロジェクト管理機能はPhase W1で実装します。" />
+    <ScrollViewer>
+        <StackPanel MaxWidth="880" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="20">
+            <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="ホーム" />
+            <InfoBar x:Name="StatusInfoBar" IsClosable="True" IsOpen="False" Severity="Informational" />
+
+            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                <StackPanel Spacing="14">
+                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="現在のプロジェクト" />
+                    <TextBlock x:Name="CurrentProjectTitle" FontSize="18" Text="プロジェクトは開かれていません" />
+                    <TextBlock x:Name="CurrentProjectPeriod" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock x:Name="CurrentProjectPath" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Click="OpenProject_Click" Content="既存プロジェクトを開く" />
+                        <Button Click="CloseProject_Click" Content="閉じる" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                <StackPanel Spacing="14">
+                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="新しい講習プロジェクト" />
+                    <Grid ColumnSpacing="16" RowSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="160" />
+                            <ColumnDefinition Width="220" />
+                            <ColumnDefinition Width="220" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <NumberBox x:Name="AcademicYearBox" Header="年度" Minimum="2000" Maximum="2200" SpinButtonPlacementMode="Compact" />
+                        <ComboBox x:Name="SeasonBox" Grid.Column="1" Header="講習区分" SelectedIndex="1">
+                            <ComboBoxItem Content="春期講習" Tag="1" />
+                            <ComboBoxItem Content="夏期講習" Tag="2" />
+                            <ComboBoxItem Content="冬期講習" Tag="3" />
+                        </ComboBox>
+                        <TextBox x:Name="GeneratedTitleBox" Grid.Column="2" Header="自動生成される名称" IsReadOnly="True" />
+                        <CalendarDatePicker x:Name="StartDatePicker" Grid.Row="1" Header="開始日" DateChanged="ProjectDefinition_Changed" />
+                        <CalendarDatePicker x:Name="EndDatePicker" Grid.Row="1" Grid.Column="1" Header="終了日" DateChanged="ProjectDefinition_Changed" />
+                        <Button
+                            Grid.Row="1"
+                            Grid.Column="2"
+                            VerticalAlignment="Bottom"
+                            Click="CreateProject_Click"
+                            Content="保存先を選んで作成"
+                            Style="{StaticResource AccentButtonStyle}" />
+                    </Grid>
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="一時SQLiteの作成と整合性確認に成功した場合だけ保存します。同名ファイルは上書きしません。"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
         </StackPanel>
-    </Grid>
+    </ScrollViewer>
 </Page>
