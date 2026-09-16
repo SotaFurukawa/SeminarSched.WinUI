@@ -1,0 +1,3 @@
+<local:WorkflowPageBase x:Class="SeminarSched_WinUI.Pages.QuestionnairePage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:SeminarSched_WinUI.Pages" Loaded="Page_Loaded">
+    <StackPanel Padding="24" Spacing="16"><TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="② アンケート作成"/><InfoBar x:Name="ProjectRequired"/><TextBlock Text="設定した開校日・コマ・科目から、生徒用と講師用のGoogleフォーム作成キットを生成します。" TextWrapping="Wrap"/><Button Content="作成キットを保存" IsEnabled="False"/><InfoBar IsOpen="True" Severity="Informational" Title="実装準備中" Message="Apps Script生成処理をPython版から移植中です。"/></StackPanel>
+</local:WorkflowPageBase>

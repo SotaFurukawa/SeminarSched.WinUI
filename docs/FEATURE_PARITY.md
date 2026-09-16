@@ -5,7 +5,7 @@
 | Python版機能 | Python側実装 | C#側実装 | 状態 | 備考 |
 |---|---|---|---|---|
 | アプリ起動・version/About表示 | UI / release metadata | WinUI shell / assembly metadata | 実装済み | v0.0.0。UI実機確認は未完了 |
-| NavigationView業務導線 | QML workflow shell | 初期Home/About/Settingsのみ | 実装中 | W1で6段階flowへ拡張 |
+| NavigationView業務導線 | QML workflow shell | ①設定〜⑥出力の6段階flow | 実装中 | ②〜④・⑥は未接続機能を明示する骨格 |
 | Home dashboard | workspace view model / QML | project作成・open・close UI | 実装中 | recent projectと主要導線は未実装 |
 | 新規project作成 | project service | 年度・講習区分・期間・開講日を持つWinUI schema v1 | 実装中 | SQLite整合性確認後にatomic move |
 | `.jukuschedule` open | project service / SQLite | WinUI schema v1の検証付きread/open | 実装中 | Python版は直接変更せず、copy-first importを別途設計 |
@@ -14,9 +14,9 @@
 | migration・整合性確認 | Alembic / project service | 未実装 | 未実装 | migration前backup必須 |
 | 自動backup・世代管理 | recovery service | UIからのSQLite backup API検証付きsnapshot | 実装中 | 自動実行と世代管理は未実装 |
 | 復元・復元前backup | recovery service | 確認UI・復元前3世代backup・検証・rollback付きatomic restore | 実装中 | failure injection拡充は未実装 |
-| 生徒基本情報 | master repository/service | domain validation・SQLite CRUD | 実装中 | 管理UI・ID wizardは未実装 |
-| 講師基本情報 | master repository/service | domain validation・SQLite CRUD | 実装中 | 管理UIは未実装 |
-| 科目・略称 | master repository/service | domain validation・SQLite CRUD | 実装中 | 管理UI・校種presetは未実装 |
+| 生徒基本情報 | master repository/service | 追加・一覧UI、domain validation・SQLite CRUD | 実装中 | 編集・無効化・ID wizardは未実装 |
+| 講師基本情報 | master repository/service | 追加・一覧UI、domain validation・SQLite CRUD | 実装中 | 編集・無効化・資格matrix UIは未実装 |
+| 科目・略称 | master repository/service | 追加・一覧UI、domain validation・SQLite CRUD | 実装中 | 編集・無効化・校種presetは未実装 |
 | 通常授業・担当優先度 | regular lesson profile | SQLite upsert・優先度1〜5・1対1必須 | 実装中 | 管理UIは未実装 |
 | 共通基本情報Excel | master Excel service | 未実装 | 未実装 | 5sheet、preview、transaction |
 | 講習設定 | phase2 models/view model | 未実装 | 未実装 | 期間、開校日、休校日 |

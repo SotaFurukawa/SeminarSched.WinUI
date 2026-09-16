@@ -49,6 +49,21 @@ public sealed partial class MainWindow : Window
                 case "optimization":
                     NavFrame.Navigate(typeof(OptimizationPage));
                     break;
+                case "setup":
+                    NavFrame.Navigate(typeof(SetupPage));
+                    break;
+                case "questionnaire":
+                    NavFrame.Navigate(typeof(QuestionnairePage));
+                    break;
+                case "import":
+                    NavFrame.Navigate(typeof(ImportPage));
+                    break;
+                case "preconfirmation":
+                    NavFrame.Navigate(typeof(PreconfirmationPage));
+                    break;
+                case "output":
+                    NavFrame.Navigate(typeof(OutputPage));
+                    break;
                 default:
                     throw new InvalidOperationException($"Unknown navigation item tag: {item.Tag}");
             }

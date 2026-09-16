@@ -121,6 +121,14 @@ Next Version Rule:
 - 管理UIは次checkpoint。実在データを使わず架空fixtureのみで検証。
 - Release/x64 build: warning 0 / error 0。全34 tests passed。
 
+### v0.1.0 checkpoint 9
+
+- Python版の正本どおり、NavigationViewを①設定、②アンケート作成、③アンケート取込み、④事前確定、⑤時間割、⑥出力へ変更。
+- workflow page共通のproject未open guardを追加。未接続機能はボタンを有効化せず「実装準備中」と明示する。
+- ①設定へproject概要、生徒・講師・科目の追加・一覧UIを接続。入力はdomain validationとSQLite制約を必ず通る。
+- ①のコマ・開校日詳細編集、②〜④、⑥の実処理は未実装であり、完成扱いにしない。
+- Release/x64 build: warning 0 / error 0。全34 tests passed。privacy gate passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`
