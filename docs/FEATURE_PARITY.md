@@ -14,13 +14,13 @@
 | migration・整合性確認 | Alembic / project service | schema v2・自動backup付きv1→v2 migration・共通製品識別 | 実装中 | rollback failure injectionと今後のversion追加testを継続 |
 | 自動backup・世代管理 | recovery service | UIからのSQLite backup API検証付きsnapshot | 実装中 | 自動実行と世代管理は未実装 |
 | 復元・復元前backup | recovery service | 確認UI・復元前3世代backup・検証・rollback付きatomic restore | 実装中 | failure injection拡充は未実装 |
-| 生徒基本情報 | master repository/service | 追加・一覧UI、domain validation・SQLite CRUD | 実装中 | 編集・無効化・ID wizardは未実装 |
-| 講師基本情報 | master repository/service | 追加・一覧UI、domain validation・SQLite CRUD | 実装中 | 編集・無効化・資格matrix UIは未実装 |
-| 科目・略称 | master repository/service | 追加・一覧UI、domain validation・SQLite CRUD | 実装中 | 編集・無効化・校種presetは未実装 |
-| 通常授業・担当優先度 | regular lesson profile | SQLite upsert・優先度1〜5・1対1必須 | 実装中 | 管理UIは未実装 |
+| 生徒基本情報 | master repository/service | 追加・一覧・選択編集・使用停止UI、domain validation・SQLite CRUD | 実装中 | ID wizardと検索は未実装 |
+| 講師基本情報 | master repository/service | 追加・一覧・選択編集・使用停止・対応科目UI | 実装中 | 資格matrix一括操作と検索は未実装 |
+| 科目・略称 | master repository/service | 追加・一覧・選択編集・使用停止UI、domain validation・SQLite CRUD | 実装中 | 校種presetは未実装 |
+| 通常授業・担当優先度 | regular lesson profile | 管理UI・SQLite upsert・優先度1〜5・1対1必須 | 実装中 | 受講希望の全項目編集はExcel中心 |
 | 共通基本情報Excel | master Excel service | 5sheet出力・全行preview・SHA再確認・transaction upsert・原本snapshot | 実装中 | 名前選択helper列とExcel内dropdownを継続移植 |
 | 講習設定 | phase2 models/view model | 期間内日付・開校/休校・日別有効コマの保存UI | 実装中 | note編集・一括操作拡充は未実装 |
-| コマ設定・並べ替え | phase2 UI/service | コマ追加・表示順・時刻範囲・一覧UI | 実装中 | 編集・無効化・drag並べ替えは未実装 |
+| コマ設定・並べ替え | phase2 UI/service | コマ追加・選択編集・使用停止・表示順・時刻範囲UI | 実装中 | drag並べ替えは未実装 |
 | Google Forms作成kit | questionnaire script service | 設定値入りCode.gs・READMEのatomic生成UI | 実装中 | Python版の学年分岐・全質問・診断は未移植 |
 | 生徒回答・講師回答2file選択 | import UI/service | CSV/XLSXの2file選択UI | 実装中 | sheet選択とGoogle Forms生列mapping UIは未実装 |
 | CSV UTF-8/CP932・旧形式 | importing readers | quoted CSV・BOM/UTF-8/CP932自動判定・XLSX先頭sheet | 実装中 | 生Google Forms回答の自動mappingは未実装 |

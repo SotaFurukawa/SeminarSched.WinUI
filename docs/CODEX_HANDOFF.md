@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `3453c05`（v0.1.0 master data workbook）
+Latest Development Checkpoint: `b79ba4b`（v0.1.0 master data editor）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Next Version Rule:
 
@@ -221,6 +221,14 @@ Next Version Rule:
 - preview後の原本SHA-256を再確認し、全masterを単一transactionでupsert。途中DB失敗時は全変更をrollback。
 - ImportBatch、原本BLOB/SHA-256 snapshot、個人情報を含めないAuditLogを同一transactionで保存。
 - commit `3453c05`。Release/x64 build: warning 0 / error 0。全63 tests passed。Privacy gate passed。
+
+### v0.1.0 checkpoint 22
+
+- ①設定で生徒・講師・科目・コマを一覧から選択し、全項目の更新と使用停止/再有効化を行えるようにした。
+- 生徒の最大連続コマ/空きコマ、講師の空きコマ、科目略称/順序、コマ時刻/順序も画面編集に対応。
+- 担当設定tabを追加し、講師対応科目の指導可否と、通常授業の担当講師・優先度1〜5・1対1必須を保存・一覧確認可能にした。
+- repositoryの更新/使用停止、資格・通常授業のread-backを自動テストで確認。
+- commit `b79ba4b`。Release/x64 build: warning 0 / error 0。全63 tests passed。Privacy gate passed。
 
 ### 次回最初に確認するファイル
 
