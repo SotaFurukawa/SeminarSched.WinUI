@@ -1,0 +1,609 @@
+# SeminarSched Codex引き継ぎ書
+
+最終更新: 2026-09-16
+Python参照版: v1.9.5 / commit `1d323a4`
+Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
+
+## 0. WinUI版の現在地点
+
+Current Version: `v0.0.0 (beta)`
+Latest Commit: `HEAD`（`v0.0.0` tag target。初回commit後に確定）
+Latest Draft Release: `v0.0.0` notes prepared / GitHub未作成（`gh`未認証）
+Next Version Rule:
+
+- Bug fix / minor change -> `v0.0.1`
+- New feature -> `v0.1.0`
+- `v1.0.0` -> ユーザーの明示指示がある場合のみ
+
+### 実装済み
+
+- 独立した`SeminarSched.WinUI.sln`と独立`.git`
+- .NET 10.0.401 / Windows App SDK 2.4.0 / packaged WinUI 3 shell
+- Home、About、Settingsの初期NavigationView
+- `Domain`、`Application`、`Infrastructure`、`Optimization`、`Reporting`のproject境界
+- `Directory.Build.props`を正本とするversion一元管理
+- About画面の`v0.0.0 (beta)`表示
+- Windows CI、xUnit、repository privacy gate
+- `docs/FEATURE_PARITY.md`、ADR 0001、Privacy、Security、暫定license
+
+### 検証済み
+
+- `dotnet build SeminarSched.WinUI.sln --configuration Release -p:Platform=x64`: warning 0 / error 0
+- `dotnet test ... --no-build -p:Platform=x64`: 8 tests passed
+- `scripts/Test-RepositoryPrivacy.ps1`: passed
+- Python参照repoはcommit `1d323a4`のまま。WinUI作業による変更なし
+
+### 未完了・blocker
+
+- GitHub CLI 2.101.0は`C:\Users\sota1\.local\gh\bin\gh.exe`へ導入済みだが、GitHub hostへ未認証。
+- そのため`SotaFurukawa/SeminarSched.WinUI`の存在確認、作成、push、Draft Release作成は未実施。
+- `dotnet run`による起動を試行したが、端末のWindows Developer Modeが無効なためpackaged app登録前に停止した。buildとXAML compileは成功済み。
+- ReadyToRunとtrimは、RID別配布profileとWinRT trim検証を設計するまで無効化している。
+
+### 次に行うこと
+
+1. GitHub認証後、同名repoの存在を確認する。存在しなければprivate repoとして作成する。
+2. `main`と`v0.0.0` tagをpushし、`docs/releases/v0.0.0.md`からDraft Releaseを作成する。
+3. Phase W1を`v0.1.0`として開始し、業務flowのNavigationViewとproject lifecycleの最小縦sliceを実装する。
+4. `.jukuschedule`互換、SQLite migration、配布形式、最終licenseは個別ADRを先に作成する。
+
+### 次回最初に確認するファイル
+
+- `AGENTS.md`
+- `Directory.Build.props`
+- `docs/FEATURE_PARITY.md`
+- `docs/adr/0001-platform-and-architecture.md`
+- `docs/releases/v0.0.0.md`
+
+## 1. この文書の目的
+
+この文書は、別のCodexチャットがSeminarSchedの文脈を失わず、既存Python版を参照しながら
+C# + WinUI 3版を独立プロジェクトとして開発するための引き継ぎ資料である。
+
+新しいチャットでは、最初にリポジトリ直下の`AGENTS.md`と本書を全文読むこと。その後に
+必要な範囲だけPython版のコード、テスト、ADR、画面を調査する。
+
+## 2. 絶対に守る方針
+
+### 2.1 Python版を変更しない
+
+現在の`SeminarSched`はPython 3.12、PySide6/QML、SQLite、SQLAlchemy、Alembic、
+OR-Tools CP-SATで作られたv1.9.5 Betaの参照実装である。今後は読み取り専用とする。
+
+- Python版のコード、テスト、migration、UI、installer、workflowを変更しない。
+- Python版の`main`へWinUI関連コミットを入れない。
+- Python版に新しいtagやreleaseを作らない。
+- Python版で問題を見つけても、WinUI版側の設計・テスト・issueとして扱う。
+- 本書と`AGENTS.md`を追加する今回の文書作業だけが凍結前の整理作業である。
+
+### 2.2 WinUI版は完全に別プロジェクト・別Gitリポジトリ
+
+新実装の正式な作業名は`SeminarSched.WinUI`とする。
+
+- このPythonリポジトリから見た推奨相対位置: `..\SeminarSched.WinUI`
+- Python版`seminarSched`の内側には作らない。
+- 独立した`.sln`、`.gitignore`、`README`、`LICENSE`、CI、version、releaseを持たせる。
+- GitHubにも`SotaFurukawa/SeminarSched.WinUI`という別リポジトリを作る。
+- 既存Pythonリポジトリのbranchやsubmoduleとして管理しない。
+- GitHub作成前に同名リポジトリの有無を確認する。存在する場合は新規作成せず内容を調べる。
+
+### 2.3 原則完全移植
+
+WinUI版は試作UIや一部機能版ではなく、Python版v1.9.5で利用者が操作できる全機能の
+原則完全移植を目標とする。次を省略して「移植完了」としてはならない。
+
+- プロジェクト・基本情報・設定
+- Googleフォーム作成キットと回答取込
+- 入力検証と警告
+- OR-Toolsによる自動時間割作成
+- 手動時間割編集、固定、Undo/Redo、再最適化
+- Excel/PDF帳票
+- バックアップ、復元、監査ログ
+- Windows配布、installer/portable相当、テスト、利用者向け文書
+
+ただし、Python版で意図的に停止中または未実装の機能まで、無断で新規実装する意味ではない。
+特に集団授業の操作フローはv1.6.0以降停止中で、再導入時はv2.0.0相当の大きな機能として
+別途設計する方針だった。WinUI初期版ではPython v1.9.5と同じ境界を再現する。
+
+## 3. 現在のPython版の状態
+
+### 3.1 バージョンと品質
+
+- アプリversion: `1.9.5`
+- release channel: Beta
+- 最終確認commit: `1d323a4`
+- 直近ローカル品質確認:
+  - pytest: 536件成功
+  - Ruff lint/format: 成功
+  - mypy strict: 181 source files、issueなし
+  - QML lint: 終了コード0。動的QML propertyに対する既知warningが3件
+- `v1.9.5` tagは上記commitへ付け直してpush済み。Windows release workflowの完了監視は
+  ユーザーのクレジット節約方針により行っていないため、GitHub Actionsとdraft releaseは
+  WinUI着手前に必要に応じて確認する。
+
+### 3.2 技術構成
+
+| 領域 | Python参照版 |
+|---|---|
+| UI | PySide6 / Qt Quick / QML |
+| 言語 | Python 3.12 |
+| DB | SQLite |
+| ORM / migration | SQLAlchemy 2 / Alembic |
+| 最適化 | OR-Tools 9.14 CP-SAT |
+| Excel | openpyxl / XlsxWriter |
+| PDF | Qt系描画と共通帳票モデル |
+| 設定・保存先 | YAML / platformdirs |
+| 配布 | Nuitka、Portable ZIP、Inno Setup installer |
+| 品質 | pytest、Ruff、mypy、QML lint、GitHub Actions |
+
+ソースの主要境界は次のとおり。
+
+- `src/summer_scheduler/domain`: 業務ルールと値の解釈
+- `src/summer_scheduler/application`: use case、transaction境界、入力検証
+- `src/summer_scheduler/infrastructure`: SQLite、Excel、export、設定、project file
+- `src/summer_scheduler/optimization`: DTO、候補生成、CP-SAT、目的関数、独立validator
+- `src/summer_scheduler/reporting`: Excel/PDF共通レイアウト
+- `src/summer_scheduler/ui`: QMLとViewModel
+- `tests`: unit、integration、scenario、UI contract
+- `docs/adr`: 重要な設計判断
+
+### 3.3 データモデル
+
+主要テーブルは次のとおり。
+
+- `ApplicationMetadata`
+- `Campus`
+- `CourseProject`
+- `OutputSetting`
+- `TimeSlot`
+- `OpenDate`
+- `Student`
+- `Teacher`
+- `Subject`
+- `TeacherQualification`
+- `RegularLessonProfile`
+- `LessonRequest`
+- `StudentAvailability`
+- `TeacherAvailability`
+- `GroupLesson` / `GroupLessonStudent`（互換保持。現在の操作UIは停止中）
+- `ImportBatch`
+- `ImportSourceSnapshot`
+- `ValidationIssue`
+- `AuditLog`
+- `OptimizationRun`
+- `Assignment`
+
+Alembic revisionは`20260728_0001`から`20260912_0011`まで存在する。アプリ管理DBと
+各`.jukuschedule`プロジェクトファイル内SQLite DBの責務を分離している。
+
+## 4. 業務フローと画面
+
+左ナビゲーションの中心フローは次の6段階である。
+
+1. 設定
+2. アンケート作成
+3. アンケート取込
+4. 時間割編集
+5. 時間割自動作成
+6. 出力
+
+ホームには、プロジェクトを開いていなくても操作できる「生徒の基本情報」「講師の基本情報」
+と共通基本情報Excelの導線がある。プロジェクト未選択時は業務フローだけをoverlayで無効化し、
+基本情報画面は無効化しない。最近使用したプロジェクトには「開く」と「表示しない」がある。
+進行済みstepはproject metadataへ保存し、再起動後も復元する。
+
+ウィンドウ上部にはアプリ全体の「すべて保存」がある。画面ごとの保存ボタン乱立は避け、
+編集操作は原則即時commitし、「すべて保存」は共通基本情報Excelの再読込・反映と安全な
+復旧用保存点の作成を含む。
+
+### 4.1 ホームとプロジェクト
+
+- 新規作成時に年度、春期/夏期/冬期、開始日、終了日をプルダウン指定する。
+- `2026夏期講習`のような名称を自動生成する。
+- `.jukuschedule`はSQLiteを格納するproject fileである。
+- 開く、別名保存、複製、手動バックアップ、最近使用、非表示を提供する。
+- project open直後と設定間隔ごとに既定5世代の自動バックアップを作る。
+- migration前backup、SQLite整合性確認、復旧候補、原子的復元を備える。
+- 復元前backupを作れない場合は置換しない。
+
+### 4.2 基本情報
+
+共通基本情報Excelは`生徒・講師_基本情報.xlsx`で、次の5シートを持つ。
+
+1. 生徒
+2. 講師
+3. 科目
+4. 講師対応科目
+5. 通常授業
+
+機能:
+
+- 新規template作成、既存正本をExcelで開く、検証preview、transaction反映
+- 生徒・講師の個別追加・編集wizard
+- 有効/退席の扱い
+- 講師の指導可能科目
+- 生徒の通常授業科目、通常担当講師、担当優先度、1対1必須
+- 科目コード、表示名、帳票用略称
+- 外部Excelを保存した後、「すべて保存」で再読込してDBと画面へ即時反映
+- 取込前backupと正規化済み正本の保持
+
+### 4.3 設定
+
+- プロジェクト年度、講習区分、開始・終了日
+- コマ名、表示名、開始・終了時刻、有効/無効、dragによる並べ替え
+- 開校日・休校日
+- 日付ごとに使用可能なコマを設定
+- 複数日を選択し、異なる既存値があっても選択操作で更新可能
+- 変更は自動反映し、画面単位の保存ボタンへ依存しない
+- 科目、科目略称、校種/学年との対応
+
+### 4.4 Googleフォーム作成キット
+
+外部通信をせず、現在の設定から次をローカルフォルダーへ生成する。
+
+- 生徒用Apps Script
+- 講師勤務日時用Apps Script
+- 講師指導可能科目用Apps Script
+- Googleフォーム作成手順
+
+画面にはApps Scriptサイトを開く「Google App Script」ボタンがあり、手順はモーダルから
+別ウィンドウ表示へ切り替えられる。
+
+生徒フォームの重要仕様:
+
+- 氏名・学年入力ページに「中高一貫などで他学年の授業を受講する」checkを1つだけ置く。
+- checkなしなら学年から学校区分を自動決定し、その校種の科目だけを表示する。
+- checkありなら小・中・高の学校区分と科目を選べる。
+- 回答sheetでは学校区分、受講教科、回数を教科番号ごとに正規化する。
+- 回答列順は、受講不可日時の確認、特記事項、学力テストを日時列より左へ置く。
+- 手入力済み行を上書きせず、フォーム回答は次の空行へ追記する。
+
+### 4.5 アンケート取込
+
+- 生徒回答と講師回答のxlsx/CSVを2ファイル同時に選ぶ。
+- 「回答ファイルを選ぶ」「内容を確認する」「反映完了」の3stepを同じ幅で表示する。
+- GoogleスプレッドシートからダウンロードしたCSV/XLSXを氏名・学年・日付・コマで照合する。
+- 最大4科目、受講回数、不可日時を正規化する。
+- UTF-8/CP932 CSV、Google Forms XLSX、旧列形式、複数check値を扱う。
+- 追加・変更・変更なし・削除候補・error・warningをpreviewする。
+- errorがあれば反映不可。削除候補は明示確認なしに削除しない。
+- 反映直前に原本を再読込・再検証し、ImportBatch/AuditLogと同じtransactionで保存する。
+- 取込後に複数生徒を選び、日付・コマ単位で参加可/不可を編集できる。
+- 反映済み原本と統合XLSXをproject内へ保存する。
+
+名詞は「取込」、動詞は「取り込む」で表記を統一する。
+
+### 4.6 時間割編集
+
+- 行=コマ、列=当日出勤候補講師のgrid。
+- 休校日は表示しない。
+- 当日全コマ不可の講師は通常表示しない。
+- 一部コマだけ可能な講師は列を表示し、不可コマをgrayにする。
+- `+`から講師を一時表示し、コマごとの勤務可/不可を小さい操作で変更できる。
+- 未配置cardをdrag/dropして配置する。
+- 配置済みcardを別セルまたは未配置へ戻せる。
+- cardはdrag中もgridより前面に表示する。
+- 氏名検索中は一致cardを先頭へ移し、検索解除で元順序へ戻す。
+- card文言は日本語の科目表示を使う。
+- 指導可能科目外への手動配置は即拒否せず、warningと確認後に許可できる。
+- hard constraint違反は配置不可。
+- Undo/Redo、差分、詳細編集、note、lock/unlock、全配置resetを持つ。
+- header、コマ行、講師列、本体gridのscroll位置を同期する。
+
+#### 手動配置とロックの重要な違い
+
+v1.9.5で明確化された重要仕様である。
+
+- 手動配置・手動移動したcardは`is_manual=True`にする。
+- 手動配置しただけでは`is_locked=True`にしない。利用者は後から別講師へ再移動できる。
+- ただし次回の自動作成では、手動配置の日時・コマ・講師を保持して動かさない。
+- `is_locked=True`は、画面上の手動移動も禁止する明示的な固定である。
+- 自動作成後も手動配置metadataを失わない。
+
+Python版の一部古いdocstringやREADMEには「手動配置を自動lock」と読める文が残っている可能性が
+ある。実装コード、v1.9.5 tests、`CHANGELOG.md`を正とする。
+
+## 5. 自動時間割作成・最適化
+
+### 5.1 基本構造
+
+- LessonRequestの必要回数を個別sessionへ展開する。
+- open date、使用コマ、生徒/講師availability、講師資格等から疎なcandidateを生成する。
+- greedy初期解を作り、独立検証済みのcomplete hintとしてCP-SATへ渡す。
+- solver実行とUIはworker threadで分離する。
+- cancelは`CpSolver.stop_search()`へ協調的に伝える。
+- 入力DTOは不変化し、version付きJSONとSHA-256 fingerprintで実行前後を照合する。
+- solver結果を直接DBへ保存せず、独立validator通過後に1 transactionでAssignmentを置換する。
+- `UNKNOWN`、`INFEASIBLE`、`MODEL_INVALID`では未保証のsolver variableを読まない。
+
+### 5.2 主なハード制約
+
+- 各sessionはちょうど1つのcandidateへ配置、または未配置。
+- 生徒は同一日時に重複不可。
+- 講師は同一日時に最大2名。
+- 1対1必須sessionがある枠へ別生徒を重ねない。
+- 指導可能科目、開校日、有効コマ、availabilityを候補条件とする。
+- 集団授業blockとの生徒・講師重複を禁止する。
+- 生徒/講師の連続上限、空きコマ条件を扱う。
+- explicit lockと手動配置保持を自動作成で動かさない。
+- 通常担当優先度5は、生徒と通常担当講師の共通可能コマおよび講師容量が足りる範囲で必須。
+  講師が全期間欠席、一部期間しか来られない、または容量不足の分だけ代講を許す。
+
+### 5.3 通常担当講師の優先度
+
+通常担当の最低担当割合は次の業務ルールとして扱う。
+
+| 優先度 | 通常担当の目標/最低割合 |
+|---:|---:|
+| 5 | 100%（可能容量まではhard requirement） |
+| 4 | 75% |
+| 3 | 50% |
+| 2 | 25% |
+| 1 | 0% |
+
+端数は切り上げる。通常担当が来られず割合を満たせない場合、授業を未配置にするのではなく、
+資格と出勤条件を満たす代講講師へ配置し、対象生徒、科目、優先度、目標回数、実績回数を
+「確認が必要な項目」および「未配置・警告」へ表示する。
+
+優先度5と手動配置が衝突する場合は、利用者が明示的に置いた手動配置を保持する。勝手に通常担当へ
+戻さず、必要な不足警告を出す。
+
+### 5.4 辞書式目的の大まかな順序
+
+現行コードの`optimization/objectives.py`を正本とする。概略は次の順序。
+
+1. 未配置数の最小化
+2. 通常担当不足（優先度5、4、3、2の順）
+3. 同一日への過度な集中を抑制
+4. 最も分散が悪い受講希望の改善
+5. 生徒ごとの週偏り最大値を抑制
+6. 通常担当・希望講師の一致
+7. 同一生徒・科目で担当講師が増えすぎないこと
+8. 受講希望ごとの期間内分散
+9. 生徒単位の週・月偏り
+10. 講師稼働率の公平性（設定有効時）
+11. 講師の出勤日数圧縮と週分散
+12. 稼働コマ数、希望日時、既存配置維持
+
+分散は「誰か1人だけ良ければ全体scoreが上がる」方式にせず、最も悪い生徒/受講希望を先に
+改善する。科目も同じ科目が連続して固まりすぎないようにする。講師は勤務可能枠に対する実際の
+稼働率を公平化しつつ、同じ勤務コマ数なら出勤日数が少ない解を好む。
+
+### 5.5 実行時間と進捗
+
+- 高速: 30秒
+- 標準: 120秒
+- 高品質: 600秒
+
+v1.9.5では各辞書式工程へ制限時間を配分し、最初の重い工程だけで全時間を使い切らない。
+工程が`FEASIBLE`で最適性未証明なら、その値を悪化させない境界を追加して後続へ進み、最後に
+残り時間で優先度の高い未完了目的を追加改善する。全目的が数学的に`OPTIMAL`と証明された場合は、
+制限時間前でも終了してよい。進捗barは経過時間と工程番号の大きい方を使い、現在工程と
+`経過/制限時間`を表示する。
+
+## 6. 出力
+
+出力画面は「配布物確認」を統合済みで、次の5種類を扱う。
+
+1. 全体時間割
+2. 生徒配布時間割
+3. 講師配布時間割（学年順）
+4. 講師配布時間割（講師別）
+5. 未配置・警告一覧
+
+ExcelとPDFを生成する。講師別出力はfolderを作り、その中へ`架空講師あおいt.xlsx`のような
+講師別fileを生成する。実名はruntime dataから取得し、テスト・Gitへ固定で入れない。
+
+### 6.1 全体時間割
+
+- 日曜始まり・土曜終わりの週単位。
+- 設定期間に重なる週数だけ行/sectionを作る。季節名から週数を決めない。
+- 休校日を除き、週内の日付を横方向へ並べる。
+- その日に出勤予定の講師だけを表示する。
+- 一部コマ不可はgray表示。
+- 1セル最大2名を横分割し、各生徒は「学年、科目略称、生徒名」を縦方向に表示する。
+- 不要な4人ごとの隙間や`[未確定]`表示を入れない。
+
+### 6.2 生徒・講師配布帳票
+
+- Python版で確定したカレンダー形式を移植する。
+- 期間に重なる日曜～土曜の週数を段数にする。
+- 生徒名表記は空白なし。同姓がいる場合だけ名の先頭1文字を付ける。
+- 学年は`H3`ではなく`高3`等の日本語表記。
+- 科目は設定の略称を使う。
+- 講習不参加の生徒は個別カレンダーを作らず、先頭の講習欠席一覧へ学年・氏名を表形式で出す。
+- 講師配布版には、生徒名とカレンダーの間に`科目略称 通常担当講師名t`を表示する。
+- 講師別packetの並びは、通常授業担当生徒、講習担当生徒、その他生徒の順。その他は1ページ4名。
+- PDFはA4に収め、複数生徒を同一PDFにする場合も生徒/section単位で正しく改ページする。
+
+### 6.3 安全性
+
+- 出力直前に最新DBを再読込し、独立validatorを再実行する。
+- hard violationがあれば出力しない。
+- 同名fileを確認なしで上書きしない。
+- temporary file成功後だけ原子的に置き換える。
+- preview PDFは画面枠内へclipし、横幅不足時は下段へwrapする。
+- 出力物は個人情報を含むため、Git、release、CI artifactへ含めない。
+
+## 7. バックアップ、監査、データ安全
+
+- SQLite backup APIを使い、開いているDBをExplorerの通常copyで複製しない。
+- project open、migration、明示保存、再最適化前に目的別backupを作る。
+- 自動backupは世代管理する。
+- 復元前backupを作ってからatomic replaceする。
+- import、manual edit、optimization保存はAuditLogを残す。
+- Undo/Redoはprocess内command stackで、再起動をまたがない。
+- project fingerprintが外部変更を検出したら、古いUndo/Redo stackを破棄する。
+- app終了時もcommit済みdataだけを残し、未commit transactionはrollbackする。
+
+## 8. プライバシーと外部資料
+
+ユーザーから開発中に実在のCSV/XLSX/PDF/画像が提供されたが、これらは仕様確認のための
+ローカル参照資料であり、GitHubへ上げてはならない。特に氏名を含むファイル、プロジェクトDB、
+最適化log、生成時間割をcommitしない。
+
+テストは`架空`であることが明確な氏名、または匿名IDのみを使用する。CIとreleaseは実データが
+なくても完結しなければならない。新しいWinUI repoでも同じprivacy gateを最初から設ける。
+
+## 9. 現在の既知の未実装・保留事項
+
+Python v1.9.5で未実装または正式受入未完了のもの:
+
+- 選択日・選択生徒・選択講師周辺だけの部分再最適化
+- セル、日付、講師、選択範囲単位の一括lock
+- Undo/Redo履歴のアプリ再起動をまたぐ復元
+- 集団授業の操作フロー（DB互換形式と内部serviceは残るが、UIは停止中。再導入はv2相当）
+- Google APIによる直接作成/同期
+- cloud同期、複数人同時編集
+- code signing。現在は未署名配布方針
+- 完成artifactの最終SBOM/第三者license監査
+- 多様なclean Windows端末、DPI、実printer、upgrade installでの正式な通し受入
+- すべての品質presetが全辞書式工程を常に`OPTIMAL`まで証明する保証
+
+WinUI版では、これらを初期版へ勝手に追加せず、まずPython v1.9.5 parityを達成する。追加する
+場合はversion、scope、acceptance criteriaを別途合意する。
+
+## 10. 文書間の相違と正本
+
+長期間に多数の仕様変更があったため、古いPhase文書やREADMEの一部は最新挙動と一致しない。
+特に次は注意する。
+
+- 手動配置は「UI上もlock」ではなく、「再編集可能だが自動作成では保持」が最新。
+- `FEASIBLE`工程で即終了する古い説明より、v1.9.5の後続工程・追加改善動作が最新。
+- 集団授業はDB/serviceが存在しても、現在の利用者向けflowでは停止中。
+- 出力は独立した「配布物確認」ではなく、出力画面へ統合済み。
+
+判断順序:
+
+1. v1.9.5の実装コード
+2. v1.9.5で通過しているtests
+3. `CHANGELOG.md`の新しいversion
+4. 本引き継ぎ書
+5. ADR
+6. README / specification / 過去Phase文書
+
+相違を見つけた場合、Python版は直さず、WinUI版のparity matrixへ記録する。
+
+## 11. WinUI版で先に決めるべき技術事項
+
+以下はまだ実装開始前の判断事項である。勝手に確定せず、ADRへ残す。
+
+1. 対象.NET versionとWindows App SDK/WinUI 3 version
+2. installer/MSIXまたは別installer、portable相当の提供方法
+3. SQLite access層とmigration方式
+4. `.jukuschedule`をPython版と直接相互運用するか、読取import後にWinUI形式へ変換するか
+5. OR-Tools .NETでのCP-SAT parityとsolver version固定
+6. Excel libraryとPDF rendererのlicense・日本語font・印刷品質
+7. PDF preview componentとoffline要件
+8. logging、crash recovery、backup保存先
+9. GPLv3のPython版を参照移植する際のWinUI版license。権利者の意向も含めて明示確認する
+10. GitHub ActionsでのWindows build、test、artifact、release方式
+
+特に`.jukuschedule`互換性は早期に決める。既存projectを開く必要がある場合も、最初はcopyを
+作って読取検証し、Python版projectをその場でmigration/上書きしない。
+
+## 12. WinUI版の推奨アーキテクチャ
+
+Python版の責務分離を保ち、例えば次のSolution構成にする。名称はADRで確定してよい。
+
+```text
+SeminarSched.WinUI.sln
+src/
+  SeminarSched.WinUI/             # WinUI 3 views, navigation, ViewModels
+  SeminarSched.Application/       # use cases, transaction orchestration
+  SeminarSched.Domain/            # entities, value objects, business rules
+  SeminarSched.Infrastructure/    # SQLite, files, Excel/PDF, settings
+  SeminarSched.Optimization/      # immutable input, candidates, CP-SAT, validator
+  SeminarSched.Reporting/         # renderer-independent layout model
+tests/
+  SeminarSched.Domain.Tests/
+  SeminarSched.Application.Tests/
+  SeminarSched.Optimization.Tests/
+  SeminarSched.Infrastructure.Tests/
+  SeminarSched.AcceptanceTests/
+docs/
+  adr/
+  parity/
+```
+
+MVVM toolkit等を採用してもよいが、ViewModelからDBやOR-Toolsを直接呼ばない。solver input、
+report layout、import previewはUI frameworkから独立した型にする。
+
+## 13. 推奨移植手順
+
+### Phase W0: 独立repoとparity inventory
+
+- sibling directoryに新規SolutionとGitを作成
+- GitHubへ`SotaFurukawa/SeminarSched.WinUI`を作成
+- license/privacy/security/.gitignore/CIの土台を作る
+- Python v1.9.5の画面、use case、DB、tests、帳票をparity matrixへ列挙
+- 実データを使わないsynthetic acceptance datasetを作る
+
+### Phase W1: shell、設定、project lifecycle
+
+- WinUI navigation、window、icon、version表示
+- app settings、workspace、recent projects
+- SQLite schema/migration
+- 新規/open/save-as/duplicate/backup/recovery
+
+### Phase W2: master dataと設定
+
+- 生徒、講師、科目、資格、通常授業
+- 共通基本情報Excel
+- project期間、コマ、開校日、日別使用コマ
+
+### Phase W3: questionnaireとimport
+
+- Apps Script kit
+- 生徒/講師回答の2file検証
+- diff/error/warning/transaction反映
+- 取込後availability編集
+
+### Phase W4: optimization core
+
+- Python版DTOとcandidate条件をC#へ移植
+- hard constraints、優先度、辞書式目的、progress/cancel
+- 独立validator
+- Python版scenarioに対応するgolden test
+
+### Phase W5: schedule editor
+
+- 大規模grid virtualization
+- drag/drop、warning confirmation、manual/lock semantics
+- undo/redo、reset、teacher availability編集
+- 一部固定再最適化
+
+### Phase W6: reporting
+
+- 共通layout model
+- 5種類のExcel/PDF
+- preview、atomic save、teacher packet folder
+- synthetic golden workbook/PDF構造test
+
+### Phase W7: distribution and acceptance
+
+- backup/recovery/auditのfailure injection test
+- installer/portable相当
+- clean Windows、offline、日本語path、OneDrive、DPI、長時間、印刷受入
+- license/SBOM/checksum/privacy gate
+
+各PhaseはPython版の該当scenarioと同等のテストを通してから次へ進む。UIだけ先に全画面を作り、
+中身がplaceholderのまま完成扱いにしない。
+
+## 14. 最初の新チャットで行うこと
+
+1. Python repoでは`AGENTS.md`と本書を読む。
+2. `git status`を確認し、Python repoを変更しない。
+3. siblingの`SeminarSched.WinUI`とGitHub同名repoの存在を確認する。
+4. 存在しなければ別directory・別Git・別GitHub repoとして作る。
+5. W0のparity matrixとarchitecture ADRを最初に作る。
+6. `.jukuschedule`互換、license、配布形式の未決事項を明示する。
+7. synthetic dataのみで最小の縦sliceを実装し、CIを通す。
+
+新しいチャットへの開始指示は次のとおり。
+
+> `AGENTS.md`と`docs/CODEX_HANDOFF.md`を全文読み、これまでのSeminarSchedの文脈を
+> 引き継いでください。既存Python版は読み取り専用とし、変更しないでください。
+> C# + WinUI 3版`SeminarSched.WinUI`を、別directory・別Git・別GitHub repoとして
+> 作成してください。Python v1.9.5の利用者向け機能を原則完全移植し、まずPhase W0の
+> parity inventory、architecture ADR、CI基盤から開始してください。

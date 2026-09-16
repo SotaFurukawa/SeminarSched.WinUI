@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "SeminarSched.WinUI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "SeminarSched.WinUI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
