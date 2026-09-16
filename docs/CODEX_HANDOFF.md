@@ -175,6 +175,13 @@ Next Version Rule:
 - Windows日本語TTF resolverを追加し、実PDF signatureとXLSXサイズをtest。Python版の5帳票すべては未完。
 - Release/x64 build: warning 0 / error 0。全47 tests passed。
 
+### v0.1.0 checkpoint 16
+
+- 共通帳票snapshotへ学年を追加し、Excelへ生徒別sheetと講師別sheetを生成。
+- PDFへ生徒別配布sectionと講師別配布sectionを改ページ生成。生徒順は学年・氏名、講師順は氏名。
+- Python版の週calendar、欠席一覧、講師別folder packetは未完。
+- Release/x64 build: warning 0 / error 0。帳票実ファイルtest passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`
