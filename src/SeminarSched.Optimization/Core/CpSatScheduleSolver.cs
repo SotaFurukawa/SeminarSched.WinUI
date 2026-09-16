@@ -1,25 +1,150 @@
 using System.Diagnostics;
+using System.Globalization;
 using Google.OrTools.Sat;
 
 namespace SeminarSched.Optimization.Core;
 
 public sealed class CpSatScheduleSolver
 {
-    public async Task<ScheduleSolution> SolveAsync(ScheduleProblem problem, TimeSpan maximumDuration, int randomSeed=1, CancellationToken cancellationToken=default)
+    public Task<ScheduleSolution> SolveAsync(
+        ScheduleProblem problem,
+        TimeSpan maximumDuration,
+        int randomSeed = 1,
+        CancellationToken cancellationToken = default)
     {
-        if(maximumDuration<=TimeSpan.Zero)throw new ArgumentOutOfRangeException(nameof(maximumDuration));
-        return await Task.Run(()=>Solve(problem,maximumDuration,randomSeed,cancellationToken),cancellationToken);
+        if (maximumDuration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(maximumDuration));
+        return Task.Run(() => Solve(problem, maximumDuration, randomSeed, cancellationToken), cancellationToken);
     }
-    private static ScheduleSolution Solve(ScheduleProblem problem,TimeSpan maximum,int seed,CancellationToken token)
+
+    private static ScheduleSolution Solve(ScheduleProblem problem, TimeSpan maximum, int seed, CancellationToken cancellationToken)
     {
-        var watch=Stopwatch.StartNew();var model=new CpModel();var variables=problem.Candidates.Select((candidate,index)=>(candidate,variable:model.NewBoolVar($"x_{index}"))).ToArray();
-        foreach(var group in variables.GroupBy(x=>x.candidate.RequestId)){var demand=problem.Demands.Single(d=>d.RequestId==group.Key);model.Add(LinearExpr.Sum(group.Select(x=>x.variable))<=Math.Max(0,demand.RequiredSessions-demand.AlreadyFixedSessions));}
-        foreach(var group in variables.GroupBy(x=>(x.candidate.StudentId,x.candidate.OpenDateId,x.candidate.TimeSlotId)))model.Add(LinearExpr.Sum(group.Select(x=>x.variable))<=1);
-        foreach(var group in variables.GroupBy(x=>(x.candidate.TeacherId,x.candidate.OpenDateId,x.candidate.TimeSlotId)))model.Add(LinearExpr.Sum(group.Select(x=>x.variable))<=1);
-        model.Maximize(LinearExpr.Sum(variables.Select(x=>x.variable)));
-        var solver=new CpSolver{StringParameters=$"max_time_in_seconds:{maximum.TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)} random_seed:{seed} num_search_workers:0"};
-        using var registration=token.Register(solver.StopSearch);var status=solver.Solve(model);token.ThrowIfCancellationRequested();if(status is not CpSolverStatus.Optimal and not CpSolverStatus.Feasible)throw new InvalidOperationException($"時間割を作成できませんでした: {status}");
-        var placements=variables.Where(x=>solver.BooleanValue(x.variable)).Select(x=>new SchedulePlacement(x.candidate.RequestId,x.candidate.StudentId,x.candidate.TeacherId,x.candidate.OpenDateId,x.candidate.TimeSlotId)).ToArray();
-        var unassigned=problem.Demands.Sum(d=>Math.Max(0,d.RequiredSessions-d.AlreadyFixedSessions-placements.Count(x=>x.RequestId==d.RequestId)));var solution=new ScheduleSolution(placements,unassigned,-placements.Length,watch.Elapsed);ScheduleSolutionValidator.Validate(problem,solution);return solution;
+        var watch = Stopwatch.StartNew();
+        var model = new CpModel();
+        var variables = problem.Candidates
+            .Select((candidate, index) => (candidate, variable: model.NewBoolVar($"x_{index}")))
+            .ToArray();
+
+        foreach (var group in variables.GroupBy(item => item.candidate.RequestId))
+        {
+            var demand = problem.Demands.Single(item => item.RequestId == group.Key);
+            model.Add(LinearExpr.Sum(group.Select(item => item.variable)) <= Math.Max(0, demand.RequiredSessions - demand.AlreadyFixedSessions));
+        }
+
+        foreach (var group in variables.GroupBy(item => (item.candidate.StudentId, item.candidate.OpenDateId, item.candidate.TimeSlotId)))
+            model.Add(LinearExpr.Sum(group.Select(item => item.variable)) <= 1);
+
+        foreach (var group in variables.GroupBy(item => (item.candidate.TeacherId, item.candidate.OpenDateId, item.candidate.TimeSlotId)))
+        {
+            var weighted = group.Select(item => LinearExpr.Term(item.variable, item.candidate.OneToOneRequired ? 2 : 1));
+            var fixedLoad = problem.ExistingPlacements
+                .Where(item => item.TeacherId == group.Key.TeacherId && item.OpenDateId == group.Key.OpenDateId && item.TimeSlotId == group.Key.TimeSlotId)
+                .Sum(item => item.OneToOneRequired ? 2 : 1);
+            model.Add(LinearExpr.Sum(weighted) <= 2 - fixedLoad);
+        }
+
+        AddRegularTeacherMinimums(model, problem, variables);
+        AddStudentConsecutiveAndGapConstraints(model, problem, variables);
+
+        // Assignment count dominates every soft penalty, so a prettier timetable can never
+        // replace an otherwise assignable lesson with an unassigned lesson.
+        var objectiveTerms = variables.Select(item =>
+            LinearExpr.Term(item.variable, 1_000_000L - (item.candidate.PreferencePenalty * 100L) + item.candidate.AvailabilityPreference));
+        model.Maximize(LinearExpr.Sum(objectiveTerms));
+
+        var solver = new CpSolver
+        {
+            StringParameters = $"max_time_in_seconds:{maximum.TotalSeconds.ToString(CultureInfo.InvariantCulture)} random_seed:{seed} num_search_workers:0",
+        };
+        using var registration = cancellationToken.Register(solver.StopSearch);
+        var status = solver.Solve(model);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (status is not CpSolverStatus.Optimal and not CpSolverStatus.Feasible)
+            throw new InvalidOperationException($"時間割を作成できませんでした: {status}");
+
+        var placements = variables
+            .Where(item => solver.BooleanValue(item.variable))
+            .Select(item => new SchedulePlacement(
+                item.candidate.RequestId,
+                item.candidate.StudentId,
+                item.candidate.TeacherId,
+                item.candidate.OpenDateId,
+                item.candidate.TimeSlotId))
+            .ToArray();
+        var unassigned = problem.Demands.Sum(demand => Math.Max(
+            0,
+            demand.RequiredSessions - demand.AlreadyFixedSessions - placements.Count(item => item.RequestId == demand.RequestId)));
+        var selectedCandidates = variables.Where(item => solver.BooleanValue(item.variable)).Select(item => item.candidate).ToArray();
+        var objective = (unassigned * 1_000_000L) + selectedCandidates.Sum(item => (item.PreferencePenalty * 100L) - item.AvailabilityPreference);
+        var solution = new ScheduleSolution(placements, unassigned, objective, watch.Elapsed);
+        ScheduleSolutionValidator.Validate(problem, solution);
+        return solution;
+    }
+
+    private static void AddRegularTeacherMinimums(
+        CpModel model,
+        ScheduleProblem problem,
+        IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables)
+    {
+        foreach (var demand in problem.Demands.Where(item => item.RegularTeacherId is not null && item.RegularTeacherPriority >= 2))
+        {
+            var requiredMinimum = MinimumRegularTeacherSessions(demand.RequiredSessions, demand.RegularTeacherPriority);
+            var remainingMinimum = Math.Max(0, requiredMinimum - demand.FixedRegularTeacherSessions);
+            if (remainingMinimum == 0) continue;
+            var regular = variables
+                .Where(item => item.candidate.RequestId == demand.RequestId && item.candidate.TeacherId == demand.RegularTeacherId)
+                .Select(item => item.variable)
+                .ToArray();
+            // Capacity shortages must not make the entire model infeasible. Require as much
+            // of the configured minimum as the actual candidate set can supply.
+            model.Add(LinearExpr.Sum(regular) >= Math.Min(remainingMinimum, regular.Length));
+        }
+    }
+
+    private static void AddStudentConsecutiveAndGapConstraints(
+        CpModel model,
+        ScheduleProblem problem,
+        IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables)
+    {
+        var demandByRequest = problem.Demands.ToDictionary(item => item.RequestId);
+        var studentDays = variables.Select(item => (item.candidate.StudentId, item.candidate.OpenDateId))
+            .Concat(problem.ExistingPlacements.Select(item => (item.StudentId, item.OpenDateId)))
+            .Distinct();
+        foreach (var studentDayKey in studentDays)
+        {
+            var studentDay = variables.Where(item => item.candidate.StudentId == studentDayKey.StudentId && item.candidate.OpenDateId == studentDayKey.OpenDateId).ToArray();
+            var fixedForDay = problem.ExistingPlacements.Where(item => item.StudentId == studentDayKey.StudentId && item.OpenDateId == studentDayKey.OpenDateId).ToArray();
+            var involvedRequests = studentDay.Select(item => item.candidate.RequestId).Concat(fixedForDay.Select(item => item.RequestId)).Distinct();
+            var maximum = involvedRequests.Select(requestId => demandByRequest[requestId].MaxConsecutiveSlots).DefaultIfEmpty(2).Min();
+            var allowGap = involvedRequests.All(requestId => demandByRequest[requestId].AllowGap);
+            var slotOrders = problem.AvailableSlots.Where(slot => slot.OpenDateId == studentDayKey.OpenDateId).Select(slot => slot.SlotOrder).Distinct().Order().ToArray();
+            var occupancy = slotOrders.Select(slotOrder => new
+            {
+                Variables = studentDay.Where(item => item.candidate.SlotOrder == slotOrder).Select(item => item.variable).ToArray(),
+                Fixed = fixedForDay.Any(item => item.SlotOrder == slotOrder) ? 1 : 0,
+            }).ToArray();
+            for (var start = 0; start + maximum < occupancy.Length; start++)
+            {
+                var window = occupancy.Skip(start).Take(maximum + 1).ToArray();
+                model.Add(LinearExpr.Sum(window.SelectMany(item => item.Variables)) <= maximum - window.Sum(item => item.Fixed));
+            }
+
+            if (allowGap) continue;
+            for (var first = 0; first < occupancy.Length; first++)
+            for (var last = first + 2; last < occupancy.Length; last++)
+            for (var middle = first + 1; middle < last; middle++)
+            {
+                var firstExpression = LinearExpr.Sum(occupancy[first].Variables) + occupancy[first].Fixed;
+                var middleExpression = LinearExpr.Sum(occupancy[middle].Variables) + occupancy[middle].Fixed;
+                var lastExpression = LinearExpr.Sum(occupancy[last].Variables) + occupancy[last].Fixed;
+                model.Add(firstExpression + lastExpression - middleExpression <= 1);
+            }
+        }
+    }
+
+    internal static int MinimumRegularTeacherSessions(int requiredSessions, int priority)
+    {
+        if (requiredSessions < 0) throw new ArgumentOutOfRangeException(nameof(requiredSessions));
+        if (priority is < 1 or > 5) throw new ArgumentOutOfRangeException(nameof(priority));
+        return ((priority - 1) * requiredSessions + 3) / 4;
     }
 }

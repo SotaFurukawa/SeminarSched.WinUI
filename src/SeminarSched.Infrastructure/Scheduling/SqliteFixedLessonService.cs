@@ -6,16 +6,192 @@ namespace SeminarSched.Infrastructure.Scheduling;
 
 public sealed class SqliteFixedLessonService : IFixedLessonService
 {
-    public async Task<IReadOnlyList<LessonRequestOption>> GetRequestsAsync(string p,CancellationToken t=default){await using var c=await Open(p,t);await Ensure(c,t);await using var q=c.CreateCommand();q.CommandText="SELECT r.Id,r.StudentId,s.ExternalId||' '||s.Name||' / '||sub.DisplayName FROM LessonRequest r JOIN Student s ON s.Id=r.StudentId JOIN Subject sub ON sub.Id=r.SubjectId ORDER BY s.ExternalId,sub.SortOrder;";var x=new List<LessonRequestOption>();await using var d=await q.ExecuteReaderAsync(t);while(await d.ReadAsync(t))x.Add(new(d.GetInt64(0),d.GetInt64(1),d.GetString(2)));return x;}
-    public async Task<IReadOnlyList<TeacherOption>> GetTeachersAsync(string p,CancellationToken t=default){await using var c=await Open(p,t);await Ensure(c,t);await using var q=c.CreateCommand();q.CommandText="SELECT Id,ExternalId||' '||Name FROM Teacher WHERE Active=1 ORDER BY ExternalId;";var x=new List<TeacherOption>();await using var d=await q.ExecuteReaderAsync(t);while(await d.ReadAsync(t))x.Add(new(d.GetInt64(0),d.GetString(1)));return x;}
-    public async Task<IReadOnlyList<ScheduleSlotOption>> GetSlotsAsync(string p,CancellationToken t=default){await using var c=await Open(p,t);await Ensure(c,t);await using var q=c.CreateCommand();q.CommandText="SELECT d.Id,s.Id,d.Date||' '||s.DisplayName||' ('||s.StartTime||'-'||s.EndTime||')' FROM OpenDate d JOIN OpenDateTimeSlot ds ON ds.OpenDateId=d.Id JOIN TimeSlot s ON s.Id=ds.TimeSlotId WHERE d.IsOpen=1 AND s.Active=1 ORDER BY d.Date,s.SortOrder;";var x=new List<ScheduleSlotOption>();await using var d=await q.ExecuteReaderAsync(t);while(await d.ReadAsync(t))x.Add(new(d.GetInt64(0),d.GetInt64(1),d.GetString(2)));return x;}
-    public async Task<IReadOnlyList<FixedLesson>> GetFixedLessonsAsync(string p,CancellationToken t=default){await using var c=await Open(p,t);await Ensure(c,t);await using var q=c.CreateCommand();q.CommandText="SELECT a.Id,a.LessonRequestId,a.TeacherId,a.OpenDateId,a.TimeSlotId,d.Date||' '||ts.DisplayName||' / '||s.Name||' / '||te.Name FROM Assignment a JOIN LessonRequest r ON r.Id=a.LessonRequestId JOIN Student s ON s.Id=r.StudentId JOIN Teacher te ON te.Id=a.TeacherId JOIN OpenDate d ON d.Id=a.OpenDateId JOIN TimeSlot ts ON ts.Id=a.TimeSlotId WHERE a.IsLocked=1 ORDER BY d.Date,ts.SortOrder;";var x=new List<FixedLesson>();await using var d=await q.ExecuteReaderAsync(t);while(await d.ReadAsync(t))x.Add(new(d.GetInt64(0),d.GetInt64(1),d.GetInt64(2),d.GetInt64(3),d.GetInt64(4),d.GetString(5)));return x;}
-    public async Task AddAsync(string p,long request,long teacher,long date,long slot,CancellationToken t=default){await using var c=await Open(p,t);await Ensure(c,t);await using var tx=await c.BeginTransactionAsync(t);await using var validate=c.CreateCommand();validate.Transaction=(SqliteTransaction)tx;validate.CommandText="SELECT r.StudentId,r.SubjectId FROM LessonRequest r WHERE r.Id=@r AND EXISTS(SELECT 1 FROM OpenDateTimeSlot ds JOIN OpenDate d ON d.Id=ds.OpenDateId WHERE ds.OpenDateId=@d AND ds.TimeSlotId=@s AND d.IsOpen=1);";validate.Parameters.AddWithValue("@r",request);validate.Parameters.AddWithValue("@d",date);validate.Parameters.AddWithValue("@s",slot);await using var reader=await validate.ExecuteReaderAsync(t);if(!await reader.ReadAsync(t))throw new InvalidOperationException("受講希望または開校コマが無効です。");var student=reader.GetInt64(0);var subject=reader.GetInt64(1);await reader.DisposeAsync();
-        await using var conflict=c.CreateCommand();conflict.Transaction=(SqliteTransaction)tx;conflict.CommandText="SELECT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest r ON r.Id=a.LessonRequestId WHERE a.OpenDateId=@d AND a.TimeSlotId=@s AND (a.TeacherId=@t OR r.StudentId=@student));";conflict.Parameters.AddWithValue("@d",date);conflict.Parameters.AddWithValue("@s",slot);conflict.Parameters.AddWithValue("@t",teacher);conflict.Parameters.AddWithValue("@student",student);if(Convert.ToInt64(await conflict.ExecuteScalarAsync(t))==1)throw new InvalidOperationException("同じ日時に生徒または講師の授業が既にあります。");
-        await using var qualification=c.CreateCommand();qualification.Transaction=(SqliteTransaction)tx;qualification.CommandText="SELECT COALESCE((SELECT CanTeach FROM TeacherQualification WHERE TeacherId=@t AND SubjectId=@s),0);";qualification.Parameters.AddWithValue("@t",teacher);qualification.Parameters.AddWithValue("@s",subject);var can=await qualification.ExecuteScalarAsync(t);if(Convert.ToInt64(can)==0)throw new InvalidOperationException("この講師は科目を担当可能に設定されていません。");
-        await using var add=c.CreateCommand();add.Transaction=(SqliteTransaction)tx;add.CommandText="INSERT INTO Assignment(LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source) VALUES(@r,@t,@d,@s,1,'preconfirmed');";add.Parameters.AddWithValue("@r",request);add.Parameters.AddWithValue("@t",teacher);add.Parameters.AddWithValue("@d",date);add.Parameters.AddWithValue("@s",slot);await add.ExecuteNonQueryAsync(t);await tx.CommitAsync(t);}
-    public async Task RemoveAsync(string p,long id,CancellationToken t=default){await using var c=await Open(p,t);await Ensure(c,t);await using var q=c.CreateCommand();q.CommandText="DELETE FROM Assignment WHERE Id=@id AND IsLocked=1;";q.Parameters.AddWithValue("@id",id);await q.ExecuteNonQueryAsync(t);}
-    private static async Task<SqliteConnection> Open(string p,CancellationToken t){var c=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.GetFullPath(p),Mode=SqliteOpenMode.ReadWrite,ForeignKeys=true,Pooling=false}.ToString());await c.OpenAsync(t);return c;}
-    private static Task Ensure(SqliteConnection connection, CancellationToken cancellationToken) =>
-        SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken);
+    public async Task<IReadOnlyList<LessonRequestOption>> GetRequestsAsync(string projectPath, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
+        await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT r.Id,r.StudentId,s.ExternalId||' '||s.Name||' / '||sub.DisplayName FROM LessonRequest r JOIN Student s ON s.Id=r.StudentId JOIN Subject sub ON sub.Id=r.SubjectId ORDER BY s.ExternalId,sub.SortOrder;";
+        var result = new List<LessonRequestOption>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            result.Add(new LessonRequestOption(reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2)));
+        return result;
+    }
+
+    public async Task<IReadOnlyList<TeacherOption>> GetTeachersAsync(string projectPath, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
+        await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Id,ExternalId||' '||Name FROM Teacher WHERE Active=1 ORDER BY ExternalId;";
+        var result = new List<TeacherOption>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            result.Add(new TeacherOption(reader.GetInt64(0), reader.GetString(1)));
+        return result;
+    }
+
+    public async Task<IReadOnlyList<ScheduleSlotOption>> GetSlotsAsync(string projectPath, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
+        await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT d.Id,s.Id,d.Date||' '||s.DisplayName||' ('||s.StartTime||'-'||s.EndTime||')' FROM OpenDate d JOIN OpenDateTimeSlot ds ON ds.OpenDateId=d.Id JOIN TimeSlot s ON s.Id=ds.TimeSlotId WHERE d.IsOpen=1 AND s.Active=1 ORDER BY d.Date,s.SortOrder;";
+        var result = new List<ScheduleSlotOption>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            result.Add(new ScheduleSlotOption(reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2)));
+        return result;
+    }
+
+    public async Task<IReadOnlyList<FixedLesson>> GetFixedLessonsAsync(string projectPath, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
+        await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT a.Id,a.LessonRequestId,a.TeacherId,a.OpenDateId,a.TimeSlotId,d.Date||' '||ts.DisplayName||' / '||s.Name||' / '||te.Name FROM Assignment a JOIN LessonRequest r ON r.Id=a.LessonRequestId JOIN Student s ON s.Id=r.StudentId JOIN Teacher te ON te.Id=a.TeacherId JOIN OpenDate d ON d.Id=a.OpenDateId JOIN TimeSlot ts ON ts.Id=a.TimeSlotId WHERE a.IsLocked=1 ORDER BY d.Date,ts.SortOrder;";
+        var result = new List<FixedLesson>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            result.Add(new FixedLesson(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3), reader.GetInt64(4), reader.GetString(5)));
+        return result;
+    }
+
+    public async Task AddAsync(string projectPath, long requestId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
+        await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+        var request = await ReadRequestAsync(connection, transaction, requestId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
+        await EnsureNoStudentCollisionAsync(connection, transaction, request.StudentId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
+        await EnsureTeacherCanTeachAsync(connection, transaction, teacherId, request.SubjectId, cancellationToken).ConfigureAwait(false);
+        await EnsureAvailabilityAsync(connection, transaction, request.StudentId, teacherId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
+        await EnsureTeacherCapacityAsync(connection, transaction, teacherId, openDateId, timeSlotId, request.OneToOneRequired ? 2 : 1, cancellationToken).ConfigureAwait(false);
+
+        await using var add = connection.CreateCommand();
+        add.Transaction = transaction;
+        add.CommandText = """
+            INSERT INTO Assignment(LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source,SessionIndex)
+            VALUES($request,$teacher,$date,$slot,1,'preconfirmed',$session);
+            """;
+        add.Parameters.AddWithValue("$request", requestId);
+        add.Parameters.AddWithValue("$teacher", teacherId);
+        add.Parameters.AddWithValue("$date", openDateId);
+        add.Parameters.AddWithValue("$slot", timeSlotId);
+        add.Parameters.AddWithValue("$session", request.AssignedSessions + 1);
+        await add.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task RemoveAsync(string projectPath, long assignmentId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
+        await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM Assignment WHERE Id=$id AND IsLocked=1;";
+        command.Parameters.AddWithValue("$id", assignmentId);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<RequestState> ReadRequestAsync(SqliteConnection connection, SqliteTransaction transaction, long requestId, long openDateId, long timeSlotId, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT r.StudentId,r.SubjectId,r.RequiredSessions,
+                   (SELECT COUNT(*) FROM Assignment a WHERE a.LessonRequestId=r.Id),
+                   CASE WHEN r.OneToOneRequired=1 OR COALESCE(p.OneToOneRequired,0)=1 THEN 1 ELSE 0 END
+            FROM LessonRequest r
+            LEFT JOIN RegularLessonProfile p ON p.ProjectId=r.ProjectId AND p.StudentId=r.StudentId AND p.SubjectId=r.SubjectId
+            WHERE r.Id=$request
+              AND EXISTS(SELECT 1 FROM OpenDateTimeSlot ds JOIN OpenDate d ON d.Id=ds.OpenDateId WHERE ds.OpenDateId=$date AND ds.TimeSlotId=$slot AND d.IsOpen=1);
+            """;
+        command.Parameters.AddWithValue("$request", requestId);
+        command.Parameters.AddWithValue("$date", openDateId);
+        command.Parameters.AddWithValue("$slot", timeSlotId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            throw new InvalidOperationException("受講希望または開校コマが無効です。");
+        var state = new RequestState(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt32(2), reader.GetInt32(3), reader.GetBoolean(4));
+        if (state.AssignedSessions >= state.RequiredSessions)
+            throw new InvalidOperationException("この受講希望は必要回数がすべて配置済みです。");
+        return state;
+    }
+
+    private static async Task EnsureNoStudentCollisionAsync(SqliteConnection connection, SqliteTransaction transaction, long studentId, long openDateId, long timeSlotId, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest r ON r.Id=a.LessonRequestId WHERE r.StudentId=$student AND a.OpenDateId=$date AND a.TimeSlotId=$slot);";
+        command.Parameters.AddWithValue("$student", studentId);
+        command.Parameters.AddWithValue("$date", openDateId);
+        command.Parameters.AddWithValue("$slot", timeSlotId);
+        if (Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) != 0)
+            throw new InvalidOperationException("同じ日時に生徒の授業が既にあります。");
+    }
+
+    private static async Task EnsureTeacherCanTeachAsync(SqliteConnection connection, SqliteTransaction transaction, long teacherId, long subjectId, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT EXISTS(SELECT 1 FROM TeacherQualification q JOIN Teacher t ON t.Id=q.TeacherId WHERE q.TeacherId=$teacher AND q.SubjectId=$subject AND q.CanTeach=1 AND t.Active=1);";
+        command.Parameters.AddWithValue("$teacher", teacherId);
+        command.Parameters.AddWithValue("$subject", subjectId);
+        if (Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 0)
+            throw new InvalidOperationException("この講師は科目を担当可能に設定されていません。");
+    }
+
+    private static async Task EnsureAvailabilityAsync(SqliteConnection connection, SqliteTransaction transaction, long studentId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT
+              (EXISTS(SELECT 1 FROM StudentAvailability WHERE StudentId=$student) AND NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE StudentId=$student AND OpenDateId=$date AND TimeSlotId=$slot AND AvailabilityLevel>0))
+              OR (EXISTS(SELECT 1 FROM TeacherAvailability WHERE TeacherId=$teacher) AND NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE TeacherId=$teacher AND OpenDateId=$date AND TimeSlotId=$slot AND AvailabilityLevel>0))
+              OR EXISTS(SELECT 1 FROM TeacherUnavailability WHERE TeacherId=$teacher AND OpenDateId=$date AND TimeSlotId=$slot);
+            """;
+        command.Parameters.AddWithValue("$student", studentId);
+        command.Parameters.AddWithValue("$teacher", teacherId);
+        command.Parameters.AddWithValue("$date", openDateId);
+        command.Parameters.AddWithValue("$slot", timeSlotId);
+        if (Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) != 0)
+            throw new InvalidOperationException("生徒または講師が参加できない日時です。");
+    }
+
+    private static async Task EnsureTeacherCapacityAsync(SqliteConnection connection, SqliteTransaction transaction, long teacherId, long openDateId, long timeSlotId, int requestedLoad, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT COALESCE(SUM(CASE WHEN r.OneToOneRequired=1 OR COALESCE(p.OneToOneRequired,0)=1 THEN 2 ELSE 1 END),0)
+            FROM Assignment a
+            JOIN LessonRequest r ON r.Id=a.LessonRequestId
+            LEFT JOIN RegularLessonProfile p ON p.ProjectId=r.ProjectId AND p.StudentId=r.StudentId AND p.SubjectId=r.SubjectId
+            WHERE a.TeacherId=$teacher AND a.OpenDateId=$date AND a.TimeSlotId=$slot;
+            """;
+        command.Parameters.AddWithValue("$teacher", teacherId);
+        command.Parameters.AddWithValue("$date", openDateId);
+        command.Parameters.AddWithValue("$slot", timeSlotId);
+        var existingLoad = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
+        if (existingLoad + requestedLoad > 2)
+            throw new InvalidOperationException("同じ日時の講師担当上限（2人）を超えます。");
+    }
+
+    private static async Task<SqliteConnection> OpenAsync(string projectPath, CancellationToken cancellationToken)
+    {
+        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = Path.GetFullPath(projectPath),
+            Mode = SqliteOpenMode.ReadWrite,
+            ForeignKeys = true,
+            Pooling = false,
+        }.ToString());
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return connection;
+    }
+
+    private sealed record RequestState(long StudentId, long SubjectId, int RequiredSessions, int AssignedSessions, bool OneToOneRequired);
 }

@@ -21,6 +21,8 @@ public sealed class SqliteScheduleRunServiceTests : IDisposable
         await using(var c=new SqliteConnection($"Data Source={path};Pooling=False")){await c.OpenAsync();await using var q=c.CreateCommand();q.CommandText=$"INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,{student.Id},{subject.Id},1);";await q.ExecuteNonQueryAsync();}
         var result=await new SqliteScheduleRunService().RunAsync(path,TimeSpan.FromSeconds(5));Assert.Equal(1,result.PlacedLessons);Assert.Equal(0,result.UnassignedLessons);
         await using var verify=new SqliteConnection($"Data Source={path};Mode=ReadOnly;Pooling=False");await verify.OpenAsync();await using var count=verify.CreateCommand();count.CommandText="SELECT COUNT(*) FROM Assignment WHERE Source='cp-sat';";Assert.Equal(1L,Convert.ToInt64(await count.ExecuteScalarAsync()));
+        count.CommandText="SELECT COUNT(*) FROM OptimizationRun WHERE Status='completed' AND UnassignedCount=0;";Assert.Equal(1L,Convert.ToInt64(await count.ExecuteScalarAsync()));
+        count.CommandText="SELECT SessionIndex FROM Assignment WHERE Source='cp-sat';";Assert.Equal(1L,Convert.ToInt64(await count.ExecuteScalarAsync()));
     }
     public void Dispose(){if(Directory.Exists(_directory))Directory.Delete(_directory,true);}
 }
