@@ -22,7 +22,13 @@
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Click="OpenProject_Click" Content="既存プロジェクトを開く" />
                         <Button Click="CloseProject_Click" Content="閉じる" />
+                        <Button Click="CreateBackup_Click" Content="バックアップを作成" />
+                        <Button Click="RestoreBackup_Click" Content="バックアップから復元" />
                     </StackPanel>
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="復元は選択したバックアップで現在のプロジェクトを置き換えます。置換前後に整合性を検証します。"
+                        TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
 

@@ -90,6 +90,7 @@ Next Version Rule:
 - backupは一時fileへ作成し、integrityとWinUI schemaを検証後に上書きなしで配置する。
 - restoreは置換用DBを先に検証し、`File.Replace`とrollback copyで原子的に差し替える。置換後検証失敗時は元DBへ戻す。
 - Release/x64 build: warning 0 / error 0。全24 tests passed。
+- Home画面から保存先folderを選ぶbackup作成と、確認dialog付きrestoreを実行できる。
 
 ### 次回最初に確認するファイル
 

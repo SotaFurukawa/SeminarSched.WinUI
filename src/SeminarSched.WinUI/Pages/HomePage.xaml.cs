@@ -100,6 +100,89 @@ public sealed partial class HomePage : Page
         ShowStatus(InfoBarSeverity.Informational, "プロジェクトを閉じました", string.Empty);
     }
 
+    private async void CreateBackup_Click(object sender, RoutedEventArgs e)
+    {
+        var current = App.ProjectService.Current;
+        if (current is null)
+        {
+            ShowStatus(InfoBarSeverity.Warning, "バックアップを作成できません", "先にプロジェクトを開いてください。");
+            return;
+        }
+
+        try
+        {
+            var picker = new FolderPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
+            picker.FileTypeFilter.Add("*");
+            InitializePicker(picker);
+            var folder = await picker.PickSingleFolderAsync();
+            if (folder is null)
+            {
+                return;
+            }
+
+            var backupName = $"{current.Title}_backup_{DateTime.Now:yyyyMMdd_HHmmss}{ProjectService.ProjectExtension}";
+            SetBusy(true);
+            var path = await App.ProjectService.CreateBackupAsync(Path.Combine(folder.Path, backupName));
+            ShowStatus(InfoBarSeverity.Success, "バックアップを作成しました", path);
+        }
+        catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            ShowStatus(InfoBarSeverity.Error, "バックアップを作成できませんでした", exception.Message);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private async void RestoreBackup_Click(object sender, RoutedEventArgs e)
+    {
+        if (App.ProjectService.Current is null)
+        {
+            ShowStatus(InfoBarSeverity.Warning, "復元できません", "復元先のプロジェクトを先に開いてください。");
+            return;
+        }
+
+        try
+        {
+            var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
+            picker.FileTypeFilter.Add(ProjectService.ProjectExtension);
+            InitializePicker(picker);
+            var file = await picker.PickSingleFileAsync();
+            if (file is null)
+            {
+                return;
+            }
+
+            var confirmation = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = "バックアップから復元しますか？",
+                Content = "現在のプロジェクトを選択したバックアップの内容で置き換えます。",
+                PrimaryButtonText = "復元する",
+                CloseButtonText = "キャンセル",
+                DefaultButton = ContentDialogButton.Close,
+            };
+            if (await confirmation.ShowAsync() != ContentDialogResult.Primary)
+            {
+                return;
+            }
+
+            SetBusy(true);
+            var restored = await App.ProjectService.RestoreBackupAsync(file.Path);
+            RefreshCurrentProject();
+            ShowStatus(InfoBarSeverity.Success, "プロジェクトを復元しました", restored.Title);
+        }
+        catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            ShowStatus(InfoBarSeverity.Error, "プロジェクトを復元できませんでした", exception.Message);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
     private void ProjectDefinition_Changed(object sender, object e) => RefreshGeneratedTitle();
 
     private CourseProjectDefinition BuildDefinition()
