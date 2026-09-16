@@ -46,6 +46,9 @@ public sealed partial class MainWindow : Window
                 case "about":
                     NavFrame.Navigate(typeof(AboutPage));
                     break;
+                case "optimization":
+                    NavFrame.Navigate(typeof(OptimizationPage));
+                    break;
                 default:
                     throw new InvalidOperationException($"Unknown navigation item tag: {item.Tag}");
             }

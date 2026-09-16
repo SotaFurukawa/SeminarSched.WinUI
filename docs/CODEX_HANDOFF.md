@@ -68,6 +68,13 @@ Next Version Rule:
 - `ScheduleEvaluation`はhard violation、未配置、重要希望違反、主要penalty、講師空き、分散、その他penalty、objectiveの順で比較する。
 - Release/x64 build: warning 0 / error 0。全15 tests passed。
 
+### v0.1.0 checkpoint 2
+
+- 時間割自動作成ページへ1〜5でsnapするWinUI Sliderと、名称・推定時間・strategy数・説明のリアルタイム表示を追加。
+- 初回はLevel 3。最後に選んだlevelを`%LOCALAPPDATA%\SeminarSched.WinUI\settings.json`へ原子的に保存・復元する。
+- settings書込は一時file成功後のreplaceで、slider連続操作は250ms debounceする。
+- Release/x64 build: warning 0 / error 0。全18 tests passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

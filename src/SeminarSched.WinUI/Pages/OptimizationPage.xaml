@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="SeminarSched_WinUI.Pages.OptimizationPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Loaded="Page_Loaded"
+    mc:Ignorable="d">
+
+    <ScrollViewer>
+        <StackPanel MaxWidth="760" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="20">
+            <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="時間割自動作成" />
+            <TextBlock
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="時間割データの作成機能は移植中です。品質設定は今から保存して次回起動時に復元できます。"
+                TextWrapping="Wrap" />
+
+            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                <StackPanel Spacing="12">
+                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="最適化品質" />
+                    <Grid ColumnSpacing="12">
+                        <TextBlock Text="高速" />
+                        <TextBlock HorizontalAlignment="Right" Text="最高品質" />
+                    </Grid>
+                    <Slider
+                        x:Name="QualitySlider"
+                        Minimum="1"
+                        Maximum="5"
+                        StepFrequency="1"
+                        TickFrequency="1"
+                        TickPlacement="BottomRight"
+                        SnapsTo="StepValues"
+                        Value="3"
+                        ValueChanged="QualitySlider_ValueChanged" />
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock HorizontalAlignment="Center" Text="1" />
+                        <TextBlock Grid.Column="1" HorizontalAlignment="Center" Text="2" />
+                        <TextBlock Grid.Column="2" HorizontalAlignment="Center" Text="3" />
+                        <TextBlock Grid.Column="3" HorizontalAlignment="Center" Text="4" />
+                        <TextBlock Grid.Column="4" HorizontalAlignment="Center" Text="5" />
+                    </Grid>
+
+                    <TextBlock Margin="0,8,0,0" FontSize="18" FontWeight="SemiBold" Text="{x:Bind ViewModel.LevelText, Mode=OneWay}" />
+                    <TextBlock FontSize="16" Text="{x:Bind ViewModel.DisplayName, Mode=OneWay}" />
+                    <TextBlock Text="{x:Bind ViewModel.EstimatedDuration, Mode=OneWay}" />
+                    <TextBlock Text="{x:Bind ViewModel.StrategySummary, Mode=OneWay}" />
+                    <TextBlock MaxWidth="640" HorizontalAlignment="Left" Text="{x:Bind ViewModel.Description, Mode=OneWay}" TextWrapping="Wrap" />
+                    <InfoBar
+                        x:Name="SaveErrorInfoBar"
+                        IsClosable="True"
+                        IsOpen="False"
+                        Message="品質設定を保存できませんでした。"
+                        Severity="Error"
+                        Title="設定の保存エラー" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

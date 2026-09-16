@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SeminarSched.Domain\SeminarSched.Domain.csproj" />
+    <ProjectReference Include="..\SeminarSched.Optimization\SeminarSched.Optimization.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

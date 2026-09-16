@@ -4,6 +4,8 @@ using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
+using SeminarSched.Application.Settings;
+using SeminarSched.Infrastructure.Settings;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -16,6 +18,12 @@ namespace SeminarSched_WinUI;
 public partial class App : Application
 {
     private Window? _window;
+
+    public static IAppSettingsStore SettingsStore { get; } = new JsonAppSettingsStore(
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "SeminarSched.WinUI",
+            "settings.json"));
 
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code

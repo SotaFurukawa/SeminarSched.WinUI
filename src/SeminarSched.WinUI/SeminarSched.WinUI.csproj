@@ -56,6 +56,7 @@
   <ItemGroup>
     <ProjectReference Include="..\SeminarSched.Application\SeminarSched.Application.csproj" />
     <ProjectReference Include="..\SeminarSched.Infrastructure\SeminarSched.Infrastructure.csproj" />
+    <ProjectReference Include="..\SeminarSched.Optimization\SeminarSched.Optimization.csproj" />
   </ItemGroup>
 
   <!--
