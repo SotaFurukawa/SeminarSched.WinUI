@@ -105,6 +105,14 @@ Next Version Rule:
 - 自動snapshotにもSQLite backup API、integrity検証、WinUI schema検証を適用する。
 - Release/x64 build: warning 0 / error 0。全26 tests passed。
 
+### v0.1.0 checkpoint 7
+
+- profileのstageと時間予算に従ってstrategyを実行するgeneric `ScheduleOptimizer`を追加。
+- 全候補を共通辞書式Evaluatorで比較し、stageごとに上位候補だけを次段hintへ進める。
+- 最大時間、strategy別時間、停滞早期終了、progress、通常cancel、現在best採用を分離した。
+- 実CP-SATの複数strategyは未実装。ユーザー方針によりPython v1.9.5 parityを先に進め、後段へ保留する。
+- Release/x64 build: warning 0 / error 0。全29 tests passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

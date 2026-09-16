@@ -34,9 +34,9 @@
 | 辞書式目的・公平性 | objectives | 未実装 | 未実装 | 未配置、分散、講師公平性 |
 | 高速/標準/高品質 | optimization view model | 未実装 | 未実装 | 30/120/600秒 |
 | 5段階の最適化品質profile | 追加仕様 | profile catalog / slider / JSON設定 | 実装中 | strategy実装・実行中UIは未完了 |
-| 高品質トーナメント探索 | 追加仕様 | stage・時間配分定義 | 実装中 | optimizer orchestrationとbenchmarkは未完了 |
-| 現在best採用/キャンセル分離 | 追加仕様 | 未実装 | 未実装 | validator・transaction境界必須 |
-| progress/cancel | worker / solver callback | 未実装 | 未実装 | UI threadを停止しない |
+| 高品質トーナメント探索 | 追加仕様 | 共通optimizer orchestration・候補選抜 | 実装中 | 実CP-SAT複数戦略とbenchmarkは後段へ保留 |
+| 現在best採用/キャンセル分離 | 追加仕様 | execution API上で分離・部分結果test | 実装中 | UI接続とvalidator・transaction境界は未実装 |
+| progress/cancel | worker / solver callback | 非同期progress DTO・cancel API | 実装中 | 実solverとUIへの接続は未実装 |
 | solver独立validator | result validation | 未実装 | 未実装 | 保存前必須 |
 | optimization transaction保存 | optimization run service | 未実装 | 未実装 | fingerprint照合 |
 | 時間割grid | schedule editor QML | 未実装 | 未実装 | virtualization必須 |
