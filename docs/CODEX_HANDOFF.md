@@ -137,6 +137,13 @@ Next Version Rule:
 - Release/x64 build: warning 0 / error 0。全39 tests passed。
 - Release境界を更新: Python v1.9.5 parity完成=`v0.1.0` Draft、追加の複数strategy最適化完成=`v0.2.0` Draft。
 
+### v0.1.0 checkpoint 11
+
+- ②アンケート作成で、①の開校日・有効コマ・科目を埋め込んだGoogle Apps Script kitを生成可能。
+- 出力は新規一時folderへCode.gs/READMEを書き、全成功後だけ最終folder名へ移動する。同名上書きなし。
+- 現段階のフォームは生徒ID・科目・参加可能コマ、講師ID・勤務可能コマの基本版。Python版の学年別分岐等は未完。
+- Release/x64 build: warning 0 / error 0。全40 tests passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

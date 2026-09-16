@@ -21,7 +21,7 @@
 | 共通基本情報Excel | master Excel service | 未実装 | 未実装 | 5sheet、preview、transaction |
 | 講習設定 | phase2 models/view model | 期間内日付・開校/休校・日別有効コマの保存UI | 実装中 | note編集・一括操作拡充は未実装 |
 | コマ設定・並べ替え | phase2 UI/service | コマ追加・表示順・時刻範囲・一覧UI | 実装中 | 編集・無効化・drag並べ替えは未実装 |
-| Google Forms作成kit | questionnaire script service | 未実装 | 未実装 | 外部通信なし |
+| Google Forms作成kit | questionnaire script service | 設定値入りCode.gs・READMEのatomic生成UI | 実装中 | Python版の学年分岐・全質問・診断は未移植 |
 | 生徒回答・講師回答2file選択 | import UI/service | 未実装 | 未実装 | CSV/XLSX |
 | CSV UTF-8/CP932・旧形式 | importing readers | 未実装 | 未実装 | 正規化mapping |
 | import preview/diff | importing diff | 未実装 | 未実装 | error/warning/削除候補 |
