@@ -14,6 +14,8 @@ using SeminarSched.Infrastructure.CourseSettings;
 using SeminarSched.Application.Questionnaires;
 using SeminarSched.Application.Importing;
 using SeminarSched.Infrastructure.Importing;
+using SeminarSched.Application.Scheduling;
+using SeminarSched.Infrastructure.Scheduling;
 using SeminarSched.Infrastructure.Settings;
 
 // To learn more about WinUI, the WinUI project structure,
@@ -47,6 +49,8 @@ public partial class App : Application
     public static QuestionnaireKitService QuestionnaireKit { get; } = new(CourseSettings, MasterData);
 
     public static IResponseImportService ResponseImport { get; } = new CsvResponseImportService();
+
+    public static IFixedLessonService FixedLessons { get; } = new SqliteFixedLessonService();
 
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code

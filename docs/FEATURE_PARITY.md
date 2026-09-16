@@ -26,7 +26,7 @@
 | CSV UTF-8/CP932・旧形式 | importing readers | quoted UTF-8 CSV reader | 実装中 | CP932・旧形式の正規化mappingは未実装 |
 | import preview/diff | importing diff | 全行参照検証・issue一覧・件数preview | 実装中 | 詳細diff・warning・削除候補は未実装 |
 | import transaction/AuditLog | availability import service | SHA-256再検証・単一transaction反映 | 実装中 | AuditLog・生徒availabilityは未実装 |
-| availability一括編集 | phase3 UI/service | 未実装 | 未実装 | 日付・コマ単位 |
+| availability一括編集 | phase3 UI/service | 講師CSV勤務不可のtransaction保存 | 実装中 | 生徒availabilityと手動matrix UIは未実装 |
 | candidate生成 | optimization candidates | 未実装 | 未実装 | 疎な候補集合 |
 | greedy初期解・complete hint | initial solution | 未実装 | 未実装 | 独立検証後hint |
 | CP-SAT hard constraints | OR-Tools optimizer | 未実装 | 未実装 | 容量、資格、availability等 |
@@ -41,7 +41,7 @@
 | optimization transaction保存 | optimization run service | 未実装 | 未実装 | fingerprint照合 |
 | 時間割grid | schedule editor QML | 未実装 | 未実装 | virtualization必須 |
 | drag/drop手動配置 | schedule edit service | 未実装 | 未実装 | hard violation拒否 |
-| manual/lock semantics | manual edit tests | 未実装 | 未実装 | 手動配置は再移動可・再最適化保持 |
+| manual/lock semantics | manual edit tests | ④固定Assignment追加・解除UI | 実装中 | ⑤手動配置・再最適化保持は未実装 |
 | Undo/Redo | command stack | 未実装 | 未実装 | process内のみ |
 | 講師一時表示・availability編集 | editor UI/service | 未実装 | 未実装 | 不可コマgray |
 | 検索・scroll同期 | editor QML | 未実装 | 未実装 | header/row/grid同期 |

@@ -152,6 +152,13 @@ Next Version Rule:
 - XLSX、CP932、Google Forms生CSVの列mapping、生徒availability、AuditLogは未実装。
 - Release/x64 build: warning 0 / error 0。全41 tests passed。
 
+### v0.1.0 checkpoint 13
+
+- ④で受講希望・講師・開校日コマを選び、固定Assignmentを追加・解除可能。
+- 保存前に開校コマ、講師の明示的な指導可、同時刻の同一生徒・同一講師重複をtransaction内で検証する。
+- ⑤の自動作成は`IsLocked=1`を固定入力として扱う設計境界になった。
+- Release/x64 build: warning 0 / error 0。全43 tests passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`
