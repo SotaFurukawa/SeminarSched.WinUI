@@ -26,6 +26,7 @@ public sealed partial class OptimizationPage : Page
             ViewModel.Select((int)settings.OptimizationQualityLevel);
             QualitySlider.Value = ViewModel.SliderValue;
             _isLoaded = true;
+            RunButton.IsEnabled = App.ProjectService.Current is not null;
         }
         catch (IOException)
         {
@@ -37,6 +38,20 @@ public sealed partial class OptimizationPage : Page
             SaveErrorInfoBar.IsOpen = true;
             _isLoaded = true;
         }
+    }
+
+    private async void Run_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            RunButton.IsEnabled=false;RunProgress.IsActive=true;RunStatus.IsOpen=false;
+            var profile=SeminarSched.Optimization.Profiles.OptimizationProfileCatalog.Get(ViewModel.Level);
+            var result=await App.ScheduleRun.RunAsync(App.ProjectService.Current!.Path,profile.MaximumDuration);
+            RunStatus.Severity=InfoBarSeverity.Success;RunStatus.Title="時間割を作成しました";RunStatus.Message=$"配置 {result.PlacedLessons}件、未配置 {result.UnassignedLessons}件、{result.Elapsed.TotalSeconds:F1}秒";RunStatus.IsOpen=true;
+        }
+        catch(Exception ex) when(ex is InvalidOperationException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
+        {RunStatus.Severity=InfoBarSeverity.Error;RunStatus.Title="時間割を作成できませんでした";RunStatus.Message=ex.Message;RunStatus.IsOpen=true;}
+        finally{RunProgress.IsActive=false;RunButton.IsEnabled=App.ProjectService.Current is not null;}
     }
 
     private void QualitySlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)

@@ -52,6 +52,8 @@ public partial class App : Application
 
     public static IFixedLessonService FixedLessons { get; } = new SqliteFixedLessonService();
 
+    public static IScheduleRunService ScheduleRun { get; } = new SqliteScheduleRunService();
+
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code
     /// executed, and as such is the logical equivalent of main() or WinMain().

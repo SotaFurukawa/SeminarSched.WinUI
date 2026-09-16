@@ -159,6 +159,14 @@ Next Version Rule:
 - ⑤の自動作成は`IsLocked=1`を固定入力として扱う設計境界になった。
 - Release/x64 build: warning 0 / error 0。全43 tests passed。
 
+### v0.1.0 checkpoint 14
+
+- Google.OrTools 9.15.6755を固定し、ADR 0003へsolver/validator/transaction境界を記録。
+- SQLite正本から候補を構築し、単一CP-SATで要求回数最大化、生徒・講師同時刻衝突回避、固定授業保持を実装。
+- solver結果は純粋validator後、DB正本に対して開校コマ・指導可・勤務不可・衝突・回数超過を再検証し、未固定Assignmentだけをatomic置換する。
+- ⑤UIから非同期実行し、配置数・未配置数・時間を表示する。複数strategyはv0.2.0。
+- Release/x64 build: warning 0 / error 0。全46 tests passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

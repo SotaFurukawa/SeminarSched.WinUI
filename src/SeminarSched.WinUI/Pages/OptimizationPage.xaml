@@ -13,7 +13,7 @@
             <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="時間割自動作成" />
             <TextBlock
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="時間割データの作成機能は移植中です。品質設定は今から保存して次回起動時に復元できます。"
+                Text="固定授業を保持し、指導可能な講師と開校コマからCP-SATで時間割を作成します。"
                 TextWrapping="Wrap" />
 
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
@@ -61,6 +61,9 @@
                         Severity="Error"
                         Title="設定の保存エラー" />
                 </StackPanel>
+            </Border>
+            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                <StackPanel Spacing="12"><TextBlock FontSize="20" FontWeight="SemiBold" Text="自動作成"/><InfoBar x:Name="RunStatus" IsClosable="True"/><Button x:Name="RunButton" Content="時間割を自動作成" Click="Run_Click" Style="{StaticResource AccentButtonStyle}"/><ProgressRing x:Name="RunProgress" IsActive="False" HorizontalAlignment="Left"/><TextBlock Text="現時点のv0.1.0 solverは単一CP-SAT戦略です。複数戦略はv0.2.0で接続します。" TextWrapping="Wrap"/></StackPanel>
             </Border>
         </StackPanel>
     </ScrollViewer>

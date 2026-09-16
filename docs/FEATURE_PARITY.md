@@ -27,9 +27,9 @@
 | import preview/diff | importing diff | 全行参照検証・issue一覧・件数preview | 実装中 | 詳細diff・warning・削除候補は未実装 |
 | import transaction/AuditLog | availability import service | SHA-256再検証・単一transaction反映 | 実装中 | AuditLog・生徒availabilityは未実装 |
 | availability一括編集 | phase3 UI/service | 講師CSV勤務不可のtransaction保存 | 実装中 | 生徒availabilityと手動matrix UIは未実装 |
-| candidate生成 | optimization candidates | 未実装 | 未実装 | 疎な候補集合 |
-| greedy初期解・complete hint | initial solution | 未実装 | 未実装 | 独立検証後hint |
-| CP-SAT hard constraints | OR-Tools optimizer | 未実装 | 未実装 | 容量、資格、availability等 |
+| candidate生成 | optimization candidates | SQLite正本から資格・開校・勤務不可・固定衝突を除く候補 | 実装中 | 生徒availability・容量2等を拡張中 |
+| greedy初期解・complete hint | initial solution | 未実装 | 未実装 | v0.2.0複数strategy側で実装 |
+| CP-SAT hard constraints | OR-Tools optimizer | 単一CP-SAT、要求回数・生徒/講師衝突・固定保持 | 実装中 | Python版全hard/soft objectiveは未移植 |
 | 通常担当優先度1〜5 | objectives/constraints | 未実装 | 未実装 | v1.9.5挙動を正本とする |
 | 辞書式目的・公平性 | objectives | 未実装 | 未実装 | 未配置、分散、講師公平性 |
 | 高速/標準/高品質 | optimization view model | 未実装 | 未実装 | 30/120/600秒 |
@@ -37,8 +37,8 @@
 | 高品質トーナメント探索 | 追加仕様 | 共通optimizer orchestration・候補選抜 | 実装中 | 実CP-SAT複数戦略とbenchmarkは後段へ保留 |
 | 現在best採用/キャンセル分離 | 追加仕様 | execution API上で分離・部分結果test | 実装中 | UI接続とvalidator・transaction境界は未実装 |
 | progress/cancel | worker / solver callback | 非同期progress DTO・cancel API | 実装中 | 実solverとUIへの接続は未実装 |
-| solver独立validator | result validation | 未実装 | 未実装 | 保存前必須 |
-| optimization transaction保存 | optimization run service | 未実装 | 未実装 | fingerprint照合 |
+| solver独立validator | result validation | 純粋validator＋DB保存前validator | 実装中 | Python版全診断codeは未移植 |
+| optimization transaction保存 | optimization run service | 固定保持・未固定atomic置換 | 実装中 | input fingerprint永続化は未実装 |
 | 時間割grid | schedule editor QML | 未実装 | 未実装 | virtualization必須 |
 | drag/drop手動配置 | schedule edit service | 未実装 | 未実装 | hard violation拒否 |
 | manual/lock semantics | manual edit tests | ④固定Assignment追加・解除UI | 実装中 | ⑤手動配置・再最適化保持は未実装 |
