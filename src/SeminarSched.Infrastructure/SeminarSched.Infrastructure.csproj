@@ -4,6 +4,7 @@
     <ProjectReference Include="..\SeminarSched.Application\SeminarSched.Application.csproj" />
     <ProjectReference Include="..\SeminarSched.Domain\SeminarSched.Domain.csproj" />
     <ProjectReference Include="..\SeminarSched.Optimization\SeminarSched.Optimization.csproj" />
+    <ProjectReference Include="..\SeminarSched.Reporting\SeminarSched.Reporting.csproj" />
   </ItemGroup>
 
   <ItemGroup>

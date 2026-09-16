@@ -16,6 +16,8 @@ using SeminarSched.Application.Importing;
 using SeminarSched.Infrastructure.Importing;
 using SeminarSched.Application.Scheduling;
 using SeminarSched.Infrastructure.Scheduling;
+using SeminarSched.Application.Output;
+using SeminarSched.Infrastructure.Output;
 using SeminarSched.Infrastructure.Settings;
 
 // To learn more about WinUI, the WinUI project structure,
@@ -53,6 +55,8 @@ public partial class App : Application
     public static IFixedLessonService FixedLessons { get; } = new SqliteFixedLessonService();
 
     public static IScheduleRunService ScheduleRun { get; } = new SqliteScheduleRunService();
+
+    public static IOutputPackageService OutputPackage { get; } = new SqliteOutputPackageService();
 
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code

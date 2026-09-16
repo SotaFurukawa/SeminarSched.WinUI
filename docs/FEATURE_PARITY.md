@@ -46,12 +46,12 @@
 | 講師一時表示・availability編集 | editor UI/service | 未実装 | 未実装 | 不可コマgray |
 | 検索・scroll同期 | editor QML | 未実装 | 未実装 | header/row/grid同期 |
 | 未配置・警告 | diagnostics/output | 未実装 | 未実装 | 通常担当不足を含む |
-| 全体時間割Excel/PDF | reporting/output service | 未実装 | 未実装 | 日曜始まり週単位 |
+| 全体時間割Excel/PDF | reporting/output service | 共通snapshotからExcel/PDF atomic生成 | 実装中 | Python版週カレンダーlayoutは未移植 |
 | 生徒配布時間割Excel/PDF | reporting renderers | 未実装 | 未実装 | 不参加一覧を含む |
 | 講師配布（学年順） | reporting renderers | 未実装 | 未実装 | A4 calendar |
 | 講師配布（講師別） | reporting renderers | 未実装 | 未実装 | 講師別folder |
-| 未配置・警告一覧出力 | output service | 未実装 | 未実装 | 5種類目 |
-| atomic export・上書き確認 | output service | 未実装 | 未実装 | validator再実行 |
+| 未配置・警告一覧出力 | output service | 未配置回数をExcel/PDFへ出力 | 実装中 | Python版全5種類診断は未移植 |
+| atomic export・上書き確認 | output service | integrity再確認・新規一時folder・上書きなし | 実装中 | 個別file選択とpreviewは未実装 |
 | 設定・logging | settings/logging | 未実装 | 未実装 | 個人情報を記録しない |
 | 集団授業DB/service互換 | group lesson service | 未実装 | 保留 | v1.9.5同様UI停止中 |
 | Windows配布・受入 | packaging/release tests | CI基盤のみ | 実装中 | installer/portable方針は未決 |

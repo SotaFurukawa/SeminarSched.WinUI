@@ -167,6 +167,14 @@ Next Version Rule:
 - ⑤UIから非同期実行し、配置数・未配置数・時間を表示する。複数strategyはv0.2.0。
 - Release/x64 build: warning 0 / error 0。全46 tests passed。
 
+### v0.1.0 checkpoint 15
+
+- ClosedXML 0.105.1とPDFsharp-MigraDoc 6.2.4をMIT license確認のうえ固定し、ADR 0004へ記録。
+- ⑥でDB integrity再確認後、全体時間割と未配置一覧を共通snapshotからExcel/PDFへ生成する。
+- 一時folderですべて成功した場合だけ最終folderへ移動し、既存出力を上書きしない。
+- Windows日本語TTF resolverを追加し、実PDF signatureとXLSXサイズをtest。Python版の5帳票すべては未完。
+- Release/x64 build: warning 0 / error 0。全47 tests passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`
