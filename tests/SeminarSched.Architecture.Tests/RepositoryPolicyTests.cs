@@ -7,11 +7,11 @@ public sealed class RepositoryPolicyTests
     private static readonly string RepositoryRoot = FindRepositoryRoot();
 
     [Fact]
-    public void CentralVersion_StartsAtBetaZero()
+    public void CentralVersion_IsCurrentBetaVersion()
     {
         var document = XDocument.Load(Path.Combine(RepositoryRoot, "Directory.Build.props"));
 
-        Assert.Equal("0.0.0", document.Descendants("VersionPrefix").Single().Value);
+        Assert.Equal("0.1.0", document.Descendants("VersionPrefix").Single().Value);
         Assert.Equal("beta", document.Descendants("VersionSuffix").Single().Value);
     }
 

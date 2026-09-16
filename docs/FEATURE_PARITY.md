@@ -33,6 +33,9 @@
 | 通常担当優先度1〜5 | objectives/constraints | 未実装 | 未実装 | v1.9.5挙動を正本とする |
 | 辞書式目的・公平性 | objectives | 未実装 | 未実装 | 未配置、分散、講師公平性 |
 | 高速/標準/高品質 | optimization view model | 未実装 | 未実装 | 30/120/600秒 |
+| 5段階の最適化品質profile | 追加仕様 | profile catalog / 辞書式評価 | 実装中 | UI、永続化、strategy実装は未完了 |
+| 高品質トーナメント探索 | 追加仕様 | stage・時間配分定義 | 実装中 | optimizer orchestrationとbenchmarkは未完了 |
+| 現在best採用/キャンセル分離 | 追加仕様 | 未実装 | 未実装 | validator・transaction境界必須 |
 | progress/cancel | worker / solver callback | 未実装 | 未実装 | UI threadを停止しない |
 | solver独立validator | result validation | 未実装 | 未実装 | 保存前必須 |
 | optimization transaction保存 | optimization run service | 未実装 | 未実装 | fingerprint照合 |

@@ -6,13 +6,14 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.0.0 (beta)`
-Latest Version Commit: `65129cd`（`v0.0.0` tag target）
+Current Version: `v0.1.0 (beta)`（実装中・未Release）
+Latest Stable Development Commit: `65129cd`（`v0.0.0` tag target）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Next Version Rule:
 
-- Bug fix / minor change -> `v0.0.1`
-- New feature -> `v0.1.0`
+- v0.1.0開発中の追加・修正 -> 同一作業単位として`v0.1.0`へ集約
+- v0.1.0 Draft Release後のbug fix / minor change -> `v0.1.1`
+- v0.1.0 Draft Release後のnew feature -> `v0.2.0`
 - `v1.0.0` -> ユーザーの明示指示がある場合のみ
 
 ### 実装済み
@@ -51,6 +52,21 @@ Next Version Rule:
 1. Phase W1を`v0.1.0`として開始し、業務flowのNavigationViewとproject lifecycleの最小縦sliceを実装する。
 2. `.jukuschedule`互換、SQLite migration、配布形式、最終licenseは個別ADRを先に作成する。
 3. UI実機確認が必要になった時点でWindows Developer Modeを有効化する。
+
+### v0.1.0実装方針（2026-09-17開始）
+
+- ユーザー指示により、Python版v1.9.5の全利用者向け機能と最適化品質スライダーを`v0.1.0`へまとめる。
+- 機能単位でbuild/test/commit/pushするが、`v0.1.0` Draft Releaseは全対象の完了後に作成する。
+- 問題箇所は保留理由と再開条件を本書・Feature Parityへ記録し、独立して進められる実装を継続する。
+- 最適化の探索戦略、validator、transaction保存はUIから分離し、品質レベルは設定profileとして管理する。
+
+### v0.1.0 checkpoint 1
+
+- version正本を`0.1.0-beta`へ更新。MSIX/app manifestも`0.1.0.0`へ同期。
+- ADR 0002で5段階品質profile、トーナメント探索、共通辞書式評価、best採用/cancel分離を決定。
+- `OptimizationProfileCatalog`へLevel 1〜5の時間予算、停滞終了、stage、strategy構成を集約。
+- `ScheduleEvaluation`はhard violation、未配置、重要希望違反、主要penalty、講師空き、分散、その他penalty、objectiveの順で比較する。
+- Release/x64 build: warning 0 / error 0。全15 tests passed。
 
 ### 次回最初に確認するファイル
 
