@@ -7,8 +7,8 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.0.0 (beta)`
-Latest Commit: `HEAD`（`v0.0.0` tag target。初回commit後に確定）
-Latest Draft Release: `v0.0.0` notes prepared / GitHub未作成（`gh`未認証）
+Latest Version Commit: `65129cd`（`v0.0.0` tag target）
+Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Next Version Rule:
 
 - Bug fix / minor change -> `v0.0.1`
@@ -33,19 +33,24 @@ Next Version Rule:
 - `scripts/Test-RepositoryPrivacy.ps1`: passed
 - Python参照repoはcommit `1d323a4`のまま。WinUI作業による変更なし
 
+### Git / GitHub
+
+- GitHub CLI 2.101.0: `C:\Users\sota1\.local\gh\bin\gh.exe`
+- Repository: `https://github.com/SotaFurukawa/SeminarSched.WinUI`（private）
+- `main`と`v0.0.0`はpush済み。
+- `v0.0.0 (beta)` Draft Release作成済み。公開していない。
+- CI workflowはpushを受理し、run `35118906674`が開始されたことだけ確認済み。完了までの長時間監視は行っていない。
+
 ### 未完了・blocker
 
-- GitHub CLI 2.101.0は`C:\Users\sota1\.local\gh\bin\gh.exe`へ導入済みだが、GitHub hostへ未認証。
-- そのため`SotaFurukawa/SeminarSched.WinUI`の存在確認、作成、push、Draft Release作成は未実施。
 - `dotnet run`による起動を試行したが、端末のWindows Developer Modeが無効なためpackaged app登録前に停止した。buildとXAML compileは成功済み。
 - ReadyToRunとtrimは、RID別配布profileとWinRT trim検証を設計するまで無効化している。
 
 ### 次に行うこと
 
-1. GitHub認証後、同名repoの存在を確認する。存在しなければprivate repoとして作成する。
-2. `main`と`v0.0.0` tagをpushし、`docs/releases/v0.0.0.md`からDraft Releaseを作成する。
-3. Phase W1を`v0.1.0`として開始し、業務flowのNavigationViewとproject lifecycleの最小縦sliceを実装する。
-4. `.jukuschedule`互換、SQLite migration、配布形式、最終licenseは個別ADRを先に作成する。
+1. Phase W1を`v0.1.0`として開始し、業務flowのNavigationViewとproject lifecycleの最小縦sliceを実装する。
+2. `.jukuschedule`互換、SQLite migration、配布形式、最終licenseは個別ADRを先に作成する。
+3. UI実機確認が必要になった時点でWindows Developer Modeを有効化する。
 
 ### 次回最初に確認するファイル
 
