@@ -182,6 +182,13 @@ Next Version Rule:
 - Python版の週calendar、欠席一覧、講師別folder packetは未完。
 - Release/x64 build: warning 0 / error 0。帳票実ファイルtest passed。
 
+### v0.1.0 checkpoint 17
+
+- Homeから現在のprojectを別名複製し、検証済みの複製先へ作業対象を切り替えられる。
+- 複製はExplorerの通常copyではなくSQLite backup APIを使い、同名ファイルは上書きしない。
+- 元projectが不変であること、既存の複製先を保護することをapplication testで固定。
+- Release/x64 build: warning 0 / error 0。49 tests passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

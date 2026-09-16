@@ -73,6 +73,22 @@ public sealed class ProjectService
         return Current;
     }
 
+    public async Task<ProjectSummary> SaveAsAsync(
+        string destinationPath,
+        CancellationToken cancellationToken = default)
+    {
+        var current = Current ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
+        var target = NormalizeProjectPath(destinationPath);
+        if (File.Exists(target))
+        {
+            throw new IOException("同名のプロジェクトが既に存在します。上書きは行いません。");
+        }
+
+        await _repository.CreateBackupAsync(current.Path, target, cancellationToken).ConfigureAwait(false);
+        Current = await _repository.OpenAsync(target, cancellationToken).ConfigureAwait(false);
+        return Current;
+    }
+
     public static string NormalizeProjectPath(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);

@@ -24,6 +24,7 @@
                         <Button Click="CloseProject_Click" Content="閉じる" />
                         <Button Click="CreateBackup_Click" Content="バックアップを作成" />
                         <Button Click="RestoreBackup_Click" Content="バックアップから復元" />
+                        <Button Click="SaveAs_Click" Content="複製して切り替え" />
                     </StackPanel>
                     <TextBlock
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"

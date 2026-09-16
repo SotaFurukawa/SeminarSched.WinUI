@@ -6,10 +6,10 @@
 |---|---|---|---|---|
 | アプリ起動・version/About表示 | UI / release metadata | WinUI shell / assembly metadata | 実装済み | v0.0.0。UI実機確認は未完了 |
 | NavigationView業務導線 | QML workflow shell | ①設定〜⑥出力の6段階flow | 実装中 | ②〜④・⑥は未接続機能を明示する骨格 |
-| Home dashboard | workspace view model / QML | project作成・open・close UI | 実装中 | recent projectと主要導線は未実装 |
+| Home dashboard | workspace view model / QML | project作成・open・close・backup・restore・複製UI | 実装中 | 主要導線は実装済み。recentの手動非表示は未実装 |
 | 新規project作成 | project service | 年度・講習区分・期間・開講日を持つWinUI schema v1 | 実装中 | SQLite整合性確認後にatomic move |
 | `.jukuschedule` open | project service / SQLite | WinUI schema v1の検証付きread/open | 実装中 | Python版は直接変更せず、copy-first importを別途設計 |
-| 別名保存・複製 | project service | 未実装 | 未実装 | 原子的処理 |
+| 別名保存・複製 | project service | SQLite backup APIで検証付き複製を作成し、複製先へ切り替え | 実装済み | 元DB不変・上書き拒否を自動テスト |
 | 最近使用・非表示 | workspace view model | 最大10件の履歴・再open・欠損時自動除去 | 実装中 | 手動非表示操作は未実装 |
 | migration・整合性確認 | Alembic / project service | 未実装 | 未実装 | migration前backup必須 |
 | 自動backup・世代管理 | recovery service | UIからのSQLite backup API検証付きsnapshot | 実装中 | 自動実行と世代管理は未実装 |
