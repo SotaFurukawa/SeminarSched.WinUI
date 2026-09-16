@@ -22,11 +22,11 @@
 | 講習設定 | phase2 models/view model | 期間内日付・開校/休校・日別有効コマの保存UI | 実装中 | note編集・一括操作拡充は未実装 |
 | コマ設定・並べ替え | phase2 UI/service | コマ追加・表示順・時刻範囲・一覧UI | 実装中 | 編集・無効化・drag並べ替えは未実装 |
 | Google Forms作成kit | questionnaire script service | 設定値入りCode.gs・READMEのatomic生成UI | 実装中 | Python版の学年分岐・全質問・診断は未移植 |
-| 生徒回答・講師回答2file選択 | import UI/service | 2つのUTF-8 CSV選択UI | 実装中 | XLSXとGoogle生CSV mappingは未実装 |
-| CSV UTF-8/CP932・旧形式 | importing readers | quoted UTF-8 CSV reader | 実装中 | CP932・旧形式の正規化mappingは未実装 |
+| 生徒回答・講師回答2file選択 | import UI/service | CSV/XLSXの2file選択UI | 実装中 | sheet選択とGoogle Forms生列mapping UIは未実装 |
+| CSV UTF-8/CP932・旧形式 | importing readers | quoted CSV・BOM/UTF-8/CP932自動判定・XLSX先頭sheet | 実装中 | 生Google Forms回答の自動mappingは未実装 |
 | import preview/diff | importing diff | 全行参照検証・issue一覧・件数preview | 実装中 | 詳細diff・warning・削除候補は未実装 |
-| import transaction/AuditLog | availability import service | SHA-256再検証・単一transaction反映 | 実装中 | AuditLog・生徒availabilityは未実装 |
-| availability一括編集 | phase3 UI/service | 講師CSV勤務不可のtransaction保存 | 実装中 | 生徒availabilityと手動matrix UIは未実装 |
+| import transaction/AuditLog | availability import service | SHA-256再検証・単一transaction反映・ImportBatch・原本BLOB snapshot・AuditLog | 実装中 | 詳細diff表示とmapping保存は未実装 |
+| availability一括編集 | phase3 UI/service | 生徒/講師の日付・コマ別0/1/2取込、講師不可と同期 | 実装中 | 手動matrix UIは未実装 |
 | candidate生成 | optimization candidates | SQLite正本から資格・開校・勤務不可・固定衝突を除く候補 | 実装中 | 生徒availability・容量2等を拡張中 |
 | greedy初期解・complete hint | initial solution | 未実装 | 未実装 | v0.2.0複数strategy側で実装 |
 | CP-SAT hard constraints | OR-Tools optimizer | 単一CP-SAT、要求回数・生徒/講師衝突・固定保持 | 実装中 | Python版全hard/soft objectiveは未移植 |

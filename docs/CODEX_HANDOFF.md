@@ -197,6 +197,14 @@ Next Version Rule:
 - v1を開く際はSQLite backup APIで`*_before_migration_v1_*`を作成してからtransaction migrationし、失敗時はbackupから復元する。
 - Release/x64 build: warning 0 / error 0。50 tests passed。Privacy gate passed。
 
+### v0.1.0 checkpoint 19
+
+- ③取込みでCSVのBOM付きUTF-8・UTF-8・CP932自動判定とXLSX先頭sheet読み込みを追加。
+- 従来の必要回数/勤務不可形式に加え、生徒・講師の日付×コマの可用性level 0/1/2、生徒の第1〜3希望講師を全行検証・反映。
+- 日付・コマ検証を`OpenDateTimeSlot`まで含むよう修正し、日別に無効なコマを拒否。
+- 取込原本のBLOB/SHA-256 snapshot、ImportBatch、個人情報をメッセージに含めないAuditLogを可用性反映と同一transactionで保存。
+- CP932講師CSVとXLSX生徒回答の混在取込みtestで可用性・希望講師・snapshot・監査履歴を検証。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`
