@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using SeminarSched.Application.Projects;
+using SeminarSched.Application.Settings;
 using SeminarSched.Domain.Projects;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -14,7 +15,7 @@ public sealed partial class HomePage : Page
         InitializeComponent();
     }
 
-    private void Page_Loaded(object sender, RoutedEventArgs e)
+    private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         if (AcademicYearBox.Value == 0)
         {
@@ -27,6 +28,7 @@ public sealed partial class HomePage : Page
 
         RefreshGeneratedTitle();
         RefreshCurrentProject();
+        await RefreshRecentProjectsAsync();
     }
 
     private async void CreateProject_Click(object sender, RoutedEventArgs e)
@@ -49,7 +51,9 @@ public sealed partial class HomePage : Page
             var path = Path.Combine(folder.Path, definition.Title + ProjectService.ProjectExtension);
             SetBusy(true);
             var summary = await App.ProjectService.CreateAsync(path, definition);
+            await App.RecentProjects.TouchAsync(summary.Path, summary.Title);
             RefreshCurrentProject();
+            await RefreshRecentProjectsAsync();
             ShowStatus(InfoBarSeverity.Success, "プロジェクトを作成しました", summary.Title);
         }
         catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
@@ -80,7 +84,9 @@ public sealed partial class HomePage : Page
 
             SetBusy(true);
             var summary = await App.ProjectService.OpenAsync(file.Path);
+            await App.RecentProjects.TouchAsync(summary.Path, summary.Title);
             RefreshCurrentProject();
+            await RefreshRecentProjectsAsync();
             ShowStatus(InfoBarSeverity.Success, "プロジェクトを開きました", summary.Title);
         }
         catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException)
@@ -98,6 +104,52 @@ public sealed partial class HomePage : Page
         App.ProjectService.Close();
         RefreshCurrentProject();
         ShowStatus(InfoBarSeverity.Informational, "プロジェクトを閉じました", string.Empty);
+    }
+
+    private async void RecentProject_ItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is not RecentProjectEntry entry)
+        {
+            return;
+        }
+
+        try
+        {
+            SetBusy(true);
+            var summary = await App.ProjectService.OpenAsync(entry.Path);
+            await App.RecentProjects.TouchAsync(summary.Path, summary.Title);
+            RefreshCurrentProject();
+            await RefreshRecentProjectsAsync();
+            ShowStatus(InfoBarSeverity.Success, "プロジェクトを開きました", summary.Title);
+        }
+        catch (FileNotFoundException)
+        {
+            await App.RecentProjects.RemoveAsync(entry.Path);
+            await RefreshRecentProjectsAsync();
+            ShowStatus(InfoBarSeverity.Warning, "プロジェクトが見つかりません", "履歴から削除しました。");
+        }
+        catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            ShowStatus(InfoBarSeverity.Error, "プロジェクトを開けませんでした", exception.Message);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private async Task RefreshRecentProjectsAsync()
+    {
+        try
+        {
+            var entries = await App.RecentProjects.GetAsync();
+            RecentProjectsList.ItemsSource = entries;
+            NoRecentProjectsText.Visibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            ShowStatus(InfoBarSeverity.Warning, "最近使ったプロジェクトを読み込めませんでした", exception.Message);
+        }
     }
 
     private async void CreateBackup_Click(object sender, RoutedEventArgs e)

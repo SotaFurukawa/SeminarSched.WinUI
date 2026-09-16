@@ -31,6 +31,8 @@ public partial class App : Application
 
     public static ProjectService ProjectService { get; } = new(new SqliteProjectRepository());
 
+    public static RecentProjectService RecentProjects { get; } = new(SettingsStore);
+
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code
     /// executed, and as such is the logical equivalent of main() or WinMain().

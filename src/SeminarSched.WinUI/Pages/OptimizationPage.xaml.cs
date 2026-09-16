@@ -58,7 +58,8 @@ public sealed partial class OptimizationPage : Page
         try
         {
             await Task.Delay(250, cancellationToken);
-            await App.SettingsStore.SaveAsync(new AppSettings(ViewModel.Level), cancellationToken);
+            var settings = await App.SettingsStore.LoadAsync(cancellationToken);
+            await App.SettingsStore.SaveAsync(settings with { OptimizationQualityLevel = ViewModel.Level }, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

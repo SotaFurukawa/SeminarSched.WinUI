@@ -10,7 +10,7 @@
 | 新規project作成 | project service | 年度・講習区分・期間・開講日を持つWinUI schema v1 | 実装中 | SQLite整合性確認後にatomic move |
 | `.jukuschedule` open | project service / SQLite | WinUI schema v1の検証付きread/open | 実装中 | Python版は直接変更せず、copy-first importを別途設計 |
 | 別名保存・複製 | project service | 未実装 | 未実装 | 原子的処理 |
-| 最近使用・非表示 | workspace view model | 未実装 | 未実装 | 進行step復元を含む |
+| 最近使用・非表示 | workspace view model | 最大10件の履歴・再open・欠損時自動除去 | 実装中 | 手動非表示操作は未実装 |
 | migration・整合性確認 | Alembic / project service | 未実装 | 未実装 | migration前backup必須 |
 | 自動backup・世代管理 | recovery service | UIからのSQLite backup API検証付きsnapshot | 実装中 | 自動実行と世代管理は未実装 |
 | 復元・復元前backup | recovery service | 確認UI・検証・rollback付きatomic restore | 実装中 | 復元前自動backupとfailure injection拡充は未実装 |

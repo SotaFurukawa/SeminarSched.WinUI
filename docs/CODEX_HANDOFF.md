@@ -92,6 +92,13 @@ Next Version Rule:
 - Release/x64 build: warning 0 / error 0。全24 tests passed。
 - Home画面から保存先folderを選ぶbackup作成と、確認dialog付きrestoreを実行できる。
 
+### v0.1.0 checkpoint 5
+
+- 最近使ったprojectを最大10件、最終open順でsettingsへ保存し、Homeから再openできる。
+- 同じpathは重複させず先頭へ移動し、移動・削除済みfileを選んだ場合は履歴から除去する。
+- 品質level保存時にrecent project設定を失わないmerge保存へ修正。
+- Release/x64 build: warning 0 / error 0。全26 tests passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

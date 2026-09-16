@@ -33,6 +33,23 @@
             </Border>
 
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                <StackPanel Spacing="12">
+                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="最近使ったプロジェクト" />
+                    <ListView x:Name="RecentProjectsList" IsItemClickEnabled="True" ItemClick="RecentProject_ItemClick">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Padding="4" Spacing="2">
+                                    <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
+                                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{Binding Path}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <TextBlock x:Name="NoRecentProjectsText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="最近使ったプロジェクトはありません。" />
+                </StackPanel>
+            </Border>
+
+            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Spacing="14">
                     <TextBlock FontSize="20" FontWeight="SemiBold" Text="新しい講習プロジェクト" />
                     <Grid ColumnSpacing="16" RowSpacing="12">
