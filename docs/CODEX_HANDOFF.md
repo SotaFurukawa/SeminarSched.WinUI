@@ -1,13 +1,13 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-09-16
+最終更新: 2026-09-17
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Stable Development Commit: `65129cd`（`v0.0.0` tag target）
+Latest Development Checkpoint: `53add44`（v0.1.0 master data persistence）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Next Version Rule:
 
@@ -23,7 +23,7 @@ Next Version Rule:
 - Home、About、Settingsの初期NavigationView
 - `Domain`、`Application`、`Infrastructure`、`Optimization`、`Reporting`のproject境界
 - `Directory.Build.props`を正本とするversion一元管理
-- About画面の`v0.0.0 (beta)`表示
+- About画面のversion正本連動表示
 - Windows CI、xUnit、repository privacy gate
 - `docs/FEATURE_PARITY.md`、ADR 0001、Privacy、Security、暫定license
 
