@@ -22,10 +22,10 @@
 | 講習設定 | phase2 models/view model | 期間内日付・開校/休校・日別有効コマの保存UI | 実装中 | note編集・一括操作拡充は未実装 |
 | コマ設定・並べ替え | phase2 UI/service | コマ追加・表示順・時刻範囲・一覧UI | 実装中 | 編集・無効化・drag並べ替えは未実装 |
 | Google Forms作成kit | questionnaire script service | 設定値入りCode.gs・READMEのatomic生成UI | 実装中 | Python版の学年分岐・全質問・診断は未移植 |
-| 生徒回答・講師回答2file選択 | import UI/service | 未実装 | 未実装 | CSV/XLSX |
-| CSV UTF-8/CP932・旧形式 | importing readers | 未実装 | 未実装 | 正規化mapping |
-| import preview/diff | importing diff | 未実装 | 未実装 | error/warning/削除候補 |
-| import transaction/AuditLog | availability import service | 未実装 | 未実装 | 原本再検証必須 |
+| 生徒回答・講師回答2file選択 | import UI/service | 2つのUTF-8 CSV選択UI | 実装中 | XLSXとGoogle生CSV mappingは未実装 |
+| CSV UTF-8/CP932・旧形式 | importing readers | quoted UTF-8 CSV reader | 実装中 | CP932・旧形式の正規化mappingは未実装 |
+| import preview/diff | importing diff | 全行参照検証・issue一覧・件数preview | 実装中 | 詳細diff・warning・削除候補は未実装 |
+| import transaction/AuditLog | availability import service | SHA-256再検証・単一transaction反映 | 実装中 | AuditLog・生徒availabilityは未実装 |
 | availability一括編集 | phase3 UI/service | 未実装 | 未実装 | 日付・コマ単位 |
 | candidate生成 | optimization candidates | 未実装 | 未実装 | 疎な候補集合 |
 | greedy初期解・complete hint | initial solution | 未実装 | 未実装 | 独立検証後hint |

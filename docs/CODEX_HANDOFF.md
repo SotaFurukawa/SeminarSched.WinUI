@@ -144,6 +144,14 @@ Next Version Rule:
 - 現段階のフォームは生徒ID・科目・参加可能コマ、講師ID・勤務可能コマの基本版。Python版の学年別分岐等は未完。
 - Release/x64 build: warning 0 / error 0。全40 tests passed。
 
+### v0.1.0 checkpoint 12
+
+- ③で生徒・講師のUTF-8 CSVを2つ選択し、全行のmaster参照、必要回数、日付・コマをpreview検証可能。
+- エラー0件の場合だけ反映を有効化し、LessonRequestと講師勤務不可を単一SQLite transactionで保存する。
+- preview時の両file SHA-256を保持し、反映直前に再hashして差替えを拒否する。
+- XLSX、CP932、Google Forms生CSVの列mapping、生徒availability、AuditLogは未実装。
+- Release/x64 build: warning 0 / error 0。全41 tests passed。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`
