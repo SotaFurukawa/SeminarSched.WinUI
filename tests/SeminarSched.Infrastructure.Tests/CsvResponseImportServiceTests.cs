@@ -95,5 +95,35 @@ public sealed class CsvResponseImportServiceTests : IDisposable
         Assert.Equal(2, reader.GetInt32(1));
         Assert.Equal(1, reader.GetInt32(2));
     }
+    [Fact]
+    public async Task PreviewAsync_ComputesDiffAndRemovalCandidatesRequireExplicitConfirmation()
+    {
+        Directory.CreateDirectory(_directory);var db=Path.Combine(_directory,"diff.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(db,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,21)));
+        var master=new SqliteMasterDataRepository();await master.SaveStudentAsync(db,new Student(0,"S-001","架空 生徒","中2"));await master.SaveTeacherAsync(db,new Teacher(0,"T-001","架空 講師"));await master.SaveSubjectAsync(db,new Subject(0,"JH_MATH","数学","数","中学",1));
+        var course=new SqliteCourseSettingsRepository();var slot=await course.SaveTimeSlotAsync(db,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));
+        await course.SaveCourseDayAsync(db,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));await course.SaveCourseDayAsync(db,new CourseDay(new DateOnly(2026,7,21),true,"",[slot.Id]));
+
+        var service=new CsvResponseImportService();
+        var firstStudents=Path.Combine(_directory,"first-students.csv");var firstTeachers=Path.Combine(_directory,"first-teachers.csv");
+        await File.WriteAllTextAsync(firstStudents,"生徒ID,科目コード,日付,1\nS-001,JH_MATH,2026-07-20,2\nS-001,JH_MATH,2026-07-21,2\n");
+        await File.WriteAllTextAsync(firstTeachers,"講師ID,日付,1\nT-001,2026-07-20,2\n");
+        var firstPreview=await service.PreviewAsync(db,firstStudents,firstTeachers);Assert.True(firstPreview.CanApply,string.Join(Environment.NewLine,firstPreview.Issues.Select(issue=>issue.Message)));
+        Assert.Equal(2,firstPreview.Diff.StudentAdded);Assert.Empty(firstPreview.Diff.StudentRemovalCandidates);
+        await service.ApplyAsync(db,firstPreview);
+
+        var secondStudents=Path.Combine(_directory,"second-students.csv");
+        await File.WriteAllTextAsync(secondStudents,"生徒ID,科目コード,日付,1\nS-001,JH_MATH,2026-07-20,1\n");
+        var secondPreview=await service.PreviewAsync(db,secondStudents,firstTeachers);Assert.True(secondPreview.CanApply,string.Join(Environment.NewLine,secondPreview.Issues.Select(issue=>issue.Message)));
+        Assert.Equal(1,secondPreview.Diff.StudentChanged);
+        var removal=Assert.Single(secondPreview.Diff.StudentRemovalCandidates);Assert.Equal("S-001",removal.ExternalId);Assert.Equal("2026-07-21",removal.Date);
+
+        await service.ApplyAsync(db,secondPreview,removeUnlistedAvailability:false);
+        await using(var connection=new SqliteConnection($"Data Source={db};Mode=ReadOnly;Pooling=False")){await connection.OpenAsync();await using var command=connection.CreateCommand();command.CommandText="SELECT COUNT(*) FROM StudentAvailability;";Assert.Equal(2L,Convert.ToInt64(await command.ExecuteScalarAsync()));}
+
+        await service.ApplyAsync(db,secondPreview,removeUnlistedAvailability:true);
+        await using(var connection=new SqliteConnection($"Data Source={db};Mode=ReadOnly;Pooling=False")){await connection.OpenAsync();await using var command=connection.CreateCommand();command.CommandText="SELECT COUNT(*) FROM StudentAvailability;";Assert.Equal(1L,Convert.ToInt64(await command.ExecuteScalarAsync()));}
+    }
+
     public void Dispose(){if(Directory.Exists(_directory))Directory.Delete(_directory,true);}
 }

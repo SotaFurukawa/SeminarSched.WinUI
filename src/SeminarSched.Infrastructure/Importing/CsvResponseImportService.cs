@@ -17,7 +17,7 @@ public sealed class CsvResponseImportService : IResponseImportService
     public Task<ResponseImportPreview> PreviewAsync(string projectPath, string studentFilePath, string teacherFilePath, CancellationToken cancellationToken = default) =>
         Task.Run(() => Preview(projectPath, studentFilePath, teacherFilePath), cancellationToken);
 
-    public async Task ApplyAsync(string projectPath, ResponseImportPreview preview, CancellationToken cancellationToken = default)
+    public async Task ApplyAsync(string projectPath, ResponseImportPreview preview, bool removeUnlistedAvailability = false, CancellationToken cancellationToken = default)
     {
         if (!preview.CanApply) throw new InvalidOperationException("エラーがあるため反映できません。");
         var current = Preview(projectPath, preview.StudentFilePath, preview.TeacherFilePath);
@@ -31,6 +31,12 @@ public sealed class CsvResponseImportService : IResponseImportService
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         await ApplyStudentRowsAsync(connection, (SqliteTransaction)transaction, students, cancellationToken).ConfigureAwait(false);
         await ApplyTeacherRowsAsync(connection, (SqliteTransaction)transaction, teachers, cancellationToken).ConfigureAwait(false);
+        var removedStudentDates = 0; var removedTeacherDates = 0;
+        if (removeUnlistedAvailability)
+        {
+            removedStudentDates = await RemoveUnlistedAvailabilityAsync(connection, (SqliteTransaction)transaction, "Student", "StudentAvailability", "StudentId", preview.Diff.StudentRemovalCandidates, cancellationToken).ConfigureAwait(false);
+            removedTeacherDates = await RemoveUnlistedAvailabilityAsync(connection, (SqliteTransaction)transaction, "Teacher", "TeacherAvailability", "TeacherId", preview.Diff.TeacherRemovalCandidates, cancellationToken).ConfigureAwait(false);
+        }
         await SaveImportEvidenceAsync(connection, (SqliteTransaction)transaction, "student_availability", preview.StudentFilePath, preview.StudentFileSha256, students.Rows.Count, cancellationToken).ConfigureAwait(false);
         await SaveImportEvidenceAsync(connection, (SqliteTransaction)transaction, "teacher_availability", preview.TeacherFilePath, preview.TeacherFileSha256, teachers.Rows.Count, cancellationToken).ConfigureAwait(false);
 
@@ -47,9 +53,30 @@ public sealed class CsvResponseImportService : IResponseImportService
             TeacherRows = teachers.Rows.Count,
             StudentSha256 = preview.StudentFileSha256,
             TeacherSha256 = preview.TeacherFileSha256,
+            RemovedStudentDates = removedStudentDates,
+            RemovedTeacherDates = removedTeacherDates,
         }));
         await audit.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<int> RemoveUnlistedAvailabilityAsync(SqliteConnection connection, SqliteTransaction transaction, string entityTable, string availabilityTable, string entityColumn, IReadOnlyList<AvailabilityDiffKey> removals, CancellationToken cancellationToken)
+    {
+        var removed = 0;
+        foreach (var removal in removals)
+        {
+            await using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = $"""
+                DELETE FROM {availabilityTable}
+                WHERE {entityColumn}=(SELECT Id FROM {entityTable} WHERE ExternalId=$external)
+                  AND OpenDateId=(SELECT Id FROM OpenDate WHERE Date=$date);
+                """;
+            command.Parameters.AddWithValue("$external", removal.ExternalId);
+            command.Parameters.AddWithValue("$date", removal.Date);
+            removed += await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) > 0 ? 1 : 0;
+        }
+        return removed;
     }
 
     private static ResponseImportPreview Preview(string projectPath, string studentPath, string teacherPath)
@@ -61,7 +88,76 @@ public sealed class CsvResponseImportService : IResponseImportService
         connection.Open();
         ValidateStudentRows(connection, students, issues);
         ValidateTeacherRows(connection, teachers, issues);
-        return new(studentPath, teacherPath, HashIfPresent(studentPath), HashIfPresent(teacherPath), students.Rows.Count, teachers.Rows.Count, issues);
+        var slotCodes = ActiveSlotCodes(connection);
+        var diff = issues.Any(issue => issue.IsError) ? ResponseImportDiff.Empty : ComputeDiff(connection, students, teachers, slotCodes);
+        return new(studentPath, teacherPath, HashIfPresent(studentPath), HashIfPresent(teacherPath), students.Rows.Count, teachers.Rows.Count, issues, diff);
+    }
+
+    private static ResponseImportDiff ComputeDiff(SqliteConnection connection, TabularData students, TabularData teachers, IReadOnlyList<string> slotCodes)
+    {
+        var (studentAdded, studentChanged, studentUnchanged, studentRemovals) = students.Has("日付")
+            ? ComputeAvailabilityDiff(connection, students, "生徒ID", "Student", "StudentAvailability", "StudentId", slotCodes)
+            : (0, 0, 0, (IReadOnlyList<AvailabilityDiffKey>)[]);
+        var (teacherAdded, teacherChanged, teacherUnchanged, teacherRemovals) = teachers.Has("日付")
+            ? ComputeAvailabilityDiff(connection, teachers, "講師ID", "Teacher", "TeacherAvailability", "TeacherId", slotCodes)
+            : (0, 0, 0, (IReadOnlyList<AvailabilityDiffKey>)[]);
+        return new(studentAdded, studentChanged, studentUnchanged, studentRemovals, teacherAdded, teacherChanged, teacherUnchanged, teacherRemovals);
+    }
+
+    private static (int Added, int Changed, int Unchanged, IReadOnlyList<AvailabilityDiffKey> Removals) ComputeAvailabilityDiff(
+        SqliteConnection connection, TabularData data, string externalHeader, string entityTable, string availabilityTable, string entityColumn, IReadOnlyList<string> slotCodes)
+    {
+        var added = 0; var changed = 0; var unchanged = 0;
+        var fileDatesByExternalId = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in data.Rows)
+        {
+            var external = data.Value(row, externalHeader);
+            if (external.Length == 0 || !TryNormalizeDate(data.Value(row, "日付"), out var date)) continue;
+            if (!fileDatesByExternalId.TryGetValue(external, out var dates)) { dates = []; fileDatesByExternalId[external] = dates; }
+            dates.Add(date);
+
+            var isNew = true; var isChanged = false;
+            foreach (var slotCode in slotCodes)
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = $"""
+                    SELECT a.AvailabilityLevel FROM {availabilityTable} a
+                    JOIN {entityTable} e ON e.Id=a.{entityColumn}
+                    JOIN OpenDate d ON d.Id=a.OpenDateId
+                    JOIN TimeSlot s ON s.Id=a.TimeSlotId
+                    WHERE e.ExternalId=$external AND d.Date=$date AND s.Code=$slot;
+                    """;
+                command.Parameters.AddWithValue("$external", external);
+                command.Parameters.AddWithValue("$date", date);
+                command.Parameters.AddWithValue("$slot", slotCode);
+                var existing = command.ExecuteScalar();
+                if (existing is not null) isNew = false;
+                var existingLevel = existing is null ? (int?)null : Convert.ToInt32(existing, CultureInfo.InvariantCulture);
+                var fileLevel = int.TryParse(data.Value(row, slotCode), out var level) ? level : (int?)null;
+                if (existingLevel != fileLevel) isChanged = true;
+            }
+            if (isNew) added++; else if (isChanged) changed++; else unchanged++;
+        }
+
+        var removals = new List<AvailabilityDiffKey>();
+        foreach (var (external, fileDates) in fileDatesByExternalId)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = $"""
+                SELECT DISTINCT d.Date FROM {availabilityTable} a
+                JOIN {entityTable} e ON e.Id=a.{entityColumn}
+                JOIN OpenDate d ON d.Id=a.OpenDateId
+                WHERE e.ExternalId=$external;
+                """;
+            command.Parameters.AddWithValue("$external", external);
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                var existingDate = reader.GetString(0);
+                if (!fileDates.Contains(existingDate)) removals.Add(new AvailabilityDiffKey(external, existingDate));
+            }
+        }
+        return (added, changed, unchanged, removals);
     }
 
     private static TabularData ReadOrIssue(string path, string label, List<ImportIssue> issues)
@@ -144,7 +240,7 @@ public sealed class CsvResponseImportService : IResponseImportService
         foreach (var header in PreferredTeacherHeaders.Where(data.Has))
         {
             var value = data.Value(row, header);
-            if (value.Length > 0 && !Exists(connection, "Teacher", "ExternalId", value)) issues.Add(new(line, header, "登録されていない講師IDです。"));
+            if (value.Length > 0 && !Exists(connection, "Teacher", "ExternalId", value)) issues.Add(new(line, header, "登録されていない講師IDです（希望講師は空欄として扱われます）。", IsError: false));
         }
     }
 

@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `d570233`（v0.1.0 checkpoint 26, ②生徒フォーム学年分岐）
+Latest Development Checkpoint: checkpoint 27（v0.1.0, ③import diff・削除候補確認。コミットhashは本checkpoint末尾を参照）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -273,6 +273,17 @@ Next Version Rule:
 - Google上で実際にスクリプトを実行しての動作確認はこの環境からはできない（外部ネットワーク到達不可）。Apps Script API仕様（`ListItem/MultipleChoiceItem.createChoice(value, destinationPageBreakItem)`によるpage分岐、選択肢配列は全ページ作成後にまとめて設定する定石パターン）に基づいて実装した。次回ユーザーが実際にGoogle上で試すことを推奨。
 - ビルド警告0・エラー0、全71テスト成功（既存70＋学年分岐のJSON構造検証1件を既存テストへ追加、件数据え置き）。Privacy gate成功。
 - 未実装のまま残る②の項目: 講師指導可能科目用の別Apps Script、回答sheetの列正規化・診断。
+
+### v0.1.0 checkpoint 27 (Claude)
+
+③アンケート取込みへ、可用性形式（日付列あり）のdiff表示と削除候補の明示確認を追加。
+
+- `ResponseImportPreview`へ`ResponseImportDiff`（生徒/講師それぞれの追加・変更・変更なし件数、削除候補`AvailabilityDiffKey`一覧）を追加。Previewの都度DBの既存`StudentAvailability`/`TeacherAvailability`と突き合わせて算出する。
+- 削除候補＝取込対象に含まれる生徒・講師について、以前DBに登録済みだが新しい回答ファイルに含まれない日付。`IResponseImportService.ApplyAsync`へ`removeUnlistedAvailability`パラメータ（既定false）を追加し、trueの場合のみ削除候補を同一transactionで削除する。falseなら既存データはそのまま保持される（「削除候補は明示確認なしに削除しない」仕様どおり）。
+- ③画面へdiff件数summary、削除候補一覧ListView、「削除候補を反映と同時に削除する」CheckBoxを追加。
+- 希望講師ID（第1〜3希望）が未登録の場合の検証を、取込全体を止めるERRORからWARNING（IsError:false）へ引き下げた。Apply側は元々未登録IDをNULLとして無視する挙動だったため、実際の反映結果と検証結果の重大度を一致させた。ERROR/WARNINGは画面のissue一覧に`[エラー]`/`[警告]`として区別表示する。
+- ビルド警告0・エラー0、全72テスト成功（既存71＋diff/削除候補confirmationの往復1件）。Privacy gate成功。
+- 未実装のまま残る③の項目: 簡易形式（必要回数・勤務不可）側のdiff算出、Google Forms生回答の列mapping UI。
 
 ### 次回最初に確認するファイル
 
