@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `b7b88b6`（v0.1.0 checkpoint 35, ①生徒/講師/科目一覧に検索box追加）
+Latest Development Checkpoint: checkpoint 36（v0.1.0, ①講師対応科目の一括設定。コミットhashは本checkpoint末尾を参照）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -361,6 +361,14 @@ Python版v1.9.5 `objectives.py`の辞書式目的（本引継ぎ書5.4節）の�
 - WinUI UI層はこのプロジェクトの既存方針どおり自動テスト対象外（Infrastructure/Applicationのみ単体test対象）。ビルド成功のみで動作確認済み、実機でのタイプ確認は未実施。
 - ビルド警告0・エラー0、全88テスト成功（UI限定の変更のためテスト件数は据え置き）。Privacy gate成功。
 - 未実装のまま残る①の項目: ID自動採番wizard、講師の資格matrix一括操作、科目の校種preset。
+
+### v0.1.0 checkpoint 36 (Claude)
+
+①設定「担当設定」タブへ、講師対応科目（資格）の一括設定UIを追加。
+
+- 講師・科目それぞれの複数選択ListViewと「指導可能」CheckBoxを追加し、選択した講師×科目の全組み合わせへ`IMasterDataRepository.SaveQualificationAsync`を順次呼び出す（新しいSQLは追加せず、既存の単一保存APIをUI側でループするだけの実装。`SaveQualificationAsync`自体は複数の既存testで検証済み）。
+- ビルド警告0・エラー0、全88テスト成功（UI限定の変更のためテスト件数は据え置き）。Privacy gate成功。
+- 未実装のまま残る①の項目: ID自動採番wizard、科目の校種preset、一括設定時の備考(Note)反映。
 
 ### 次回最初に確認するファイル
 

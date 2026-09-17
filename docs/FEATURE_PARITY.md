@@ -15,7 +15,7 @@
 | 自動backup・世代管理 | recovery service | UIからのSQLite backup API検証付きsnapshot | 実装中 | 自動実行と世代管理は未実装 |
 | 復元・復元前backup | recovery service | 確認UI・復元前3世代backup・検証・rollback付きatomic restore | 実装中 | failure injection拡充は未実装 |
 | 生徒基本情報 | master repository/service | 追加・一覧・選択編集・使用停止UI、domain validation・SQLite CRUD。一覧をID・氏名・学年で絞り込む検索boxを追加 | 実装中 | ID自動採番wizardは未実装 |
-| 講師基本情報 | master repository/service | 追加・一覧・選択編集・使用停止・対応科目UI。一覧をID・氏名で絞り込む検索boxを追加 | 実装中 | 資格matrix一括操作（複数講師×複数科目をまとめて設定）は未実装 |
+| 講師基本情報 | master repository/service | 追加・一覧・選択編集・使用停止・対応科目UI。一覧をID・氏名で絞り込む検索boxを追加。複数講師×複数科目を選択し指導可否を一括設定するUIを追加 | 実装中 | 一括設定は指導可否のみ（備考の一括設定は不可） |
 | 科目・略称 | master repository/service | 追加・一覧・選択編集・使用停止UI、domain validation・SQLite CRUD。一覧をコード・科目名・校種で絞り込む検索boxを追加 | 実装中 | 校種presetは未実装 |
 | 通常授業・担当優先度 | regular lesson profile | 管理UI・SQLite upsert・優先度1〜5・1対1必須 | 実装中 | 受講希望の全項目編集はExcel中心 |
 | 共通基本情報Excel | master Excel service | 5sheet出力・全行preview・SHA再確認・transaction upsert・原本snapshot | 実装中 | 名前選択helper列とExcel内dropdownを継続移植 |
