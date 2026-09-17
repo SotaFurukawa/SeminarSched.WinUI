@@ -94,6 +94,46 @@ public sealed class SqliteMasterDataRepository : IMasterDataRepository
         await using var connection=await OpenAsync(projectPath,cancellationToken);await EnsureSchemaAsync(connection,cancellationToken);await using var command=connection.CreateCommand();command.CommandText="SELECT Id,StudentId,SubjectId,RegularTeacherId,RegularTeacherPriority,OneToOneRequired,Note FROM RegularLessonProfile WHERE ProjectId=1 ORDER BY StudentId,SubjectId;";var result=new List<RegularLessonProfile>();await using var reader=await command.ExecuteReaderAsync(cancellationToken);while(await reader.ReadAsync(cancellationToken))result.Add(new RegularLessonProfile(reader.GetInt64(0),reader.GetInt64(1),reader.GetInt64(2),reader.IsDBNull(3)?null:reader.GetInt64(3),reader.GetInt32(4),reader.GetBoolean(5),reader.GetString(6)));return result;
     }
 
+    public async Task SaveLessonRequestAsync(string projectPath, LessonRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        await using var connection = await OpenAsync(projectPath, cancellationToken); await EnsureSchemaAsync(connection, cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions,RegularTeacherId,RegularTeacherPriority,PreferredTeacher1Id,PreferredTeacher2Id,PreferredTeacher3Id,OneToOneRequired,MaxConsecutiveSlotsOverride,AllowGapOverride,Note)
+            VALUES(1,@student,@subject,@sessions,@regular,@priority,@preferred1,@preferred2,@preferred3,@one,@maximum,@gap,@note)
+            ON CONFLICT(ProjectId,StudentId,SubjectId) DO UPDATE SET RequiredSessions=excluded.RequiredSessions,RegularTeacherId=excluded.RegularTeacherId,RegularTeacherPriority=excluded.RegularTeacherPriority,PreferredTeacher1Id=excluded.PreferredTeacher1Id,PreferredTeacher2Id=excluded.PreferredTeacher2Id,PreferredTeacher3Id=excluded.PreferredTeacher3Id,OneToOneRequired=excluded.OneToOneRequired,MaxConsecutiveSlotsOverride=excluded.MaxConsecutiveSlotsOverride,AllowGapOverride=excluded.AllowGapOverride,Note=excluded.Note;
+            """;
+        command.Parameters.AddWithValue("@student", request.StudentId); command.Parameters.AddWithValue("@subject", request.SubjectId); command.Parameters.AddWithValue("@sessions", request.RequiredSessions);
+        command.Parameters.AddWithValue("@regular", (object?)request.RegularTeacherId ?? DBNull.Value); command.Parameters.AddWithValue("@priority", request.RegularTeacherPriority);
+        command.Parameters.AddWithValue("@preferred1", (object?)request.PreferredTeacher1Id ?? DBNull.Value); command.Parameters.AddWithValue("@preferred2", (object?)request.PreferredTeacher2Id ?? DBNull.Value); command.Parameters.AddWithValue("@preferred3", (object?)request.PreferredTeacher3Id ?? DBNull.Value);
+        command.Parameters.AddWithValue("@one", request.OneToOneRequired); command.Parameters.AddWithValue("@maximum", (object?)request.MaxConsecutiveSlotsOverride ?? DBNull.Value); command.Parameters.AddWithValue("@gap", (object?)request.AllowGapOverride ?? DBNull.Value); command.Parameters.AddWithValue("@note", request.Note);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<LessonRequest>> GetLessonRequestsAsync(string projectPath, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken); await EnsureSchemaAsync(connection, cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Id,StudentId,SubjectId,RequiredSessions,RegularTeacherId,RegularTeacherPriority,PreferredTeacher1Id,PreferredTeacher2Id,PreferredTeacher3Id,OneToOneRequired,MaxConsecutiveSlotsOverride,AllowGapOverride,Note FROM LessonRequest WHERE ProjectId=1 ORDER BY StudentId,SubjectId;";
+        var result = new List<LessonRequest>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            result.Add(new LessonRequest(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt32(3),
+                reader.IsDBNull(4) ? null : reader.GetInt64(4), reader.GetInt32(5),
+                reader.IsDBNull(6) ? null : reader.GetInt64(6), reader.IsDBNull(7) ? null : reader.GetInt64(7), reader.IsDBNull(8) ? null : reader.GetInt64(8),
+                reader.GetBoolean(9), reader.IsDBNull(10) ? null : reader.GetInt32(10), reader.IsDBNull(11) ? null : reader.GetBoolean(11), reader.GetString(12)));
+        return result;
+    }
+
+    public async Task DeleteLessonRequestAsync(string projectPath, long studentId, long subjectId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken); await EnsureSchemaAsync(connection, cancellationToken);
+        await using var command = connection.CreateCommand(); command.CommandText = "DELETE FROM LessonRequest WHERE ProjectId=1 AND StudentId=@student AND SubjectId=@subject;";
+        command.Parameters.AddWithValue("@student", studentId); command.Parameters.AddWithValue("@subject", subjectId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private static async Task<long> SaveAsync(SqliteConnection connection, string table, long id, string columns, string values, string updates, Action<SqliteCommand> bind, CancellationToken token)
     {
         await using var command = connection.CreateCommand();

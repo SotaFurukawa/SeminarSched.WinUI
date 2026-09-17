@@ -36,6 +36,33 @@ public sealed class SqliteMasterDataRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveGetDeleteLessonRequest_RoundTripsAllFieldsAndUpsertsOnConflict()
+    {
+        var path = Path.Combine(_directory, "request.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(
+            2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 22)));
+        var repository = new SqliteMasterDataRepository();
+        var student = await repository.SaveStudentAsync(path, new Student(0, "S-001", "架空 生徒", "中2"));
+        var teacher1 = await repository.SaveTeacherAsync(path, new Teacher(0, "T-001", "架空 講師1"));
+        var teacher2 = await repository.SaveTeacherAsync(path, new Teacher(0, "T-002", "架空 講師2"));
+        var subject = await repository.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "数学", "数", "中学", 1));
+
+        await repository.SaveLessonRequestAsync(path, new LessonRequest(0, student.Id, subject.Id, 4,
+            teacher1.Id, 5, teacher1.Id, teacher2.Id, null, true, 3, false, "初回"));
+        var stored = Assert.Single(await repository.GetLessonRequestsAsync(path));
+        Assert.Equal(4, stored.RequiredSessions); Assert.Equal(teacher1.Id, stored.RegularTeacherId); Assert.Equal(5, stored.RegularTeacherPriority);
+        Assert.Equal(teacher1.Id, stored.PreferredTeacher1Id); Assert.Equal(teacher2.Id, stored.PreferredTeacher2Id); Assert.Null(stored.PreferredTeacher3Id);
+        Assert.True(stored.OneToOneRequired); Assert.Equal(3, stored.MaxConsecutiveSlotsOverride); Assert.False(stored.AllowGapOverride); Assert.Equal("初回", stored.Note);
+
+        await repository.SaveLessonRequestAsync(path, new LessonRequest(0, student.Id, subject.Id, 6, note: "更新"));
+        var updated = Assert.Single(await repository.GetLessonRequestsAsync(path));
+        Assert.Equal(6, updated.RequiredSessions); Assert.Null(updated.RegularTeacherId); Assert.Equal("更新", updated.Note);
+
+        await repository.DeleteLessonRequestAsync(path, student.Id, subject.Id);
+        Assert.Empty(await repository.GetLessonRequestsAsync(path));
+    }
+
+    [Fact]
     public async Task SaveStudent_DuplicateExternalId_IsRejectedByDatabase()
     {
         var path = Path.Combine(_directory, "duplicate.jukuschedule");

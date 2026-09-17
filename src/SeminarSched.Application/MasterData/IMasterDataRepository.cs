@@ -14,4 +14,7 @@ public interface IMasterDataRepository
     Task<IReadOnlyList<TeacherQualification>> GetQualificationsAsync(string projectPath, CancellationToken cancellationToken = default);
     Task SaveRegularLessonAsync(string projectPath, RegularLessonProfile profile, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RegularLessonProfile>> GetRegularLessonsAsync(string projectPath, CancellationToken cancellationToken = default);
+    Task SaveLessonRequestAsync(string projectPath, LessonRequest request, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LessonRequest>> GetLessonRequestsAsync(string projectPath, CancellationToken cancellationToken = default);
+    Task DeleteLessonRequestAsync(string projectPath, long studentId, long subjectId, CancellationToken cancellationToken = default);
 }

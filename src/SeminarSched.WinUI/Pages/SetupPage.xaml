@@ -22,8 +22,24 @@
                     <StackPanel Spacing="4"><TextBlock Text="講師"/><ListView x:Name="BulkQualificationTeachers" SelectionMode="Multiple" MaxHeight="160" DisplayMemberPath="Display"/></StackPanel>
                     <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="科目"/><ListView x:Name="BulkQualificationSubjects" SelectionMode="Multiple" MaxHeight="160" DisplayMemberPath="Display"/></StackPanel>
                 </Grid>
-                <StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="BulkQualificationCanTeach" Content="指導可能" IsChecked="True"/><Button Content="選択した組み合わせへ一括設定" Click="SaveBulkQualifications_Click" Style="{StaticResource AccentButtonStyle}"/></StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="BulkQualificationCanTeach" Content="指導可能" IsChecked="True"/><TextBox x:Name="BulkQualificationNote" Width="320" Header="備考（空欄なら変更しない）"/><Button Content="選択した組み合わせへ一括設定" Click="SaveBulkQualifications_Click" Style="{StaticResource AccentButtonStyle}"/></StackPanel>
                 <TextBlock Margin="0,16,0,0" FontSize="18" FontWeight="SemiBold" Text="通常授業の担当設定"/><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="220"/><ColumnDefinition Width="220"/><ColumnDefinition Width="120"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><ComboBox x:Name="RegularStudent" Header="生徒"/><ComboBox x:Name="RegularSubject" Grid.Column="1" Header="科目"/><ComboBox x:Name="RegularTeacher" Grid.Column="2" Header="通常担当講師（任意）"/><NumberBox x:Name="RegularPriority" Grid.Column="3" Header="優先度 1～5" Minimum="1" Maximum="5" Value="3"/><Button Grid.Column="4" VerticalAlignment="Bottom" Content="保存" Click="SaveRegularLesson_Click"/></Grid><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="RegularOneToOne" Content="1対1必須"/><TextBox x:Name="RegularNote" Width="420" Header="備考"/></StackPanel><ListView x:Name="RegularLessons"/></StackPanel></TabViewItem>
+            <TabViewItem Header="受講希望"><StackPanel Padding="16" Spacing="10">
+                <TextBlock FontSize="18" FontWeight="SemiBold" Text="受講希望"/>
+                <TextBlock Text="生徒ごとの受講希望（必要授業回数・希望講師）を個別に登録・編集します。一覧から選ぶと編集でき、共通基本情報Excelでの一括登録・編集も引き続きご利用いただけます。" TextWrapping="Wrap"/>
+                <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/><ColumnDefinition Width="120"/></Grid.ColumnDefinitions>
+                    <ComboBox x:Name="RequestStudent" Header="生徒"/><ComboBox x:Name="RequestSubject" Grid.Column="1" Header="科目"/><NumberBox x:Name="RequestRequiredSessions" Grid.Column="2" Header="必要授業回数" Minimum="1" Value="1"/><ComboBox x:Name="RequestRegularTeacher" Grid.Column="3" Header="通常担当講師（任意）"/><NumberBox x:Name="RequestRegularPriority" Grid.Column="4" Header="優先度 1～5" Minimum="1" Maximum="5" Value="3"/>
+                </Grid>
+                <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <ComboBox x:Name="RequestPreferred1" Header="第1希望講師（任意）"/><ComboBox x:Name="RequestPreferred2" Grid.Column="1" Header="第2希望講師（任意）"/><ComboBox x:Name="RequestPreferred3" Grid.Column="2" Header="第3希望講師（任意）"/>
+                </Grid>
+                <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="260"/><ColumnDefinition Width="200"/></Grid.ColumnDefinitions>
+                    <CheckBox x:Name="RequestOneToOne" Content="1対1必須" VerticalAlignment="Bottom"/><NumberBox x:Name="RequestMaxConsecutiveOverride" Grid.Column="1" Header="最大連続コマ数上書き（0=既定値）" Minimum="0" Value="0"/><ComboBox x:Name="RequestAllowGapOverride" Grid.Column="2" Header="空きコマ許可上書き" SelectedIndex="0"><ComboBoxItem Content="指定なし"/><ComboBoxItem Content="許可"/><ComboBoxItem Content="不許可"/></ComboBox>
+                </Grid>
+                <TextBox x:Name="RequestNote" Header="備考"/>
+                <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="保存" Click="SaveLessonRequest_Click" Style="{StaticResource AccentButtonStyle}"/><Button Content="新規入力" Click="NewLessonRequest_Click"/><Button Content="選択した行を削除" Click="DeleteLessonRequest_Click"/></StackPanel>
+                <ListView x:Name="LessonRequests" SelectionChanged="LessonRequests_SelectionChanged"/>
+            </StackPanel></TabViewItem>
             <TabViewItem Header="コマ・開校日"><StackPanel Padding="16" Spacing="12">
                 <TextBlock FontSize="18" FontWeight="SemiBold" Text="コマ設定"/>
                 <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="130"/><ColumnDefinition Width="110"/><ColumnDefinition Width="110"/><ColumnDefinition Width="80"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>

@@ -15,9 +15,10 @@
 | 自動backup・世代管理 | recovery service | UIからのSQLite backup API検証付きsnapshot | 実装中 | 自動実行と世代管理は未実装 |
 | 復元・復元前backup | recovery service | 確認UI・復元前3世代backup・検証・rollback付きatomic restore | 実装中 | failure injection拡充は未実装 |
 | 生徒基本情報 | master repository/service | 追加・一覧・選択編集・使用停止UI、domain validation・SQLite CRUD。一覧をID・氏名・学年で絞り込む検索boxを追加 | 実装中 | ID自動採番wizardは未実装 |
-| 講師基本情報 | master repository/service | 追加・一覧・選択編集・使用停止・対応科目UI。一覧をID・氏名で絞り込む検索boxを追加。複数講師×複数科目を選択し指導可否を一括設定するUIを追加 | 実装中 | 一括設定は指導可否のみ（備考の一括設定は不可） |
+| 講師基本情報 | master repository/service | 追加・一覧・選択編集・使用停止・対応科目UI。一覧をID・氏名で絞り込む検索boxを追加。複数講師×複数科目を選択し指導可否を一括設定するUIを追加。一括設定へ備考欄を追加し、指導可否とあわせて備考も一括設定可能（空欄なら既存の備考を変更しない） | 実装済み | |
 | 科目・略称 | master repository/service | 追加・一覧・選択編集・使用停止UI、domain validation・SQLite CRUD。一覧をコード・科目名・校種で絞り込む検索boxを追加。校種入力を「小学校/中学校/高等学校」を選べる編集可能ComboBoxへ変更（自由入力も可） | 実装済み | |
-| 通常授業・担当優先度 | regular lesson profile | 管理UI・SQLite upsert・優先度1〜5・1対1必須 | 実装中 | 受講希望の全項目編集はExcel中心 |
+| 通常授業・担当優先度 | regular lesson profile | 管理UI・SQLite upsert・優先度1〜5・1対1必須 | 実装済み | |
+| 受講希望・個別編集 | lesson request (StudentId,SubjectId)単位upsert | 「担当設定」タブへ受講希望の個別登録・編集・削除UIを追加（必要授業回数・通常担当講師＋優先度・第1〜3希望講師・1対1必須・最大連続コマ数上書き・空きコマ許可上書き・備考の全項目）。一覧から選択すると値を読み込んで編集できる。共通基本情報Excelでの一括編集も引き続き利用可能 | 実装済み | |
 | 共通基本情報Excel | master Excel service | 5sheet出力・全行preview・SHA再確認・transaction upsert・原本snapshot。講師対応科目・受講希望シートの全FK列（講師ID・科目コード・生徒ID・通常担当/希望講師ID）へ、ID/コード列自体のdropdown、名前選択dropdown（選択すると数式で自動的にIDへ変換）、確認用の逆引き名前列を追加（Python版の名前選択helper列を移植） | 実装済み | |
 | 講習設定 | phase2 models/view model | 期間内日付・開校/休校・日別有効コマの保存UI。開校日一覧を複数選択可能にし、備考欄を追加。選択した全日付へ開校/休校と備考をまとめて適用する一括操作を実装 | 実装済み | |
 | コマ設定・並べ替え | phase2 UI/service | コマ追加・選択編集・使用停止・表示順・時刻範囲UI。一覧のdrag&dropで表示順を並べ替え、確定時にSortOrderをまとめて保存 | 実装済み | |

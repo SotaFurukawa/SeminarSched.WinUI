@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `8021fdc`（v0.1.0 checkpoint 41, 共通基本情報Excelの名前選択helper列・dropdown）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
+Latest Development Checkpoint: checkpoint 42（講師対応科目の備考一括設定、受講希望の個別編集UI新設）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -426,6 +426,18 @@ Feature Parity行21（共通基本情報Excel）の残課題「名前選択helpe
 - 新規テスト`Export_QualificationSheet_NameSelectionAutoFillsIdAndConfirmColumnResolvesName`で、名前選択列に名前を入力した後にファイルを再読み込みし、ID列が数式によって正しいIDへ自動変換されること、確認列が正しい名前を逆引きすることを検証した（ClosedXMLの数式評価エンジンでCOUNTIF/INDEX/MATCH/IFERRORが正しく動くことを実機で確認）。
 - SetupPageの共通基本情報Excel説明文に名前選択機能の案内を追加。
 - Release/x64 build: warning 0 / error 0。全89 tests passed（新規1件）。Privacy gate成功。
+
+### v0.1.0 checkpoint 42 (Claude)
+
+ユーザーから「使用量が91%なので寝る前にできるところまで進めてほしい、許可なしでどんどん進めてよい」との指示を受け、引き続きFeature Parityの残課題（行18・行20周辺）を実装した。
+
+- 講師対応科目の一括設定（「担当設定」タブ）へ備考入力欄を追加。空欄のまま一括設定すると各ペアの既存の備考を変更せず維持し、値を入力すると全ペアへ同じ備考を一括設定する（既存の`SaveQualificationAsync`が備考も含めた全列upsertのため、空欄時は事前に`GetQualificationsAsync`で既存値を読み取ってペアごとに引き継ぐ実装とした）。
+- 受講希望（LessonRequest）の個別編集UIを新設（Python版はExcel中心だったが、WinUI版でも個別のadd/edit/deleteを可能にした）。
+  - `SeminarSched.Domain.MasterData.LessonRequest`レコードを新設（必要授業回数・通常担当講師＋優先度・第1〜3希望講師・1対1必須・最大連続コマ数上書き・空きコマ許可上書き・備考）。
+  - `IMasterDataRepository`/`SqliteMasterDataRepository`へ`SaveLessonRequestAsync`（`(ProjectId,StudentId,SubjectId)`一意制約でのupsert、`MasterDataWorkbookService`のExcel取込upsertと同一SQLパターン）・`GetLessonRequestsAsync`・`DeleteLessonRequestAsync`を追加。
+  - `SetupPage`の「担当設定」タブへ「受講希望」セクションを新設。一覧から選択すると全フィールドを読み込んで編集でき（`_nullableTeacherItems`をRegularTeacher/Preferred1〜3の各ComboBoxで共用）、優先度5で通常担当講師未指定の場合はUI側でエラー表示する（Excel取込のvalidationと同じ業務ルール）。最大連続コマ数上書きは`NumberBox`の値0を「上書きなし」として扱い、空きコマ許可上書きは「指定なし/許可/不許可」の3択ComboBoxとした。
+  - 新規テスト`SaveGetDeleteLessonRequest_RoundTripsAllFieldsAndUpsertsOnConflict`（`SqliteMasterDataRepositoryTests.cs`）で全項目のround-trip・upsertによる更新・削除を検証した。
+- Release/x64 build: warning 0 / error 0。全90 tests passed（新規1件）。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 
