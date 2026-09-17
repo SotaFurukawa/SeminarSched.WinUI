@@ -9,7 +9,7 @@
     mc:Ignorable="d">
 
     <ScrollViewer>
-        <StackPanel MaxWidth="760" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="20">
+        <StackPanel MaxWidth="1200" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="20">
             <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="時間割自動作成" />
             <TextBlock
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -67,6 +67,28 @@
             </Border>
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Spacing="12"><TextBlock FontSize="20" FontWeight="SemiBold" Text="時間割の確認・手動配置"/><TextBlock Text="手動配置は再最適化後も保持されます。ロックは帳票・編集画面で固定状態を明示するために使用します。" TextWrapping="Wrap"/><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="ManualRequest" Header="受講希望"/><ComboBox x:Name="ManualTeacher" Grid.Column="1" Header="講師"/><ComboBox x:Name="ManualSlot" Grid.Column="2" Header="日時・コマ"/></Grid><StackPanel Orientation="Horizontal" Spacing="8"><CheckBox x:Name="ManualLocked" Content="ロックして追加"/><Button Content="手動配置を追加" Click="AddManual_Click" Style="{StaticResource AccentButtonStyle}"/><Button Content="選択した手動配置を削除" Click="RemoveManual_Click"/><Button Content="選択項目のロック切替" Click="ToggleLock_Click"/><Button Content="自動配置だけリセット" Click="ResetAutomatic_Click"/></StackPanel><ListView x:Name="Assignments" MaxHeight="360" SelectionMode="Single"/></StackPanel>
+            </Border>
+            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                <StackPanel Spacing="12">
+                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="日別グリッド編集"/>
+                    <TextBlock Text="カードをドラッグしてセル間を移動、未配置一覧からはセルへドラッグして配置できます。右クリックでロック切替・削除、セル右上の丸印/バツ印で講師の出勤可否を切り替えられます。" TextWrapping="Wrap"/>
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <ComboBox x:Name="BoardDate" Header="日付" DisplayMemberPath="Label" MinWidth="200" SelectionChanged="BoardDate_SelectionChanged"/>
+                        <TextBox x:Name="BoardSearch" Grid.Column="1" Header="生徒名検索" TextChanged="BoardSearch_TextChanged"/>
+                        <Button x:Name="AddTeacherButton" Grid.Column="2" VerticalAlignment="Bottom" Content="+ 講師を表示" Click="AddTeacher_Click"/>
+                    </Grid>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <StackPanel Spacing="8">
+                            <TextBlock FontWeight="SemiBold" Text="未配置"/>
+                            <ListView x:Name="UnplacedList" MaxHeight="480" CanDragItems="True" DragItemsStarting="UnplacedList_DragItemsStarting"/>
+                        </StackPanel>
+                        <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="480">
+                            <Grid x:Name="BoardGrid"/>
+                        </ScrollViewer>
+                    </Grid>
+                </StackPanel>
             </Border>
         </StackPanel>
     </ScrollViewer>

@@ -14,6 +14,29 @@ public sealed record ScheduleAssignmentItem(
     public override string ToString() => $"{Label}　[{(IsManual ? "手動" : "自動")}{(IsLocked ? "・ロック" : "")}]";
 }
 
+public sealed record OpenDateOption(long Id, string Label);
+
+public sealed record BoardSlotRow(long TimeSlotId, string Label, int SortOrder);
+
+public sealed record BoardTeacherColumn(long TeacherId, string Label);
+
+public sealed record BoardCard(long AssignmentId, long TeacherId, long TimeSlotId, long StudentId, string StudentLabel, string SubjectLabel, bool IsManual, bool IsLocked)
+{
+    public override string ToString() => $"{StudentLabel}　{SubjectLabel}{(IsManual ? "　[手動]" : "")}{(IsLocked ? "　[ロック]" : "")}";
+}
+
+public sealed record BoardCell(long TimeSlotId, long TeacherId, bool Blocked, IReadOnlyList<BoardCard> Cards);
+
+public sealed record ScheduleBoard(IReadOnlyList<BoardSlotRow> Slots, IReadOnlyList<BoardTeacherColumn> Teachers, IReadOnlyList<BoardCell> Cells)
+{
+    public BoardCell? Cell(long timeSlotId, long teacherId) => Cells.FirstOrDefault(c => c.TimeSlotId == timeSlotId && c.TeacherId == teacherId);
+}
+
+public sealed record UnplacedSessionOption(long LessonRequestId, string Label, int Remaining)
+{
+    public override string ToString() => $"{Label}　(残り{Remaining}回)";
+}
+
 public interface IScheduleEditorService
 {
     Task<IReadOnlyList<ScheduleAssignmentItem>> GetAssignmentsAsync(string projectPath, CancellationToken cancellationToken = default);
@@ -21,4 +44,9 @@ public interface IScheduleEditorService
     Task RemoveManualAsync(string projectPath, long assignmentId, CancellationToken cancellationToken = default);
     Task SetLockedAsync(string projectPath, long assignmentId, bool isLocked, CancellationToken cancellationToken = default);
     Task ResetAutomaticAsync(string projectPath, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<OpenDateOption>> GetOpenDatesAsync(string projectPath, CancellationToken cancellationToken = default);
+    Task<ScheduleBoard> GetBoardAsync(string projectPath, long openDateId, IReadOnlyCollection<long> extraTeacherIds, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<UnplacedSessionOption>> GetUnplacedSessionsAsync(string projectPath, CancellationToken cancellationToken = default);
+    Task MoveAsync(string projectPath, long assignmentId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken = default);
+    Task SetTeacherUnavailableAsync(string projectPath, long teacherId, long openDateId, long timeSlotId, bool unavailable, CancellationToken cancellationToken = default);
 }

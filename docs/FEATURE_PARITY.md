@@ -39,12 +39,12 @@
 | progress/cancel | worker / solver callback | 非同期progress DTO・cancel API | 実装中 | 実solverとUIへの接続は未実装 |
 | solver独立validator | result validation | 候補外・回数・衝突・容量・通常担当最低数・連続/空き時間をsolver外で再検証 | 実装中 | Python版全診断codeは未移植 |
 | optimization transaction保存 | optimization run service | 固定保持・未固定atomic置換・OptimizationRun入出力概要保存 | 実装中 | 安定したinput fingerprintと詳細penalty内訳は未実装 |
-| 時間割grid | schedule editor QML | 未実装 | 未実装 | virtualization必須 |
-| drag/drop手動配置 | schedule edit service | 未実装 | 未実装 | hard violation拒否 |
-| manual/lock semantics | manual edit tests | ④固定Assignment追加・解除UI、可否/資格/同時2名/1対1/必要回数検証。⑤に手動配置追加/削除・ロック切替・自動配置だけリセットUIを追加し、`IsManual`は再最適化時も`IsLocked`と同様に保持・候補除外・AuditLog記録 | 実装中 | drag/dropと講師一時表示・availability編集は未実装 |
+| 時間割grid | schedule editor QML | ⑤に日付選択付きの行=コマ・列=講師グリッドを追加。カードはWinUIネイティブグリッドで生成 | 実装中 | virtualizationは未対応（開講コマ・講師数が多い場合の性能検証は今後） |
+| drag/drop手動配置 | schedule edit service | カードのドラッグでセル間移動、未配置一覧からドラッグで新規配置。`MoveAsync`が資格・衝突・空き時間・講師上限をhard constraintとして再検証し、ロック済みは移動不可 | 実装中 | 実機での目視確認は未実施（ビルド・自動テストのみ確認） |
+| manual/lock semantics | manual edit tests | ④固定Assignment追加・解除UI、可否/資格/同時2名/1対1/必要回数検証。⑤に手動配置追加/削除/移動・ロック切替・自動配置だけリセットUIを追加し、`IsManual`は再最適化時も`IsLocked`と同様に保持・候補除外・AuditLog記録 | 実装中 | Undo/Redoは未実装 |
 | Undo/Redo | command stack | 未実装 | 未実装 | process内のみ |
-| 講師一時表示・availability編集 | editor UI/service | 未実装 | 未実装 | 不可コマgray |
-| 検索・scroll同期 | editor QML | 未実装 | 未実装 | header/row/grid同期 |
+| 講師一時表示・availability編集 | editor UI/service | グリッドの「+講師を表示」で全コマ不可の講師も列表示でき、セル右上の丸/バツで`TeacherUnavailability`を切替。既存配置があるセルは不可へ変更不可 | 実装中 | 一括操作（複数コマ・複数講師まとめて設定）は未実装 |
+| 検索・scroll同期 | editor QML | 生徒名検索でグリッド内カードをハイライト表示 | 実装中 | header/row/grid間のscroll同期は未実装 |
 | 未配置・警告 | diagnostics/output | 未実装 | 未実装 | 通常担当不足を含む |
 | 全体時間割Excel/PDF | reporting/output service | 共通snapshotからExcel/PDF atomic生成 | 実装中 | Python版週カレンダーlayoutは未移植 |
 | 生徒配布時間割Excel/PDF | reporting renderers | 生徒別sheet・PDF section | 実装中 | 週calendar・不参加一覧は未実装 |

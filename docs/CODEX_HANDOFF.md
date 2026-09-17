@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `aeb7f94`（v0.1.0 checkpoint 23, manual placement persists across re-optimization）
+Latest Development Checkpoint: checkpoint 24（v0.1.0, ⑤日別グリッド編集・drag&drop・講師一時表示。コミットhashは本checkpoint末尾を参照）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -240,6 +240,19 @@ Next Version Rule:
 - `SqliteScheduleRunService`の候補生成・既存配置抽出・自動配置クリアを、`IsLocked=1`と同様に`IsManual=1`も保持対象として扱うよう修正。再最適化しても手動配置は消えない。
 - 精査で`SqliteScheduleEditorServiceTests`の1テストが失敗。原因はロジックのバグではなく、テスト用fixtureの`RequiredSessions=2`が同fixture内の開講コマ数(1コマのみ)と矛盾しており、`UnassignedLessons`が意図せず1になっていたこと。`RequiredSessions=1`へ修正し解消。
 - Release/x64 build: warning 0 / error 0。全66 tests passed (2+7+9+19+29)。Privacy gate passed。
+
+### v0.1.0 checkpoint 24 (Claude)
+
+ユーザー指示「⑤の残り含め、全ての実装(②、③、⑥なども全て)を順番に実装していってください」を受け、⑤の中核機能である日別グリッド編集から着手。
+
+- `IScheduleEditorService`へ`GetOpenDatesAsync`/`GetBoardAsync`/`GetUnplacedSessionsAsync`/`MoveAsync`/`SetTeacherUnavailableAsync`を追加。
+- `GetBoardAsync`は指定日について、行=有効コマ、列=指導可能かつ当日全コマ不可ではない講師（`TeacherUnavailability`・`TeacherAvailability`を解析）のグリッドを返す。全コマ不可の講師も`extraTeacherIds`で強制表示可能（「+講師を表示」用）。
+- `SqliteFixedLessonService`に`MoveAsync`を追加。ロック済みは移動不可、移動先で生徒衝突・講師資格・可用性・講師上限（2枠）を再検証し、成功時は`IsManual=1`へ設定（Python版の「手動移動したcardはis_manual=True」仕様に合わせた）。AuditLogに`manual_assignment_moved`を記録。
+- `SetTeacherUnavailableAsync`は`TeacherUnavailability`行の追加/削除。既に配置がある(講師,日付,コマ)を不可にはできない。
+- ⑤ OptimizationPageへ日付選択・生徒名検索・未配置一覧（ドラッグ元）・動的に構築するグリッド（ドラッグ先、右クリックでロック切替/削除、セル右上でその場出勤可否切替）を追加。既存のコンボボックス方式の手動配置UIはそのまま残し、二重の入力経路を確保。
+- ビルド警告0・エラー0、全70テスト成功（既存66＋新規4: グリッド構造、移動の成功/ロック拒否/同一セル拒否/生徒衝突拒否、講師全コマ不可時の列非表示と`extraTeacherIds`強制表示、既存配置があるセルの出勤不可拒否）。Privacy gate成功。
+- 実機起動でクラッシュがないことと`Application Error`イベントが記録されていないことは確認したが、UI自動操作の仕組みがこの環境にないため、プロジェクトを開いて⑤画面のドラッグ&ドロップを実際に操作しての目視確認はできていない。次回ユーザーが実機操作で確認することを推奨。
+- 未実装のまま残る⑤の項目: Undo/Redo、grid virtualization、header/row/grid間のscroll同期、複数コマ・複数講師の一括availability操作。
 
 ### 次回最初に確認するファイル
 
