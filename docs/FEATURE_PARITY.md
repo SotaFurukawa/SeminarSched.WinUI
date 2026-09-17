@@ -31,7 +31,7 @@
 | greedy初期解・complete hint | initial solution | 未実装 | 未実装 | v0.2.0複数strategy側で実装 |
 | CP-SAT hard constraints | OR-Tools optimizer | 要求回数・生徒衝突・講師同時2名/1対1・固定保持・最大連続・空き時間禁止 | 実装中 | 学年別/日別上限等の残制約を継続移植 |
 | 通常担当優先度1〜5 | objectives/constraints | 0/25/50/75/100%最低担当と候補不足時緩和・希望講師penalty | 実装中 | 辞書式soft objectiveと公平性は未完了 |
-| 辞書式目的・公平性 | objectives | 未実装 | 未実装 | 未配置、分散、講師公平性 |
+| 辞書式目的・公平性 | objectives | 単一weighted-sum内でtier順に重みを分離する近似方式（真の逐次lexicographic解法ではない）。未配置数（最優先）→通常担当・希望講師の一致は既存のPreferencePenaltyへ通常担当優先度も合成済み→本checkpointで生徒の同一日集中を抑制するday-dispersion項を追加 | 実装中 | 分散が悪い受講希望の改善、生徒週偏り、同一生徒科目の担当講師分散抑制、講師稼働率公平性、講師出勤日数圧縮は未実装 |
 | 高速/標準/高品質 | optimization view model | 未実装 | 未実装 | 30/120/600秒 |
 | 5段階の最適化品質profile | 追加仕様 | profile catalog / slider / JSON設定 | 実装中 | strategy実装・実行中UIは未完了 |
 | 高品質トーナメント探索 | 追加仕様 | 共通optimizer orchestration・候補選抜 | 実装中 | 実CP-SAT複数戦略とbenchmarkは後段へ保留 |

@@ -46,9 +46,13 @@ public sealed class CpSatScheduleSolver
         AddStudentConsecutiveAndGapConstraints(model, problem, variables);
 
         // Assignment count dominates every soft penalty, so a prettier timetable can never
-        // replace an otherwise assignable lesson with an unassigned lesson.
+        // replace an otherwise assignable lesson with an unassigned lesson. Day-spread ranks
+        // above teacher-preference matching per the Python reference's lexicographic order
+        // (v1.9.5 objectives.py), so it is weighted above the *100 preference term but stays
+        // far below the 1,000,000-per-placement floor.
         var objectiveTerms = variables.Select(item =>
-            LinearExpr.Term(item.variable, 1_000_000L - (item.candidate.PreferencePenalty * 100L) + item.candidate.AvailabilityPreference));
+            LinearExpr.Term(item.variable, 1_000_000L - (item.candidate.PreferencePenalty * 100L) + item.candidate.AvailabilityPreference))
+            .Concat(BuildDayDispersionTerms(model, variables));
         model.Maximize(LinearExpr.Sum(objectiveTerms));
 
         var solver = new CpSolver
@@ -78,6 +82,32 @@ public sealed class CpSatScheduleSolver
         var solution = new ScheduleSolution(placements, unassigned, objective, watch.Elapsed);
         ScheduleSolutionValidator.Validate(problem, solution);
         return solution;
+    }
+
+    private const long DayDispersionWeight = 10_000L;
+
+    /// <summary>
+    /// For each student, rewards using more distinct days rather than concentrating a student's
+    /// several lesson-request sessions onto as few days as possible (Python v1.9.5 objectives.py
+    /// tier 3: "同一日への過度な集中を抑制").
+    /// </summary>
+    private static IEnumerable<LinearExpr> BuildDayDispersionTerms(
+        CpModel model,
+        IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables)
+    {
+        var index = 0;
+        foreach (var group in variables.GroupBy(item => (item.candidate.StudentId, item.candidate.OpenDateId)))
+        {
+            var dayVariables = group.Select(item => item.variable).ToArray();
+            if (dayVariables.Length <= 1)
+            {
+                yield return LinearExpr.Term(dayVariables[0], DayDispersionWeight);
+                continue;
+            }
+            var dayUsed = model.NewBoolVar($"day_used_{index++}");
+            model.AddMaxEquality(dayUsed, dayVariables);
+            yield return LinearExpr.Term(dayUsed, DayDispersionWeight);
+        }
     }
 
     private static void AddRegularTeacherMinimums(

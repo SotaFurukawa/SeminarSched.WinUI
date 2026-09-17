@@ -112,6 +112,25 @@ public sealed class CpSatScheduleSolverTests
     }
 
     [Fact]
+    public async Task SolveAsync_PrefersSpreadingAStudentsSessionsAcrossDistinctDaysWhenOtherwiseTied()
+    {
+        var demands = new[] { new LessonDemand(1, 10, 1, 0), new LessonDemand(2, 10, 1, 0) };
+        var candidates = new[] { 1L, 2L }
+            .SelectMany(requestId => new[] { 1L, 2L }.SelectMany(day => new[]
+            {
+                new PlacementCandidate(requestId, 10, 100, day, 1, (int)day, 1),
+                new PlacementCandidate(requestId, 10, 100, day, 2, (int)day, 2),
+            }))
+            .ToArray();
+        var slots = new[] { 1L, 2L }.SelectMany(day => new[] { new ScheduleSlot(day, 1, (int)day, 1), new ScheduleSlot(day, 2, (int)day, 2) }).ToArray();
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, slots), TimeSpan.FromSeconds(5));
+
+        Assert.Equal(2, solution.Placements.Count);
+        Assert.Equal(2, solution.Placements.Select(p => p.OpenDateId).Distinct().Count());
+    }
+
+    [Fact]
     public void Validator_RejectsUnsatisfiedRegularTeacherMinimum()
     {
         var problem = new ScheduleProblem(
