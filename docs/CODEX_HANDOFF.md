@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `f432a1c`（v0.1.0 checkpoint 29, ⑥全体時間割のgrid化）
+Latest Development Checkpoint: checkpoint 30（v0.1.0, ③availability一括編集matrix UI。コミットhashは本checkpoint末尾を参照）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -303,6 +303,15 @@ Next Version Rule:
 - `ScheduleReport`へ`OpenDates`・`SlotLabels`を追加。Excel側は新しい「全体時間割」sheetをgrid形式で生成し、従来の日付順一覧は「配置一覧」sheetへ退避（削除はしていない）。PDF側は週ごとに独立したtable（列数が週によって異なるため）を生成し、日付header行をMigraDocの`MergeRight`でその日の講師列数ぶん結合。
 - 1セル最大2名の表示は、Python版の「横分割」ではなく同一セル内の改行による縦積みとした（Excel/PDFとも複数列に動的に分岐するテーブル構造は実装コストが高く、視認性は保ちつつ実装の堅牢性を優先する判断）。コマ不可のgray表示（一部コマ不可の講師）は今回のscopeに含めていない。
 - ビルド警告0・エラー0、全79テスト成功（既存77＋`OverviewGridLayout`単体2件）。Privacy gate成功。
+
+### v0.1.0 checkpoint 30 (Claude)
+
+③アンケート取込みへ、CSV/XLSX取込みとは独立した可用性の手動一括編集UIを追加。
+
+- `IAvailabilityMatrixService`/`SqliteAvailabilityMatrixService`を新設。生徒・講師の一覧取得、開講日一覧、指定日の有効コマ一覧、指定日の複数対象×複数コマの現在値取得（`GetDayMatrixAsync`、未設定はlevel=1として扱う）、複数対象への一括level設定（`SetLevelAsync`）を提供。講師の場合はlevel=0で`TeacherUnavailability`にも反映し、level>0に戻すと解除する（CSV取込み時の同期ロジックと同一パターン）。
+- ③画面へ、生徒/講師切替、複数選択ListView、日付・コマ・値(0/1/2)の選択と一括適用ボタン、選択中対象×選択日の現在値を表示する読み取り専用previewグリッドを追加。
+- ビルド警告0・エラー0、全82テスト成功（既存79＋新規3: 一括適用の反映確認、講師level=0時のTeacherUnavailability同期と解除、開講外コマへの適用拒否）。Privacy gate成功。
+- 未実装のまま残る項目: 複数日付・複数コマへの同時一括適用、週単位でのmatrix一覧編集。
 
 ### 次回最初に確認するファイル
 

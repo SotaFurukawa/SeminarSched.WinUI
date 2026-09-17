@@ -1,1 +1,28 @@
-<local:WorkflowPageBase x:Class="SeminarSched_WinUI.Pages.ImportPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:SeminarSched_WinUI.Pages" Loaded="Page_Loaded"><ScrollViewer><StackPanel Padding="24" Spacing="16"><TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="③ アンケート取込み"/><InfoBar x:Name="ProjectRequired"/><InfoBar x:Name="Status" IsClosable="True"/><TextBlock Text="生徒回答と講師回答を両方選び、全行を検証してから一括反映します。CSVはUTF-8/CP932、XLSXに対応します。" TextWrapping="Wrap"/><StackPanel Orientation="Horizontal" Spacing="8"><Button x:Name="SelectButton" Content="2つの回答ファイルを選んで検証" Click="Select_Click"/><Button x:Name="ApplyButton" Content="検証済み内容を反映" IsEnabled="False" Click="Apply_Click" Style="{StaticResource AccentButtonStyle}"/></StackPanel><TextBlock Text="簡易形式: 生徒ID・科目コード・必要回数／講師ID・勤務不可。可用性形式: ID・日付・各コマの0/1/2。" TextWrapping="Wrap"/><TextBlock x:Name="DiffSummary" TextWrapping="Wrap" Visibility="Collapsed"/><StackPanel x:Name="RemovalPanel" Spacing="8" Visibility="Collapsed"><TextBlock FontWeight="SemiBold" Text="削除候補（新しい回答に含まれない、以前登録済みの日付）"/><TextBlock Text="チェックした場合のみ、これらの可用性を反映と同時に削除します。未チェックなら既存データはそのまま残ります。" TextWrapping="Wrap"/><ListView x:Name="RemovalList" MaxHeight="200"/><CheckBox x:Name="RemoveUnlisted" Content="削除候補を反映と同時に削除する"/></StackPanel><TextBlock FontWeight="SemiBold" Text="検証結果"/><ListView x:Name="Issues"/></StackPanel></ScrollViewer></local:WorkflowPageBase>
+<local:WorkflowPageBase x:Class="SeminarSched_WinUI.Pages.ImportPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:SeminarSched_WinUI.Pages" Loaded="Page_Loaded"><ScrollViewer><StackPanel Padding="24" Spacing="16"><TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="③ アンケート取込み"/><InfoBar x:Name="ProjectRequired"/><InfoBar x:Name="Status" IsClosable="True"/><TextBlock Text="生徒回答と講師回答を両方選び、全行を検証してから一括反映します。CSVはUTF-8/CP932、XLSXに対応します。" TextWrapping="Wrap"/><StackPanel Orientation="Horizontal" Spacing="8"><Button x:Name="SelectButton" Content="2つの回答ファイルを選んで検証" Click="Select_Click"/><Button x:Name="ApplyButton" Content="検証済み内容を反映" IsEnabled="False" Click="Apply_Click" Style="{StaticResource AccentButtonStyle}"/></StackPanel><TextBlock Text="簡易形式: 生徒ID・科目コード・必要回数／講師ID・勤務不可。可用性形式: ID・日付・各コマの0/1/2。" TextWrapping="Wrap"/><TextBlock x:Name="DiffSummary" TextWrapping="Wrap" Visibility="Collapsed"/><StackPanel x:Name="RemovalPanel" Spacing="8" Visibility="Collapsed"><TextBlock FontWeight="SemiBold" Text="削除候補（新しい回答に含まれない、以前登録済みの日付）"/><TextBlock Text="チェックした場合のみ、これらの可用性を反映と同時に削除します。未チェックなら既存データはそのまま残ります。" TextWrapping="Wrap"/><ListView x:Name="RemovalList" MaxHeight="200"/><CheckBox x:Name="RemoveUnlisted" Content="削除候補を反映と同時に削除する"/></StackPanel><TextBlock FontWeight="SemiBold" Text="検証結果"/><ListView x:Name="Issues"/>
+<Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+    <StackPanel Spacing="12">
+        <TextBlock FontSize="20" FontWeight="SemiBold" Text="可用性の手動編集"/>
+        <TextBlock Text="複数の生徒または講師を選び、特定の日付・コマへ参加可否（0:不可 / 1:可 / 2:優先）を一括で設定できます。取込済みの回答も上書きされます。" TextWrapping="Wrap"/>
+        <StackPanel Orientation="Horizontal" Spacing="16">
+            <RadioButton x:Name="MatrixStudentKind" Content="生徒" IsChecked="True" Checked="MatrixKind_Changed"/>
+            <RadioButton x:Name="MatrixTeacherKind" Content="講師" Checked="MatrixKind_Changed"/>
+        </StackPanel>
+        <ListView x:Name="MatrixEntities" SelectionMode="Multiple" MaxHeight="180" DisplayMemberPath="Label" SelectionChanged="MatrixEntities_SelectionChanged"/>
+        <Grid ColumnSpacing="8">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <ComboBox x:Name="MatrixDate" Header="日付" DisplayMemberPath="Label" SelectionChanged="MatrixDate_SelectionChanged"/>
+            <ComboBox x:Name="MatrixSlot" Grid.Column="1" Header="コマ" DisplayMemberPath="Label"/>
+            <ComboBox x:Name="MatrixLevel" Grid.Column="2" Header="値" SelectedIndex="1">
+                <ComboBoxItem Content="0: 不可"/>
+                <ComboBoxItem Content="1: 可"/>
+                <ComboBoxItem Content="2: 優先"/>
+            </ComboBox>
+            <Button Grid.Column="3" VerticalAlignment="Bottom" Content="選択した対象へ一括適用" Click="ApplyMatrix_Click" Style="{StaticResource AccentButtonStyle}"/>
+        </Grid>
+        <TextBlock FontWeight="SemiBold" Text="選択日の現在値"/>
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" MaxHeight="320">
+            <Grid x:Name="MatrixGrid"/>
+        </ScrollViewer>
+    </StackPanel>
+</Border>
+</StackPanel></ScrollViewer></local:WorkflowPageBase>
