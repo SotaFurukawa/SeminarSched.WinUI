@@ -14,7 +14,7 @@
 | migration・整合性確認 | Alembic / project service | schema v2・自動backup付きv1→v2 migration・共通製品識別 | 実装中 | rollback failure injectionと今後のversion追加testを継続 |
 | 自動backup・世代管理 | recovery service | UIからのSQLite backup API検証付きsnapshot | 実装中 | 自動実行と世代管理は未実装 |
 | 復元・復元前backup | recovery service | 確認UI・復元前3世代backup・検証・rollback付きatomic restore | 実装中 | failure injection拡充は未実装 |
-| 生徒基本情報 | master repository/service | 追加・一覧・選択編集・使用停止UI、domain validation・SQLite CRUD。一覧をID・氏名・学年で絞り込む検索boxを追加 | 実装中 | ID自動採番wizardは未実装 |
+| 生徒基本情報 | master repository/service | 追加・一覧・選択編集・使用停止UI、domain validation・SQLite CRUD。一覧をID・氏名・学年で絞り込む検索boxを追加。「IDを自動採番」ボタンで既存IDの命名パターン（prefix＋連番）から次の空きIDを自動入力（講師も同様） | 実装済み | |
 | 講師基本情報 | master repository/service | 追加・一覧・選択編集・使用停止・対応科目UI。一覧をID・氏名で絞り込む検索boxを追加。複数講師×複数科目を選択し指導可否を一括設定するUIを追加。一括設定へ備考欄を追加し、指導可否とあわせて備考も一括設定可能（空欄なら既存の備考を変更しない） | 実装済み | |
 | 科目・略称 | master repository/service | 追加・一覧・選択編集・使用停止UI、domain validation・SQLite CRUD。一覧をコード・科目名・校種で絞り込む検索boxを追加。校種入力を「小学校/中学校/高等学校」を選べる編集可能ComboBoxへ変更（自由入力も可） | 実装済み | |
 | 通常授業・担当優先度 | regular lesson profile | 管理UI・SQLite upsert・優先度1〜5・1対1必須 | 実装済み | |

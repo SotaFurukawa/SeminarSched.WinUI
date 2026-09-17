@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `2d6991b`（v0.1.0 checkpoint 42, 講師対応科目の備考一括設定、受講希望の個別編集UI新設）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
+Latest Development Checkpoint: checkpoint 43（生徒・講師IDの自動採番ボタン）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -438,6 +438,14 @@ Feature Parity行21（共通基本情報Excel）の残課題「名前選択helpe
   - `SetupPage`の「担当設定」タブへ「受講希望」セクションを新設。一覧から選択すると全フィールドを読み込んで編集でき（`_nullableTeacherItems`をRegularTeacher/Preferred1〜3の各ComboBoxで共用）、優先度5で通常担当講師未指定の場合はUI側でエラー表示する（Excel取込のvalidationと同じ業務ルール）。最大連続コマ数上書きは`NumberBox`の値0を「上書きなし」として扱い、空きコマ許可上書きは「指定なし/許可/不許可」の3択ComboBoxとした。
   - 新規テスト`SaveGetDeleteLessonRequest_RoundTripsAllFieldsAndUpsertsOnConflict`（`SqliteMasterDataRepositoryTests.cs`）で全項目のround-trip・upsertによる更新・削除を検証した。
 - Release/x64 build: warning 0 / error 0。全90 tests passed（新規1件）。Privacy gate成功。
+
+### v0.1.0 checkpoint 43 (Claude)
+
+Feature Parity行17「ID自動採番wizard」を実装した（ユーザーの許可のもと無人で継続）。
+
+- `SetupPage`の生徒・講師タブへ「IDを自動採番」ボタンを追加。既存の全ID（`_studentItems`/`_teacherItems`）を正規表現`^(.*?)(\d+)$`で prefix と数値末尾に分解し、最も件数の多いprefixグループの最大値+1を、既存の桁数に合わせて0埋めして採番する（例: S-001〜S-009が既存なら次はS-010）。既存IDが無ければ既定値`S-001`/`T-001`から開始する。
+- 単純なUIヘルパー（既存の`_studentItems`/`_teacherItems`キャッシュを読むだけで新規のrepository/serviceは不要）のため、既存の自動テストの対象範囲外（WinUIページのcode-behindは元々テスト対象外という既存方針を踏襲）。
+- Release/x64 build: warning 0 / error 0。全90 tests passed。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 

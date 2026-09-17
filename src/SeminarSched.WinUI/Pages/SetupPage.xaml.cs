@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -86,6 +88,19 @@ public sealed partial class SetupPage : WorkflowPageBase
     }
     private void NewStudent_Click(object sender,RoutedEventArgs e)=>ResetStudent();
     private void NewTeacher_Click(object sender,RoutedEventArgs e)=>ResetTeacher();
+    private void AutoNumberStudentId_Click(object sender,RoutedEventArgs e)=>StudentId.Text=NextExternalId(_studentItems.Select(x=>x.Value.ExternalId),"S-");
+    private void AutoNumberTeacherId_Click(object sender,RoutedEventArgs e)=>TeacherId.Text=NextExternalId(_teacherItems.Select(x=>x.Value.ExternalId),"T-");
+
+    private static string NextExternalId(IEnumerable<string> existingIds, string defaultPrefix)
+    {
+        var pattern = new Regex(@"^(.*?)(\d+)$");
+        var matches = existingIds.Select(id => pattern.Match(id)).Where(m => m.Success).ToArray();
+        if (matches.Length == 0) return $"{defaultPrefix}001";
+        var group = matches.GroupBy(m => m.Groups[1].Value).OrderByDescending(g => g.Count()).First();
+        var width = group.Max(m => m.Groups[2].Value.Length);
+        var next = group.Max(m => int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture)) + 1;
+        return $"{group.Key}{next.ToString(CultureInfo.InvariantCulture).PadLeft(width, '0')}";
+    }
     private void NewSubject_Click(object sender,RoutedEventArgs e)=>ResetSubject();
     private void NewSlot_Click(object sender,RoutedEventArgs e)=>ResetSlot();
     private void ResetStudent(){_studentEditId=0;Students.SelectedItem=null;StudentId.Text=StudentName.Text=StudentGrade.Text=StudentNote.Text="";StudentMaximum.Value=2;StudentAllowGap.IsChecked=false;StudentActive.IsChecked=true;}
