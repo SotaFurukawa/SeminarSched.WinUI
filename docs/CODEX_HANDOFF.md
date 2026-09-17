@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `c5b60e2`（v0.1.0 checkpoint 31, 最適化へ同一日集中抑制の辞書式soft objective追加）
+Latest Development Checkpoint: checkpoint 32（v0.1.0, ⑥通常担当不足診断の追加。コミットhashは本checkpoint末尾を参照）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -322,6 +322,15 @@ Python版v1.9.5 `objectives.py`の辞書式目的（本引継ぎ書5.4節）の�
 - 新規test 1件（他条件が全く同じ場合、生徒の2つの受講希望が同日へ固まるより別日へ分かれる解を優先することを確認）を追加。既存19件のOptimization testはすべて挙動維持（目的関数を変えても既存の期待値に影響しない設計だったため）。
 - ビルド警告0・エラー0、全83テスト成功。Privacy gate成功。
 - 未実装のまま残る辞書式目的: 分散が悪い受講希望の改善、生徒週偏り最大値抑制、同一生徒・科目の担当講師分散抑制、講師稼働率の公平性、講師出勤日数圧縮。いずれも本項目と同様の「補助変数＋重み分離」方式で追加できるが、それぞれ独立した検証が必要なため個別checkpointとして扱う。
+
+### v0.1.0 checkpoint 32 (Claude)
+
+⑥出力の「未配置・警告」へ、Python版5.3節の通常担当優先度目標割合を下回っている生徒・科目を「通常担当不足」として追加。
+
+- `SqliteOutputPackageService`へ`LoadRegularTeacherShortfallsAsync`を追加。目標回数は`CpSatScheduleSolver.MinimumRegularTeacherSessions`と同じ切り上げ式（`((priority-1)*required+3)/4`）をレポート側でも再現し、実績（そのLessonRequestで通常担当講師に割り当てられた回数）が目標を下回る場合のみ一覧化する。
+- `ScheduleReport`へ`RegularTeacherShortfalls`を追加し、Excel「未配置・警告」sheetとPDFの同セクションへ表示。
+- ビルド警告0・エラー0、全84テスト成功（既存83＋新規1: 通常担当2回中0回のケースを検出）。Privacy gate成功。
+- 未実装のまま残る診断: 学年別上限超過などPython版のその他の診断種別。
 
 ### 次回最初に確認するファイル
 

@@ -40,7 +40,9 @@ public sealed class ExcelScheduleReportRenderer
         }
 
         var issues=workbook.AddWorksheet("未配置・警告");issues.Cell(1,1).Value="未配置";issues.Cell(1,1).Style.Font.Bold=true;for(var i=0;i<report.Unassigned.Count;i++)issues.Cell(i+2,1).Value=report.Unassigned[i];
-        var absentStart=report.Unassigned.Count+3;issues.Cell(absentStart,1).Value="講習欠席一覧";issues.Cell(absentStart,1).Style.Font.Bold=true;
+        var shortfallStart=report.Unassigned.Count+3;issues.Cell(shortfallStart,1).Value="通常担当不足";issues.Cell(shortfallStart,1).Style.Font.Bold=true;
+        for(var i=0;i<report.RegularTeacherShortfalls.Count;i++)issues.Cell(shortfallStart+1+i,1).Value=report.RegularTeacherShortfalls[i];
+        var absentStart=shortfallStart+report.RegularTeacherShortfalls.Count+2;issues.Cell(absentStart,1).Value="講習欠席一覧";issues.Cell(absentStart,1).Style.Font.Bold=true;
         for(var i=0;i<report.AbsentStudents.Count;i++){issues.Cell(absentStart+1+i,1).Value=report.AbsentStudents[i].Grade;issues.Cell(absentStart+1+i,2).Value=report.AbsentStudents[i].Name;}
         issues.Columns().AdjustToContents();
         workbook.SaveAs(path);

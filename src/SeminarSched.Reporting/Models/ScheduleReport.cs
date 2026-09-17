@@ -10,4 +10,5 @@ public sealed record ScheduleReport(
     IReadOnlyList<string> SlotLabels,
     IReadOnlyList<ScheduleReportRow> Rows,
     IReadOnlyList<string> Unassigned,
-    IReadOnlyList<AbsentStudent> AbsentStudents);
+    IReadOnlyList<AbsentStudent> AbsentStudents,
+    IReadOnlyList<string> RegularTeacherShortfalls);

@@ -21,6 +21,7 @@ public sealed class PdfScheduleReportRenderer
         AddOverview(section,overviewGrid);
 
         if(report.Unassigned.Count>0){section.AddParagraph("未配置").Format.Font.Bold=true;foreach(var item in report.Unassigned)section.AddParagraph("・"+item);}
+        if(report.RegularTeacherShortfalls.Count>0){section.AddParagraph("通常担当不足").Format.Font.Bold=true;foreach(var item in report.RegularTeacherShortfalls)section.AddParagraph("・"+item);}
         if(report.AbsentStudents.Count>0)
         {
             section.AddParagraph("講習欠席一覧").Format.Font.Bold=true;
