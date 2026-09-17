@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `216b404`（v0.1.0 checkpoint 34, recent非表示・logging基盤）
+Latest Development Checkpoint: checkpoint 35（v0.1.0, ①生徒/講師/科目一覧に検索box追加。コミットhashは本checkpoint末尾を参照）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -352,6 +352,15 @@ Python版v1.9.5 `objectives.py`の辞書式目的（本引継ぎ書5.4節）の�
 - project作成/open/close/backup/restore（HomePage）、時間割自動作成（OptimizationPage）、出力実行（OutputPage）にログ呼び出しを追加。
 - ビルド警告0・エラー0、全88テスト成功（既存84＋新規4: RemoveAsyncの動作確認1件、FileAppLoggerのINFO/ERROR記録・保持期間超過ファイルの自動削除3件）。Privacy gate成功。
 - 未実装のまま残るlogging関連: ①設定の個別保存操作など他の画面はまだログ対象外。ログ閲覧・エクスポートUIはなし（ファイルを直接開く運用）。
+
+### v0.1.0 checkpoint 35 (Claude)
+
+①設定の生徒・講師・科目一覧へ、表示中の一覧をクライアント側で絞り込む検索boxを追加（`SetupPage`）。
+
+- `ReloadAsync`で取得した全件を`_studentItems`/`_teacherItems`/`_subjectItems`としてページに保持し、検索box(`StudentSearch`/`TeacherSearch`/`SubjectSearch`)の`TextChanged`で`MasterItem<T>.Display`文字列への部分一致（大文字小文字を無視）でフィルタしてから`ListView.ItemsSource`へ反映する。サーバー側クエリではなくクライアント側filterなので、追加のSQLite queryは発生しない。
+- WinUI UI層はこのプロジェクトの既存方針どおり自動テスト対象外（Infrastructure/Applicationのみ単体test対象）。ビルド成功のみで動作確認済み、実機でのタイプ確認は未実施。
+- ビルド警告0・エラー0、全88テスト成功（UI限定の変更のためテスト件数は据え置き）。Privacy gate成功。
+- 未実装のまま残る①の項目: ID自動採番wizard、講師の資格matrix一括操作、科目の校種preset。
 
 ### 次回最初に確認するファイル
 

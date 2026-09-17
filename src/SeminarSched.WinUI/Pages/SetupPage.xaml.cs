@@ -16,6 +16,9 @@ public sealed partial class SetupPage : WorkflowPageBase
     private long _subjectEditId;
     private long _slotEditId;
     private bool _loading;
+    private MasterItem<Student>[] _studentItems = [];
+    private MasterItem<Teacher>[] _teacherItems = [];
+    private MasterItem<Subject>[] _subjectItems = [];
 
     public SetupPage() => InitializeComponent();
 
@@ -197,7 +200,8 @@ public sealed partial class SetupPage : WorkflowPageBase
             var studentItems=studentValues.Select(x => new MasterItem<Student>(x,$"{(x.Active?"":"[停止] ")}{x.ExternalId}　{x.Name}　{x.Grade}")).ToArray();
             var teacherItems=teacherValues.Select(x => new MasterItem<Teacher>(x,$"{(x.Active?"":"[停止] ")}{x.ExternalId}　{x.Name}")).ToArray();
             var subjectItems=subjectValues.Select(x => new MasterItem<Subject>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}")).ToArray();
-            Students.ItemsSource=studentItems;Teachers.ItemsSource=teacherItems;Subjects.ItemsSource=subjectItems;
+            _studentItems=studentItems;_teacherItems=teacherItems;_subjectItems=subjectItems;
+            ApplyStudentFilter();ApplyTeacherFilter();ApplySubjectFilter();
             QualificationTeacher.ItemsSource=teacherItems;QualificationSubject.ItemsSource=subjectItems;RegularStudent.ItemsSource=studentItems;RegularSubject.ItemsSource=subjectItems;
             RegularTeacher.ItemsSource=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[停止] ")}{x.ExternalId}　{x.Name}"))).ToArray();if(RegularTeacher.SelectedIndex<0)RegularTeacher.SelectedIndex=0;
             var qualifications=await App.MasterData.GetQualificationsAsync(path);Qualifications.ItemsSource=qualifications.Select(value=>$"{teacherValues.Single(x=>x.Id==value.TeacherId).ExternalId}　{subjectValues.Single(x=>x.Id==value.SubjectId).Code}　{(value.CanTeach?"指導可能":"不可")}　{value.Note}").ToArray();
@@ -208,6 +212,17 @@ public sealed partial class SetupPage : WorkflowPageBase
         }
         finally{_loading=false;}
     }
+
+    private void StudentSearch_TextChanged(object sender, TextChangedEventArgs e) => ApplyStudentFilter();
+    private void TeacherSearch_TextChanged(object sender, TextChangedEventArgs e) => ApplyTeacherFilter();
+    private void SubjectSearch_TextChanged(object sender, TextChangedEventArgs e) => ApplySubjectFilter();
+
+    private void ApplyStudentFilter() => Students.ItemsSource = Filter(_studentItems, StudentSearch.Text);
+    private void ApplyTeacherFilter() => Teachers.ItemsSource = Filter(_teacherItems, TeacherSearch.Text);
+    private void ApplySubjectFilter() => Subjects.ItemsSource = Filter(_subjectItems, SubjectSearch.Text);
+
+    private static MasterItem<T>[] Filter<T>(MasterItem<T>[] items, string query) =>
+        string.IsNullOrWhiteSpace(query) ? items : items.Where(item => item.Display.Contains(query.Trim(), StringComparison.CurrentCultureIgnoreCase)).ToArray();
 
     private void Show(InfoBarSeverity severity, string title, string message) { Status.Severity = severity; Status.Title = title; Status.Message = message; Status.IsOpen = true; }
 
