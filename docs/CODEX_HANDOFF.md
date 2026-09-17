@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `ba4547e`（v0.1.0 checkpoint 40, ① 設定ページの講習設定note・一括操作とコマ設定drag並べ替え）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
+Latest Development Checkpoint: checkpoint 41（共通基本情報Excelの名前選択helper列・dropdown）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -411,6 +411,21 @@ Feature Parity行22（講習設定）・行23（コマ設定・並べ替え）�
   - 開校日・休校日一覧(`CourseDays`)を単一選択から複数選択(`SelectionMode="Extended"`)へ変更し、備考入力欄(`CourseDayNote`)を追加。単一選択時は既存の備考を読み込み表示する。開校/休校ボタンは選択した全日付へ一括適用し、備考欄が空なら既存の既定値（開校=""・休校="休校"）を維持する。
   - `CourseDay`のnote/SortOrderは元々domain・SQLiteスキーマに存在しており、schema変更・migrationは不要（UI層のみの実装）。
 - Release/x64 build: warning 0 / error 0。全88 tests passed。Privacy gate成功。
+
+### v0.1.0 checkpoint 41 (Claude)
+
+Feature Parity行21（共通基本情報Excel）の残課題「名前選択helper列とExcel内dropdown」を実装した。実装前にPython参照repo（read-only、`src/summer_scheduler/infrastructure/excel/template.py`）を調査し、openpyxlでの実装（ID列dropdown＋名前選択dropdown＋IDへの自動変換数式＋確認用逆引き数式列、行3〜10000がvalidation範囲、行3〜1000が数式prefill範囲）を確認した上で、ClosedXML（`IXLRangeBase.CreateDataValidation()`/`.List(IXLRangeBase,bool)`、`IXLCell.FormulaA1`）で同等の挙動を移植した。
+
+- `MasterDataWorkbookService.cs`: 「講師対応科目」「受講希望」シートの出力を専用メソッドに書き換え、各FK列（講師ID・科目コード・生徒ID・通常担当講師ID・第1〜3希望講師ID、計8列×2シート）へ`AddReferenceHelperColumns`で以下を追加した。
+  - ID/コード列自体に、対応する生徒/講師/科目シートのID/コード列を参照元とするdropdown（`IgnoreBlanks`は必須列のみ`false`）。
+  - 隣に「◯◯名から選択」dropdown列（対応シートの氏名/表示名列が参照元、常に空欄可）。
+  - 既存データがある行より後の空白行（`ReferenceFormulaMaxRow`=200行まで）は、ID列へ`IF(選択="","",IF(COUNTIF(名前一覧,選択)=1,INDEX(ID一覧,MATCH(選択,名前一覧,0)),""))`という数式を事前入力し、名前を選ぶだけでIDが自動入力されるようにした（同名が複数あると空欄のまま、直接ID入力にフォールバック）。
+  - 「◯◯名（確認）」列（既存データ行も含め全行）へ、現在のID値から名前を逆引きする`IFERROR(INDEX(...),"ID不明")`数式を追加し、直接typedしたIDでも名前が確認できるようにした。
+  - 定数はPython版（10000/1000）よりも小さい`ReferenceValidationMaxRow=1000`・`ReferenceFormulaMaxRow=200`とした（現実的なroster規模とimport時の数式再評価コストを踏まえた意図的な縮小）。
+  - importの列読み取り（`RowReader`）はヘッダー名で列を検索するため、列順の変更・追加列の挿入は無改修で動作する（確認済み）。
+- 新規テスト`Export_QualificationSheet_NameSelectionAutoFillsIdAndConfirmColumnResolvesName`で、名前選択列に名前を入力した後にファイルを再読み込みし、ID列が数式によって正しいIDへ自動変換されること、確認列が正しい名前を逆引きすることを検証した（ClosedXMLの数式評価エンジンでCOUNTIF/INDEX/MATCH/IFERRORが正しく動くことを実機で確認）。
+- SetupPageの共通基本情報Excel説明文に名前選択機能の案内を追加。
+- Release/x64 build: warning 0 / error 0。全89 tests passed（新規1件）。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 

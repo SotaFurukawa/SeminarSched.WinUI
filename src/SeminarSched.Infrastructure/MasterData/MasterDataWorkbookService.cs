@@ -12,6 +12,8 @@ public sealed class MasterDataWorkbookService : IMasterDataWorkbookService
 {
     private static readonly string[] SheetNames = ["生徒", "講師", "科目", "講師対応科目", "受講希望"];
     private const long MaximumWorkbookBytes = 25 * 1024 * 1024;
+    private const int ReferenceValidationMaxRow = 1000;
+    private const int ReferenceFormulaMaxRow = 200;
 
     public async Task ExportAsync(string projectPath, string destinationPath, CancellationToken cancellationToken = default)
     {
@@ -330,14 +332,125 @@ public sealed class MasterDataWorkbookService : IMasterDataWorkbookService
     private static async Task WriteStudentsAsync(XLWorkbook workbook,SqliteConnection connection,CancellationToken cancellationToken)=>await WriteSheetAsync(workbook,connection,"生徒",StudentExportHeaders,"SELECT 0,ExternalId,Name,Grade,DefaultMaxConsecutiveSlots,AllowGap,Note,Active FROM Student ORDER BY Active DESC,ExternalId",["はい","S-EXAMPLE","架空 花子","J2",2,"いいえ","この行は取込時に無視されます。","はい"],cancellationToken).ConfigureAwait(false);
     private static async Task WriteTeachersAsync(XLWorkbook workbook,SqliteConnection connection,CancellationToken cancellationToken)=>await WriteSheetAsync(workbook,connection,"講師",TeacherExportHeaders,"SELECT 0,ExternalId,Name,AllowGap,Note,Active FROM Teacher ORDER BY Active DESC,ExternalId",["はい","T-EXAMPLE","架空 太郎","いいえ","この行は取込時に無視されます。","はい"],cancellationToken).ConfigureAwait(false);
     private static async Task WriteSubjectsAsync(XLWorkbook workbook,SqliteConnection connection,CancellationToken cancellationToken)=>await WriteSheetAsync(workbook,connection,"科目",SubjectExportHeaders,"SELECT 0,Code,DisplayName,ShortName,SchoolLevel,SortOrder,Active FROM Subject ORDER BY SortOrder,Code",["はい","JH-MATH","中学校・数学（例）","数学","中学校",1,"はい"],cancellationToken).ConfigureAwait(false);
-    private static async Task WriteQualificationsAsync(XLWorkbook workbook,SqliteConnection connection,CancellationToken cancellationToken)=>await WriteSheetAsync(workbook,connection,"講師対応科目",QualificationExportHeaders,"SELECT 0,t.ExternalId,s.Code,q.CanTeach,q.Note FROM TeacherQualification q JOIN Teacher t ON t.Id=q.TeacherId JOIN Subject s ON s.Id=q.SubjectId ORDER BY t.ExternalId,s.Code",["はい","T-EXAMPLE","JH-MATH","はい","この行は取込時に無視されます。"],cancellationToken).ConfigureAwait(false);
-    private static async Task WriteLessonRequestsAsync(XLWorkbook workbook,SqliteConnection connection,CancellationToken cancellationToken)=>await WriteSheetAsync(workbook,connection,"受講希望",RequestExportHeaders,"SELECT 0,st.ExternalId,su.Code,r.RequiredSessions,rt.ExternalId,r.RegularTeacherPriority,p1.ExternalId,p2.ExternalId,p3.ExternalId,r.OneToOneRequired,r.MaxConsecutiveSlotsOverride,r.AllowGapOverride,r.Note FROM LessonRequest r JOIN Student st ON st.Id=r.StudentId JOIN Subject su ON su.Id=r.SubjectId LEFT JOIN Teacher rt ON rt.Id=r.RegularTeacherId LEFT JOIN Teacher p1 ON p1.Id=r.PreferredTeacher1Id LEFT JOIN Teacher p2 ON p2.Id=r.PreferredTeacher2Id LEFT JOIN Teacher p3 ON p3.Id=r.PreferredTeacher3Id WHERE r.ProjectId=1 ORDER BY st.ExternalId,su.Code",["はい","S-EXAMPLE","JH-MATH",4,"T-EXAMPLE",3,"T-EXAMPLE",null,null,"いいえ",null,null,"この行は取込時に無視されます。"],cancellationToken).ConfigureAwait(false);
+    private static async Task WriteQualificationsAsync(XLWorkbook workbook, SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var sheet = workbook.AddWorksheet("講師対応科目");
+        var headers = QualificationExportHeaders;
+        for (var column = 0; column < headers.Length; column++) sheet.Cell(1, column + 1).Value = headers[column];
+        sheet.Cell(2,1).Value="はい";sheet.Cell(2,2).Value="T-EXAMPLE";sheet.Cell(2,5).Value="JH-MATH";sheet.Cell(2,8).Value="はい";sheet.Cell(2,9).Value="この行は取込時に無視されます。";
+
+        var row = 3;
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT t.ExternalId,s.Code,q.CanTeach,q.Note FROM TeacherQualification q JOIN Teacher t ON t.Id=q.TeacherId JOIN Subject s ON s.Id=q.SubjectId ORDER BY t.ExternalId,s.Code";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            sheet.Cell(row,2).Value = reader.GetString(0);
+            sheet.Cell(row,5).Value = reader.GetString(1);
+            sheet.Cell(row,8).Value = ToCellValue(reader.GetBoolean(2));
+            sheet.Cell(row,9).Value = reader.GetString(3);
+            row++;
+        }
+        var lastDataRow = row - 1;
+        AddReferenceHelperColumns(workbook, sheet, idColumn: 2, selectColumn: 3, confirmColumn: 4, sourceSheetName: "講師", lastDataRow, idRequired: true);
+        AddReferenceHelperColumns(workbook, sheet, idColumn: 5, selectColumn: 6, confirmColumn: 7, sourceSheetName: "科目", lastDataRow, idRequired: true);
+        FinalizeSheetStyle(sheet, headers.Length);
+    }
+
+    private static async Task WriteLessonRequestsAsync(XLWorkbook workbook, SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var sheet = workbook.AddWorksheet("受講希望");
+        var headers = RequestExportHeaders;
+        for (var column = 0; column < headers.Length; column++) sheet.Cell(1, column + 1).Value = headers[column];
+        sheet.Cell(2,1).Value="はい";sheet.Cell(2,2).Value="S-EXAMPLE";sheet.Cell(2,5).Value="JH-MATH";sheet.Cell(2,8).Value=4;sheet.Cell(2,9).Value="T-EXAMPLE";sheet.Cell(2,12).Value=3;sheet.Cell(2,13).Value="T-EXAMPLE";sheet.Cell(2,22).Value="いいえ";sheet.Cell(2,25).Value="この行は取込時に無視されます。";
+
+        var row = 3;
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT st.ExternalId,su.Code,r.RequiredSessions,rt.ExternalId,r.RegularTeacherPriority,p1.ExternalId,p2.ExternalId,p3.ExternalId,r.OneToOneRequired,r.MaxConsecutiveSlotsOverride,r.AllowGapOverride,r.Note FROM LessonRequest r JOIN Student st ON st.Id=r.StudentId JOIN Subject su ON su.Id=r.SubjectId LEFT JOIN Teacher rt ON rt.Id=r.RegularTeacherId LEFT JOIN Teacher p1 ON p1.Id=r.PreferredTeacher1Id LEFT JOIN Teacher p2 ON p2.Id=r.PreferredTeacher2Id LEFT JOIN Teacher p3 ON p3.Id=r.PreferredTeacher3Id WHERE r.ProjectId=1 ORDER BY st.ExternalId,su.Code";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            sheet.Cell(row,2).Value = reader.GetString(0);
+            sheet.Cell(row,5).Value = reader.GetString(1);
+            sheet.Cell(row,8).Value = reader.GetInt32(2);
+            sheet.Cell(row,9).Value = ToCellValue(reader.IsDBNull(3) ? null : reader.GetString(3));
+            sheet.Cell(row,12).Value = reader.GetInt32(4);
+            sheet.Cell(row,13).Value = ToCellValue(reader.IsDBNull(5) ? null : reader.GetString(5));
+            sheet.Cell(row,16).Value = ToCellValue(reader.IsDBNull(6) ? null : reader.GetString(6));
+            sheet.Cell(row,19).Value = ToCellValue(reader.IsDBNull(7) ? null : reader.GetString(7));
+            sheet.Cell(row,22).Value = ToCellValue(reader.GetBoolean(8));
+            sheet.Cell(row,23).Value = ToCellValue(reader.IsDBNull(9) ? null : reader.GetInt32(9));
+            sheet.Cell(row,24).Value = ToCellValue(reader.IsDBNull(10) ? null : reader.GetBoolean(10));
+            sheet.Cell(row,25).Value = reader.GetString(11);
+            row++;
+        }
+        var lastDataRow = row - 1;
+        AddReferenceHelperColumns(workbook, sheet, idColumn: 2, selectColumn: 3, confirmColumn: 4, sourceSheetName: "生徒", lastDataRow, idRequired: true);
+        AddReferenceHelperColumns(workbook, sheet, idColumn: 5, selectColumn: 6, confirmColumn: 7, sourceSheetName: "科目", lastDataRow, idRequired: true);
+        AddReferenceHelperColumns(workbook, sheet, idColumn: 9, selectColumn: 10, confirmColumn: 11, sourceSheetName: "講師", lastDataRow, idRequired: false);
+        AddReferenceHelperColumns(workbook, sheet, idColumn: 13, selectColumn: 14, confirmColumn: 15, sourceSheetName: "講師", lastDataRow, idRequired: false);
+        AddReferenceHelperColumns(workbook, sheet, idColumn: 16, selectColumn: 17, confirmColumn: 18, sourceSheetName: "講師", lastDataRow, idRequired: false);
+        AddReferenceHelperColumns(workbook, sheet, idColumn: 19, selectColumn: 20, confirmColumn: 21, sourceSheetName: "講師", lastDataRow, idRequired: false);
+        FinalizeSheetStyle(sheet, headers.Length);
+    }
 
     private static async Task WriteSheetAsync(XLWorkbook workbook,SqliteConnection connection,string name,string[] headers,string sql,object?[] example,CancellationToken cancellationToken)
     {
         var sheet=workbook.AddWorksheet(name);for(var column=0;column<headers.Length;column++){sheet.Cell(1,column+1).Value=headers[column];sheet.Cell(2,column+1).Value=ToCellValue(example[column]);}
         var row=3;await using var command=connection.CreateCommand();command.CommandText=sql;await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false)){for(var column=0;column<reader.FieldCount;column++)sheet.Cell(row,column+1).Value=ToCellValue(reader.IsDBNull(column)?null:reader.GetValue(column));row++;}
-        var header=sheet.Range(1,1,1,headers.Length);header.Style.Font.Bold=true;header.Style.Fill.BackgroundColor=XLColor.FromHtml("#DCE6F1");sheet.SheetView.FreezeRows(1);sheet.Columns().AdjustToContents(10,36);sheet.RangeUsed()?.SetAutoFilter();
+        FinalizeSheetStyle(sheet, headers.Length);
+    }
+
+    // Dropdown on the id column + a name-picker dropdown that auto-fills blank rows' ids + a reverse-lookup confirm column.
+    private static void AddReferenceHelperColumns(XLWorkbook workbook, IXLWorksheet sheet, int idColumn, int selectColumn, int confirmColumn, string sourceSheetName, int lastDataRow, bool idRequired)
+    {
+        var sourceSheet = workbook.Worksheet(sourceSheetName);
+        var idSourceRange = sourceSheet.Range(3, 2, ReferenceValidationMaxRow, 2);
+        var nameSourceRange = sourceSheet.Range(3, 3, ReferenceValidationMaxRow, 3);
+        var idLetter = ColumnLetter(idColumn);
+        var selectLetter = ColumnLetter(selectColumn);
+        var idSourceRef = $"'{sourceSheetName}'!$B$3:$B${ReferenceValidationMaxRow}";
+        var nameSourceRef = $"'{sourceSheetName}'!$C$3:$C${ReferenceValidationMaxRow}";
+
+        var idValidation = sheet.Range(3, idColumn, ReferenceValidationMaxRow, idColumn).CreateDataValidation();
+        idValidation.List(idSourceRange, true);
+        idValidation.IgnoreBlanks = !idRequired;
+        idValidation.ShowErrorMessage = true;
+        idValidation.ErrorTitle = "一覧にない値です";
+        idValidation.ErrorMessage = $"{sourceSheetName}シートに登録済みのIDまたはコードを入力するか、右の「名前から選択」列で選んでください。";
+
+        var selectValidation = sheet.Range(3, selectColumn, ReferenceValidationMaxRow, selectColumn).CreateDataValidation();
+        selectValidation.List(nameSourceRange, true);
+        selectValidation.IgnoreBlanks = true;
+        selectValidation.ShowErrorMessage = true;
+        selectValidation.ErrorTitle = "一覧にない名前です";
+        selectValidation.ErrorMessage = $"{sourceSheetName}シートに登録済みの名前を選択してください。";
+
+        var formulaEnd = Math.Max(lastDataRow, ReferenceFormulaMaxRow);
+        for (var row = 3; row <= formulaEnd; row++)
+            sheet.Cell(row, confirmColumn).FormulaA1 = $"IF({idLetter}{row}=\"\",\"\",IFERROR(INDEX({nameSourceRef},MATCH({idLetter}{row},{idSourceRef},0)),\"ID不明\"))";
+
+        for (var row = lastDataRow + 1; row <= ReferenceFormulaMaxRow; row++)
+            sheet.Cell(row, idColumn).FormulaA1 = $"IF({selectLetter}{row}=\"\",\"\",IF(COUNTIF({nameSourceRef},{selectLetter}{row})=1,INDEX({idSourceRef},MATCH({selectLetter}{row},{nameSourceRef},0)),\"\"))";
+    }
+
+    private static void FinalizeSheetStyle(IXLWorksheet sheet, int headerColumnCount)
+    {
+        var header = sheet.Range(1, 1, 1, headerColumnCount);
+        header.Style.Font.Bold = true; header.Style.Fill.BackgroundColor = XLColor.FromHtml("#DCE6F1");
+        sheet.SheetView.FreezeRows(1); sheet.Columns().AdjustToContents(10, 36); sheet.RangeUsed()?.SetAutoFilter();
+    }
+
+    private static string ColumnLetter(int columnNumber)
+    {
+        var letters = string.Empty;
+        while (columnNumber > 0)
+        {
+            var remainder = (columnNumber - 1) % 26;
+            letters = (char)('A' + remainder) + letters;
+            columnNumber = (columnNumber - 1) / 26;
+        }
+        return letters;
     }
 
     private static XLCellValue ToCellValue(object? value)=>value switch{null=>Blank.Value,bool boolean=>boolean?"はい":"いいえ",long number=>number,int number=>number,double number=>number,string text=>text,_=>Convert.ToString(value,CultureInfo.InvariantCulture)??string.Empty};
@@ -358,8 +471,8 @@ public sealed class MasterDataWorkbookService : IMasterDataWorkbookService
     private static readonly string[] StudentExportHeaders=["例示行","生徒ID（必須）","氏名（必須）","学年（必須）","標準最大連続コマ数","空きコマ許可","備考","有効"];
     private static readonly string[] TeacherExportHeaders=["例示行","講師ID（必須）","氏名（必須）","空きコマ許可","備考","有効"];
     private static readonly string[] SubjectExportHeaders=["例示行","科目コード（必須）","表示名（必須）","略称","学校段階（必須）","並び順（必須）","有効"];
-    private static readonly string[] QualificationExportHeaders=["例示行","講師ID（必須）","科目コード（必須）","指導可能","備考"];
-    private static readonly string[] RequestExportHeaders=["例示行","生徒ID（必須）","科目コード（必須）","必要授業回数（必須）","通常担当講師ID","担当講師優先度","第1希望講師ID","第2希望講師ID","第3希望講師ID","1対1必須","最大連続コマ数上書き","空きコマ許可上書き","備考"];
+    private static readonly string[] QualificationExportHeaders=["例示行","講師ID（必須）","講師名から選択","講師名（確認）","科目コード（必須）","科目名から選択","科目名（確認）","指導可能","備考"];
+    private static readonly string[] RequestExportHeaders=["例示行","生徒ID（必須）","生徒名から選択","生徒氏名（確認）","科目コード（必須）","科目名から選択","科目名（確認）","必要授業回数（必須）","通常担当講師ID","通常担当講師名から選択","通常担当講師名（確認）","担当講師優先度","第1希望講師ID","第1希望講師名から選択","第1希望講師名（確認）","第2希望講師ID","第2希望講師名から選択","第2希望講師名（確認）","第3希望講師ID","第3希望講師名から選択","第3希望講師名（確認）","1対1必須","最大連続コマ数上書き","空きコマ許可上書き","備考"];
 
     private interface IWorkbookRow{int RowNumber{get;}}
     private sealed record StudentRow(int RowNumber,string ExternalId,string Name,string Grade,int DefaultMaximum,bool AllowGap,string Note,bool Active):IWorkbookRow;

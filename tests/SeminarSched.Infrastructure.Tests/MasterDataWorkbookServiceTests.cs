@@ -45,6 +45,37 @@ public sealed class MasterDataWorkbookServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Export_QualificationSheet_NameSelectionAutoFillsIdAndConfirmColumnResolvesName()
+    {
+        var project = await CreateProjectAsync();
+        var workbookPath = Path.Combine(_directory, "名前選択.xlsx");
+        var service = new MasterDataWorkbookService();
+        await service.ExportAsync(project, workbookPath);
+
+        using (var workbook = new XLWorkbook(workbookPath))
+        {
+            workbook.Worksheet("講師").Cell(3, 2).Value = "T-001";
+            workbook.Worksheet("講師").Cell(3, 3).Value = "架空 講師";
+            workbook.Worksheet("科目").Cell(3, 2).Value = "JH_MATH";
+            workbook.Worksheet("科目").Cell(3, 3).Value = "数学";
+
+            var qualification = workbook.Worksheet("講師対応科目");
+            Assert.Equal(["例示行","講師ID（必須）","講師名から選択","講師名（確認）","科目コード（必須）","科目名から選択","科目名（確認）","指導可能","備考"], qualification.Row(1).CellsUsed().Select(cell => cell.GetString()));
+            qualification.Cell(3, 3).Value = "架空 講師";
+            qualification.Cell(3, 6).Value = "数学";
+            qualification.Cell(3, 8).Value = "はい";
+            workbook.Save();
+        }
+
+        using var reopened = new XLWorkbook(workbookPath);
+        var sheet = reopened.Worksheet("講師対応科目");
+        Assert.Equal("T-001", sheet.Cell(3, 2).GetString());
+        Assert.Equal("JH_MATH", sheet.Cell(3, 5).GetString());
+        Assert.Equal("架空 講師", sheet.Cell(3, 4).GetString());
+        Assert.Equal("数学", sheet.Cell(3, 7).GetString());
+    }
+
+    [Fact]
     public async Task Preview_InvalidReference_BlocksEveryDatabaseChange()
     {
         var project = await CreateProjectAsync();var workbookPath=Path.Combine(_directory,"不正.xlsx");var service=new MasterDataWorkbookService();await service.ExportAsync(project,workbookPath);
