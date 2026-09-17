@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `2e61049`（v0.1.0 checkpoint 38, Windows配布方針の確定とMSIX署名基盤）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
+Latest Development Checkpoint: checkpoint 40（① 設定ページの講習設定note・一括操作とコマ設定drag並べ替え）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -401,6 +401,16 @@ Python版v1.9.5 `objectives.py`の辞書式目的（本引継ぎ書5.4節）の�
 
 - `docs/adr/0005-windows-distribution.md`の「検証状況」を更新し、管理者権限でのcertutil手順がユーザー環境で成功したことを記録した。
 - `.msix`本体のダブルクリックインストール自体の成否は、ユーザーからの追加報告待ち。
+
+### v0.1.0 checkpoint 40 (Claude)
+
+Feature Parity行22（講習設定）・行23（コマ設定・並べ替え）の残課題を実装した（最適化以外の残gapを継続する方針）。
+
+- `SetupPage`の「コマ・開校日」タブ:
+  - コマ一覧(`TimeSlots`)を`ObservableCollection<MasterItem<TimeSlot>>`にバインドし、`CanReorderItems`/`AllowDrop`でdrag並べ替えを有効化。`DragItemsCompleted`で並べ替え後の位置をSortOrderとして`SaveTimeSlotAsync`へ反映する（内容が変わった項目のみ保存）。
+  - 開校日・休校日一覧(`CourseDays`)を単一選択から複数選択(`SelectionMode="Extended"`)へ変更し、備考入力欄(`CourseDayNote`)を追加。単一選択時は既存の備考を読み込み表示する。開校/休校ボタンは選択した全日付へ一括適用し、備考欄が空なら既存の既定値（開校=""・休校="休校"）を維持する。
+  - `CourseDay`のnote/SortOrderは元々domain・SQLiteスキーマに存在しており、schema変更・migrationは不要（UI層のみの実装）。
+- Release/x64 build: warning 0 / error 0。全88 tests passed。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 

@@ -1,6 +1,8 @@
+using System.Collections.ObjectModel;
 using Microsoft.Data.Sqlite;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.ApplicationModel.DataTransfer;
 using SeminarSched.Domain.MasterData;
 using SeminarSched.Domain.CourseSettings;
 using SeminarSched.Application.MasterData;
@@ -19,8 +21,9 @@ public sealed partial class SetupPage : WorkflowPageBase
     private MasterItem<Student>[] _studentItems = [];
     private MasterItem<Teacher>[] _teacherItems = [];
     private MasterItem<Subject>[] _subjectItems = [];
+    private readonly ObservableCollection<MasterItem<TimeSlot>> _timeSlotItems = new();
 
-    public SetupPage() => InitializeComponent();
+    public SetupPage() { InitializeComponent(); TimeSlots.ItemsSource = _timeSlotItems; }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
@@ -171,17 +174,41 @@ public sealed partial class SetupPage : WorkflowPageBase
         return string.Join(Environment.NewLine, lines);
     }
 
-    private async void SetOpenDay_Click(object sender, RoutedEventArgs e) => await SaveSelectedDayAsync(true);
-    private async void SetClosedDay_Click(object sender, RoutedEventArgs e) => await SaveSelectedDayAsync(false);
+    private async void SetOpenDay_Click(object sender, RoutedEventArgs e) => await SaveSelectedDaysAsync(true);
+    private async void SetClosedDay_Click(object sender, RoutedEventArgs e) => await SaveSelectedDaysAsync(false);
 
-    private async Task SaveSelectedDayAsync(bool isOpen)
+    private async Task SaveSelectedDaysAsync(bool isOpen)
     {
-        if (CourseDays.SelectedItem is not CourseDayItem selected) { Show(InfoBarSeverity.Warning, "日付を選択してください", ""); return; }
+        var selected = CourseDays.SelectedItems.Cast<CourseDayItem>().ToArray();
+        if (selected.Length == 0) { Show(InfoBarSeverity.Warning, "日付を選択してください", ""); return; }
         await ExecuteAsync(async path =>
         {
             var slots = await App.CourseSettings.GetTimeSlotsAsync(path);
-            await App.CourseSettings.SaveCourseDayAsync(path, new CourseDay(selected.Date, isOpen, isOpen ? "" : "休校", isOpen ? slots.Where(x => x.Active).Select(x => x.Id).ToArray() : []));
-        }, isOpen ? "開校日に設定しました" : "休校日に設定しました");
+            var enabledIds = isOpen ? slots.Where(x => x.Active).Select(x => x.Id).ToArray() : [];
+            var note = CourseDayNote.Text;
+            foreach (var day in selected)
+                await App.CourseSettings.SaveCourseDayAsync(path, new CourseDay(day.Date, isOpen, string.IsNullOrEmpty(note) ? (isOpen ? "" : "休校") : note, enabledIds));
+        }, selected.Length == 1 ? (isOpen ? "開校日に設定しました" : "休校日に設定しました") : $"{selected.Length}件を{(isOpen ? "開校日" : "休校日")}に設定しました");
+    }
+
+    private void CourseDays_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        if (CourseDays.SelectedItems.Count == 1 && CourseDays.SelectedItems[0] is CourseDayItem selected) CourseDayNote.Text = selected.Note;
+    }
+
+    private async void TimeSlots_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)
+    {
+        if (args.DropResult != DataPackageOperation.Move) return;
+        await ExecuteAsync(async path =>
+        {
+            for (var i = 0; i < _timeSlotItems.Count; i++)
+            {
+                var slot = _timeSlotItems[i].Value;
+                if (slot.SortOrder != i + 1)
+                    await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(slot.Id, slot.Code, slot.DisplayName, slot.StartTime, slot.EndTime, i + 1, slot.Active));
+            }
+        }, "コマの表示順を更新しました");
     }
 
     private async Task ExecuteAsync(Func<string, Task> action, string success)
@@ -218,8 +245,9 @@ public sealed partial class SetupPage : WorkflowPageBase
             var qualifications=await App.MasterData.GetQualificationsAsync(path);Qualifications.ItemsSource=qualifications.Select(value=>$"{teacherValues.Single(x=>x.Id==value.TeacherId).ExternalId}　{subjectValues.Single(x=>x.Id==value.SubjectId).Code}　{(value.CanTeach?"指導可能":"不可")}　{value.Note}").ToArray();
             var regularLessons=await App.MasterData.GetRegularLessonsAsync(path);RegularLessons.ItemsSource=regularLessons.Select(value=>$"{studentValues.Single(x=>x.Id==value.StudentId).ExternalId}　{subjectValues.Single(x=>x.Id==value.SubjectId).Code}　通常担当: {(value.RegularTeacherId is long id?teacherValues.Single(x=>x.Id==id).ExternalId:"指定なし")}　優先度{value.RegularTeacherPriority}　{(value.OneToOneRequired?"1対1":"通常")}").ToArray();
             var slots = await App.CourseSettings.GetTimeSlotsAsync(path);
-            TimeSlots.ItemsSource = slots.Select(x => new MasterItem<TimeSlot>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}　{x.StartTime:HH\\:mm}～{x.EndTime:HH\\:mm}")).ToArray();
-            CourseDays.ItemsSource = (await App.CourseSettings.GetCourseDaysAsync(path)).Select(x => new CourseDayItem(x.Date, x.IsOpen ? "開校" : "休校", x.IsOpen ? $"{x.EnabledTimeSlotIds.Count}コマ" : "-")).ToArray();
+            _timeSlotItems.Clear();
+            foreach (var item in slots.OrderBy(x => x.SortOrder).Select(x => new MasterItem<TimeSlot>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}　{x.StartTime:HH\\:mm}～{x.EndTime:HH\\:mm}"))) _timeSlotItems.Add(item);
+            CourseDays.ItemsSource = (await App.CourseSettings.GetCourseDaysAsync(path)).Select(x => new CourseDayItem(x.Date, x.IsOpen ? "開校" : "休校", x.IsOpen ? $"{x.EnabledTimeSlotIds.Count}コマ" : "-", x.Note)).ToArray();
         }
         finally{_loading=false;}
     }
@@ -237,6 +265,6 @@ public sealed partial class SetupPage : WorkflowPageBase
 
     private void Show(InfoBarSeverity severity, string title, string message) { Status.Severity = severity; Status.Title = title; Status.Message = message; Status.IsOpen = true; }
 
-    private sealed record CourseDayItem(DateOnly Date, string StatusLabel, string SlotSummary);
+    private sealed record CourseDayItem(DateOnly Date, string StatusLabel, string SlotSummary, string Note);
     private sealed record MasterItem<T>(T Value,string Display){public override string ToString()=>Display;}
 }

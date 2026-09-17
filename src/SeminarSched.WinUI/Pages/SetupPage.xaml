@@ -28,11 +28,14 @@
                 <TextBlock FontSize="18" FontWeight="SemiBold" Text="コマ設定"/>
                 <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="130"/><ColumnDefinition Width="110"/><ColumnDefinition Width="110"/><ColumnDefinition Width="80"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <TextBox x:Name="SlotCode" Header="コード"/><TextBox x:Name="SlotName" Grid.Column="1" Header="表示名"/><TimePicker x:Name="SlotStart" Grid.Column="2" Header="開始" ClockIdentifier="24HourClock"/><TimePicker x:Name="SlotEnd" Grid.Column="3" Header="終了" ClockIdentifier="24HourClock"/><NumberBox x:Name="SlotOrder" Grid.Column="4" Header="順序" Minimum="1" Value="1"/><Button Grid.Column="5" VerticalAlignment="Bottom" Content="保存" Click="AddSlot_Click"/>
-                </Grid><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="SlotActive" Content="有効" IsChecked="True"/><Button Content="新規入力" Click="NewSlot_Click"/></StackPanel><ListView x:Name="TimeSlots" SelectionChanged="TimeSlots_SelectionChanged"/>
+                </Grid><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="SlotActive" Content="有効" IsChecked="True"/><Button Content="新規入力" Click="NewSlot_Click"/></StackPanel>
+                <TextBlock Text="一覧をドラッグすると表示順を並べ替えられます。" TextWrapping="Wrap"/>
+                <ListView x:Name="TimeSlots" SelectionChanged="TimeSlots_SelectionChanged" CanReorderItems="True" AllowDrop="True" DragItemsCompleted="TimeSlots_DragItemsCompleted"/>
                 <TextBlock Margin="0,12,0,0" FontSize="18" FontWeight="SemiBold" Text="開校日・休校日"/>
-                <TextBlock Text="日付を選び、開校または休校へ切り替えます。「開校」は現在有効な全コマをその日に設定します。" TextWrapping="Wrap"/>
+                <TextBlock Text="日付を選び、開校または休校へ切り替えます。「開校」は現在有効な全コマをその日に設定します。複数日を選ぶと一括で切り替えられます。" TextWrapping="Wrap"/>
+                <TextBox x:Name="CourseDayNote" Width="420" Header="備考（空欄なら既定値を使用）"/>
                 <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="開校（全コマ）" Click="SetOpenDay_Click"/><Button Content="休校" Click="SetClosedDay_Click"/></StackPanel>
-                <ListView x:Name="CourseDays" SelectionMode="Single"><ListView.ItemTemplate><DataTemplate><StackPanel Orientation="Horizontal" Spacing="12"><TextBlock Width="120" Text="{Binding Date}"/><TextBlock Width="60" Text="{Binding StatusLabel}"/><TextBlock Text="{Binding SlotSummary}"/></StackPanel></DataTemplate></ListView.ItemTemplate></ListView>
+                <ListView x:Name="CourseDays" SelectionMode="Extended" SelectionChanged="CourseDays_SelectionChanged"><ListView.ItemTemplate><DataTemplate><StackPanel Orientation="Horizontal" Spacing="12"><TextBlock Width="120" Text="{Binding Date}"/><TextBlock Width="60" Text="{Binding StatusLabel}"/><TextBlock Text="{Binding SlotSummary}"/></StackPanel></DataTemplate></ListView.ItemTemplate></ListView>
             </StackPanel></TabViewItem>
         </TabView>
     </StackPanel></ScrollViewer>
