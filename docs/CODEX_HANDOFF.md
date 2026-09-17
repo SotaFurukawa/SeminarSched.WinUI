@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `5dd0688`（v0.1.0 checkpoint 24, ⑤日別グリッド編集・drag&drop・講師一時表示）
+Latest Development Checkpoint: checkpoint 25（v0.1.0, ⑤Undo/Redo。コミットhashは本checkpoint末尾を参照）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -253,6 +253,14 @@ Next Version Rule:
 - ビルド警告0・エラー0、全70テスト成功（既存66＋新規4: グリッド構造、移動の成功/ロック拒否/同一セル拒否/生徒衝突拒否、講師全コマ不可時の列非表示と`extraTeacherIds`強制表示、既存配置があるセルの出勤不可拒否）。Privacy gate成功。
 - 実機起動でクラッシュがないことと`Application Error`イベントが記録されていないことは確認したが、UI自動操作の仕組みがこの環境にないため、プロジェクトを開いて⑤画面のドラッグ&ドロップを実際に操作しての目視確認はできていない。次回ユーザーが実機操作で確認することを推奨。
 - 未実装のまま残る⑤の項目: Undo/Redo、grid virtualization、header/row/grid間のscroll同期、複数コマ・複数講師の一括availability操作。
+
+### v0.1.0 checkpoint 25 (Claude)
+
+- `IScheduleEditorService`へ`CaptureSnapshotAsync`/`RestoreSnapshotAsync`を追加。`Assignment`・`TeacherUnavailability`全行をレコード列として取得し、復元時はDELETE後に元のIdを含めて再INSERTする（AUTOINCREMENTシーケンスは自動的に追いつくため後続のID採番と衝突しない）。
+- ⑤へ「元に戻す」「やり直す」ボタンを追加。自動作成の実行、手動配置の追加/削除/移動/ロック切替、自動配置リセット、講師出勤可否変更など、⑤内のすべての変更操作の直前に現在状態をsnapshotしてundo stackへ積む方式（操作単位の逆操作ではなく、テーブル全体のstate replaceなので実装・検証が単純で取りこぼしがない）。
+- Undo/Redo履歴はページのmemory上のみで、プロジェクトを開き直す・アプリを終了すると失われる（Python版の「process内のみ」の仕様と同じ）。
+- ビルド警告0・エラー0、全71テスト成功（既存70＋snapshot往復1件）。Privacy gate成功。
+- 実機起動でのクラッシュなしとApplication Errorイベント無しは確認したが、ドラッグ&ドロップ同様、UI自動操作の手段がないためUndo/Redoボタンの実クリック確認はできていない。
 
 ### 次回最初に確認するファイル
 

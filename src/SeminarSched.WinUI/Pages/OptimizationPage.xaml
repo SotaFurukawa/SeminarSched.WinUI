@@ -71,12 +71,14 @@
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Spacing="12">
                     <TextBlock FontSize="20" FontWeight="SemiBold" Text="日別グリッド編集"/>
-                    <TextBlock Text="カードをドラッグしてセル間を移動、未配置一覧からはセルへドラッグして配置できます。右クリックでロック切替・削除、セル右上の丸印/バツ印で講師の出勤可否を切り替えられます。" TextWrapping="Wrap"/>
+                    <TextBlock Text="カードをドラッグしてセル間を移動、未配置一覧からはセルへドラッグして配置できます。右クリックでロック切替・削除、セル右上の丸印/バツ印で講師の出勤可否を切り替えられます。「元に戻す」「やり直す」で自動作成を含む直前の変更を取り消し・再適用できます（アプリを終了すると履歴は失われます）。" TextWrapping="Wrap"/>
                     <Grid ColumnSpacing="12">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                         <ComboBox x:Name="BoardDate" Header="日付" DisplayMemberPath="Label" MinWidth="200" SelectionChanged="BoardDate_SelectionChanged"/>
                         <TextBox x:Name="BoardSearch" Grid.Column="1" Header="生徒名検索" TextChanged="BoardSearch_TextChanged"/>
-                        <Button x:Name="AddTeacherButton" Grid.Column="2" VerticalAlignment="Bottom" Content="+ 講師を表示" Click="AddTeacher_Click"/>
+                        <Button x:Name="UndoButton" Grid.Column="2" VerticalAlignment="Bottom" Content="元に戻す" IsEnabled="False" Click="Undo_Click"/>
+                        <Button x:Name="RedoButton" Grid.Column="3" VerticalAlignment="Bottom" Content="やり直す" IsEnabled="False" Click="Redo_Click"/>
+                        <Button x:Name="AddTeacherButton" Grid.Column="4" VerticalAlignment="Bottom" Content="+ 講師を表示" Click="AddTeacher_Click"/>
                     </Grid>
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>

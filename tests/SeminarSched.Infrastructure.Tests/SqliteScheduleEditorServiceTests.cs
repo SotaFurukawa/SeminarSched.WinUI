@@ -101,6 +101,32 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
         await Assert.ThrowsAsync<InvalidOperationException>(()=>editor.SetTeacherUnavailableAsync(state.Path,state.Teacher1Id,state.DateId,state.Slot1Id,true));
     }
 
+    [Fact]
+    public async Task SnapshotRoundTrip_RestoresPriorAssignmentsAndUnavailability()
+    {
+        var state=await CreateBoardStateAsync();var editor=new SqliteScheduleEditorService();
+        var empty=await editor.CaptureSnapshotAsync(state.Path);
+        Assert.Empty(empty.Assignments);Assert.Empty(empty.TeacherUnavailabilities);
+
+        await editor.AddManualAsync(state.Path,state.RequestId,state.Teacher1Id,state.DateId,state.Slot1Id,false);
+        await editor.SetTeacherUnavailableAsync(state.Path,state.Teacher2Id,state.DateId,state.Slot2Id,true);
+        var populated=await editor.CaptureSnapshotAsync(state.Path);
+        Assert.Single(populated.Assignments);Assert.Single(populated.TeacherUnavailabilities);
+
+        await editor.RestoreSnapshotAsync(state.Path,empty);
+        Assert.Empty(await editor.GetAssignmentsAsync(state.Path));
+        var boardAfterUndo=await editor.GetBoardAsync(state.Path,state.DateId,[]);
+        Assert.False(boardAfterUndo.Cell(state.Slot2Id,state.Teacher2Id)!.Blocked);
+
+        await editor.RestoreSnapshotAsync(state.Path,populated);
+        var restored=Assert.Single(await editor.GetAssignmentsAsync(state.Path));
+        Assert.Equal(state.Teacher1Id,restored.TeacherId);Assert.Equal(populated.Assignments[0].Id,restored.Id);
+        var boardAfterRedo=await editor.GetBoardAsync(state.Path,state.DateId,[]);
+        Assert.True(boardAfterRedo.Cell(state.Slot2Id,state.Teacher2Id)!.Blocked);
+
+        await using var connection=new SqliteConnection($"Data Source={state.Path};Pooling=False");await connection.OpenAsync();await using var command=connection.CreateCommand();command.CommandText="SELECT COUNT(*) FROM AuditLog WHERE Action='schedule_snapshot_restored';";Assert.Equal(2L,Convert.ToInt64(await command.ExecuteScalarAsync()));
+    }
+
     private static async Task InsertRawAssignmentAsync(string path,long requestId,long teacherId,long openDateId,long timeSlotId,bool isLocked,bool isManual)
     {
         await using var connection=new SqliteConnection($"Data Source={path};Pooling=False");await connection.OpenAsync();

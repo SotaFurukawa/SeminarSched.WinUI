@@ -188,6 +188,51 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<ScheduleSnapshot> CaptureSnapshotAsync(string projectPath,CancellationToken cancellationToken=default)
+    {
+        await using var connection=await OpenAsync(projectPath,cancellationToken).ConfigureAwait(false);await SqliteProjectSchema.EnsureCurrentAsync(connection,cancellationToken).ConfigureAwait(false);
+        var assignments=new List<AssignmentSnapshotRow>();
+        await using(var command=connection.CreateCommand())
+        {
+            command.CommandText="SELECT Id,LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source,SessionIndex,OptimizationRunId,IsManual,Note FROM Assignment;";
+            await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                assignments.Add(new AssignmentSnapshotRow(reader.GetInt64(0),reader.GetInt64(1),reader.GetInt64(2),reader.GetInt64(3),reader.GetInt64(4),reader.GetBoolean(5),reader.GetString(6),reader.GetInt32(7),reader.IsDBNull(8)?null:reader.GetInt64(8),reader.GetBoolean(9),reader.GetString(10)));
+        }
+        var unavailabilities=new List<TeacherUnavailabilitySnapshotRow>();
+        await using(var command=connection.CreateCommand())
+        {
+            command.CommandText="SELECT TeacherId,OpenDateId,TimeSlotId FROM TeacherUnavailability;";
+            await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                unavailabilities.Add(new TeacherUnavailabilitySnapshotRow(reader.GetInt64(0),reader.GetInt64(1),reader.GetInt64(2)));
+        }
+        return new ScheduleSnapshot(assignments,unavailabilities);
+    }
+
+    public async Task RestoreSnapshotAsync(string projectPath,ScheduleSnapshot snapshot,CancellationToken cancellationToken=default)
+    {
+        await using var connection=await OpenAsync(projectPath,cancellationToken).ConfigureAwait(false);await SqliteProjectSchema.EnsureCurrentAsync(connection,cancellationToken).ConfigureAwait(false);await using var transaction=(SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await using(var clearAssignments=connection.CreateCommand()){clearAssignments.Transaction=transaction;clearAssignments.CommandText="DELETE FROM Assignment;";await clearAssignments.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);}
+        await using(var clearUnavailability=connection.CreateCommand()){clearUnavailability.Transaction=transaction;clearUnavailability.CommandText="DELETE FROM TeacherUnavailability;";await clearUnavailability.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);}
+        foreach(var row in snapshot.Assignments)
+        {
+            await using var insert=connection.CreateCommand();insert.Transaction=transaction;
+            insert.CommandText="INSERT INTO Assignment(Id,LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source,SessionIndex,OptimizationRunId,IsManual,Note) VALUES($id,$request,$teacher,$date,$slot,$locked,$source,$session,$run,$manual,$note);";
+            insert.Parameters.AddWithValue("$id",row.Id);insert.Parameters.AddWithValue("$request",row.LessonRequestId);insert.Parameters.AddWithValue("$teacher",row.TeacherId);insert.Parameters.AddWithValue("$date",row.OpenDateId);insert.Parameters.AddWithValue("$slot",row.TimeSlotId);insert.Parameters.AddWithValue("$locked",row.IsLocked);insert.Parameters.AddWithValue("$source",row.Source);insert.Parameters.AddWithValue("$session",row.SessionIndex);insert.Parameters.AddWithValue("$run",(object?)row.OptimizationRunId??DBNull.Value);insert.Parameters.AddWithValue("$manual",row.IsManual);insert.Parameters.AddWithValue("$note",row.Note);
+            await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        foreach(var row in snapshot.TeacherUnavailabilities)
+        {
+            await using var insert=connection.CreateCommand();insert.Transaction=transaction;
+            insert.CommandText="INSERT INTO TeacherUnavailability(TeacherId,OpenDateId,TimeSlotId) VALUES($teacher,$date,$slot);";
+            insert.Parameters.AddWithValue("$teacher",row.TeacherId);insert.Parameters.AddWithValue("$date",row.OpenDateId);insert.Parameters.AddWithValue("$slot",row.TimeSlotId);
+            await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        await InsertAuditAsync(connection,transaction,"schedule_snapshot_restored","project:1",new{assignments=snapshot.Assignments.Count,unavailabilities=snapshot.TeacherUnavailabilities.Count},cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     private static async Task InsertAuditAsync(SqliteConnection connection,SqliteTransaction transaction,string action,string entityId,object? summary,CancellationToken cancellationToken){await using var command=connection.CreateCommand();command.Transaction=transaction;command.CommandText="INSERT INTO AuditLog(ProjectId,TimestampUtc,Action,EntityType,EntityId,AfterJson,Reason,Source,OperationId) VALUES(1,$utc,$action,'assignment',$entity,$after,'時間割手動編集','manual',$operation);";command.Parameters.AddWithValue("$utc",DateTimeOffset.UtcNow.ToString("O",CultureInfo.InvariantCulture));command.Parameters.AddWithValue("$action",action);command.Parameters.AddWithValue("$entity",entityId);command.Parameters.AddWithValue("$after",summary is null?DBNull.Value:JsonSerializer.Serialize(summary));command.Parameters.AddWithValue("$operation",Guid.NewGuid().ToString("N"));await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);}
     private static async Task<SqliteConnection> OpenAsync(string path,CancellationToken cancellationToken){var connection=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.GetFullPath(path),Mode=SqliteOpenMode.ReadWrite,ForeignKeys=true,Pooling=false}.ToString());await connection.OpenAsync(cancellationToken).ConfigureAwait(false);return connection;}
 }

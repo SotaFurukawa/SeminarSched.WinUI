@@ -37,6 +37,12 @@ public sealed record UnplacedSessionOption(long LessonRequestId, string Label, i
     public override string ToString() => $"{Label}　(残り{Remaining}回)";
 }
 
+public sealed record AssignmentSnapshotRow(long Id, long LessonRequestId, long TeacherId, long OpenDateId, long TimeSlotId, bool IsLocked, string Source, int SessionIndex, long? OptimizationRunId, bool IsManual, string Note);
+
+public sealed record TeacherUnavailabilitySnapshotRow(long TeacherId, long OpenDateId, long TimeSlotId);
+
+public sealed record ScheduleSnapshot(IReadOnlyList<AssignmentSnapshotRow> Assignments, IReadOnlyList<TeacherUnavailabilitySnapshotRow> TeacherUnavailabilities);
+
 public interface IScheduleEditorService
 {
     Task<IReadOnlyList<ScheduleAssignmentItem>> GetAssignmentsAsync(string projectPath, CancellationToken cancellationToken = default);
@@ -49,4 +55,6 @@ public interface IScheduleEditorService
     Task<IReadOnlyList<UnplacedSessionOption>> GetUnplacedSessionsAsync(string projectPath, CancellationToken cancellationToken = default);
     Task MoveAsync(string projectPath, long assignmentId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken = default);
     Task SetTeacherUnavailableAsync(string projectPath, long teacherId, long openDateId, long timeSlotId, bool unavailable, CancellationToken cancellationToken = default);
+    Task<ScheduleSnapshot> CaptureSnapshotAsync(string projectPath, CancellationToken cancellationToken = default);
+    Task RestoreSnapshotAsync(string projectPath, ScheduleSnapshot snapshot, CancellationToken cancellationToken = default);
 }

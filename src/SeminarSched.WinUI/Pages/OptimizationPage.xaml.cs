@@ -17,6 +17,8 @@ public sealed partial class OptimizationPage : Page
     private CancellationTokenSource? _saveDebounce;
     private bool _isLoaded;
     private readonly HashSet<long> _extraTeacherIds = [];
+    private readonly Stack<ScheduleSnapshot> _undoStack = new();
+    private readonly Stack<ScheduleSnapshot> _redoStack = new();
     private ScheduleBoard? _currentBoard;
     private long? _selectedDateId;
     private sealed record CellTag(long TimeSlotId, long TeacherId, bool Blocked);
@@ -37,6 +39,7 @@ public sealed partial class OptimizationPage : Page
             QualitySlider.Value = ViewModel.SliderValue;
             _isLoaded = true;
             RunButton.IsEnabled = App.ProjectService.Current is not null;
+            _undoStack.Clear(); _redoStack.Clear(); UpdateUndoRedoButtons();
             if (RunButton.IsEnabled) await ReloadEditorAsync();
         }
         catch (IOException)
@@ -53,17 +56,73 @@ public sealed partial class OptimizationPage : Page
 
     private async void Run_Click(object sender, RoutedEventArgs e)
     {
+        var path=App.ProjectService.Current!.Path;
         try
         {
             RunButton.IsEnabled=false;RunProgress.IsActive=true;RunStatus.IsOpen=false;
+            PushUndoSnapshot(await App.ScheduleEditor.CaptureSnapshotAsync(path));
             var profile=SeminarSched.Optimization.Profiles.OptimizationProfileCatalog.Get(ViewModel.Level);
-            var result=await App.ScheduleRun.RunAsync(App.ProjectService.Current!.Path,profile.MaximumDuration);
+            var result=await App.ScheduleRun.RunAsync(path,profile.MaximumDuration);
             RunStatus.Severity=InfoBarSeverity.Success;RunStatus.Title="時間割を作成しました";RunStatus.Message=$"配置 {result.PlacedLessons}件、未配置 {result.UnassignedLessons}件、{result.Elapsed.TotalSeconds:F1}秒";RunStatus.IsOpen=true;
             await ReloadEditorAsync();
         }
         catch(Exception ex) when(ex is InvalidOperationException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
-        {RunStatus.Severity=InfoBarSeverity.Error;RunStatus.Title="時間割を作成できませんでした";RunStatus.Message=ex.Message;RunStatus.IsOpen=true;}
+        {
+            if(_undoStack.Count>0)_undoStack.Pop();UpdateUndoRedoButtons();
+            RunStatus.Severity=InfoBarSeverity.Error;RunStatus.Title="時間割を作成できませんでした";RunStatus.Message=ex.Message;RunStatus.IsOpen=true;
+        }
         finally{RunProgress.IsActive=false;RunButton.IsEnabled=App.ProjectService.Current is not null;}
+    }
+
+    private void PushUndoSnapshot(ScheduleSnapshot snapshot)
+    {
+        _undoStack.Push(snapshot);
+        _redoStack.Clear();
+        UpdateUndoRedoButtons();
+    }
+
+    private void UpdateUndoRedoButtons()
+    {
+        UndoButton.IsEnabled = _undoStack.Count > 0;
+        RedoButton.IsEnabled = _redoStack.Count > 0;
+    }
+
+    private async void Undo_Click(object sender, RoutedEventArgs e)
+    {
+        if (_undoStack.Count == 0 || App.ProjectService.Current?.Path is not { } path) return;
+        try
+        {
+            IsEnabled = false;
+            var current = await App.ScheduleEditor.CaptureSnapshotAsync(path);
+            var previous = _undoStack.Pop();
+            _redoStack.Push(current);
+            await App.ScheduleEditor.RestoreSnapshotAsync(path, previous);
+            await ReloadEditorAsync();
+            UpdateUndoRedoButtons();
+            RunStatus.Severity = InfoBarSeverity.Success; RunStatus.Title = "元に戻しました"; RunStatus.Message = ""; RunStatus.IsOpen = true;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
+        { ShowEditorError(exception.Message); }
+        finally { IsEnabled = true; }
+    }
+
+    private async void Redo_Click(object sender, RoutedEventArgs e)
+    {
+        if (_redoStack.Count == 0 || App.ProjectService.Current?.Path is not { } path) return;
+        try
+        {
+            IsEnabled = false;
+            var current = await App.ScheduleEditor.CaptureSnapshotAsync(path);
+            var next = _redoStack.Pop();
+            _undoStack.Push(current);
+            await App.ScheduleEditor.RestoreSnapshotAsync(path, next);
+            await ReloadEditorAsync();
+            UpdateUndoRedoButtons();
+            RunStatus.Severity = InfoBarSeverity.Success; RunStatus.Title = "やり直しました"; RunStatus.Message = ""; RunStatus.IsOpen = true;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
+        { ShowEditorError(exception.Message); }
+        finally { IsEnabled = true; }
     }
 
     private async Task ReloadEditorAsync()
@@ -272,7 +331,20 @@ public sealed partial class OptimizationPage : Page
     private async void ResetAutomatic_Click(object sender,RoutedEventArgs e)=>await ExecuteEditorAsync(async()=>await App.ScheduleEditor.ResetAutomaticAsync(App.ProjectService.Current!.Path),"自動配置をリセットしました");
     private async Task ExecuteEditorAsync(Func<Task> action,string success)
     {
-        try{IsEnabled=false;await action();await ReloadEditorAsync();RunStatus.Severity=InfoBarSeverity.Success;RunStatus.Title=success;RunStatus.Message="";RunStatus.IsOpen=true;}catch(Exception exception)when(exception is InvalidOperationException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException){ShowEditorError(exception.Message);}finally{IsEnabled=true;}
+        var path=App.ProjectService.Current?.Path;var snapshotPushed=false;
+        try
+        {
+            IsEnabled=false;
+            if(path is not null){PushUndoSnapshot(await App.ScheduleEditor.CaptureSnapshotAsync(path));snapshotPushed=true;}
+            await action();await ReloadEditorAsync();
+            RunStatus.Severity=InfoBarSeverity.Success;RunStatus.Title=success;RunStatus.Message="";RunStatus.IsOpen=true;
+        }
+        catch(Exception exception)when(exception is InvalidOperationException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            if(snapshotPushed){_undoStack.Pop();UpdateUndoRedoButtons();}
+            ShowEditorError(exception.Message);
+        }
+        finally{IsEnabled=true;}
     }
     private void ShowEditorError(string message){RunStatus.Severity=InfoBarSeverity.Error;RunStatus.Title="時間割を編集できませんでした";RunStatus.Message=message;RunStatus.IsOpen=true;}
 
