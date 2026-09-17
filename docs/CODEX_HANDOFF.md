@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `51d1631`（v0.1.0 checkpoint 27, ③import diff・削除候補確認）
+Latest Development Checkpoint: checkpoint 28（v0.1.0, ⑥生徒/講師配布の週calendar化。コミットhashは本checkpoint末尾を参照）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -284,6 +284,16 @@ Next Version Rule:
 - 希望講師ID（第1〜3希望）が未登録の場合の検証を、取込全体を止めるERRORからWARNING（IsError:false）へ引き下げた。Apply側は元々未登録IDをNULLとして無視する挙動だったため、実際の反映結果と検証結果の重大度を一致させた。ERROR/WARNINGは画面のissue一覧に`[エラー]`/`[警告]`として区別表示する。
 - ビルド警告0・エラー0、全72テスト成功（既存71＋diff/削除候補confirmationの往復1件）。Privacy gate成功。
 - 未実装のまま残る③の項目: 簡易形式（必要回数・勤務不可）側のdiff算出、Google Forms生回答の列mapping UI。
+
+### v0.1.0 checkpoint 28 (Claude)
+
+⑥出力の生徒配布・講師配布帳票を、単純な日付順一覧表からPython版仕様の「日曜始まり・土曜終わりの週calendar」形式へ変更。
+
+- `SeminarSched.Reporting.Layout.WeeklyCalendarLayout`を新設。`Build(start,end,linesByDate)`が対象期間を含む日曜〜土曜の週群を生成し（`CalendarWeek`/`CalendarCell`）、`BuildStudentLabels`が「姓のみ表示、同姓のみ名の先頭1文字を付与」という生徒名表記規則を実装。Excel/PDF両rendererで共有するrenderer非依存レイアウトとして`SeminarSched.Reporting`側に置いた。
+- `ScheduleReport`へ`StartDate`/`EndDate`（`CourseProject`から取得）、`AbsentStudents`（受講希望が1件もない生徒。講習に一度も参加しない生徒として「講習欠席一覧」へ列挙）、`ScheduleReportRow.SubjectShortName`（`Subject.ShortName`、未設定ならDisplayNameへfallback）を追加。
+- `ExcelScheduleReportRenderer`/`PdfScheduleReportRenderer`の生徒別・講師別section/sheetを週calendarへ書き換え。生徒別セルは「科目略称 講師名t」、講師別セルは「科目略称 生徒表記」を表示。未配置・警告sheetの下に「講習欠席一覧」を追加。
+- ビルド警告0・エラー0、全77テスト成功（既存72＋`WeeklyCalendarLayout`単体4件＋複数週・同姓生徒・欠席一覧を検証する結合test1件）。Privacy gate成功。
+- 未実装のまま残る⑥の項目: 全体時間割（①行=コマ・列=講師のgrid、休校日除外、講師別コマ不可gray表示）は未着手。講師別folder packet（個別ファイル分割、通常担当優先→講習担当→その他の並び順、1ページ4名）も未実装。
 
 ### 次回最初に確認するファイル
 
