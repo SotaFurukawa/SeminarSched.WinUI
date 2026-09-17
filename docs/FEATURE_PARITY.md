@@ -21,7 +21,7 @@
 | 共通基本情報Excel | master Excel service | 5sheet出力・全行preview・SHA再確認・transaction upsert・原本snapshot | 実装中 | 名前選択helper列とExcel内dropdownを継続移植 |
 | 講習設定 | phase2 models/view model | 期間内日付・開校/休校・日別有効コマの保存UI | 実装中 | note編集・一括操作拡充は未実装 |
 | コマ設定・並べ替え | phase2 UI/service | コマ追加・選択編集・使用停止・表示順・時刻範囲UI | 実装中 | drag並べ替えは未実装 |
-| Google Forms作成kit | questionnaire script service | 設定値入りCode.gs・READMEのatomic生成UI | 実装中 | Python版の学年分岐・全質問・診断は未移植 |
+| Google Forms作成kit | questionnaire script service | 設定値入りCode.gs・READMEのatomic生成UI。生徒フォームに学年ベースのpage分岐（小/中/高、科目をSchoolLevelから自動分類）と「他学年も受講する」分岐、特記事項・学力テスト希望を追加 | 実装中 | 講師指導可能科目用の別Apps Script、回答sheetの列正規化・診断は未移植。実際にGoogle上でスクリプトを実行しての動作確認は未実施（この環境からはGoogleへ到達できないため） |
 | 生徒回答・講師回答2file選択 | import UI/service | CSV/XLSXの2file選択UI | 実装中 | sheet選択とGoogle Forms生列mapping UIは未実装 |
 | CSV UTF-8/CP932・旧形式 | importing readers | quoted CSV・BOM/UTF-8/CP932自動判定・XLSX先頭sheet | 実装中 | 生Google Forms回答の自動mappingは未実装 |
 | import preview/diff | importing diff | 全行参照検証・issue一覧・件数preview | 実装中 | 詳細diff・warning・削除候補は未実装 |

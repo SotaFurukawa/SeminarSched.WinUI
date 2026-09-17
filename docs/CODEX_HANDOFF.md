@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `acd7134`（v0.1.0 checkpoint 25, ⑤Undo/Redo）
+Latest Development Checkpoint: checkpoint 26（v0.1.0, ②生徒フォーム学年分岐。コミットhashは本checkpoint末尾を参照）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -261,6 +261,18 @@ Next Version Rule:
 - Undo/Redo履歴はページのmemory上のみで、プロジェクトを開き直す・アプリを終了すると失われる（Python版の「process内のみ」の仕様と同じ）。
 - ビルド警告0・エラー0、全71テスト成功（既存70＋snapshot往復1件）。Privacy gate成功。
 - 実機起動でのクラッシュなしとApplication Errorイベント無しは確認したが、ドラッグ&ドロップ同様、UI自動操作の手段がないためUndo/Redoボタンの実クリック確認はできていない。
+
+### v0.1.0 checkpoint 26 (Claude)
+
+⑤の主要項目が一段落したため、②アンケート作成（Google Forms作成kit）の生徒フォーム学年分岐へ着手。
+
+- `Subject.SchoolLevel`の文字列を「小/中/高/その他」へ分類（部分一致: "小"→小学校,"中"→中学校,"高"→高等学校、いずれも含まない場合は「その他」）し、`CONFIG.subjectsByLevel`として生成JSONへ埋め込み。
+- 生成する`Code.gs`の生徒フォームを、学年(`ListItem`、小1〜高3の12択)で各校種の科目選択ページへ分岐するmulti-page構成へ変更。各校種ページには「中高一貫などで他学年の授業も受講しますか」のはい/いいえ分岐を追加し、「はい」で全校種の科目を追加選択できる「他学年の受講科目」ページへ進む。校種に対応する科目が1つもない場合は空のCheckboxItemを作らず案内文を表示する（Apps Script側でのランタイムエラーを回避）。
+- 特記事項・学力テスト希望の設問を、日時列（参加可能コマの各日Checkbox群）より前に追加し、回答sheetの列順で日時列より左に来るようにした（Google Formsの回答列順は設問追加順に一致するため）。
+- 講師フォームは`createTeacherForm`として分離しただけで内容は現状維持。
+- Google上で実際にスクリプトを実行しての動作確認はこの環境からはできない（外部ネットワーク到達不可）。Apps Script API仕様（`ListItem/MultipleChoiceItem.createChoice(value, destinationPageBreakItem)`によるpage分岐、選択肢配列は全ページ作成後にまとめて設定する定石パターン）に基づいて実装した。次回ユーザーが実際にGoogle上で試すことを推奨。
+- ビルド警告0・エラー0、全71テスト成功（既存70＋学年分岐のJSON構造検証1件を既存テストへ追加、件数据え置き）。Privacy gate成功。
+- 未実装のまま残る②の項目: 講師指導可能科目用の別Apps Script、回答sheetの列正規化・診断。
 
 ### 次回最初に確認するファイル
 

@@ -28,11 +28,21 @@ public sealed class QuestionnaireKitService
         try
         {
             Directory.CreateDirectory(temporary);
+            var bySchoolLevel = subjects.GroupBy(x => ClassifySchoolLevel(x.SchoolLevel))
+                .ToDictionary(g => g.Key, g => g.Select(x => new { x.Code, x.DisplayName }).ToArray());
+            object[] Bucket(SchoolLevelGroup level) => bySchoolLevel.TryGetValue(level, out var list) ? list : [];
             var config = new
             {
                 openDates = days.Select(x => x.Date.ToString("yyyy-MM-dd")),
                 timeSlots = slots.Select(x => new { x.Code, x.DisplayName, start = x.StartTime.ToString("HH:mm"), end = x.EndTime.ToString("HH:mm") }),
                 subjects = subjects.Select(x => new { x.Code, x.DisplayName }),
+                subjectsByLevel = new
+                {
+                    elementary = Bucket(SchoolLevelGroup.Elementary),
+                    juniorHigh = Bucket(SchoolLevelGroup.JuniorHigh),
+                    seniorHigh = Bucket(SchoolLevelGroup.SeniorHigh),
+                    other = Bucket(SchoolLevelGroup.Other),
+                },
             };
             var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(Path.Combine(temporary, "Code.gs"), BuildScript(json), new UTF8Encoding(false), cancellationToken);
@@ -43,21 +53,97 @@ public sealed class QuestionnaireKitService
         finally { if (Directory.Exists(temporary)) Directory.Delete(temporary, true); }
     }
 
+    private enum SchoolLevelGroup { Elementary, JuniorHigh, SeniorHigh, Other }
+
+    private static SchoolLevelGroup ClassifySchoolLevel(string schoolLevel)
+    {
+        if (schoolLevel.Contains('小')) return SchoolLevelGroup.Elementary;
+        if (schoolLevel.Contains('中')) return SchoolLevelGroup.JuniorHigh;
+        if (schoolLevel.Contains('高')) return SchoolLevelGroup.SeniorHigh;
+        return SchoolLevelGroup.Other;
+    }
+
     private static string BuildScript(string json) => $$"""
         // SeminarSched.WinUI generated Google Apps Script. Personal responses stay in your Google account.
         const CONFIG = {{json}};
 
-        function createSeminarSchedForms() {
-          const student = FormApp.create('季節講習 生徒アンケート');
-          student.addTextItem().setTitle('生徒ID').setRequired(true);
-          student.addCheckboxItem().setTitle('受講希望科目').setChoiceValues(CONFIG.subjects.map(x => x.code + ' ' + x.displayName)).setRequired(true);
-          addAvailability(student);
+        // Grade choices route to the matching school-level page; subjects tagged with an
+        // unrecognized SchoolLevel land only in the override page (CONFIG.subjectsByLevel.other),
+        // never silently dropped.
+        const GRADE_CHOICES = [
+          ['小1','elementary'],['小2','elementary'],['小3','elementary'],['小4','elementary'],['小5','elementary'],['小6','elementary'],
+          ['中1','juniorHigh'],['中2','juniorHigh'],['中3','juniorHigh'],
+          ['高1','seniorHigh'],['高2','seniorHigh'],['高3','seniorHigh'],
+        ];
 
-          const teacher = FormApp.create('季節講習 講師勤務アンケート');
-          teacher.addTextItem().setTitle('講師ID').setRequired(true);
-          addAvailability(teacher);
+        function createSeminarSchedForms() {
+          const student = createStudentForm();
+          const teacher = createTeacherForm();
           Logger.log('生徒回答URL: ' + student.getPublishedUrl());
           Logger.log('講師回答URL: ' + teacher.getPublishedUrl());
+        }
+
+        function createStudentForm() {
+          const form = FormApp.create('季節講習 生徒アンケート');
+          form.addTextItem().setTitle('生徒ID').setRequired(true);
+          form.addTextItem().setTitle('氏名').setRequired(true);
+          const gradeItem = form.addListItem().setTitle('学年').setRequired(true);
+
+          const elementaryPage = form.addPageBreakItem().setTitle('受講科目（小学校）');
+          const elementaryYesNo = addLevelSubjectPage(form, '小学校', CONFIG.subjectsByLevel.elementary);
+          const juniorPage = form.addPageBreakItem().setTitle('受講科目（中学校）');
+          const juniorYesNo = addLevelSubjectPage(form, '中学校', CONFIG.subjectsByLevel.juniorHigh);
+          const seniorPage = form.addPageBreakItem().setTitle('受講科目（高等学校）');
+          const seniorYesNo = addLevelSubjectPage(form, '高等学校', CONFIG.subjectsByLevel.seniorHigh);
+
+          const overridePage = form.addPageBreakItem().setTitle('他学年の受講科目');
+          form.addParagraphTextItem().setTitle('特記事項').setRequired(false);
+          addSubjectCheckboxIfAny(form, '追加で受講する科目（小学校）', CONFIG.subjectsByLevel.elementary);
+          addSubjectCheckboxIfAny(form, '追加で受講する科目（中学校）', CONFIG.subjectsByLevel.juniorHigh);
+          addSubjectCheckboxIfAny(form, '追加で受講する科目（高等学校）', CONFIG.subjectsByLevel.seniorHigh);
+          addSubjectCheckboxIfAny(form, '追加で受講する科目（その他）', CONFIG.subjectsByLevel.other);
+
+          const availabilityPage = form.addPageBreakItem().setTitle('参加可能日時');
+          form.addMultipleChoiceItem().setTitle('学力テストの受験を希望しますか').setChoiceValues(['はい', 'いいえ']).setRequired(true);
+          addAvailability(form);
+
+          const levelPages = { elementary: elementaryPage, juniorHigh: juniorPage, seniorHigh: seniorPage };
+          gradeItem.setChoices(GRADE_CHOICES.map(([label, level]) => gradeItem.createChoice(label, levelPages[level])));
+          setYesNoBranch(elementaryYesNo, overridePage, availabilityPage);
+          setYesNoBranch(juniorYesNo, overridePage, availabilityPage);
+          setYesNoBranch(seniorYesNo, overridePage, availabilityPage);
+          return form;
+        }
+
+        // Adds the level's subject checklist (if any) plus the "他学年も受講する" branch question,
+        // and returns that MultipleChoiceItem so the caller can wire its per-choice page jump once
+        // the destination pages exist.
+        function addLevelSubjectPage(form, levelLabel, subjectsForLevel) {
+          addSubjectCheckboxIfAny(form, levelLabel + 'の受講希望科目', subjectsForLevel);
+          if (subjectsForLevel.length === 0) {
+            form.addParagraphTextItem().setTitle('この学年区分に対応する科目は設定されていません。').setRequired(false);
+          }
+          return form.addMultipleChoiceItem().setTitle('中高一貫などで他学年の授業も受講しますか').setRequired(true);
+        }
+
+        function addSubjectCheckboxIfAny(form, title, subjectsForLevel) {
+          if (subjectsForLevel.length === 0) return;
+          form.addCheckboxItem().setTitle(title)
+            .setChoiceValues(subjectsForLevel.map(x => x.code + ' ' + x.displayName));
+        }
+
+        function setYesNoBranch(yesNoItem, yesPage, noPage) {
+          yesNoItem.setChoices([
+            yesNoItem.createChoice('はい（他学年の科目も選ぶ）', yesPage),
+            yesNoItem.createChoice('いいえ（このまま進む）', noPage),
+          ]);
+        }
+
+        function createTeacherForm() {
+          const form = FormApp.create('季節講習 講師勤務アンケート');
+          form.addTextItem().setTitle('講師ID').setRequired(true);
+          addAvailability(form);
+          return form;
         }
 
         function addAvailability(form) {
