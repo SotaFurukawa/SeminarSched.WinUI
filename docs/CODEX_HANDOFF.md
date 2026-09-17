@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `eb51815`（v0.1.0 checkpoint 32, ⑥通常担当不足診断の追加）
+Latest Development Checkpoint: checkpoint 33（v0.1.0, ⑥講師別folder packet。コミットhashは本checkpoint末尾を参照）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -331,6 +331,16 @@ Python版v1.9.5 `objectives.py`の辞書式目的（本引継ぎ書5.4節）の�
 - `ScheduleReport`へ`RegularTeacherShortfalls`を追加し、Excel「未配置・警告」sheetとPDFの同セクションへ表示。
 - ビルド警告0・エラー0、全84テスト成功（既存83＋新規1: 通常担当2回中0回のケースを検出）。Privacy gate成功。
 - 未実装のまま残る診断: 学年別上限超過などPython版のその他の診断種別。
+
+### v0.1.0 checkpoint 33 (Claude)
+
+⑥出力へ講師別folder packetを追加。出力実行のたびに「講師別」sub folder内へ講師ごとの独立したExcelファイルを生成する。
+
+- `ScheduleReportRow`へ`IsRegularTeacher`（そのAssignmentのTeacherIdが当該生徒・科目のRegularLessonProfile.RegularTeacherIdと一致するか）を追加。
+- `ExcelScheduleReportRenderer.RenderTeacherPacket`を新設。講師ごとに「担当一覧」（通常担当を先に列挙→講習担当（その他）の順）と「時間割」（週calendar、既存のWriteCalendarを再利用）の2sheetを持つ独立workbookを生成する。
+- `SqliteOutputPackageService.GenerateAsync`が出力ごとに`講師別`folderを作り、`{講師名}t.xlsx`（ファイル名重複時は連番を付与、ファイル名不正文字は除去）で各講師の個別ファイルを書き出す。`OutputPackageResult`へ`TeacherPacketDirectory`を追加。
+- Python版の「その他区分は1ページ4名」という詳細なPDFページ割りはExcel中心の現構成には該当せず、実装していない（Python原典を参照できないため、担当一覧の並び順という確認可能な部分だけを再現し、ページ割りの数値までは推測で実装していない）。個別ファイルはExcelのみで、PDF側は共通PDF内のsectionのまま。
+- ビルド警告0・エラー0、全84テスト成功（既存の通常担当不足testへ講師別folder生成・担当一覧の並び順・時間割sheet存在の確認を追加。新規[Fact]は追加していないため件数据え置き）。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 

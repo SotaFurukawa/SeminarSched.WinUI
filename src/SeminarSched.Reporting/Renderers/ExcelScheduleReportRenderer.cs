@@ -48,6 +48,36 @@ public sealed class ExcelScheduleReportRenderer
         workbook.SaveAs(path);
     }
 
+    /// <summary>
+    /// Python版6節「講師別出力」相当。講師ごとに独立したファイルとして、担当一覧（通常担当を先に列挙）と
+    /// 個別の週calendarを生成する。呼び出し側（output service）が講師別folderへ配置する。
+    /// </summary>
+    public void RenderTeacherPacket(ScheduleReport report,string teacherName,string path)
+    {
+        var teacherRows=report.Rows.Where(x=>x.Teacher==teacherName).ToArray();
+        var studentLabels=WeeklyCalendarLayout.BuildStudentLabels(report.Rows.Select(x=>x.Student));
+        using var workbook=new XLWorkbook();
+
+        var roster=workbook.AddWorksheet("担当一覧");
+        roster.Cell(1,1).Value=$"{teacherName} 担当一覧";roster.Cell(1,1).Style.Font.Bold=true;
+        var regular=teacherRows.Where(x=>x.IsRegularTeacher).Select(x=>$"{studentLabels[x.Student]} {x.SubjectShortName}").Distinct().OrderBy(x=>x,StringComparer.Ordinal).ToArray();
+        var others=teacherRows.Where(x=>!x.IsRegularTeacher).Select(x=>$"{studentLabels[x.Student]} {x.SubjectShortName}").Distinct().OrderBy(x=>x,StringComparer.Ordinal).ToArray();
+        var row=3;
+        roster.Cell(row,1).Value="通常担当";roster.Cell(row,1).Style.Font.Bold=true;row++;
+        foreach(var line in regular){roster.Cell(row,1).Value=line;row++;}
+        row++;
+        roster.Cell(row,1).Value="講習担当（その他）";roster.Cell(row,1).Style.Font.Bold=true;row++;
+        foreach(var line in others){roster.Cell(row,1).Value=line;row++;}
+        roster.Column(1).AdjustToContents();
+
+        var calendar=workbook.AddWorksheet("時間割");
+        calendar.Cell(1,1).Value=teacherName;calendar.Cell(1,1).Style.Font.Bold=true;
+        var linesByDate=teacherRows.GroupBy(x=>DateOnly.Parse(x.Date)).ToDictionary(g=>g.Key,IReadOnlyList<string> (g)=>g.OrderBy(x=>x.TimeSlot).Select(x=>$"{x.SubjectShortName} {studentLabels[x.Student]}").ToArray());
+        WriteCalendar(calendar,report.StartDate,report.EndDate,linesByDate);
+
+        workbook.SaveAs(path);
+    }
+
     private static void WriteCalendar(IXLWorksheet sheet,DateOnly start,DateOnly end,IReadOnlyDictionary<DateOnly,IReadOnlyList<string>> linesByDate)
     {
         var weeks=WeeklyCalendarLayout.Build(start,end,linesByDate);

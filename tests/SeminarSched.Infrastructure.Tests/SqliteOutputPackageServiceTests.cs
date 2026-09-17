@@ -101,6 +101,15 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         using var workbook=new ClosedXML.Excel.XLWorkbook(result.ExcelPath);
         var issuesSheet=workbook.Worksheet("未配置・警告");
         Assert.Contains(issuesSheet.CellsUsed(),cell=>cell.GetString().Contains("通常担当架空 通常担当")&&cell.GetString().Contains("目標2回中0回"));
+
+        Assert.True(Directory.Exists(result.TeacherPacketDirectory));
+        var substituteFile=Path.Combine(result.TeacherPacketDirectory,"架空 代講t.xlsx");
+        Assert.True(File.Exists(substituteFile));
+        using var substituteWorkbook=new ClosedXML.Excel.XLWorkbook(substituteFile);
+        var roster=substituteWorkbook.Worksheet("担当一覧");
+        Assert.Contains(roster.CellsUsed(),cell=>cell.GetString()=="講習担当（その他）");
+        Assert.Contains(roster.CellsUsed(),cell=>cell.GetString().Contains("架空") && cell.GetString().Contains("数"));
+        Assert.True(substituteWorkbook.Worksheets.Contains("時間割"));
     }
 
     public void Dispose(){if(Directory.Exists(_directory))Directory.Delete(_directory,true);}
