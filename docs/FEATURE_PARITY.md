@@ -54,7 +54,7 @@
 | atomic export・上書き確認 | output service | integrity再確認・新規一時folder・上書きなし | 実装中 | 個別file選択とpreviewは未実装 |
 | 設定・logging | settings/logging | `IAppLogger`/`FileAppLogger`を追加。`%LocalAppData%\SeminarSched.WinUI\logs\app-yyyyMMdd.log`へ日次でoperational logを記録（14日保持で自動削除）、未処理例外もWinUIの`UnhandledException`経由で記録。project作成/open/close/backup/restore、時間割自動作成、出力実行のログを追加。件数・成否のみでファイルパスや生徒・講師名は一切記録しない | 実装中 | project/import/scheduling以外の操作（①設定の個別保存など）はまだログ未対象。UIからログ閲覧・エクスポートする画面はない |
 | 集団授業DB/service互換 | group lesson service | 未実装 | 保留 | v1.9.5同様UI停止中 |
-| Windows配布・受入 | packaging/release tests | CI基盤のみ | 実装中 | installer/portable方針は未決 |
+| Windows配布・受入 | packaging/release tests | 方針をMSIXサイドロードに確定（[ADR 0005](docs/adr/0005-windows-distribution.md)）。ローカル自己署名証明書の生成・署名付き`.msix`生成を行う`scripts\New-SigningCertificate.ps1`/`New-MsixPackage.ps1`を追加。署名済み`.msix`の生成と署名者検証は実機で確認済み | 実装中 | `Add-AppxPackage`によるインストールには管理者権限での証明書信頼（`LocalMachine\TrustedPeople`）が必要で、この環境には管理者権限がないため実インストールは未検証。ユーザー側での検証が必要 |
 
 ## Completion rule
 

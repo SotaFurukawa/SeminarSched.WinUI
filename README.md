@@ -18,6 +18,17 @@ dotnet test SeminarSched.WinUI.sln --configuration Release --no-build
 
 アプリの起動にはDeveloper Modeが必要です。
 
+## インストール（サイドロードMSIX）
+
+配布はMicrosoft Storeを使わないMSIXのサイドロードです（詳細は[ADR 0005](docs/adr/0005-windows-distribution.md)）。
+
+1. 開発側: `powershell -File scripts\New-MsixPackage.ps1` を実行すると、`dist\`へ署名済み`.msix`と利用者が信頼する必要がある`.cer`が生成される。
+2. 利用者側（初回のみ、管理者権限が必要）:
+   ```
+   certutil -addstore -f TrustedPeople "<dist\SeminarSched.WinUI.cer への絶対パス>"
+   ```
+3. 利用者側: `.msix`をダブルクリックしてインストールする。
+
 ## データ保護
 
 実在する生徒・講師の氏名、回答CSV/XLSX、`.jukuschedule`、DB、ログ、生成帳票をリポジトリ・CI artifact・Releaseへ含めないでください。テストデータは架空名または匿名IDだけを使用します。

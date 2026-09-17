@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `4401497`（v0.1.0 checkpoint 37, ①科目校種preset）
+Latest Development Checkpoint: checkpoint 38（v0.1.0, Windows配布方針の確定とMSIX署名基盤。コミットhashは本checkpoint末尾を参照）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -377,6 +377,23 @@ Python版v1.9.5 `objectives.py`の辞書式目的（本引継ぎ書5.4節）の�
 
 - ビルド警告0・エラー0、全88テスト成功（UI限定の変更のためテスト件数は据え置き）。Privacy gate成功。
 - 未実装のまま残る①の項目: ID自動採番wizard、講師対応科目の備考一括設定。
+
+### v0.1.0 checkpoint 38 (Claude)
+
+ユーザーへWindows配布方式(ポータブルEXE/MSIXサイドロード/保留)を確認し、「MSIXパッケージ（サイドロード）」を選択いただいた。ADR 0005として記録し、署名・パッケージ生成の基盤を実装・実機検証した。
+
+- `Package.appxmanifest`の`Identity/Publisher`と`PublisherDisplayName`をplaceholderの`AppPublisher`から`CN=SotaFurukawa`/`SotaFurukawa`へ変更。
+- `scripts/New-SigningCertificate.ps1`: Subjectが一致する自己署名証明書が無ければ生成し、秘密鍵(.pfx、ランダム英数字パスワード)は`%LOCALAPPDATA%\SeminarSched.WinUI\packaging\`（gitへ含めない）、公開証明書(.cer)は`dist\`（gitignore対象）へ出力する。既存があれば再利用する。
+- `scripts/New-MsixPackage.ps1`: 証明書thumbprintを`Cert:\CurrentUser\My`から取得（無ければ.pfxから再import）し、`dotnet build -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=true -p:PackageCertificateThumbprint=...`で署名付きsideload専用`.msix`を生成し`dist\`へ配置する。
+- 実機検証で判明した重要な注意点:
+  - `.pfx`を`-p:PackageCertificateKeyFile`+`-p:PackageCertificatePassword`で直接渡す方式は`APPX0105`/`APPX0107`警告で失敗し、無署名の`_Test`扱いパッケージになる（PowerShellのPFX既定エクスポート方式がAppXパッケージング側でimportできないため）。証明書をいったん`Cert:\CurrentUser\My`へ置き、thumbprint指定で署名する方式に切り替えて解決した。
+  - `Get-AuthenticodeSignature`で署名者が`CN=SotaFurukawa`であることを確認済み（署名自体は正しく機能している）。
+  - `Add-AppxPackage`によるインストールは、`CurrentUser\TrustedPeople`・`CurrentUser\Root`へ証明書を追加しただけでは`0x800B0109`（ルート証明書が信頼されていない）で失敗する。`LocalMachine\TrustedPeople`（管理者権限が必要）でのみ成功する見込みだが、この開発環境には管理者権限がなく実インストールまでは検証できていない。README/ADR 0005に、利用者が管理者権限で`certutil -addstore -f TrustedPeople`を1回実行する手順を明記した。
+  - 検証で追加したCurrentUser側の証明書エントリ（Root・TrustedPeople）は、目的を達成しない設定だったため実機から削除済み（`CurrentUser\My`の秘密鍵入り証明書のみ残置、署名に必要）。
+- `.gitignore`へ`dist/`を追加（`*.msix`・`*.pfx`・`*.cer`は既存パターンで除外済みだったが、明示のため）。
+- `README.md`にサイドロードMSIXのインストール手順を追加。`docs/adr/0005-windows-distribution.md`を新設。
+- ビルド警告0・エラー0、全88テスト成功（パッケージング設定のみの変更でテスト対象コードの変更なし）。Privacy gate成功。
+- 未検証のまま残る項目: ユーザー環境での実際の`Add-AppxPackage`インストール成功確認（管理者権限でのcertutil実行後）。
 
 ### 次回最初に確認するファイル
 
