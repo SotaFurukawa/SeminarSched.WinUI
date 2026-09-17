@@ -28,7 +28,8 @@
 ## 検証状況
 
 - 証明書生成・署名付きMSIXのビルドまでは実機で確認済み（`Get-AuthenticodeSignature`で署名者が想定どおり`CN=SotaFurukawa`であることを確認）。
-- `CurrentUser\TrustedPeople`・`CurrentUser\Root`への証明書追加は非対話的に実行できたが、`Add-AppxPackage`はこれらでは信頼せず、`LocalMachine\TrustedPeople`（管理者権限が必要）でのみ成功する見込み。この最後の一手（管理者コマンドの実行）は、この開発環境に管理者権限がないため未検証。ユーザー側で上記手順3を実行した後の実インストール確認が必要。
+- `CurrentUser\TrustedPeople`・`CurrentUser\Root`への証明書追加は非対話的に実行できたが、`Add-AppxPackage`はこれらでは信頼せず、`LocalMachine\TrustedPeople`（管理者権限が必要）でのみ成功する見込みだった。この開発環境には管理者権限がなく検証できなかったため、ユーザー環境（管理者PowerShell）で上記手順2の`certutil -addstore -f TrustedPeople`を実行してもらい、成功を確認した（2026-09-18。`証明書 "SotaFurukawa" がストアに追加されました。` / `CertUtil: -addstore コマンドは正常に完了しました。`）。
+- 残る未検証項目: `.msix`本体を実際にダブルクリック（または`Add-AppxPackage`）してインストールが完了することの確認。
 
 ## Deferred
 

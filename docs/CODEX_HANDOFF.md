@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `2e61049`（v0.1.0 checkpoint 38, Windows配布方針の確定とMSIX署名基盤）
+Latest Development Checkpoint: `2e61049`（v0.1.0 checkpoint 38, Windows配布方針の確定とMSIX署名基盤）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -393,7 +393,14 @@ Python版v1.9.5 `objectives.py`の辞書式目的（本引継ぎ書5.4節）の�
 - `.gitignore`へ`dist/`を追加（`*.msix`・`*.pfx`・`*.cer`は既存パターンで除外済みだったが、明示のため）。
 - `README.md`にサイドロードMSIXのインストール手順を追加。`docs/adr/0005-windows-distribution.md`を新設。
 - ビルド警告0・エラー0、全88テスト成功（パッケージング設定のみの変更でテスト対象コードの変更なし）。Privacy gate成功。
-- 未検証のまま残る項目: ユーザー環境での実際の`Add-AppxPackage`インストール成功確認（管理者権限でのcertutil実行後）。
+- 未検証のまま残る項目: ユーザー環境での実際の`Add-AppxPackage`インストール成功確認(管理者権限でのcertutil実行後)。
+
+### v0.1.0 checkpoint 39 (Claude)
+
+ユーザーが実機(管理者権限のPowerShell)で`certutil -addstore -f TrustedPeople "<dist\SeminarSched.WinUI.cer>"`を実行し、成功を確認した(`LocalMachine\TrustedPeople`への追加。証明書ストアの出力で「署名は公開キーと一致します」「証明書が追加されました」を確認)。checkpoint 38で未検証だった最後のブロッカーが解消された。
+
+- `docs/adr/0005-windows-distribution.md`の「検証状況」を更新し、管理者権限でのcertutil手順がユーザー環境で成功したことを記録した。
+- `.msix`本体のダブルクリックインストール自体の成否は、ユーザーからの追加報告待ち。
 
 ### 次回最初に確認するファイル
 
