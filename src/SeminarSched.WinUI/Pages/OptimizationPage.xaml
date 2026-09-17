@@ -65,6 +65,9 @@
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Spacing="12"><TextBlock FontSize="20" FontWeight="SemiBold" Text="自動作成"/><InfoBar x:Name="RunStatus" IsClosable="True"/><Button x:Name="RunButton" Content="時間割を自動作成" Click="Run_Click" Style="{StaticResource AccentButtonStyle}"/><ProgressRing x:Name="RunProgress" IsActive="False" HorizontalAlignment="Left"/><TextBlock Text="現時点のv0.1.0 solverは単一CP-SAT戦略です。複数戦略はv0.2.0で接続します。" TextWrapping="Wrap"/></StackPanel>
             </Border>
+            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                <StackPanel Spacing="12"><TextBlock FontSize="20" FontWeight="SemiBold" Text="時間割の確認・手動配置"/><TextBlock Text="手動配置は再最適化後も保持されます。ロックは帳票・編集画面で固定状態を明示するために使用します。" TextWrapping="Wrap"/><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="ManualRequest" Header="受講希望"/><ComboBox x:Name="ManualTeacher" Grid.Column="1" Header="講師"/><ComboBox x:Name="ManualSlot" Grid.Column="2" Header="日時・コマ"/></Grid><StackPanel Orientation="Horizontal" Spacing="8"><CheckBox x:Name="ManualLocked" Content="ロックして追加"/><Button Content="手動配置を追加" Click="AddManual_Click" Style="{StaticResource AccentButtonStyle}"/><Button Content="選択した手動配置を削除" Click="RemoveManual_Click"/><Button Content="選択項目のロック切替" Click="ToggleLock_Click"/><Button Content="自動配置だけリセット" Click="ResetAutomatic_Click"/></StackPanel><ListView x:Name="Assignments" MaxHeight="360" SelectionMode="Single"/></StackPanel>
+            </Border>
         </StackPanel>
     </ScrollViewer>
 </Page>

@@ -28,10 +28,10 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         {
             command.CommandText = """
                 SELECT r.Id,r.StudentId,r.RequiredSessions,
-                  (SELECT COUNT(*) FROM Assignment a WHERE a.LessonRequestId=r.Id AND a.IsLocked=1),
+                  (SELECT COUNT(*) FROM Assignment a WHERE a.LessonRequestId=r.Id AND (a.IsLocked=1 OR a.IsManual=1)),
                   COALESCE(r.RegularTeacherId,p.RegularTeacherId),
                   COALESCE(NULLIF(r.RegularTeacherPriority,1),p.RegularTeacherPriority,1),
-                  (SELECT COUNT(*) FROM Assignment a WHERE a.LessonRequestId=r.Id AND a.IsLocked=1 AND a.TeacherId=COALESCE(r.RegularTeacherId,p.RegularTeacherId)),
+                  (SELECT COUNT(*) FROM Assignment a WHERE a.LessonRequestId=r.Id AND (a.IsLocked=1 OR a.IsManual=1) AND a.TeacherId=COALESCE(r.RegularTeacherId,p.RegularTeacherId)),
                   COALESCE(r.MaxConsecutiveSlotsOverride,s.DefaultMaxConsecutiveSlots),
                   COALESCE(r.AllowGapOverride,s.AllowGap),
                   CASE WHEN r.OneToOneRequired=1 OR COALESCE(p.OneToOneRequired,0)=1 THEN 1 ELSE 0 END,
@@ -90,7 +90,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
                 WHERE (NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE ProjectId=r.ProjectId AND StudentId=r.StudentId) OR COALESCE(sa.AvailabilityLevel,0)>0)
                   AND (NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=r.ProjectId AND TeacherId=tq.TeacherId) OR COALESCE(ta.AvailabilityLevel,0)>0)
                   AND NOT EXISTS(SELECT 1 FROM TeacherUnavailability u WHERE u.TeacherId=tq.TeacherId AND u.OpenDateId=ds.OpenDateId AND u.TimeSlotId=ds.TimeSlotId)
-                  AND NOT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest ar ON ar.Id=a.LessonRequestId WHERE a.IsLocked=1 AND a.OpenDateId=ds.OpenDateId AND a.TimeSlotId=ds.TimeSlotId AND ar.StudentId=r.StudentId);
+                  AND NOT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest ar ON ar.Id=a.LessonRequestId WHERE (a.IsLocked=1 OR a.IsManual=1) AND a.OpenDateId=ds.OpenDateId AND a.TimeSlotId=ds.TimeSlotId AND ar.StudentId=r.StudentId);
                 """;
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -141,7 +141,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
                 JOIN OpenDate d ON d.Id=a.OpenDateId
                 JOIN TimeSlot ts ON ts.Id=a.TimeSlotId
                 LEFT JOIN RegularLessonProfile p ON p.ProjectId=r.ProjectId AND p.StudentId=r.StudentId AND p.SubjectId=r.SubjectId
-                WHERE a.IsLocked=1;
+                WHERE a.IsLocked=1 OR a.IsManual=1;
                 """;
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -190,7 +190,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         await using (var clear = connection.CreateCommand())
         {
             clear.Transaction = (SqliteTransaction)transaction;
-            clear.CommandText = "DELETE FROM Assignment WHERE IsLocked=0;";
+            clear.CommandText = "DELETE FROM Assignment WHERE IsLocked=0 AND IsManual=0;";
             await clear.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
         foreach (var requestGroup in solution.Placements.GroupBy(placement => placement.RequestId))

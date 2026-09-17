@@ -58,6 +58,8 @@ public partial class App : Application
 
     public static IScheduleRunService ScheduleRun { get; } = new SqliteScheduleRunService();
 
+    public static IScheduleEditorService ScheduleEditor { get; } = new SqliteScheduleEditorService();
+
     public static IOutputPackageService OutputPackage { get; } = new SqliteOutputPackageService();
 
     /// <summary>

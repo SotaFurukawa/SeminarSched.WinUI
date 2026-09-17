@@ -7,8 +7,9 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `b79ba4b`（v0.1.0 master data editor）
+Latest Development Checkpoint: checkpoint 23（v0.1.0 manual placement persists across re-optimization; コミットhashは本checkpoint末尾を参照）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
+Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
 
 - v0.1.0開発中の追加・修正 -> 同一作業単位として`v0.1.0`へ集約
@@ -229,6 +230,16 @@ Next Version Rule:
 - 担当設定tabを追加し、講師対応科目の指導可否と、通常授業の担当講師・優先度1〜5・1対1必須を保存・一覧確認可能にした。
 - repositoryの更新/使用停止、資格・通常授業のread-backを自動テストで確認。
 - commit `b79ba4b`。Release/x64 build: warning 0 / error 0。全63 tests passed。Privacy gate passed。
+
+### v0.1.0 checkpoint 23 (Claude)
+
+- ここからCodex CLIに代わりClaude Code CLIが実装・build/test・commit/push/Draft Release・本書更新を担当する（運用ルールは既存のまま踏襲）。
+- Codexが使用量上限で中断した未commit分（`IsManual`永続化）を引き継ぎ、完成・検証まで実施。
+- ⑤時間割自動作成画面へ「時間割の確認・手動配置」カードを追加。手動配置の追加・削除・ロック切替・自動配置だけリセットをUIから実行可能にした。
+- `SqliteFixedLessonService.AddManualAsync`/`SqliteScheduleEditorService`を追加し、手動配置は`IsManual=1`として保存、監査ログ(`manual_assignment_added`等)を記録する。
+- `SqliteScheduleRunService`の候補生成・既存配置抽出・自動配置クリアを、`IsLocked=1`と同様に`IsManual=1`も保持対象として扱うよう修正。再最適化しても手動配置は消えない。
+- 精査で`SqliteScheduleEditorServiceTests`の1テストが失敗。原因はロジックのバグではなく、テスト用fixtureの`RequiredSessions=2`が同fixture内の開講コマ数(1コマのみ)と矛盾しており、`UnassignedLessons`が意図せず1になっていたこと。`RequiredSessions=1`へ修正し解消。
+- Release/x64 build: warning 0 / error 0。全66 tests passed (2+7+9+19+29)。Privacy gate passed。
 
 ### 次回最初に確認するファイル
 

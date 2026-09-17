@@ -41,7 +41,7 @@
 | optimization transaction保存 | optimization run service | 固定保持・未固定atomic置換・OptimizationRun入出力概要保存 | 実装中 | 安定したinput fingerprintと詳細penalty内訳は未実装 |
 | 時間割grid | schedule editor QML | 未実装 | 未実装 | virtualization必須 |
 | drag/drop手動配置 | schedule edit service | 未実装 | 未実装 | hard violation拒否 |
-| manual/lock semantics | manual edit tests | ④固定Assignment追加・解除UI、可否/資格/同時2名/1対1/必要回数検証 | 実装中 | ⑤手動配置・再最適化保持は未実装 |
+| manual/lock semantics | manual edit tests | ④固定Assignment追加・解除UI、可否/資格/同時2名/1対1/必要回数検証。⑤に手動配置追加/削除・ロック切替・自動配置だけリセットUIを追加し、`IsManual`は再最適化時も`IsLocked`と同様に保持・候補除外・AuditLog記録 | 実装中 | drag/dropと講師一時表示・availability編集は未実装 |
 | Undo/Redo | command stack | 未実装 | 未実装 | process内のみ |
 | 講師一時表示・availability編集 | editor UI/service | 未実装 | 未実装 | 不可コマgray |
 | 検索・scroll同期 | editor QML | 未実装 | 未実装 | header/row/grid同期 |

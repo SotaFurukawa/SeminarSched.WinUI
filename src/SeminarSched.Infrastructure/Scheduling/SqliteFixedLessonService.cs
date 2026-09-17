@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using SeminarSched.Application.Scheduling;
 using SeminarSched.Infrastructure.Projects;
@@ -59,6 +61,12 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
     }
 
     public async Task AddAsync(string projectPath, long requestId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken = default)
+        => await AddCoreAsync(projectPath, requestId, teacherId, openDateId, timeSlotId, true, false, "preconfirmed", cancellationToken).ConfigureAwait(false);
+
+    internal async Task AddManualAsync(string projectPath, long requestId, long teacherId, long openDateId, long timeSlotId, bool isLocked, CancellationToken cancellationToken = default)
+        => await AddCoreAsync(projectPath, requestId, teacherId, openDateId, timeSlotId, isLocked, true, "manual", cancellationToken).ConfigureAwait(false);
+
+    private static async Task AddCoreAsync(string projectPath, long requestId, long teacherId, long openDateId, long timeSlotId, bool isLocked, bool isManual, string source, CancellationToken cancellationToken)
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
         await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
@@ -73,15 +81,19 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
         await using var add = connection.CreateCommand();
         add.Transaction = transaction;
         add.CommandText = """
-            INSERT INTO Assignment(LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source,SessionIndex)
-            VALUES($request,$teacher,$date,$slot,1,'preconfirmed',$session);
+            INSERT INTO Assignment(LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source,SessionIndex,IsManual)
+            VALUES($request,$teacher,$date,$slot,$locked,$source,$session,$manual);
             """;
         add.Parameters.AddWithValue("$request", requestId);
         add.Parameters.AddWithValue("$teacher", teacherId);
         add.Parameters.AddWithValue("$date", openDateId);
         add.Parameters.AddWithValue("$slot", timeSlotId);
+        add.Parameters.AddWithValue("$locked", isLocked);
+        add.Parameters.AddWithValue("$source", source);
         add.Parameters.AddWithValue("$session", request.AssignedSessions + 1);
+        add.Parameters.AddWithValue("$manual", isManual);
         await add.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await using var audit=connection.CreateCommand();audit.Transaction=transaction;audit.CommandText="INSERT INTO AuditLog(ProjectId,TimestampUtc,Action,EntityType,EntityId,AfterJson,Reason,Source,OperationId) VALUES(1,$utc,$action,'assignment',$entity,$after,$reason,'manual',$operation);";audit.Parameters.AddWithValue("$utc",DateTimeOffset.UtcNow.ToString("O",CultureInfo.InvariantCulture));audit.Parameters.AddWithValue("$action",isManual?"manual_assignment_added":"preconfirmed_assignment_added");audit.Parameters.AddWithValue("$entity",requestId.ToString(CultureInfo.InvariantCulture));audit.Parameters.AddWithValue("$after",JsonSerializer.Serialize(new{teacherId,openDateId,timeSlotId,isLocked,isManual}));audit.Parameters.AddWithValue("$reason",isManual?"時間割手動配置":"事前確定授業");audit.Parameters.AddWithValue("$operation",Guid.NewGuid().ToString("N"));await audit.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
