@@ -19,6 +19,8 @@ using SeminarSched.Infrastructure.Scheduling;
 using SeminarSched.Application.Output;
 using SeminarSched.Infrastructure.Output;
 using SeminarSched.Infrastructure.Settings;
+using SeminarSched.Application.Logging;
+using SeminarSched.Infrastructure.Logging;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -39,6 +41,12 @@ public partial class App : Application
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "SeminarSched.WinUI",
             "settings.json"));
+
+    public static IAppLogger Logger { get; } = new FileAppLogger(
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "SeminarSched.WinUI",
+            "logs"));
 
     public static ProjectService ProjectService { get; } = new(new SqliteProjectRepository());
 
@@ -79,6 +87,8 @@ public partial class App : Application
     /// <param name="args">Details about the launch request and process.</param>
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
+        Logger.Info("App launched");
+        UnhandledException += (_, e) => Logger.Error("Unhandled UI exception", e.Exception);
         _window = new MainWindow();
         MainWindow = _window;
         _window.Activate();

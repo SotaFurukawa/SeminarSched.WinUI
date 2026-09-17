@@ -64,12 +64,14 @@ public sealed partial class OptimizationPage : Page
             var profile=SeminarSched.Optimization.Profiles.OptimizationProfileCatalog.Get(ViewModel.Level);
             var result=await App.ScheduleRun.RunAsync(path,profile.MaximumDuration);
             RunStatus.Severity=InfoBarSeverity.Success;RunStatus.Title="時間割を作成しました";RunStatus.Message=$"配置 {result.PlacedLessons}件、未配置 {result.UnassignedLessons}件、{result.Elapsed.TotalSeconds:F1}秒";RunStatus.IsOpen=true;
+            App.Logger.Info($"Schedule run completed: placed={result.PlacedLessons} unassigned={result.UnassignedLessons} elapsedSec={result.Elapsed.TotalSeconds:F1} level={ViewModel.Level}");
             await ReloadEditorAsync();
         }
         catch(Exception ex) when(ex is InvalidOperationException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
         {
             if(_undoStack.Count>0)_undoStack.Pop();UpdateUndoRedoButtons();
             RunStatus.Severity=InfoBarSeverity.Error;RunStatus.Title="時間割を作成できませんでした";RunStatus.Message=ex.Message;RunStatus.IsOpen=true;
+            App.Logger.Error("Schedule run failed",ex);
         }
         finally{RunProgress.IsActive=false;RunButton.IsEnabled=App.ProjectService.Current is not null;}
     }

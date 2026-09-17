@@ -55,10 +55,12 @@ public sealed partial class HomePage : Page
             RefreshCurrentProject();
             await RefreshRecentProjectsAsync();
             ShowStatus(InfoBarSeverity.Success, "プロジェクトを作成しました", summary.Title);
+            App.Logger.Info("Project created");
         }
         catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
         {
             ShowStatus(InfoBarSeverity.Error, "プロジェクトを作成できませんでした", exception.Message);
+            App.Logger.Error("Project creation failed", exception);
         }
         finally
         {
@@ -88,10 +90,12 @@ public sealed partial class HomePage : Page
             RefreshCurrentProject();
             await RefreshRecentProjectsAsync();
             ShowStatus(InfoBarSeverity.Success, "プロジェクトを開きました", summary.Title);
+            App.Logger.Info("Project opened");
         }
         catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException)
         {
             ShowStatus(InfoBarSeverity.Error, "プロジェクトを開けませんでした", exception.Message);
+            App.Logger.Error("Project open failed", exception);
         }
         finally
         {
@@ -104,6 +108,7 @@ public sealed partial class HomePage : Page
         App.ProjectService.Close();
         RefreshCurrentProject();
         ShowStatus(InfoBarSeverity.Informational, "プロジェクトを閉じました", string.Empty);
+        App.Logger.Info("Project closed");
     }
 
     private async void RecentProject_ItemClick(object sender, ItemClickEventArgs e)
@@ -135,6 +140,20 @@ public sealed partial class HomePage : Page
         finally
         {
             SetBusy(false);
+        }
+    }
+
+    private async void HideRecentProject_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string path }) return;
+        try
+        {
+            await App.RecentProjects.RemoveAsync(path);
+            await RefreshRecentProjectsAsync();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            ShowStatus(InfoBarSeverity.Warning, "履歴を更新できませんでした", exception.Message);
         }
     }
 
@@ -176,10 +195,12 @@ public sealed partial class HomePage : Page
             SetBusy(true);
             var path = await App.ProjectService.CreateBackupAsync(Path.Combine(folder.Path, backupName));
             ShowStatus(InfoBarSeverity.Success, "バックアップを作成しました", path);
+            App.Logger.Info("Backup created");
         }
         catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException)
         {
             ShowStatus(InfoBarSeverity.Error, "バックアップを作成できませんでした", exception.Message);
+            App.Logger.Error("Backup creation failed", exception);
         }
         finally
         {
@@ -224,10 +245,12 @@ public sealed partial class HomePage : Page
             var restored = await App.ProjectService.RestoreBackupAsync(file.Path);
             RefreshCurrentProject();
             ShowStatus(InfoBarSeverity.Success, "プロジェクトを復元しました", restored.Title);
+            App.Logger.Info("Project restored from backup");
         }
         catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException)
         {
             ShowStatus(InfoBarSeverity.Error, "プロジェクトを復元できませんでした", exception.Message);
+            App.Logger.Error("Project restore failed", exception);
         }
         finally
         {

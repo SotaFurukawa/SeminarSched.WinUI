@@ -38,6 +38,23 @@ public sealed class RecentProjectServiceTests : IDisposable
         Assert.Equal(10, (await service.GetAsync()).Count);
     }
 
+    [Fact]
+    public async Task RemoveAsync_HidesEntryWithoutAffectingOthers()
+    {
+        var store = new MemorySettingsStore();
+        var service = new RecentProjectService(store);
+        var first = Path.Combine(_directory, "first.jukuschedule");
+        var second = Path.Combine(_directory, "second.jukuschedule");
+        await service.TouchAsync(first, "First");
+        await service.TouchAsync(second, "Second");
+
+        await service.RemoveAsync(first);
+
+        var entries = await service.GetAsync();
+        var remaining = Assert.Single(entries);
+        Assert.Equal(Path.GetFullPath(second), remaining.Path);
+    }
+
     public void Dispose() { }
 
     private sealed class MemorySettingsStore : IAppSettingsStore

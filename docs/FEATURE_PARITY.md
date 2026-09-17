@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | アプリ起動・version/About表示 | UI / release metadata | WinUI shell / assembly metadata | 実装済み | v0.0.0。UI実機確認は未完了 |
 | NavigationView業務導線 | QML workflow shell | ①設定〜⑥出力の6段階flow | 実装中 | ②〜④・⑥は未接続機能を明示する骨格 |
-| Home dashboard | workspace view model / QML | project作成・open・close・backup・restore・複製UI | 実装中 | 主要導線は実装済み。recentの手動非表示は未実装 |
+| Home dashboard | workspace view model / QML | project作成・open・close・backup・restore・複製UI。最近使ったプロジェクト一覧に「表示しない」ボタンを追加し、`RecentProjectService.RemoveAsync`で明示的に非表示化できる | 実装中 | 非表示にした項目を後から再表示する機能はない（Python版もrecentから消すのみ） |
 | 新規project作成 | project service | 年度・講習区分・期間・開講日を持つWinUI schema v1 | 実装中 | SQLite整合性確認後にatomic move |
 | `.jukuschedule` open | project service / SQLite | WinUI schema v1の検証付きread/open | 実装中 | Python版は直接変更せず、copy-first importを別途設計 |
 | 別名保存・複製 | project service | SQLite backup APIで検証付き複製を作成し、複製先へ切り替え | 実装済み | 元DB不変・上書き拒否を自動テスト |
@@ -52,7 +52,7 @@
 | 講師配布（講師別） | reporting renderers | 講師別sheet・PDF sectionを週calendar形式で生成に加え、出力folder内に「講師別」sub folderを作り、講師ごとに`{講師名}t.xlsx`という個別ファイルを生成（担当一覧sheet＝通常担当を先に列挙→講習担当、時間割sheet＝週calendar） | 実装中 | 「その他」区分の1ページ4名レイアウトはExcel向けのため未実装。PDF個別ファイルは未対応（共通PDFのsectionのみ） |
 | 未配置・警告一覧出力 | output service | 未配置回数・通常担当不足をExcel/PDFへ出力 | 実装中 | Python版のその他診断種別は未移植 |
 | atomic export・上書き確認 | output service | integrity再確認・新規一時folder・上書きなし | 実装中 | 個別file選択とpreviewは未実装 |
-| 設定・logging | settings/logging | 未実装 | 未実装 | 個人情報を記録しない |
+| 設定・logging | settings/logging | `IAppLogger`/`FileAppLogger`を追加。`%LocalAppData%\SeminarSched.WinUI\logs\app-yyyyMMdd.log`へ日次でoperational logを記録（14日保持で自動削除）、未処理例外もWinUIの`UnhandledException`経由で記録。project作成/open/close/backup/restore、時間割自動作成、出力実行のログを追加。件数・成否のみでファイルパスや生徒・講師名は一切記録しない | 実装中 | project/import/scheduling以外の操作（①設定の個別保存など）はまだログ未対象。UIからログ閲覧・エクスポートする画面はない |
 | 集団授業DB/service互換 | group lesson service | 未実装 | 保留 | v1.9.5同様UI停止中 |
 | Windows配布・受入 | packaging/release tests | CI基盤のみ | 実装中 | installer/portable方針は未決 |
 

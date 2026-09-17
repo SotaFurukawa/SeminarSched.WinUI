@@ -39,10 +39,17 @@
                     <ListView x:Name="RecentProjectsList" IsItemClickEnabled="True" ItemClick="RecentProject_ItemClick">
                         <ListView.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Padding="4" Spacing="2">
-                                    <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
-                                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{Binding Path}" TextWrapping="Wrap" />
-                                </StackPanel>
+                                <Grid Padding="4" ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
+                                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{Binding Path}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" VerticalAlignment="Center" Content="表示しない" Tag="{Binding Path}" Click="HideRecentProject_Click" />
+                                </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>

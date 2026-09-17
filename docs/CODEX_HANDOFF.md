@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `59bd662`（v0.1.0 checkpoint 33, ⑥講師別folder packet）
+Latest Development Checkpoint: checkpoint 34（v0.1.0, recent非表示・logging基盤。コミットhashは本checkpoint末尾を参照）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -341,6 +341,17 @@ Python版v1.9.5 `objectives.py`の辞書式目的（本引継ぎ書5.4節）の�
 - `SqliteOutputPackageService.GenerateAsync`が出力ごとに`講師別`folderを作り、`{講師名}t.xlsx`（ファイル名重複時は連番を付与、ファイル名不正文字は除去）で各講師の個別ファイルを書き出す。`OutputPackageResult`へ`TeacherPacketDirectory`を追加。
 - Python版の「その他区分は1ページ4名」という詳細なPDFページ割りはExcel中心の現構成には該当せず、実装していない（Python原典を参照できないため、担当一覧の並び順という確認可能な部分だけを再現し、ページ割りの数値までは推測で実装していない）。個別ファイルはExcelのみで、PDF側は共通PDF内のsectionのまま。
 - ビルド警告0・エラー0、全84テスト成功（既存の通常担当不足testへ講師別folder生成・担当一覧の並び順・時間割sheet存在の確認を追加。新規[Fact]は追加していないため件数据え置き）。Privacy gate成功。
+
+### v0.1.0 checkpoint 34 (Claude)
+
+ユーザー確認: 「まだv1.9.5と完全に同等ではない。最適化部分は後回しでよいので、それ以外のgapを埋めてほしい」との指示。最適化(辞書式目的の残り・複数戦略)は保留し、それ以外の未実装項目を順に着手。
+
+- Homeの「最近使ったプロジェクト」一覧へ「表示しない」ボタンを追加。既存の`RecentProjectService.RemoveAsync`（今まではファイル未検出時の自動削除にしか使われていなかった）をUIから明示的に呼び出せるようにした。`RemoveAsync`自体に単体testがなかったため追加。
+- 設定・logging基盤を新設。`SeminarSched.Application.Logging.IAppLogger`と`SeminarSched.Infrastructure.Logging.FileAppLogger`を追加し、`%LocalAppData%\SeminarSched.WinUI\logs\app-yyyyMMdd.log`へ日次でoperational logを記録する（14日保持で起動時に古いfileを自動削除）。個人情報（生徒・講師名、ファイルパス）は記録せず、件数・成否・経過時間などの構造情報のみを記録する方針をコード内コメントとPrivacy観点で明記。
+- `App.OnLaunched`で`UnhandledException`をhookし、未処理例外を種別・メッセージ付きでログへ記録するようにした（従来は無音でクラッシュしていた）。
+- project作成/open/close/backup/restore（HomePage）、時間割自動作成（OptimizationPage）、出力実行（OutputPage）にログ呼び出しを追加。
+- ビルド警告0・エラー0、全88テスト成功（既存84＋新規4: RemoveAsyncの動作確認1件、FileAppLoggerのINFO/ERROR記録・保持期間超過ファイルの自動削除3件）。Privacy gate成功。
+- 未実装のまま残るlogging関連: ①設定の個別保存操作など他の画面はまだログ対象外。ログ閲覧・エクスポートUIはなし（ファイルを直接開く運用）。
 
 ### 次回最初に確認するファイル
 
