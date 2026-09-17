@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `624fdb8`（v0.1.0 checkpoint 36, ①講師対応科目の一括設定）
+Latest Development Checkpoint: checkpoint 37（v0.1.0, ①科目校種presetとrecent行の記録修正。コミットhashは本checkpoint末尾を参照）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -369,6 +369,14 @@ Python版v1.9.5 `objectives.py`の辞書式目的（本引継ぎ書5.4節）の�
 - 講師・科目それぞれの複数選択ListViewと「指導可能」CheckBoxを追加し、選択した講師×科目の全組み合わせへ`IMasterDataRepository.SaveQualificationAsync`を順次呼び出す（新しいSQLは追加せず、既存の単一保存APIをUI側でループするだけの実装。`SaveQualificationAsync`自体は複数の既存testで検証済み）。
 - ビルド警告0・エラー0、全88テスト成功（UI限定の変更のためテスト件数は据え置き）。Privacy gate成功。
 - 未実装のまま残る①の項目: ID自動採番wizard、科目の校種preset、一括設定時の備考(Note)反映。
+
+### v0.1.0 checkpoint 37 (Claude)
+
+①設定の科目「校種」入力を自由記述TextBoxから編集可能ComboBox(`IsEditable="True"`、小学校/中学校/高等学校のpreset)へ変更。自由入力も引き続き可能。これにより②の生徒フォーム学年分岐（checkpoint 26で追加した`ClassifySchoolLevel`の部分一致判定）に渡る値の表記ゆれを減らせる。コード側は`ComboBox.Text`がTextBoxと同じ読み書きに対応するため、既存の保存・編集・reset処理は無変更で動作。
+- 併せて`docs/FEATURE_PARITY.md`の「最近使用・非表示」行が、checkpoint 34で実装済みの手動非表示機能を反映していなかった記録漏れを修正（実装中→実装済み）。
+
+- ビルド警告0・エラー0、全88テスト成功（UI限定の変更のためテスト件数は据え置き）。Privacy gate成功。
+- 未実装のまま残る①の項目: ID自動採番wizard、講師対応科目の備考一括設定。
 
 ### 次回最初に確認するファイル
 

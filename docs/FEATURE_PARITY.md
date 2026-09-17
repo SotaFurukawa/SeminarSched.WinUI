@@ -10,13 +10,13 @@
 | 新規project作成 | project service | 年度・講習区分・期間・開講日を持つWinUI schema v1 | 実装中 | SQLite整合性確認後にatomic move |
 | `.jukuschedule` open | project service / SQLite | WinUI schema v1の検証付きread/open | 実装中 | Python版は直接変更せず、copy-first importを別途設計 |
 | 別名保存・複製 | project service | SQLite backup APIで検証付き複製を作成し、複製先へ切り替え | 実装済み | 元DB不変・上書き拒否を自動テスト |
-| 最近使用・非表示 | workspace view model | 最大10件の履歴・再open・欠損時自動除去 | 実装中 | 手動非表示操作は未実装 |
+| 最近使用・非表示 | workspace view model | 最大10件の履歴・再open・欠損時自動除去・「表示しない」ボタンによる手動非表示 | 実装済み | |
 | migration・整合性確認 | Alembic / project service | schema v2・自動backup付きv1→v2 migration・共通製品識別 | 実装中 | rollback failure injectionと今後のversion追加testを継続 |
 | 自動backup・世代管理 | recovery service | UIからのSQLite backup API検証付きsnapshot | 実装中 | 自動実行と世代管理は未実装 |
 | 復元・復元前backup | recovery service | 確認UI・復元前3世代backup・検証・rollback付きatomic restore | 実装中 | failure injection拡充は未実装 |
 | 生徒基本情報 | master repository/service | 追加・一覧・選択編集・使用停止UI、domain validation・SQLite CRUD。一覧をID・氏名・学年で絞り込む検索boxを追加 | 実装中 | ID自動採番wizardは未実装 |
 | 講師基本情報 | master repository/service | 追加・一覧・選択編集・使用停止・対応科目UI。一覧をID・氏名で絞り込む検索boxを追加。複数講師×複数科目を選択し指導可否を一括設定するUIを追加 | 実装中 | 一括設定は指導可否のみ（備考の一括設定は不可） |
-| 科目・略称 | master repository/service | 追加・一覧・選択編集・使用停止UI、domain validation・SQLite CRUD。一覧をコード・科目名・校種で絞り込む検索boxを追加 | 実装中 | 校種presetは未実装 |
+| 科目・略称 | master repository/service | 追加・一覧・選択編集・使用停止UI、domain validation・SQLite CRUD。一覧をコード・科目名・校種で絞り込む検索boxを追加。校種入力を「小学校/中学校/高等学校」を選べる編集可能ComboBoxへ変更（自由入力も可） | 実装済み | |
 | 通常授業・担当優先度 | regular lesson profile | 管理UI・SQLite upsert・優先度1〜5・1対1必須 | 実装中 | 受講希望の全項目編集はExcel中心 |
 | 共通基本情報Excel | master Excel service | 5sheet出力・全行preview・SHA再確認・transaction upsert・原本snapshot | 実装中 | 名前選択helper列とExcel内dropdownを継続移植 |
 | 講習設定 | phase2 models/view model | 期間内日付・開校/休校・日別有効コマの保存UI | 実装中 | note編集・一括操作拡充は未実装 |
