@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `1fd686b`（v0.1.0 checkpoint 28, ⑥生徒/講師配布の週calendar化）
+Latest Development Checkpoint: checkpoint 29（v0.1.0, ⑥全体時間割のgrid化。コミットhashは本checkpoint末尾を参照）
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -294,6 +294,15 @@ Next Version Rule:
 - `ExcelScheduleReportRenderer`/`PdfScheduleReportRenderer`の生徒別・講師別section/sheetを週calendarへ書き換え。生徒別セルは「科目略称 講師名t」、講師別セルは「科目略称 生徒表記」を表示。未配置・警告sheetの下に「講習欠席一覧」を追加。
 - ビルド警告0・エラー0、全77テスト成功（既存72＋`WeeklyCalendarLayout`単体4件＋複数週・同姓生徒・欠席一覧を検証する結合test1件）。Privacy gate成功。
 - 未実装のまま残る⑥の項目: 全体時間割（①行=コマ・列=講師のgrid、休校日除外、講師別コマ不可gray表示）は未着手。講師別folder packet（個別ファイル分割、通常担当優先→講習担当→その他の並び順、1ページ4名）も未実装。
+
+### v0.1.0 checkpoint 29 (Claude)
+
+ユーザー指示「全部とりあえず進めてみてください。元のpython仕様のもののv1.9.5の機能を全て持っている状態にしてください」を受け、⑥全体時間割を日付順の一覧表からPython版6.1仕様のgrid形式へ変更。
+
+- `SeminarSched.Reporting.Layout.OverviewGridLayout`を新設。`Build(start,end,openDates,slotLabels,assignments)`が日曜〜土曜の週群を作り、休校日（`openDates`に含まれない日）は列から除外、各日は「その日に配置がある講師」だけを列として持つ。行はプロジェクトの有効コマ一覧、セルは学年・科目略称・生徒名。
+- `ScheduleReport`へ`OpenDates`・`SlotLabels`を追加。Excel側は新しい「全体時間割」sheetをgrid形式で生成し、従来の日付順一覧は「配置一覧」sheetへ退避（削除はしていない）。PDF側は週ごとに独立したtable（列数が週によって異なるため）を生成し、日付header行をMigraDocの`MergeRight`でその日の講師列数ぶん結合。
+- 1セル最大2名の表示は、Python版の「横分割」ではなく同一セル内の改行による縦積みとした（Excel/PDFとも複数列に動的に分岐するテーブル構造は実装コストが高く、視認性は保ちつつ実装の堅牢性を優先する判断）。コマ不可のgray表示（一部コマ不可の講師）は今回のscopeに含めていない。
+- ビルド警告0・エラー0、全79テスト成功（既存77＋`OverviewGridLayout`単体2件）。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 

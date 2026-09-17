@@ -46,7 +46,7 @@
 | 講師一時表示・availability編集 | editor UI/service | グリッドの「+講師を表示」で全コマ不可の講師も列表示でき、セル右上の丸/バツで`TeacherUnavailability`を切替。既存配置があるセルは不可へ変更不可 | 実装中 | 一括操作（複数コマ・複数講師まとめて設定）は未実装 |
 | 検索・scroll同期 | editor QML | 生徒名検索でグリッド内カードをハイライト表示 | 実装中 | header/row/grid間のscroll同期は未実装 |
 | 未配置・警告 | diagnostics/output | 未実装 | 未実装 | 通常担当不足を含む |
-| 全体時間割Excel/PDF | reporting/output service | 共通snapshotからExcel/PDF atomic生成 | 実装中 | Python版週カレンダーlayoutは未移植 |
+| 全体時間割Excel/PDF | reporting/output service | 日曜始まり・土曜終わりの週単位、休校日を除いた日付を横に並べ、その日に配置がある講師だけを列として表示するgrid形式（`OverviewGridLayout`共通レイアウト）。コマを行、各セルへ学年・科目略称・生徒名を表示 | 実装中 | 1セル最大2名の表示は横分割ではなく縦積み（同一セル内で改行）。コマ不可のgray表示は未実装 |
 | 生徒配布時間割Excel/PDF | reporting renderers | 生徒別sheet・PDF sectionを日曜始まり・土曜終わりの週calendar形式で生成（`WeeklyCalendarLayout`共通レイアウト）。講習に一度も参加しない生徒は個別calendarを作らず「講習欠席一覧」へ学年・氏名で一覧化 | 実装中 | セル内の科目略称・時刻の細かい書式はPython版と完全一致ではない |
 | 講師配布（学年順） | reporting renderers | 生徒sheetを学年・氏名順に生成。生徒名は姓のみ表示、同姓がいる場合だけ名の先頭1文字を付与 | 実装中 | A4サイズへの厳密な収まり調整は未検証 |
 | 講師配布（講師別） | reporting renderers | 講師別sheet・PDF sectionを週calendar形式で生成 | 実装中 | 講師別folder packet（個別ファイル分割、通常担当優先の並び順）は未実装 |

@@ -61,6 +61,12 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         Assert.Contains(studentSheets,ws=>ws.Cell(1,1).GetString()=="中1 田中次");
         var issuesSheet=workbook.Worksheet("未配置・警告");
         Assert.Contains(issuesSheet.CellsUsed(),cell=>cell.GetString()=="架空 欠席生徒");
+
+        var overviewSheet=workbook.Worksheet("全体時間割");
+        var overviewCells=overviewSheet.CellsUsed().Select(cell=>cell.GetString()).ToArray();
+        Assert.Contains(overviewCells,text=>text.Contains("架空 講師"));
+        Assert.Contains(overviewCells,text=>text.Contains("中2 数 田中太")||text.Contains("中1 数 田中次"));
+        Assert.DoesNotContain(workbook.Worksheets,ws=>ws.Name=="時間割");
     }
 
     public void Dispose(){if(Directory.Exists(_directory))Directory.Delete(_directory,true);}

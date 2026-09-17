@@ -8,12 +8,19 @@ public sealed class ExcelScheduleReportRenderer
 {
     public void Render(ScheduleReport report,string path)
     {
-        using var workbook=new XLWorkbook();var sheet=workbook.AddWorksheet("時間割");
-        string[] headers=["日付","コマ","生徒","科目","講師","固定"];for(var i=0;i<headers.Length;i++)sheet.Cell(1,i+1).Value=headers[i];
-        for(var i=0;i<report.Rows.Count;i++){var r=report.Rows[i];sheet.Cell(i+2,1).Value=r.Date;sheet.Cell(i+2,2).Value=r.TimeSlot;sheet.Cell(i+2,3).Value=r.Student;sheet.Cell(i+2,4).Value=r.Subject;sheet.Cell(i+2,5).Value=r.Teacher;sheet.Cell(i+2,6).Value=r.IsLocked?"固定":"自動";}
-        sheet.Row(1).Style.Font.Bold=true;sheet.SheetView.FreezeRows(1);sheet.Columns().AdjustToContents();
-
+        using var workbook=new XLWorkbook();
         var studentLabels=WeeklyCalendarLayout.BuildStudentLabels(report.Rows.Select(x=>x.Student));
+
+        var overview=workbook.AddWorksheet("全体時間割");
+        var overviewAssignments=report.Rows.Select(r=>new OverviewAssignment(DateOnly.Parse(r.Date),r.Teacher,r.TimeSlot,r.StudentGrade,r.SubjectShortName,studentLabels[r.Student])).ToArray();
+        var grid=OverviewGridLayout.Build(report.StartDate,report.EndDate,report.OpenDates.ToHashSet(),report.SlotLabels,overviewAssignments);
+        WriteOverview(overview,grid);
+
+        var flatSheet=workbook.AddWorksheet("配置一覧");
+        string[] headers=["日付","コマ","生徒","科目","講師","固定"];for(var i=0;i<headers.Length;i++)flatSheet.Cell(1,i+1).Value=headers[i];
+        for(var i=0;i<report.Rows.Count;i++){var r=report.Rows[i];flatSheet.Cell(i+2,1).Value=r.Date;flatSheet.Cell(i+2,2).Value=r.TimeSlot;flatSheet.Cell(i+2,3).Value=r.Student;flatSheet.Cell(i+2,4).Value=r.Subject;flatSheet.Cell(i+2,5).Value=r.Teacher;flatSheet.Cell(i+2,6).Value=r.IsLocked?"固定":"自動";}
+        flatSheet.Row(1).Style.Font.Bold=true;flatSheet.SheetView.FreezeRows(1);flatSheet.Columns().AdjustToContents();
+
         var studentIndex=0;
         foreach(var group in report.Rows.GroupBy(x=>new{x.Student,x.StudentGrade}).OrderBy(x=>x.Key.StudentGrade).ThenBy(x=>x.Key.Student))
         {
@@ -57,5 +64,41 @@ public sealed class ExcelScheduleReportRenderer
             row++;
         }
         sheet.Columns(1,7).Width=16;sheet.SheetView.FreezeRows(3);
+    }
+
+    private static void WriteOverview(IXLWorksheet sheet,OverviewGrid grid)
+    {
+        var row=1;
+        foreach(var week in grid.Weeks)
+        {
+            sheet.Cell(row,1).Value=$"{week.SundayStart:yyyy/M/d}週";sheet.Cell(row,1).Style.Font.Bold=true;
+            var dayHeaderRow=row+1;var teacherHeaderRow=row+2;var slotStartRow=row+3;
+            sheet.Cell(teacherHeaderRow,1).Value="コマ";sheet.Cell(teacherHeaderRow,1).Style.Font.Bold=true;
+
+            var col=2;
+            foreach(var day in week.Days)
+            {
+                var teacherCount=Math.Max(1,day.Teachers.Count);var dayStartCol=col;
+                sheet.Cell(dayHeaderRow,dayStartCol).Value=$"{day.Date:M/d}({WeeklyCalendarLayout.WeekdayHeaders[(int)day.Date.DayOfWeek]})";
+                sheet.Cell(dayHeaderRow,dayStartCol).Style.Font.Bold=true;sheet.Cell(dayHeaderRow,dayStartCol).Style.Fill.BackgroundColor=XLColor.LightGray;
+                if(teacherCount>1)sheet.Range(dayHeaderRow,dayStartCol,dayHeaderRow,dayStartCol+teacherCount-1).Merge();
+
+                if(day.Teachers.Count==0){sheet.Cell(teacherHeaderRow,dayStartCol).Value="(配置なし)";col++;continue;}
+                foreach(var teacher in day.Teachers)
+                {
+                    sheet.Cell(teacherHeaderRow,col).Value=teacher.TeacherName;sheet.Cell(teacherHeaderRow,col).Style.Font.Bold=true;
+                    for(var s=0;s<grid.SlotLabels.Count;s++)
+                    {
+                        var cell=sheet.Cell(slotStartRow+s,col);cell.Style.Alignment.WrapText=true;
+                        var cards=teacher.Cells[s].Cards;
+                        if(cards.Count>0)cell.Value=string.Join("\n",cards.Select(c=>$"{c.Grade} {c.SubjectShortName} {c.Student}"));
+                    }
+                    col++;
+                }
+            }
+            for(var s=0;s<grid.SlotLabels.Count;s++){sheet.Cell(slotStartRow+s,1).Value=grid.SlotLabels[s];sheet.Cell(slotStartRow+s,1).Style.Font.Bold=true;}
+            row=slotStartRow+grid.SlotLabels.Count+1;
+        }
+        sheet.Columns().AdjustToContents();sheet.Column(1).Width=Math.Max(sheet.Column(1).Width,14);
     }
 }
