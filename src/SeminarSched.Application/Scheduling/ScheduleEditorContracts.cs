@@ -34,9 +34,13 @@ public sealed record ScheduleBoard(IReadOnlyList<BoardSlotRow> Slots, IReadOnlyL
     public BoardCell? Cell(long timeSlotId, long teacherId) => Cells.FirstOrDefault(c => c.TimeSlotId == timeSlotId && c.TeacherId == teacherId);
 }
 
-public sealed record UnplacedSessionOption(long LessonRequestId, string Label, int Remaining)
+// Python版の未配置カード表示（remainingCount/candidateCount）に合わせ、残り回数に加えて
+// 現時点で資格・空き時間の条件を満たす候補コマ数も表示する（講師の同時担当上限は候補数に含めない。
+// Python版のcandidateCountもsolverの候補生成と同じ定義=容量制約はsolver側の変数間制約であり
+// 候補列挙時点ではフィルタしないため、C#版もSqliteScheduleRunServiceの候補生成クエリをそのまま流用する）。
+public sealed record UnplacedSessionOption(long LessonRequestId, string Label, int Remaining, int CandidateCount)
 {
-    public override string ToString() => $"{Label}　(残り{Remaining}回)";
+    public override string ToString() => $"{Label}　(残り{Remaining}回・候補{CandidateCount}枠{(CandidateCount == 0 ? "　⚠配置先なし" : "")})";
 }
 
 public sealed record AssignmentSnapshotRow(long Id, long LessonRequestId, long TeacherId, long OpenDateId, long TimeSlotId, bool IsLocked, string Source, int SessionIndex, long? OptimizationRunId, bool IsManual, string Note);

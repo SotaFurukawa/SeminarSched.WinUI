@@ -154,16 +154,49 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
     public async Task<IReadOnlyList<UnplacedSessionOption>> GetUnplacedSessionsAsync(string projectPath,CancellationToken cancellationToken=default)
     {
         await using var connection=await OpenAsync(projectPath,cancellationToken).ConfigureAwait(false);await SqliteProjectSchema.EnsureCurrentAsync(connection,cancellationToken).ConfigureAwait(false);
-        await using var command=connection.CreateCommand();command.CommandText="""
-            SELECT r.Id,st.ExternalId||' '||st.Name||' / '||su.DisplayName,r.RequiredSessions-COUNT(a.Id) AS remaining
-            FROM LessonRequest r JOIN Student st ON st.Id=r.StudentId JOIN Subject su ON su.Id=r.SubjectId
-            LEFT JOIN Assignment a ON a.LessonRequestId=r.Id
-            GROUP BY r.Id HAVING remaining>0 ORDER BY st.ExternalId;
-            """;
-        var result=new List<UnplacedSessionOption>();await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            result.Add(new UnplacedSessionOption(reader.GetInt64(0),reader.GetString(1),reader.GetInt32(2)));
-        return result;
+        var rows=new List<(long Id,string Label,int Remaining)>();
+        await using(var command=connection.CreateCommand())
+        {
+            command.CommandText="""
+                SELECT r.Id,st.ExternalId||' '||st.Name||' / '||su.DisplayName,r.RequiredSessions-COUNT(a.Id) AS remaining
+                FROM LessonRequest r JOIN Student st ON st.Id=r.StudentId JOIN Subject su ON su.Id=r.SubjectId
+                LEFT JOIN Assignment a ON a.LessonRequestId=r.Id
+                GROUP BY r.Id HAVING remaining>0 ORDER BY st.ExternalId;
+                """;
+            await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                rows.Add((reader.GetInt64(0),reader.GetString(1),reader.GetInt32(2)));
+        }
+
+        // SqliteScheduleRunService.BuildProblemAsyncの候補生成クエリと同じ条件（資格・空き時間・出勤不可・
+        // 同時刻の生徒衝突）で、受講希望ごとに配置可能なコマ数を数える。講師の同時担当上限（2名まで）は
+        // solverの候補生成でも列挙時点ではフィルタしていないため、ここでも同様に含めない。
+        var candidateCounts=new Dictionary<long,int>();
+        await using(var command=connection.CreateCommand())
+        {
+            command.CommandText="""
+                SELECT r.Id,COUNT(*)
+                FROM LessonRequest r
+                JOIN CourseProject cp ON cp.Id=r.ProjectId
+                JOIN TeacherQualification tq ON tq.SubjectId=r.SubjectId AND tq.CanTeach=1
+                JOIN Teacher t ON t.Id=tq.TeacherId AND t.Active=1
+                CROSS JOIN OpenDateTimeSlot ds
+                JOIN OpenDate d ON d.Id=ds.OpenDateId AND d.IsOpen=1
+                JOIN TimeSlot ts ON ts.Id=ds.TimeSlotId AND ts.Active=1
+                LEFT JOIN StudentAvailability sa ON sa.ProjectId=r.ProjectId AND sa.StudentId=r.StudentId AND sa.OpenDateId=ds.OpenDateId AND sa.TimeSlotId=ds.TimeSlotId
+                LEFT JOIN TeacherAvailability ta ON ta.ProjectId=r.ProjectId AND ta.TeacherId=tq.TeacherId AND ta.OpenDateId=ds.OpenDateId AND ta.TimeSlotId=ds.TimeSlotId
+                WHERE (NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE ProjectId=r.ProjectId AND StudentId=r.StudentId) OR COALESCE(sa.AvailabilityLevel,0)>0)
+                  AND (NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=r.ProjectId AND TeacherId=tq.TeacherId) OR COALESCE(ta.AvailabilityLevel,0)>0)
+                  AND NOT EXISTS(SELECT 1 FROM TeacherUnavailability u WHERE u.TeacherId=tq.TeacherId AND u.OpenDateId=ds.OpenDateId AND u.TimeSlotId=ds.TimeSlotId)
+                  AND NOT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest ar ON ar.Id=a.LessonRequestId WHERE (a.IsLocked=1 OR a.IsManual=1) AND a.OpenDateId=ds.OpenDateId AND a.TimeSlotId=ds.TimeSlotId AND ar.StudentId=r.StudentId)
+                GROUP BY r.Id;
+                """;
+            await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                candidateCounts[reader.GetInt64(0)]=reader.GetInt32(1);
+        }
+
+        return rows.Select(r=>new UnplacedSessionOption(r.Id,r.Label,r.Remaining,candidateCounts.GetValueOrDefault(r.Id))).ToList();
     }
 
     public async Task<EditPreview> PreviewMoveAsync(string projectPath,long assignmentId,long teacherId,long openDateId,long timeSlotId,CancellationToken cancellationToken=default)

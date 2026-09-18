@@ -55,7 +55,8 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
     public async Task GetBoardAsync_PlacesCardsInCorrectCellAndListsUnplaced()
     {
         var state=await CreateBoardStateAsync();var editor=new SqliteScheduleEditorService();
-        Assert.Single(await editor.GetUnplacedSessionsAsync(state.Path));
+        var unplaced=Assert.Single(await editor.GetUnplacedSessionsAsync(state.Path));
+        Assert.Equal(4,unplaced.CandidateCount);
         await editor.AddManualAsync(state.Path,state.RequestId,state.Teacher1Id,state.DateId,state.Slot1Id,false);
         Assert.Empty(await editor.GetUnplacedSessionsAsync(state.Path));
         var board=await editor.GetBoardAsync(state.Path,state.DateId,[]);
