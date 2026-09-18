@@ -702,17 +702,21 @@ checkpoint 58で追加したスタックトレース記録を活かし、実機�
 **C#版の実装（スコープを1件のドラッグ移動プレビューに限定。全体差分ではない）:**
 - 既存のC#最適化ソルバー（`SqliteScheduleRunService.PreferencePenalty`＝通常担当講師＋第1〜3希望講師を1つのペナルティ値に統合、`Math.Min(生徒希望度,講師希望度)`＝希望日時一致度）は、Python版の`regular_teacher_penalty`+`preferred_teacher_penalty`+`preferred_time_score`を独自に統合した設計だったため、Python版の3分割を再現するのではなくこのC#既存の統合スコアリングを再利用した（「デザインのみ変更可」の範囲内の設計判断。目的関数の重み付けと完全に一致させるため）。
 - `unassigned_count`・`changed_existing_assignment_count`（全体スケジュール差分が必要）は今回のスコープ外（1件移動では常に差分0になりがちで実益が薄いため）。`active_teacher_slot_count`・`paired_slot_count`はプロジェクト全体のAssignmentを読み込みLINQで前後を再集計する形で実装（件数が少なく許容コスト）。
-- `qualification_override`（RED→YELLOWへの降格、資格外講師でも確認の上で手動配置を許可する特例）は未実装（`EnsureTeacherCanTeachAsync`は引き続きハード拒否のまま）。
+- `qualification_override`（RED→YELLOWへの降格、資格外講師でも確認の上で手動配置を許可する特例）も追記で実装した。`BuildMovePreviewAsync`は講師の指導可能科目チェックだけを`EnsureTeacherCanTeachAsync`（ハード拒否）ではなく非throwの`IsTeacherQualifiedAsync`に置き換え、他の全hard制約を満たす場合に限り`qualification_override`という合成ソフト指標（Before=0/After=1で常にWorsened扱い）を付けてYELLOWへ降格する。自動最適化側の候補生成は元々`TeacherQualification.CanTeach=1`を要求しているため、この手動配置を候補として選ばないことは既存ロジックのまま担保される。
 - `IScheduleEditorService`へ`PreviewMoveAsync`（読み取り専用、トランザクションをコミットせず破棄）を追加し、`MoveAsync`に`confirmSoftWarnings`/`reason`引数を追加（省略時はfalse/nullで、YELLOWなら`SoftWarningConfirmationRequiredException`を投げる＝Python版の`SoftWarningConfirmationRequiredError`と同じ「UIを経由しない直接呼び出しでもYELLOWは黙って適用されない」設計）。
 - `ScheduleEditorPage.xaml.cs`の`Cell_Drop`（assignment分岐）へ`ResolveMovePreviewAsync`を追加。GREEN→即適用、RED→エラー表示のみで中止、YELLOW→悪化した指標一覧＋理由入力欄を持つ`ContentDialog`を表示し、「変更する」を押した場合のみ`confirmSoftWarnings:true`で`MoveAsync`を再実行する。
 - 新規テスト3件（`SqliteScheduleEditorServiceTests.cs`）：`PreviewMoveAsync_ReturnsGreenWhenNoSoftMetricWorsens`、`PreviewMoveAsync_ReturnsRedMessageForHardConstraintViolation`、`MoveAsync_YellowRequiresConfirmSoftWarningsAndPersistsReason`（confirmSoftWarnings無しだと例外・ありだと成功しAuditLog.Reasonへ理由文字列が保存されることを検証）。
 
+**追加で実装した項目（同checkpoint内、時間の許す範囲で優先度を自己判断して実施）:**
+- 未配置カードのcandidateCount表示：`GetUnplacedSessionsAsync`が残り回数に加え、`SqliteScheduleRunService`の候補生成クエリと同条件（資格・空き時間・出勤不可・生徒衝突）で数えた候補コマ数を返し、0件なら「⚠配置先なし」を表示する（Python版のremainingCount/candidateCountに相当。reasonTextは未移植）。
+- 再最適化差分のカード単位詳細：`GetLabelSetAsync`（受講希望/講師/日付/コマのID→表示名ルックアップ）を新設し、④「自動作成の差分」カードに件数集計だけでなく「[日時変更] 生徒名 / 科目名　7/20 1限 → 7/21 2限」のような個別カードの変化一覧も表示するようにした。
+
 **未対応（次回以降）:**
 - `AddManualAsync`経由の配置（未配置一覧からのドラッグ）にはソフト指標プレビューを適用していない（前述の通り、未配置→配置は`unassigned_count`改善が支配的になりやすくPython版でも実質常にGREEN寄りになるため、優先度を下げた）。
-- `qualification_override`特例、`unassigned_count`/`changed_existing_assignment_count`の全体差分ベースのソフト指標。
+- `unassigned_count`/`changed_existing_assignment_count`の全体差分ベースのソフト指標（1件移動では差分が常に0になりがちで実益が薄いため今回は見送った）。
 - ドラッグ中のセルのライブ色分け（green/yellow/red背景色）は未実装。WinUIの`DragOver`イベントは同期的でデータ内容（どのカードをドラッグ中か）を確実に読めないため、Python版のような各候補セルへのリアルタイム色分けではなく、ドロップ確定後のプレビュー結果を確認ダイアログで見せる設計にした（デザイン差分として許容）。
 
-**動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全118 tests passed（Infrastructure 77・Application 12・Optimization 20・Domain 7・Architecture 2）。実機での確認ダイアログ表示・ドラッグ&ドロップの見た目確認はユーザー側で今後実施。
+**動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全120 tests passed（Infrastructure 79・Application 12・Optimization 20・Domain 7・Architecture 2）。実機での確認ダイアログ表示・ドラッグ&ドロップ・差分カードの見た目確認はユーザー側で今後実施。
 
 ### 次回最初に確認するファイル
 

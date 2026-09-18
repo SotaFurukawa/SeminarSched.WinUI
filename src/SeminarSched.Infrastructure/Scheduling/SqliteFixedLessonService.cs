@@ -96,6 +96,7 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
     private static async Task<EditPreview> BuildMovePreviewAsync(SqliteConnection connection, SqliteTransaction transaction, long assignmentId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken)
     {
         AssignmentState current;
+        bool qualified;
         try
         {
             current = await ReadAssignmentAsync(connection, transaction, assignmentId, cancellationToken).ConfigureAwait(false);
@@ -104,7 +105,9 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
                 throw new InvalidOperationException("移動先が現在の配置と同じです。");
             await EnsureSlotOpenAsync(connection, transaction, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
             await EnsureNoStudentCollisionAsync(connection, transaction, current.StudentId, openDateId, timeSlotId, assignmentId, cancellationToken).ConfigureAwait(false);
-            await EnsureTeacherCanTeachAsync(connection, transaction, teacherId, current.SubjectId, cancellationToken).ConfigureAwait(false);
+            // Python版のqualification override特例：講師の指導可能科目チェックだけはここでハード拒否せず、
+            // 他の全ハード制約を満たす場合に限りYELLOW（確認の上で許可）へ回す。
+            qualified = await IsTeacherQualifiedAsync(connection, transaction, teacherId, current.SubjectId, cancellationToken).ConfigureAwait(false);
             await EnsureAvailabilityAsync(connection, transaction, current.StudentId, teacherId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
             await EnsureTeacherCapacityAsync(connection, transaction, teacherId, openDateId, timeSlotId, current.OneToOneRequired ? 2 : 1, assignmentId, cancellationToken).ConfigureAwait(false);
         }
@@ -113,11 +116,26 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
             return new EditPreview(EditDecision.Red, ex.Message, Array.Empty<SoftMetricDelta>());
         }
 
-        var deltas = await ComputeSoftDeltasAsync(connection, transaction, assignmentId, current, teacherId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
+        var deltas = (await ComputeSoftDeltasAsync(connection, transaction, assignmentId, current, teacherId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false)).ToList();
+        if (!qualified)
+        {
+            deltas.Add(new SoftMetricDelta("qualification_override", "指導可能科目としての登録", HigherIsBetter: false, 0, 1));
+            return new EditPreview(EditDecision.Yellow, "選択した講師の指導可能科目に含まれていません。確認後は手動配置できますが、自動最適化では候補にしません。", deltas);
+        }
         var worsenedCount = deltas.Count(d => d.Worsened);
         return worsenedCount > 0
             ? new EditPreview(EditDecision.Yellow, $"配置は可能ですが、ソフト条件が{worsenedCount}項目悪化します。", deltas)
             : new EditPreview(EditDecision.Green, "配置可能です。", deltas);
+    }
+
+    private static async Task<bool> IsTeacherQualifiedAsync(SqliteConnection connection, SqliteTransaction transaction, long teacherId, long subjectId, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT EXISTS(SELECT 1 FROM TeacherQualification q JOIN Teacher t ON t.Id=q.TeacherId WHERE q.TeacherId=$teacher AND q.SubjectId=$subject AND q.CanTeach=1 AND t.Active=1);";
+        command.Parameters.AddWithValue("$teacher", teacherId);
+        command.Parameters.AddWithValue("$subject", subjectId);
+        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) != 0;
     }
 
     private static async Task<IReadOnlyList<SoftMetricDelta>> ComputeSoftDeltasAsync(SqliteConnection connection, SqliteTransaction transaction, long assignmentId, AssignmentState current, long newTeacherId, long newOpenDateId, long newTimeSlotId, CancellationToken cancellationToken)

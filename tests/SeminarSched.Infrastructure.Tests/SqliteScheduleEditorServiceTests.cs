@@ -154,6 +154,25 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
         Assert.Equal("テスト理由で確認",Convert.ToString(await command.ExecuteScalarAsync()));
     }
 
+    [Fact]
+    public async Task MoveAsync_DowngradesUnqualifiedTeacherToYellowAndAllowsConfirmedOverride()
+    {
+        var state=await CreateBoardStateAsync();
+        await InsertRawAssignmentAsync(state.Path,state.RequestId,state.Teacher1Id,state.DateId,state.Slot1Id,isLocked:false,isManual:false);
+        var master=new SqliteMasterDataRepository();
+        var unqualifiedTeacher=await master.SaveTeacherAsync(state.Path,new Teacher(0,"T-BOARD3","架空 盤講師三"));
+        var editor=new SqliteScheduleEditorService();var assignment=Assert.Single(await editor.GetAssignmentsAsync(state.Path));
+
+        var preview=await editor.PreviewMoveAsync(state.Path,assignment.Id,unqualifiedTeacher.Id,state.DateId,state.Slot2Id);
+        Assert.Equal(EditDecision.Yellow,preview.Decision);
+        Assert.Contains("指導可能科目",preview.Message);
+        Assert.Contains(preview.SoftDeltas,d=>d.Code=="qualification_override"&&d.Worsened);
+
+        await Assert.ThrowsAsync<SoftWarningConfirmationRequiredException>(()=>editor.MoveAsync(state.Path,assignment.Id,unqualifiedTeacher.Id,state.DateId,state.Slot2Id));
+        await editor.MoveAsync(state.Path,assignment.Id,unqualifiedTeacher.Id,state.DateId,state.Slot2Id,confirmSoftWarnings:true,reason:"資格外だが確認して配置");
+        var after=Assert.Single(await editor.GetAssignmentsAsync(state.Path));Assert.Equal(unqualifiedTeacher.Id,after.TeacherId);
+    }
+
     private static async Task SetPreferredTeacherAsync(string path,long requestId,long preferredTeacherId)
     {
         await using var connection=new SqliteConnection($"Data Source={path};Pooling=False");await connection.OpenAsync();
