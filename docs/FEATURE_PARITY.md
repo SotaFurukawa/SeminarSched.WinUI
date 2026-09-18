@@ -44,7 +44,7 @@
 | optimization transaction保存 | optimization run service | 固定保持・未固定atomic置換・OptimizationRun入出力概要保存 | 実装中 | 安定したinput fingerprintと詳細penalty内訳は未実装 |
 | 時間割grid | schedule editor QML | ⑤に日付選択付きの行=コマ・列=講師グリッドを追加。カードはWinUIネイティブグリッドで生成 | 実装中 | virtualizationは未対応（開講コマ・講師数が多い場合の性能検証は今後） |
 | drag/drop手動配置 | schedule edit service | カードのドラッグでセル間移動、未配置一覧からドラッグで新規配置。`MoveAsync`が資格・衝突・空き時間・講師上限をhard constraintとして再検証し、ロック済みは移動不可 | 実装中 | 実機での目視確認は未実施（ビルド・自動テストのみ確認） |
-| manual/lock semantics | manual edit tests | ④固定Assignment追加・解除UI、可否/資格/同時2名/1対1/必要回数検証。⑤に手動配置追加/削除/移動・ロック切替・自動配置だけリセットUIを追加し、`IsManual`は再最適化時も`IsLocked`と同様に保持・候補除外・AuditLog記録 | 実装中 | Undo/Redoは未実装 |
+| manual/lock semantics | manual edit tests | ④固定Assignment追加・解除UI、可否/資格/同時2名/1対1/必要回数検証。⑤に手動配置追加/削除/移動・ロック切替・自動配置だけリセットUIを追加し、`IsManual`は再最適化時も`IsLocked`と同様に保持・候補除外・AuditLog記録 | 実装済み | |
 | Undo/Redo | command stack | ⑤へ「元に戻す」「やり直す」を追加。Assignment/TeacherUnavailability全体のスナップショットをmemory上のstackで管理し、自動作成・手動編集すべての操作をカバー | 実装中 | process内のみ（再起動で消える）。粒度は操作単位ではなくテーブル全体のsnapshot |
 | 講師一時表示・availability編集 | editor UI/service | グリッドの「+講師を表示」で全コマ不可の講師も列表示でき、セル右上の丸/バツで`TeacherUnavailability`を切替。既存配置があるセルは不可へ変更不可。複数講師×複数コマを選択し出勤可否をまとめて設定する一括操作を追加（`SetTeacherUnavailableManyAsync`、単一transactionで一部競合時は全体rollback） | 実装済み | 実機でのUI操作感（ListView多重選択の使い勝手）は未確認 |
 | 検索・scroll同期 | editor QML | 生徒名検索でグリッド内カードをハイライト表示。見出し行（講師名）・見出し列（コマ名）を`TranslateTransform`でscroll位置に応じて逆方向へ平行移動させ、常に画面内に固定表示されるようにした（Excelのウィンドウ枠固定相当の見た目） | 実装済み | 実機での見た目（固定表示が正しく機能しているか）は未確認 |
