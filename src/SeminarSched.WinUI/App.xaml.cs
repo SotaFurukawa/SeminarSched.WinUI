@@ -56,6 +56,8 @@ public partial class App : Application
 
     public static IMasterDataWorkbookService MasterDataWorkbook { get; } = new MasterDataWorkbookService();
 
+    public static ISharedRosterImportService SharedRosterImport { get; } = new SharedRosterImportService();
+
     public static ICourseSettingsRepository CourseSettings { get; } = new SqliteCourseSettingsRepository();
 
     public static QuestionnaireKitService QuestionnaireKit { get; } = new(CourseSettings, MasterData);

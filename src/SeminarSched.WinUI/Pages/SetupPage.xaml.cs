@@ -240,6 +240,50 @@ public sealed partial class SetupPage : WorkflowPageBase
         finally { IsEnabled = true; }
     }
 
+    private async void ImportSharedRoster_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
+            picker.FileTypeFilter.Add(".xlsx"); InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow!));
+            var file = await picker.PickSingleFileAsync(); if (file is null) return;
+            IsEnabled = false; var preview = await App.SharedRosterImport.PreviewAsync(App.ProjectService.Current!.Path, file.Path);
+            var summary = BuildSharedRosterPreviewSummary(preview);
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = preview.HasErrors ? "取込エラーがあります" : "共通名簿Excelを反映しますか？",
+                Content = new ScrollViewer { MaxHeight = 520, Content = new TextBlock { Text = summary, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true } },
+                CloseButtonText = preview.HasErrors ? "閉じる" : "キャンセル",
+                PrimaryButtonText = preview.HasErrors ? null : "反映する",
+                DefaultButton = preview.HasErrors ? ContentDialogButton.Close : ContentDialogButton.Primary,
+            };
+            IsEnabled = true;
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+            IsEnabled = false; var result = await App.SharedRosterImport.ApplyAsync(App.ProjectService.Current!.Path, preview); await ReloadAsync();
+            Show(InfoBarSeverity.Success, "共通名簿Excelを反映しました", $"{result.ImportedRows}行（警告{result.WarningCount}件）");
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException or SqliteException)
+        {
+            Show(InfoBarSeverity.Error, "Excelを取り込めませんでした", exception.Message);
+        }
+        finally { IsEnabled = true; }
+    }
+
+    private static string BuildSharedRosterPreviewSummary(SharedRosterPreview preview)
+    {
+        var lines = new List<string> { "シート                         件数" };
+        foreach (var (name, count) in new (string, int)[] { ("生徒", preview.StudentCount), ("講師", preview.TeacherCount), ("科目", preview.SubjectCount), ("講師対応科目", preview.QualificationCount), ("通常授業", preview.RegularLessonCount) })
+            lines.Add($"{name,-14} {count,4}");
+        if (preview.Issues.Count != 0)
+        {
+            lines.Add(""); lines.Add($"検証結果（エラー{preview.Issues.Count(issue => issue.Severity == SharedRosterIssueSeverity.Error)}件・警告{preview.Issues.Count(issue => issue.Severity == SharedRosterIssueSeverity.Warning)}件）");
+            lines.AddRange(preview.Issues.Take(100).Select(issue => $"{issue.SheetName} {(issue.RowNumber is null ? "" : $"{issue.RowNumber}行 ")}{issue.ColumnName}: {issue.Message}"));
+            if (preview.Issues.Count > 100) lines.Add($"ほか{preview.Issues.Count - 100}件");
+        }
+        return string.Join(Environment.NewLine, lines);
+    }
+
     private static string BuildPreviewSummary(MasterWorkbookPreview preview)
     {
         var lines = new List<string> { "シート                         新規  更新" };
