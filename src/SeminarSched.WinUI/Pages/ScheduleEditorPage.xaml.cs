@@ -84,8 +84,40 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         PreconfirmRequest.ItemsSource=await App.FixedLessons.GetRequestsAsync(path);PreconfirmTeacher.ItemsSource=await App.FixedLessons.GetTeachersAsync(path);PreconfirmSlot.ItemsSource=await App.FixedLessons.GetSlotsAsync(path);
         ManualRequest.ItemsSource=await App.FixedLessons.GetRequestsAsync(path);ManualTeacher.ItemsSource=await App.FixedLessons.GetTeachersAsync(path);ManualSlot.ItemsSource=await App.FixedLessons.GetSlotsAsync(path);Assignments.ItemsSource=await App.ScheduleEditor.GetAssignmentsAsync(path);
         HistoryList.ItemsSource=await App.ScheduleEditor.GetAuditHistoryAsync(path);
+        await ReloadDiffAsync(path);
         await ReloadBoardDatesAsync(path);
         await ReloadBoardAsync();
+    }
+
+    private async Task ReloadDiffAsync(string path)
+    {
+        if (ScheduleUndoState.ReoptimizationBaseline is not { } baseline) { DiffCard.Visibility = Visibility.Collapsed; return; }
+        var current = await App.ScheduleEditor.CaptureSnapshotAsync(path);
+        var (newlyPlaced, dateChanged, teacherChanged, unassigned) = ComputeDiff(baseline, current);
+        if (newlyPlaced == 0 && dateChanged == 0 && teacherChanged == 0 && unassigned == 0)
+        {
+            DiffCard.Visibility = Visibility.Visible;
+            DiffSummary.Text = "比較対象との差分はありません。";
+            return;
+        }
+        DiffCard.Visibility = Visibility.Visible;
+        DiffSummary.Text = $"新規配置: {newlyPlaced}件　日時変更: {dateChanged}件　講師変更: {teacherChanged}件　未配置化: {unassigned}件";
+    }
+
+    private static (int NewlyPlaced, int DateChanged, int TeacherChanged, int Unassigned) ComputeDiff(ScheduleSnapshot before, ScheduleSnapshot after)
+    {
+        var beforeByKey = before.Assignments.ToDictionary(a => (a.LessonRequestId, a.SessionIndex));
+        var afterByKey = after.Assignments.ToDictionary(a => (a.LessonRequestId, a.SessionIndex));
+        var newlyPlaced = 0; var dateChanged = 0; var teacherChanged = 0; var unassigned = 0;
+        foreach (var (key, afterRow) in afterByKey)
+        {
+            if (!beforeByKey.TryGetValue(key, out var beforeRow)) { newlyPlaced++; continue; }
+            if (beforeRow.OpenDateId != afterRow.OpenDateId || beforeRow.TimeSlotId != afterRow.TimeSlotId) dateChanged++;
+            if (beforeRow.TeacherId != afterRow.TeacherId) teacherChanged++;
+        }
+        foreach (var key in beforeByKey.Keys)
+            if (!afterByKey.ContainsKey(key)) unassigned++;
+        return (newlyPlaced, dateChanged, teacherChanged, unassigned);
     }
 
     private async void Preconfirm_Click(object sender, RoutedEventArgs e)

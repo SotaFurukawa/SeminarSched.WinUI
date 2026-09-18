@@ -47,7 +47,9 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         try
         {
             RunButton.IsEnabled=false;RunProgress.IsActive=true;RunStatus.IsOpen=false;
-            ScheduleUndoState.Push(await App.ScheduleEditor.CaptureSnapshotAsync(path));
+            var beforeRun=await App.ScheduleEditor.CaptureSnapshotAsync(path);
+            ScheduleUndoState.Push(beforeRun);
+            ScheduleUndoState.ReoptimizationBaseline=beforeRun;
             var profile=SeminarSched.Optimization.Profiles.OptimizationProfileCatalog.Get(ViewModel.Level);
             var result=await App.ScheduleRun.RunAsync(path,profile.MaximumDuration);
             RunStatus.Severity=InfoBarSeverity.Success;RunStatus.Title="時間割を作成しました";RunStatus.Message=$"配置 {result.PlacedLessons}件、未配置 {result.UnassignedLessons}件、{result.Elapsed.TotalSeconds:F1}秒。④時間割編集で変更内容を確認できます。";RunStatus.IsOpen=true;
@@ -56,6 +58,7 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         catch(Exception ex) when(ex is InvalidOperationException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
         {
             if(ScheduleUndoState.UndoStack.Count>0)ScheduleUndoState.UndoStack.Pop();
+            ScheduleUndoState.ReoptimizationBaseline=null;
             RunStatus.Severity=InfoBarSeverity.Error;RunStatus.Title="時間割を作成できませんでした";RunStatus.Message=ex.Message;RunStatus.IsOpen=true;
             App.Logger.Error("Schedule run failed",ex);
         }
