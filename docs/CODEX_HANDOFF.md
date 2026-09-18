@@ -719,6 +719,20 @@ checkpoint 58で追加したスタックトレース記録を活かし、実機�
 
 **動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全121 tests passed（Infrastructure 80・Application 12・Optimization 20・Domain 7・Architecture 2）。実機での確認ダイアログ表示・ドラッグ&ドロップ・差分カード・未配置理由表示の見た目確認はユーザー側で今後実施。アプリの起動自体はこのcheckpoint中に何度もリビルド・再起動して確認しており、`%LocalAppData%\SeminarSched.WinUI\logs\app-20260918.log`にクラッシュは一切記録されていない。
 
+### v0.1.0 checkpoint 61 (Claude)
+
+ユーザーから「アンケート取り込みができません。元のcsvを取り込んでちゃんと動くようにしてほしい」と報告を受けた。
+
+**根本原因（実機ログから特定）:** `%LocalAppData%\SeminarSched.WinUI\logs\app-20260918.log`に22:29:34の実機クラッシュが記録されていた：`NullReferenceException` at `ImportPage.get_CurrentMatrixKind()` ← `ReloadMatrixAsync()` ← `MatrixKind_Changed`。原因は`ImportPage.xaml`の`<RadioButton x:Name="MatrixStudentKind" IsChecked="True" Checked="MatrixKind_Changed"/>`。WinUIは`IsChecked="True"`というXAMLリテラルプロパティの設定を`InitializeComponent()`実行中に同期的な`Checked`イベントとして発火させるが、その時点ではXAML中で後に宣言された兄弟コントロール（`MatrixTeacherKind`等）はまだ`Connect`されておらずnullのため、`MatrixKind_Changed`内の`CurrentMatrixKind`アクセスで即座に例外となる。`App.xaml.cs`の`UnhandledException`ハンドラは記録するだけで`e.Handled=true`を設定しないため、③アンケート取込みページを開いた瞬間に**アプリ全体が毎回クラッシュ**しており、「取り込みができません」はこのクラッシュでアンケート取込みUIへ到達すらできなかったことが原因だった（実際、クラッシュ後は22:29〜今回の修正までアプリが一度も再起動されていなかった）。
+
+**対応:** `OptimizationPage`が同種の初期化順序バグ（`QualitySlider.Value`設定による早期`ValueChanged`発火）に対して既に使っていた`_isLoaded`ガードと同じパターンを適用。`ImportPage`に`_loaded`フィールドを追加し、`Page_Loaded`（`InitializeComponent`完了後、全フィールドConnect済みが保証される）で`true`にし、`MatrixKind_Changed`は`_loaded`がfalseの間は即returnするようにした。XAML側の`IsChecked="True"`はそのまま残している（`Page_Loaded`側の`if(ready)await ReloadMatrixAsync();`が既定表示（生徒）のデータ読込を別途行うため、削除しても機能に影響はない）。
+
+**CSV解析ロジック自体の検証:** クラッシュ修正だけで解決したか確証を得るため、ユーザーがDownloadsフォルダに保存していた実際のGoogleフォーム回答CSV（生徒57名分・講師16名分、実データ）を一時的なリフレクション経由の検証ツール（コミットせず使用後に削除、実データはコミット・ログへは一切書き込んでいない）で読み込み、`ReadTable`のヘッダー検出・`StudentRequestColumns`の教科×回数×学校区分の列ペアリング（16列すべて正しく解決）・`DateHeaders`の受講/出勤不可日時列からの日付抽出（開講日21日分すべて一致）・`CanonicalQuestionnaireSubject`による科目名の正規化（例:「中学校・英語」「高校・数学ⅠA」等、想定通り）を確認した。解析ロジック自体に問題はなく、③のクラッシュが唯一の原因だったと判断できる。
+
+**追加要望への対応（同じ会話内でユーザーから追加指示）:** 「2ファイルを入れる際は別々で入れるようにしてください。生徒回答用と講師回答用でそれぞれボタンを作ってください」。①簡易形式・②Googleフォーム生回答の両セクションで、従来は1つのボタンで生徒→講師と連続してファイルピッカーが開く仕様だったのを、「生徒回答ファイルを選択」「講師回答ファイルを選択」の2ボタン＋選択済みファイル名を表示するテキスト＋両方選択後のみ有効になる「検証」ボタンの構成へ変更した（`ImportPage.xaml`/`.xaml.cs`）。ファイルを選び直すと直前の検証結果（`_preview`/`_surveyPreview`）は破棄され「反映」ボタンも無効化されるようにし、古い検証結果を新しいファイル組み合わせに対して誤って反映できないようにした。
+
+**動作確認:** Release/x64 build警告0・エラー0。修正後に実機で2回再起動し、ログにエラーが記録されていないことを確認した（22:36:16・22:41:57起動、以降エラーなし）。ボタン分離後のCSV検証・反映の実際のクリック操作による確認はユーザー側で今後実施。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

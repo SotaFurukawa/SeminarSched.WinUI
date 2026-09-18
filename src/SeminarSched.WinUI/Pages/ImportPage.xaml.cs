@@ -10,16 +10,42 @@ public sealed partial class ImportPage : WorkflowPageBase
 {
     private ResponseImportPreview? _preview;
     private CourseSurveyPreview? _surveyPreview;
+    private bool _loaded;
+    private string? _studentPath;
+    private string? _teacherPath;
+    private string? _surveyStudentPath;
+    private string? _surveyTeacherPath;
     public ImportPage() => InitializeComponent();
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
-        SelectButton.IsEnabled=EnsureProject(ProjectRequired);
-        SurveySelectButton.IsEnabled=SelectButton.IsEnabled;
-        if(SelectButton.IsEnabled)await ReloadMatrixAsync();
+        _loaded=true;
+        var ready=EnsureProject(ProjectRequired);
+        SelectStudentButton.IsEnabled=ready;SelectTeacherButton.IsEnabled=ready;
+        SurveySelectStudentButton.IsEnabled=ready;SurveySelectTeacherButton.IsEnabled=ready;
+        if(ready)await ReloadMatrixAsync();
     }
-    private async void Select_Click(object sender,RoutedEventArgs e)
+
+    private async void SelectStudent_Click(object sender,RoutedEventArgs e)
     {
-        var student=await PickResponseAsync();if(student is null)return;var teacher=await PickResponseAsync();if(teacher is null)return;
+        var path=await PickResponseAsync();if(path is null)return;
+        _studentPath=path;_preview=null;ApplyButton.IsEnabled=false;
+        UpdateSelectedFilesText();
+    }
+    private async void SelectTeacher_Click(object sender,RoutedEventArgs e)
+    {
+        var path=await PickResponseAsync();if(path is null)return;
+        _teacherPath=path;_preview=null;ApplyButton.IsEnabled=false;
+        UpdateSelectedFilesText();
+    }
+    private void UpdateSelectedFilesText()
+    {
+        SelectedFilesText.Text=$"生徒回答: {(_studentPath is null?"未選択":Path.GetFileName(_studentPath))}　/　講師回答: {(_teacherPath is null?"未選択":Path.GetFileName(_teacherPath))}";
+        VerifyButton.IsEnabled=_studentPath is not null&&_teacherPath is not null;
+    }
+
+    private async void Verify_Click(object sender,RoutedEventArgs e)
+    {
+        if(_studentPath is not{}student||_teacherPath is not{}teacher)return;
         try
         {
             IsEnabled=false;
@@ -45,9 +71,27 @@ public sealed partial class ImportPage : WorkflowPageBase
 
     private async void Apply_Click(object sender,RoutedEventArgs e){if(_preview is null)return;try{IsEnabled=false;await App.ResponseImport.ApplyAsync(App.ProjectService.Current!.Path,_preview,RemoveUnlisted.IsChecked==true);Status.Severity=InfoBarSeverity.Success;Status.Title="回答を反映しました";Status.IsOpen=true;ApplyButton.IsEnabled=false;}catch(Exception ex)when(ex is IOException or InvalidOperationException or Microsoft.Data.Sqlite.SqliteException){ShowError(ex.Message);}finally{IsEnabled=true;}}
 
-    private async void SurveySelect_Click(object sender,RoutedEventArgs e)
+    private async void SurveySelectStudent_Click(object sender,RoutedEventArgs e)
     {
-        var student=await PickResponseAsync();if(student is null)return;var teacher=await PickResponseAsync();if(teacher is null)return;
+        var path=await PickResponseAsync();if(path is null)return;
+        _surveyStudentPath=path;_surveyPreview=null;SurveyApplyButton.IsEnabled=false;
+        UpdateSurveySelectedFilesText();
+    }
+    private async void SurveySelectTeacher_Click(object sender,RoutedEventArgs e)
+    {
+        var path=await PickResponseAsync();if(path is null)return;
+        _surveyTeacherPath=path;_surveyPreview=null;SurveyApplyButton.IsEnabled=false;
+        UpdateSurveySelectedFilesText();
+    }
+    private void UpdateSurveySelectedFilesText()
+    {
+        SurveySelectedFilesText.Text=$"生徒の生回答: {(_surveyStudentPath is null?"未選択":Path.GetFileName(_surveyStudentPath))}　/　講師の生回答: {(_surveyTeacherPath is null?"未選択":Path.GetFileName(_surveyTeacherPath))}";
+        SurveyVerifyButton.IsEnabled=_surveyStudentPath is not null&&_surveyTeacherPath is not null;
+    }
+
+    private async void SurveyVerify_Click(object sender,RoutedEventArgs e)
+    {
+        if(_surveyStudentPath is not{}student||_surveyTeacherPath is not{}teacher)return;
         try
         {
             IsEnabled=false;
@@ -97,7 +141,11 @@ public sealed partial class ImportPage : WorkflowPageBase
         BulkMatrixSlots.ItemsSource=slots.Where(x=>x.Active).OrderBy(x=>x.SortOrder).Select(x=>new AvailabilitySlotOption(x.Id,$"{x.DisplayName} {x.StartTime:HH\\:mm}～{x.EndTime:HH\\:mm}")).ToArray();
     }
 
-    private async void MatrixKind_Changed(object sender,RoutedEventArgs e)=>await ReloadMatrixAsync();
+    // MatrixStudentKindはXAMLでIsChecked="True"を指定しており、WinUIはこのプロパティ設定を
+    // InitializeComponent実行中に同期的なCheckedイベントとして発火させる。その時点ではXAML中で
+    // 後に宣言された兄弟コントロール（MatrixTeacherKindやMatrixEntities等）がまだnullのため、
+    // Page_Loaded以前の呼び出しは無視する（OptimizationPage._isLoadedと同じ対策パターン）。
+    private async void MatrixKind_Changed(object sender,RoutedEventArgs e){if(!_loaded)return;await ReloadMatrixAsync();}
 
     private async void MatrixDate_SelectionChanged(object sender,SelectionChangedEventArgs e)
     {
