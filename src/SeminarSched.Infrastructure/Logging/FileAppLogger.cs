@@ -20,7 +20,7 @@ public sealed class FileAppLogger : IAppLogger
     public void Info(string message) => Write("INFO", message);
     public void Warning(string message) => Write("WARN", message);
     public void Error(string message, Exception? exception = null) =>
-        Write("ERROR", exception is null ? message : $"{message}: {exception.GetType().Name}: {exception.Message}");
+        Write("ERROR", exception is null ? message : $"{message}: {exception.GetType().Name}: {exception.Message}\n{exception.StackTrace}");
 
     private void Write(string level, string message)
     {
