@@ -166,8 +166,11 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
         return result;
     }
 
-    public async Task MoveAsync(string projectPath,long assignmentId,long teacherId,long openDateId,long timeSlotId,CancellationToken cancellationToken=default)
-        => await new SqliteFixedLessonService().MoveAsync(projectPath,assignmentId,teacherId,openDateId,timeSlotId,cancellationToken).ConfigureAwait(false);
+    public async Task<EditPreview> PreviewMoveAsync(string projectPath,long assignmentId,long teacherId,long openDateId,long timeSlotId,CancellationToken cancellationToken=default)
+        => await new SqliteFixedLessonService().PreviewMoveAsync(projectPath,assignmentId,teacherId,openDateId,timeSlotId,cancellationToken).ConfigureAwait(false);
+
+    public async Task MoveAsync(string projectPath,long assignmentId,long teacherId,long openDateId,long timeSlotId,bool confirmSoftWarnings=false,string? reason=null,CancellationToken cancellationToken=default)
+        => await new SqliteFixedLessonService().MoveAsync(projectPath,assignmentId,teacherId,openDateId,timeSlotId,confirmSoftWarnings,reason,cancellationToken).ConfigureAwait(false);
 
     public async Task SetTeacherUnavailableAsync(string projectPath,long teacherId,long openDateId,long timeSlotId,bool unavailable,CancellationToken cancellationToken=default)
         => await SetTeacherUnavailableManyAsync(projectPath,openDateId,[(teacherId,timeSlotId)],unavailable,cancellationToken).ConfigureAwait(false);

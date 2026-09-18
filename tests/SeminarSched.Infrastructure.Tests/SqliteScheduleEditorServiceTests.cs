@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using SeminarSched.Application.Scheduling;
 using SeminarSched.Domain.CourseSettings;
 using SeminarSched.Domain.MasterData;
 using SeminarSched.Domain.Projects;
@@ -94,6 +95,58 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
         long secondRequest;await using(var connection=new SqliteConnection($"Data Source={state.Path};Pooling=False")){await connection.OpenAsync();await using var command=connection.CreateCommand();command.CommandText="INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions) SELECT 1,StudentId,$subject,1 FROM LessonRequest WHERE Id=$request;SELECT last_insert_rowid();";command.Parameters.AddWithValue("$subject",subject2.Id);command.Parameters.AddWithValue("$request",state.RequestId);secondRequest=Convert.ToInt64(await command.ExecuteScalarAsync());}
         await editor.AddManualAsync(state.Path,secondRequest,state.Teacher2Id,state.DateId,state.Slot2Id,false);
         await Assert.ThrowsAsync<InvalidOperationException>(()=>editor.MoveAsync(state.Path,locked.Id,state.Teacher1Id,state.DateId,state.Slot2Id));
+    }
+
+    [Fact]
+    public async Task PreviewMoveAsync_ReturnsGreenWhenNoSoftMetricWorsens()
+    {
+        var state=await CreateBoardStateAsync();
+        await InsertRawAssignmentAsync(state.Path,state.RequestId,state.Teacher1Id,state.DateId,state.Slot1Id,isLocked:false,isManual:false);
+        var editor=new SqliteScheduleEditorService();var assignment=Assert.Single(await editor.GetAssignmentsAsync(state.Path));
+        var preview=await editor.PreviewMoveAsync(state.Path,assignment.Id,state.Teacher2Id,state.DateId,state.Slot2Id);
+        Assert.Equal(EditDecision.Green,preview.Decision);
+        Assert.Empty(preview.WorsenedDeltas);
+    }
+
+    [Fact]
+    public async Task PreviewMoveAsync_ReturnsRedMessageForHardConstraintViolation()
+    {
+        var state=await CreateBoardStateAsync();
+        await InsertRawAssignmentAsync(state.Path,state.RequestId,state.Teacher1Id,state.DateId,state.Slot1Id,isLocked:true,isManual:false);
+        var editor=new SqliteScheduleEditorService();var locked=Assert.Single(await editor.GetAssignmentsAsync(state.Path));
+        var preview=await editor.PreviewMoveAsync(state.Path,locked.Id,state.Teacher2Id,state.DateId,state.Slot2Id);
+        Assert.Equal(EditDecision.Red,preview.Decision);
+        Assert.False(preview.Allowed);
+        Assert.Contains("ロック",preview.Message);
+    }
+
+    [Fact]
+    public async Task MoveAsync_YellowRequiresConfirmSoftWarningsAndPersistsReason()
+    {
+        var state=await CreateBoardStateAsync();
+        await SetPreferredTeacherAsync(state.Path,state.RequestId,state.Teacher1Id);
+        await InsertRawAssignmentAsync(state.Path,state.RequestId,state.Teacher1Id,state.DateId,state.Slot1Id,isLocked:false,isManual:false);
+        var editor=new SqliteScheduleEditorService();var assignment=Assert.Single(await editor.GetAssignmentsAsync(state.Path));
+
+        var preview=await editor.PreviewMoveAsync(state.Path,assignment.Id,state.Teacher2Id,state.DateId,state.Slot2Id);
+        Assert.Equal(EditDecision.Yellow,preview.Decision);
+        Assert.Contains(preview.SoftDeltas,d=>d.Code=="preferred_teacher"&&d.Worsened);
+
+        await Assert.ThrowsAsync<SoftWarningConfirmationRequiredException>(()=>editor.MoveAsync(state.Path,assignment.Id,state.Teacher2Id,state.DateId,state.Slot2Id));
+        await editor.MoveAsync(state.Path,assignment.Id,state.Teacher2Id,state.DateId,state.Slot2Id,confirmSoftWarnings:true,reason:"テスト理由で確認");
+
+        var after=Assert.Single(await editor.GetAssignmentsAsync(state.Path));Assert.Equal(state.Teacher2Id,after.TeacherId);
+        await using var connection=new SqliteConnection($"Data Source={state.Path};Pooling=False");await connection.OpenAsync();
+        await using var command=connection.CreateCommand();command.CommandText="SELECT Reason FROM AuditLog WHERE Action='manual_assignment_moved';";
+        Assert.Equal("テスト理由で確認",Convert.ToString(await command.ExecuteScalarAsync()));
+    }
+
+    private static async Task SetPreferredTeacherAsync(string path,long requestId,long preferredTeacherId)
+    {
+        await using var connection=new SqliteConnection($"Data Source={path};Pooling=False");await connection.OpenAsync();
+        await using var command=connection.CreateCommand();command.CommandText="UPDATE LessonRequest SET PreferredTeacher1Id=$teacher WHERE Id=$request;";
+        command.Parameters.AddWithValue("$teacher",preferredTeacherId);command.Parameters.AddWithValue("$request",requestId);
+        await command.ExecuteNonQueryAsync();
     }
 
     [Fact]

@@ -50,21 +50,24 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
     internal async Task AddManualAsync(string projectPath, long requestId, long teacherId, long openDateId, long timeSlotId, bool isLocked, CancellationToken cancellationToken = default)
         => await AddCoreAsync(projectPath, requestId, teacherId, openDateId, timeSlotId, isLocked, cancellationToken).ConfigureAwait(false);
 
-    internal async Task MoveAsync(string projectPath, long assignmentId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken = default)
+    internal async Task<EditPreview> PreviewMoveAsync(string projectPath, long assignmentId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
+        await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
+        // プレビューは何も確定しない（トランザクションはコミットせず破棄=ロールバックする）。
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        return await BuildMovePreviewAsync(connection, transaction, assignmentId, teacherId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
+    }
+
+    internal async Task MoveAsync(string projectPath, long assignmentId, long teacherId, long openDateId, long timeSlotId, bool confirmSoftWarnings = false, string? reason = null, CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
         await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
         await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 
-        var current = await ReadAssignmentAsync(connection, transaction, assignmentId, cancellationToken).ConfigureAwait(false);
-        if (current.IsLocked) throw new InvalidOperationException("ロック済みの配置は移動できません。先にロックを解除してください。");
-        if (current.OpenDateId == openDateId && current.TimeSlotId == timeSlotId && current.TeacherId == teacherId)
-            throw new InvalidOperationException("移動先が現在の配置と同じです。");
-        await EnsureSlotOpenAsync(connection, transaction, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
-        await EnsureNoStudentCollisionAsync(connection, transaction, current.StudentId, openDateId, timeSlotId, assignmentId, cancellationToken).ConfigureAwait(false);
-        await EnsureTeacherCanTeachAsync(connection, transaction, teacherId, current.SubjectId, cancellationToken).ConfigureAwait(false);
-        await EnsureAvailabilityAsync(connection, transaction, current.StudentId, teacherId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
-        await EnsureTeacherCapacityAsync(connection, transaction, teacherId, openDateId, timeSlotId, current.OneToOneRequired ? 2 : 1, assignmentId, cancellationToken).ConfigureAwait(false);
+        var preview = await BuildMovePreviewAsync(connection, transaction, assignmentId, teacherId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
+        if (preview.Decision == EditDecision.Red) throw new InvalidOperationException(preview.Message);
+        if (preview.Decision == EditDecision.Yellow && !confirmSoftWarnings) throw new SoftWarningConfirmationRequiredException(preview);
 
         await using var update = connection.CreateCommand();
         update.Transaction = transaction;
@@ -74,16 +77,148 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
         update.Parameters.AddWithValue("$slot", timeSlotId);
         update.Parameters.AddWithValue("$id", assignmentId);
         await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        var auditReason = preview.Decision == EditDecision.Yellow ? (string.IsNullOrWhiteSpace(reason) ? "ソフト条件を確認して変更" : reason) : "時間割手動移動";
         await using var audit = connection.CreateCommand();
         audit.Transaction = transaction;
-        audit.CommandText = "INSERT INTO AuditLog(ProjectId,TimestampUtc,Action,EntityType,EntityId,AfterJson,Reason,Source,OperationId) VALUES(1,$utc,'manual_assignment_moved','assignment',$entity,$after,'時間割手動移動','manual',$operation);";
+        audit.CommandText = "INSERT INTO AuditLog(ProjectId,TimestampUtc,Action,EntityType,EntityId,AfterJson,Reason,Source,OperationId) VALUES(1,$utc,'manual_assignment_moved','assignment',$entity,$after,$reason,'manual',$operation);";
         audit.Parameters.AddWithValue("$utc", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
         audit.Parameters.AddWithValue("$entity", assignmentId.ToString(CultureInfo.InvariantCulture));
         audit.Parameters.AddWithValue("$after", JsonSerializer.Serialize(new { teacherId, openDateId, timeSlotId }));
+        audit.Parameters.AddWithValue("$reason", auditReason);
         audit.Parameters.AddWithValue("$operation", Guid.NewGuid().ToString("N"));
         await audit.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    // Python版のpreview_edit相当。ハード制約（EnsureXxxAsync群）を先に検証しRED/message化し、
+    // 満たす場合のみソフト指標（優先講師一致度・希望日時一致度・使用コマ数・1対2ペア数）の
+    // before/afterを比較してYELLOW（悪化あり）/GREEN（悪化なし）を判定する。
+    private static async Task<EditPreview> BuildMovePreviewAsync(SqliteConnection connection, SqliteTransaction transaction, long assignmentId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken)
+    {
+        AssignmentState current;
+        try
+        {
+            current = await ReadAssignmentAsync(connection, transaction, assignmentId, cancellationToken).ConfigureAwait(false);
+            if (current.IsLocked) throw new InvalidOperationException("ロック済みの配置は移動できません。先にロックを解除してください。");
+            if (current.OpenDateId == openDateId && current.TimeSlotId == timeSlotId && current.TeacherId == teacherId)
+                throw new InvalidOperationException("移動先が現在の配置と同じです。");
+            await EnsureSlotOpenAsync(connection, transaction, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
+            await EnsureNoStudentCollisionAsync(connection, transaction, current.StudentId, openDateId, timeSlotId, assignmentId, cancellationToken).ConfigureAwait(false);
+            await EnsureTeacherCanTeachAsync(connection, transaction, teacherId, current.SubjectId, cancellationToken).ConfigureAwait(false);
+            await EnsureAvailabilityAsync(connection, transaction, current.StudentId, teacherId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
+            await EnsureTeacherCapacityAsync(connection, transaction, teacherId, openDateId, timeSlotId, current.OneToOneRequired ? 2 : 1, assignmentId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new EditPreview(EditDecision.Red, ex.Message, Array.Empty<SoftMetricDelta>());
+        }
+
+        var deltas = await ComputeSoftDeltasAsync(connection, transaction, assignmentId, current, teacherId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
+        var worsenedCount = deltas.Count(d => d.Worsened);
+        return worsenedCount > 0
+            ? new EditPreview(EditDecision.Yellow, $"配置は可能ですが、ソフト条件が{worsenedCount}項目悪化します。", deltas)
+            : new EditPreview(EditDecision.Green, "配置可能です。", deltas);
+    }
+
+    private static async Task<IReadOnlyList<SoftMetricDelta>> ComputeSoftDeltasAsync(SqliteConnection connection, SqliteTransaction transaction, long assignmentId, AssignmentState current, long newTeacherId, long newOpenDateId, long newTimeSlotId, CancellationToken cancellationToken)
+    {
+        var profile = await ReadPreferenceProfileAsync(connection, transaction, current.LessonRequestId, cancellationToken).ConfigureAwait(false);
+        var preferenceBefore = PreferencePenalty(profile, current.TeacherId);
+        var preferenceAfter = PreferencePenalty(profile, newTeacherId);
+
+        var availabilityBefore = await AvailabilityPreferenceAsync(connection, transaction, current.StudentId, current.TeacherId, current.OpenDateId, current.TimeSlotId, cancellationToken).ConfigureAwait(false);
+        var availabilityAfter = await AvailabilityPreferenceAsync(connection, transaction, current.StudentId, newTeacherId, newOpenDateId, newTimeSlotId, cancellationToken).ConfigureAwait(false);
+
+        var allSlots = await LoadAssignmentSlotsAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
+        var beforeTuples = allSlots.Select(a => (a.TeacherId, a.OpenDateId, a.TimeSlotId)).ToList();
+        var afterTuples = allSlots.Select(a => a.Id == assignmentId ? (newTeacherId, newOpenDateId, newTimeSlotId) : (a.TeacherId, a.OpenDateId, a.TimeSlotId)).ToList();
+        var activeBefore = beforeTuples.Distinct().Count();
+        var activeAfter = afterTuples.Distinct().Count();
+        var pairedBefore = beforeTuples.GroupBy(t => t).Count(g => g.Count() == 2);
+        var pairedAfter = afterTuples.GroupBy(t => t).Count(g => g.Count() == 2);
+
+        return
+        [
+            new SoftMetricDelta("preferred_teacher", "優先講師との一致度", HigherIsBetter: false, preferenceBefore, preferenceAfter),
+            new SoftMetricDelta("preferred_time", "希望日時との一致度", HigherIsBetter: true, availabilityBefore, availabilityAfter),
+            new SoftMetricDelta("active_teacher_slots", "使用コマ数（講師×日時）", HigherIsBetter: false, activeBefore, activeAfter),
+            new SoftMetricDelta("paired_slots", "1対2ペア配置数", HigherIsBetter: true, pairedBefore, pairedAfter),
+        ];
+    }
+
+    // SqliteScheduleRunService.PreferencePenaltyと同じ計算式（通常担当講師の優先度＋第1〜3希望講師を
+    // 統合した1つのペナルティ値。CP-SATの最適化目的関数と同じ重み付けを流用する）。
+    private static int PreferencePenalty(PreferenceProfile profile, long teacherId)
+    {
+        var scores = new Dictionary<long, int>();
+        if (profile.RegularTeacherId is long regular) scores[regular] = (profile.RegularTeacherPriority - 1) * 2 + 2;
+        KeepMaximum(scores, profile.PreferredTeacher1Id, 6);
+        KeepMaximum(scores, profile.PreferredTeacher2Id, 4);
+        KeepMaximum(scores, profile.PreferredTeacher3Id, 2);
+        return scores.Count == 0 ? 0 : scores.Values.Max() - scores.GetValueOrDefault(teacherId);
+    }
+
+    private static void KeepMaximum(Dictionary<long, int> scores, long? teacherId, int score)
+    {
+        if (teacherId is not long id) return;
+        scores[id] = Math.Max(scores.GetValueOrDefault(id), score);
+    }
+
+    private static async Task<PreferenceProfile> ReadPreferenceProfileAsync(SqliteConnection connection, SqliteTransaction transaction, long requestId, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT COALESCE(r.RegularTeacherId,p.RegularTeacherId),
+                   COALESCE(NULLIF(r.RegularTeacherPriority,1),p.RegularTeacherPriority,1),
+                   r.PreferredTeacher1Id,r.PreferredTeacher2Id,r.PreferredTeacher3Id
+            FROM LessonRequest r
+            LEFT JOIN RegularLessonProfile p ON p.ProjectId=r.ProjectId AND p.StudentId=r.StudentId AND p.SubjectId=r.SubjectId
+            WHERE r.Id=$id;
+            """;
+        command.Parameters.AddWithValue("$id", requestId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return new PreferenceProfile(null, 1, null, null, null);
+        return new PreferenceProfile(
+            reader.IsDBNull(0) ? null : reader.GetInt64(0),
+            reader.GetInt32(1),
+            reader.IsDBNull(2) ? null : reader.GetInt64(2),
+            reader.IsDBNull(3) ? null : reader.GetInt64(3),
+            reader.IsDBNull(4) ? null : reader.GetInt64(4));
+    }
+
+    // SqliteScheduleRunServiceの候補生成と同じ既定値（該当日時に評価行が無ければ中立の1点）を使う。
+    private static async Task<int> AvailabilityPreferenceAsync(SqliteConnection connection, SqliteTransaction transaction, long studentId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT
+              COALESCE((SELECT AvailabilityLevel FROM StudentAvailability WHERE StudentId=$student AND OpenDateId=$date AND TimeSlotId=$slot),1),
+              COALESCE((SELECT AvailabilityLevel FROM TeacherAvailability WHERE TeacherId=$teacher AND OpenDateId=$date AND TimeSlotId=$slot),1);
+            """;
+        command.Parameters.AddWithValue("$student", studentId);
+        command.Parameters.AddWithValue("$teacher", teacherId);
+        command.Parameters.AddWithValue("$date", openDateId);
+        command.Parameters.AddWithValue("$slot", timeSlotId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+        return Math.Min(reader.GetInt32(0), reader.GetInt32(1));
+    }
+
+    private static async Task<List<(long Id, long TeacherId, long OpenDateId, long TimeSlotId)>> LoadAssignmentSlotsAsync(SqliteConnection connection, SqliteTransaction transaction, CancellationToken cancellationToken)
+    {
+        var list = new List<(long, long, long, long)>();
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT Id,TeacherId,OpenDateId,TimeSlotId FROM Assignment;";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            list.Add((reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3)));
+        return list;
+    }
+
+    private sealed record PreferenceProfile(long? RegularTeacherId, int RegularTeacherPriority, long? PreferredTeacher1Id, long? PreferredTeacher2Id, long? PreferredTeacher3Id);
 
     private static async Task<AssignmentState> ReadAssignmentAsync(SqliteConnection connection, SqliteTransaction transaction, long assignmentId, CancellationToken cancellationToken)
     {
@@ -91,7 +226,7 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
         command.Transaction = transaction;
         command.CommandText = """
             SELECT a.TeacherId,a.OpenDateId,a.TimeSlotId,a.IsLocked,r.StudentId,r.SubjectId,
-                   CASE WHEN r.OneToOneRequired=1 OR COALESCE(p.OneToOneRequired,0)=1 THEN 1 ELSE 0 END
+                   CASE WHEN r.OneToOneRequired=1 OR COALESCE(p.OneToOneRequired,0)=1 THEN 1 ELSE 0 END,r.Id
             FROM Assignment a
             JOIN LessonRequest r ON r.Id=a.LessonRequestId
             LEFT JOIN RegularLessonProfile p ON p.ProjectId=r.ProjectId AND p.StudentId=r.StudentId AND p.SubjectId=r.SubjectId
@@ -101,7 +236,7 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             throw new InvalidOperationException("配置が見つかりません。");
-        return new AssignmentState(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetBoolean(3), reader.GetInt64(4), reader.GetInt64(5), reader.GetBoolean(6));
+        return new AssignmentState(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetBoolean(3), reader.GetInt64(4), reader.GetInt64(5), reader.GetBoolean(6), reader.GetInt64(7));
     }
 
     private static async Task EnsureSlotOpenAsync(SqliteConnection connection, SqliteTransaction transaction, long openDateId, long timeSlotId, CancellationToken cancellationToken)
@@ -247,5 +382,5 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
     }
 
     private sealed record RequestState(long StudentId, long SubjectId, int RequiredSessions, int AssignedSessions, bool OneToOneRequired);
-    private sealed record AssignmentState(long TeacherId, long OpenDateId, long TimeSlotId, bool IsLocked, long StudentId, long SubjectId, bool OneToOneRequired);
+    private sealed record AssignmentState(long TeacherId, long OpenDateId, long TimeSlotId, bool IsLocked, long StudentId, long SubjectId, bool OneToOneRequired, long LessonRequestId);
 }

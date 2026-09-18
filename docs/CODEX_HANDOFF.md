@@ -690,6 +690,30 @@ checkpoint 58で追加したスタックトレース記録を活かし、実機�
 
 **動作確認:** Release/x64 build警告0・エラー0、全114 tests passed、privacy gate成功。アプリの起動は確認したが、この特定の再現手順（プロジェクトを開かずに④⑤を操作する）をこの環境から対話的に実行して確認することはできていない。**次回ユーザーがこの操作を試して再発しないことを確認してほしい。** 再発する場合はcheckpoint 58で追加したスタックトレース付きログ（`%LocalAppData%\SeminarSched.WinUI\logs\app-yyyyMMdd.log`）を確認すること。
 
+### v0.1.0 checkpoint 60 (Claude)
+
+ユーザーから「22時まで動かせるタスクを自分で設定して実行してよい、python版の仕様を確認し同じ仕様に合わせてほしい（デザインのみ変更可）」との指示を受け、checkpoint 59で未対応と記していたgreen/yellow/red判定のうち、ドラッグ移動（`Cell_Drop`のassignment分岐＝`MoveAsync`）を対象に実装した。
+
+**Python版仕様の確認（Exploreサブエージェントで`optimization/manual_edit.py`・`application/schedule_edit_service.py`・`ui/viewmodels/schedule_editor_view_model.py`・`ui/qml/ScheduleEditorPage.qml`を精読）:**
+- `preview_edit`はハード制約検証（`validate_optimization_result`を変更前後両方に適用）→RED、を先に確定し、そこを通過した場合のみソフト指標の悪化有無でYELLOW/GREENを判定する。RED＝ハード制約違反のみで、ソフト指標だけでREDになることはない。
+- ソフト指標は`unassigned_count`・`regular_teacher_penalty`・`preferred_teacher_penalty`・`preferred_time_score`・`paired_slot_count`・`active_teacher_slot_count`・`changed_existing_assignment_count`の7種（各LOWER/HIGHER_IS_BETTERの向き付き）。1件でも悪化すればYELLOW。
+- UIはドロップ確定前にプレビューし、YELLOWなら確認ダイアログ（悪化した指標一覧＋理由入力欄）を出し、確定時はサーバー側（`_require_preview_allowed`）でも再検証し理由文字列をAuditLogへ保存する。
+
+**C#版の実装（スコープを1件のドラッグ移動プレビューに限定。全体差分ではない）:**
+- 既存のC#最適化ソルバー（`SqliteScheduleRunService.PreferencePenalty`＝通常担当講師＋第1〜3希望講師を1つのペナルティ値に統合、`Math.Min(生徒希望度,講師希望度)`＝希望日時一致度）は、Python版の`regular_teacher_penalty`+`preferred_teacher_penalty`+`preferred_time_score`を独自に統合した設計だったため、Python版の3分割を再現するのではなくこのC#既存の統合スコアリングを再利用した（「デザインのみ変更可」の範囲内の設計判断。目的関数の重み付けと完全に一致させるため）。
+- `unassigned_count`・`changed_existing_assignment_count`（全体スケジュール差分が必要）は今回のスコープ外（1件移動では常に差分0になりがちで実益が薄いため）。`active_teacher_slot_count`・`paired_slot_count`はプロジェクト全体のAssignmentを読み込みLINQで前後を再集計する形で実装（件数が少なく許容コスト）。
+- `qualification_override`（RED→YELLOWへの降格、資格外講師でも確認の上で手動配置を許可する特例）は未実装（`EnsureTeacherCanTeachAsync`は引き続きハード拒否のまま）。
+- `IScheduleEditorService`へ`PreviewMoveAsync`（読み取り専用、トランザクションをコミットせず破棄）を追加し、`MoveAsync`に`confirmSoftWarnings`/`reason`引数を追加（省略時はfalse/nullで、YELLOWなら`SoftWarningConfirmationRequiredException`を投げる＝Python版の`SoftWarningConfirmationRequiredError`と同じ「UIを経由しない直接呼び出しでもYELLOWは黙って適用されない」設計）。
+- `ScheduleEditorPage.xaml.cs`の`Cell_Drop`（assignment分岐）へ`ResolveMovePreviewAsync`を追加。GREEN→即適用、RED→エラー表示のみで中止、YELLOW→悪化した指標一覧＋理由入力欄を持つ`ContentDialog`を表示し、「変更する」を押した場合のみ`confirmSoftWarnings:true`で`MoveAsync`を再実行する。
+- 新規テスト3件（`SqliteScheduleEditorServiceTests.cs`）：`PreviewMoveAsync_ReturnsGreenWhenNoSoftMetricWorsens`、`PreviewMoveAsync_ReturnsRedMessageForHardConstraintViolation`、`MoveAsync_YellowRequiresConfirmSoftWarningsAndPersistsReason`（confirmSoftWarnings無しだと例外・ありだと成功しAuditLog.Reasonへ理由文字列が保存されることを検証）。
+
+**未対応（次回以降）:**
+- `AddManualAsync`経由の配置（未配置一覧からのドラッグ）にはソフト指標プレビューを適用していない（前述の通り、未配置→配置は`unassigned_count`改善が支配的になりやすくPython版でも実質常にGREEN寄りになるため、優先度を下げた）。
+- `qualification_override`特例、`unassigned_count`/`changed_existing_assignment_count`の全体差分ベースのソフト指標。
+- ドラッグ中のセルのライブ色分け（green/yellow/red背景色）は未実装。WinUIの`DragOver`イベントは同期的でデータ内容（どのカードをドラッグ中か）を確実に読めないため、Python版のような各候補セルへのリアルタイム色分けではなく、ドロップ確定後のプレビュー結果を確認ダイアログで見せる設計にした（デザイン差分として許容）。
+
+**動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全118 tests passed（Infrastructure 77・Application 12・Optimization 20・Domain 7・Architecture 2）。実機での確認ダイアログ表示・ドラッグ&ドロップの見た目確認はユーザー側で今後実施。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

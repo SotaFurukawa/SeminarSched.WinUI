@@ -50,6 +50,32 @@ public sealed record AuditHistoryEntry(DateTimeOffset TimestampUtc, string Actio
     public override string ToString() => $"{TimestampUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}　{ActionLabel}{(string.IsNullOrWhiteSpace(Reason) ? "" : $"　({Reason})")}";
 }
 
+// Python版のドロップ判定（green/yellow/red）に対応。redはハード制約違反（適用不可）、
+// yellowはハード制約は満たすがソフト指標が悪化する変更（確認ダイアログ→理由入力の上で適用可）、
+// greenはそのまま適用してよい変更。
+public enum EditDecision { Green, Yellow, Red }
+
+public sealed record SoftMetricDelta(string Code, string Label, bool HigherIsBetter, int Before, int After)
+{
+    public bool Worsened => HigherIsBetter ? After < Before : After > Before;
+    public bool Improved => HigherIsBetter ? After > Before : After < Before;
+    public string Message => $"{Label}：{Before} → {After}（{(Worsened ? "悪化します" : Improved ? "改善します" : "変わりません")}）";
+}
+
+public sealed record EditPreview(EditDecision Decision, string Message, IReadOnlyList<SoftMetricDelta> SoftDeltas)
+{
+    public bool Allowed => Decision != EditDecision.Red;
+    public IReadOnlyList<SoftMetricDelta> WorsenedDeltas => SoftDeltas.Where(d => d.Worsened).ToList();
+}
+
+// MoveAsyncはこの例外を投げた場合、hard制約は満たしているがソフト指標が悪化するため、
+// 呼び出し側（UI）はPreview.SoftDeltasを確認ダイアログで提示し、ユーザー確認後
+// confirmSoftWarnings:trueで再実行する必要がある（Python版のSoftWarningConfirmationRequiredと同じ役割）。
+public sealed class SoftWarningConfirmationRequiredException(EditPreview preview) : InvalidOperationException(preview.Message)
+{
+    public EditPreview Preview { get; } = preview;
+}
+
 public interface IScheduleEditorService
 {
     Task<IReadOnlyList<ScheduleAssignmentItem>> GetAssignmentsAsync(string projectPath, CancellationToken cancellationToken = default);
@@ -60,7 +86,8 @@ public interface IScheduleEditorService
     Task<IReadOnlyList<OpenDateOption>> GetOpenDatesAsync(string projectPath, CancellationToken cancellationToken = default);
     Task<ScheduleBoard> GetBoardAsync(string projectPath, long openDateId, IReadOnlyCollection<long> extraTeacherIds, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UnplacedSessionOption>> GetUnplacedSessionsAsync(string projectPath, CancellationToken cancellationToken = default);
-    Task MoveAsync(string projectPath, long assignmentId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken = default);
+    Task<EditPreview> PreviewMoveAsync(string projectPath, long assignmentId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken = default);
+    Task MoveAsync(string projectPath, long assignmentId, long teacherId, long openDateId, long timeSlotId, bool confirmSoftWarnings = false, string? reason = null, CancellationToken cancellationToken = default);
     Task SetTeacherUnavailableAsync(string projectPath, long teacherId, long openDateId, long timeSlotId, bool unavailable, CancellationToken cancellationToken = default);
     Task SetTeacherUnavailableManyAsync(string projectPath, long openDateId, IReadOnlyCollection<(long TeacherId, long TimeSlotId)> targets, bool unavailable, CancellationToken cancellationToken = default);
     Task<ScheduleSnapshot> CaptureSnapshotAsync(string projectPath, CancellationToken cancellationToken = default);

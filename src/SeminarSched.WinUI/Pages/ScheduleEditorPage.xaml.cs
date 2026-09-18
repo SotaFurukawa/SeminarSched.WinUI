@@ -316,7 +316,9 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
             if (text.StartsWith("assignment:", StringComparison.Ordinal))
             {
                 var id = long.Parse(text.AsSpan("assignment:".Length), CultureInfo.InvariantCulture);
-                await ExecuteEditorAsync(() => App.ScheduleEditor.MoveAsync(path, id, cell.TeacherId, dateId, cell.TimeSlotId), "配置を移動しました");
+                var (proceed, confirmSoftWarnings, reason) = await ResolveMovePreviewAsync(path, id, cell.TeacherId, dateId, cell.TimeSlotId);
+                if (!proceed) return;
+                await ExecuteEditorAsync(() => App.ScheduleEditor.MoveAsync(path, id, cell.TeacherId, dateId, cell.TimeSlotId, confirmSoftWarnings, reason), "配置を移動しました");
             }
             else if (text.StartsWith("request:", StringComparison.Ordinal))
             {
@@ -367,6 +369,45 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         if(Assignments.SelectedItem is not ScheduleAssignmentItem assignment){ShowEditorError("配置を選択してください。");return;}await ExecuteEditorAsync(async()=>await App.ScheduleEditor.SetLockedAsync(App.ProjectService.Current!.Path,assignment.Id,!assignment.IsLocked),assignment.IsLocked?"ロックを解除しました":"ロックしました");
     }
     private async void ResetAutomatic_Click(object sender,RoutedEventArgs e)=>await ExecuteEditorAsync(async()=>await App.ScheduleEditor.ResetAutomaticAsync(App.ProjectService.Current!.Path),"自動配置をリセットしました",clearsHistory:true);
+
+    // ドラッグ移動の実行前にPython版と同じgreen/yellow/red判定を行う。redはエラー表示して中止、
+    // yellowはソフト指標の悪化内容を確認ダイアログで提示し、ユーザーが理由を入力・確認した場合のみ
+    // 実行を許可する（confirmSoftWarnings:trueで再度MoveAsyncを呼ぶ）。
+    private async Task<(bool Proceed,bool ConfirmSoftWarnings,string? Reason)> ResolveMovePreviewAsync(string path,long assignmentId,long teacherId,long openDateId,long timeSlotId)
+    {
+        EditPreview preview;
+        try
+        {
+            preview = await App.ScheduleEditor.PreviewMoveAsync(path, assignmentId, teacherId, openDateId, timeSlotId);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            ShowEditorError(ex.Message);
+            return (false, false, null);
+        }
+        if (preview.Decision == EditDecision.Red)
+        {
+            ShowEditorError(preview.Message);
+            return (false, false, null);
+        }
+        if (preview.Decision == EditDecision.Green) return (true, false, null);
+
+        var reasonBox = new TextBox { PlaceholderText = "変更理由（監査ログへ保存）" };
+        var panel = new StackPanel { Spacing = 8 };
+        panel.Children.Add(new TextBlock { Text = "△ " + preview.Message, TextWrapping = TextWrapping.Wrap });
+        panel.Children.Add(new ListView { ItemsSource = preview.WorsenedDeltas.Select(d => d.Message).ToArray(), IsItemClickEnabled = false });
+        panel.Children.Add(reasonBox);
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "ソフト条件の悪化を確認",
+            Content = panel,
+            PrimaryButtonText = "変更する",
+            CloseButtonText = "キャンセル",
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return (false, false, null);
+        return (true, true, string.IsNullOrWhiteSpace(reasonBox.Text) ? null : reasonBox.Text);
+    }
 
     private async Task ExecuteEditorAsync(Func<Task> action,string success,bool clearsHistory=false)
     {
