@@ -617,6 +617,22 @@ Feature Parity行「講師配布（学年順）」の残課題「A4サイズへ�
 
 **未解決・次回の課題:** ユーザーのF:ドライブには実際にPython版で使っていたGoogleフォームの生の回答CSV（`2026夏期講習 個別指導受講申込 回答原本...csv`等）もあり、これをC#版へ直接取り込む機能（Python版`application/course_survey_service.py`相当、990行規模の実機能）はまだ移植していない。次回はこの生CSV importerの移植に着手する必要がある。また、`C:\Users\sota1\AppData\Local\SummerScheduler`（ユーザー実機のPython版インストール先）は参考情報として提示されたが、まだ調査していない。
 
+### v0.1.0 checkpoint 56 (Claude)
+
+checkpoint 55で共通名簿Excel（生徒・講師_基本情報.xlsx）を取り込めるようにした後、ユーザーが実際に③アンケート取込みを試すために言及していた「F:ドライブにあるpython版で使っていたアンケート結果」（Googleフォームの生の回答CSV2件）を調査し、これを取り込む機能が丸ごと未移植であることを確認して実装した。
+
+**調査結果:** Python参照repoの`application/course_survey_service.py`（`CourseSurveyService`、約990行）が該当機能。生成済みGoogleフォームが出力する生の回答CSV/XLSX（質問文そのままの列名、例:「姓（苗字）（必須）」「受講教科（1教科目）（必須）」「受講不可日時（チェックしたコマは受講不可） [2026-07-24（金）]」）を直接検証・反映する専用serviceで、既存の`IResponseImportService`（列名を固定した簡易CSV向けの差分更新）とは全く別物。ユーザーの実ファイル（F:ドライブの生徒回答57行・講師回答16行のCSV）のヘッダーを直接確認し、Python側の実装と完全に一致することを確認した。
+
+**実装内容:**
+- `ICourseSurveyImportService`（Application層）・`CourseSurveyImportService`（Infrastructure層）を新設。Python版のロジックをほぼ1:1で移植: 学校区分・受講教科・受講回数の教科ごとの列組合せ判定（`_student_request_columns`相当）、学校区分付き科目名への正規化（`小学校・英語`等、`_canonical_questionnaire_subject`相当）、日付列からの開校日抽出＋現在の開校日との差分検証、チェックボックス複数選択セル（例:「Z 15:40～17:00, A 17:10～18:30」）からのコマコード抽出を区切り文字境界を考慮した正規表現で実装、未登録の在籍生はエラー・体験生（アンケートの「在籍区分」列が「体験生」）は警告のうえ`TRIAL-0001`形式で自動登録、時間割配置後（`Assignment`存在時）は一括置換を拒否するhard block、Googleフォームの分岐ページに由来する重複ヘッダーを許容（Python版`readers.py`と同じ「[重複2]」命名規則）。
+- 反映は生徒・講師ごとに受講希望（`LessonRequest`）と可用性（`StudentAvailability`/`TeacherAvailability`、講師は`TeacherUnavailability`も同期）を全置換する設計（差分マージではない）。
+- `App.xaml.cs`へ`App.CourseSurveyImport`を登録。`ImportPage`（③アンケート取込み）へ「Googleフォーム生回答（アンケート統合）」セクションと専用の検証・反映ボタンを追加した。
+- 新規テスト5件（`CourseSurveyImportServiceTests.cs`、架空データのみ使用）: 生徒・講師の正常な往復反映、未登録生徒のerror＋反映拒否、体験生の自動登録＋warning、配置済み時間割がある場合のhard block、2回反映した際に古い可用性が正しく全置換されること（蓄積されないこと）を検証。
+- **実データでの動作確認**: ユーザーの実際の本番ファイル（F:ドライブの共通名簿Excel・生徒回答CSV・講師回答CSV、いずれも架空データではない）に対し、読み取り専用の一時検証スクリプト（コミットせず削除済み）でこのserviceを直接実行し、75名の生徒・20名の講師・26科目の名簿に対して57名の生徒・16名の講師・83件の受講希望をエラー0件・警告0件で正しく解決できることを確認した（実行後、実データはコミット・ログ出力のいずれにも一切含めていない）。
+- Release/x64 build: warning 0 / error 0。全108 tests passed。Privacy gate成功。
+
+**未対応:** Python版`export_latest_combined`相当（取込結果を色付きの統合Excelとして出力する機能）は未移植。取込みのエビデンス自体（原本ファイルのsnapshot・監査ログ）は保存されるため、③〜⑤の業務flowを進める上での実質的なブロッカーではない。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`
