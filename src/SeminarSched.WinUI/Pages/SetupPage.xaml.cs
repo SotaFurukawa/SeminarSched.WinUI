@@ -4,6 +4,8 @@ using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
 using SeminarSched.Domain.MasterData;
 using SeminarSched.Domain.CourseSettings;
@@ -27,8 +29,10 @@ public sealed partial class SetupPage : WorkflowPageBase
     private long? _requestDeleteStudentId;
     private long? _requestDeleteSubjectId;
     private readonly ObservableCollection<MasterItem<TimeSlot>> _timeSlotItems = new();
+    private CourseDay[] _courseDays = [];
+    private readonly HashSet<DateOnly> _selectedDates = new();
 
-    public SetupPage() { InitializeComponent(); TimeSlots.ItemsSource = _timeSlotItems; }
+    public SetupPage() { InitializeComponent(); TimeSlots.ItemsSource = _timeSlotItems; RenderCalendarWeekdayHeader(); }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
@@ -36,6 +40,7 @@ public sealed partial class SetupPage : WorkflowPageBase
         if (!EnsureProject(ProjectRequired) || current is null) { Tabs.IsEnabled = false; return; }
         ProjectTitle.Text = current.Title;
         ProjectPeriod.Text = $"{current.StartDate:yyyy年M月d日} ～ {current.EndDate:yyyy年M月d日}";
+        CourseDayPeriodLabel.Text = $"{current.StartDate:yyyy年M月d日} ～ {current.EndDate:yyyy年M月d日}（変更はすぐに保存されます）";
         await ReloadAsync();
     }
 
@@ -297,28 +302,160 @@ public sealed partial class SetupPage : WorkflowPageBase
         return string.Join(Environment.NewLine, lines);
     }
 
-    private async void SetOpenDay_Click(object sender, RoutedEventArgs e) => await SaveSelectedDaysAsync(true);
-    private async void SetClosedDay_Click(object sender, RoutedEventArgs e) => await SaveSelectedDaysAsync(false);
+    private static readonly string[] WeekdayHeaders = ["日", "月", "火", "水", "木", "金", "土"];
 
-    private async Task SaveSelectedDaysAsync(bool isOpen)
+    private void RenderCalendarWeekdayHeader()
     {
-        var selected = CourseDays.SelectedItems.Cast<CourseDayItem>().ToArray();
-        if (selected.Length == 0) { Show(InfoBarSeverity.Warning, "日付を選択してください", ""); return; }
+        CalendarWeekdayHeader.Children.Clear(); CalendarWeekdayHeader.ColumnDefinitions.Clear();
+        foreach (var _ in WeekdayHeaders) CalendarWeekdayHeader.ColumnDefinitions.Add(new ColumnDefinition());
+        for (var i = 0; i < WeekdayHeaders.Length; i++)
+        {
+            var text = new TextBlock { Text = WeekdayHeaders[i], FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(4) };
+            Grid.SetColumn(text, i); CalendarWeekdayHeader.Children.Add(text);
+        }
+    }
+
+    private void RenderCourseDayCalendar()
+    {
+        CourseDayCalendar.Children.Clear(); CourseDayCalendar.RowDefinitions.Clear(); CourseDayCalendar.ColumnDefinitions.Clear();
+        for (var i = 0; i < 7; i++) CourseDayCalendar.ColumnDefinitions.Add(new ColumnDefinition());
+        if (_courseDays.Length == 0) return;
+        var leading = (int)_courseDays[0].Date.DayOfWeek;
+        var totalCells = leading + _courseDays.Length;
+        var rows = (int)Math.Ceiling(totalCells / 7.0);
+        for (var i = 0; i < rows; i++) CourseDayCalendar.RowDefinitions.Add(new RowDefinition { Height = new GridLength(92) });
+
+        for (var i = 0; i < _courseDays.Length; i++)
+        {
+            var day = _courseDays[i];
+            var cellIndex = leading + i;
+            var selected = _selectedDates.Contains(day.Date);
+            var border = new Border
+            {
+                Padding = new Thickness(6), CornerRadius = new CornerRadius(4),
+                Background = new SolidColorBrush(selected ? Windows.UI.Color.FromArgb(255, 224, 236, 255) : day.IsOpen ? Windows.UI.Color.FromArgb(255, 255, 255, 255) : Windows.UI.Color.FromArgb(255, 242, 244, 247)),
+                BorderBrush = new SolidColorBrush(selected ? Windows.UI.Color.FromArgb(255, 39, 103, 197) : Windows.UI.Color.FromArgb(255, 220, 226, 234)),
+                BorderThickness = new Thickness(selected ? 2 : 1),
+                Tag = day.Date,
+            };
+            border.Tapped += CalendarDay_Tapped;
+            var slotSummary = string.Join("・", day.EnabledTimeSlotIds.Select(id => _timeSlotItems.FirstOrDefault(x => x.Value.Id == id)?.Value.Code).Where(code => code is not null));
+            var stack = new StackPanel { Spacing = 1 };
+            stack.Children.Add(new TextBlock { Text = day.Date.ToString("M/d(ddd)", CultureInfo.GetCultureInfo("ja-JP")), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, FontSize = 11 });
+            stack.Children.Add(new TextBlock { Text = day.IsOpen ? "✓ 開校" : "－ 休校", Foreground = new SolidColorBrush(day.IsOpen ? Windows.UI.Color.FromArgb(255, 23, 107, 64) : Windows.UI.Color.FromArgb(255, 102, 112, 133)), FontSize = 11, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+            if (day.IsOpen) stack.Children.Add(new TextBlock { Text = slotSummary, FontSize = 10, Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 39, 103, 197)), TextWrapping = TextWrapping.Wrap });
+            border.Child = stack;
+            Grid.SetRow(border, cellIndex / 7); Grid.SetColumn(border, cellIndex % 7);
+            CourseDayCalendar.Children.Add(border);
+        }
+    }
+
+    private void CalendarDay_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (sender is not Border { Tag: DateOnly date }) return;
+        if (!_selectedDates.Remove(date)) _selectedDates.Add(date);
+        RenderCourseDayCalendar(); RenderCalendarSlotToggles(); UpdateCalendarSelectionCount();
+    }
+
+    private void RenderCalendarSlotToggles()
+    {
+        CalendarSlotTogglePanel.Children.Clear();
+        foreach (var item in _timeSlotItems.Where(x => x.Value.Active))
+        {
+            var slot = item.Value;
+            var selectedDays = _courseDays.Where(d => _selectedDates.Contains(d.Date)).ToArray();
+            var checkedCount = selectedDays.Count(d => d.EnabledTimeSlotIds.Contains(slot.Id));
+            var checkBox = new CheckBox
+            {
+                Content = slot.Code, Tag = slot.Id, IsThreeState = true,
+                IsEnabled = _selectedDates.Count > 0,
+                IsChecked = selectedDays.Length == 0 ? false : checkedCount == 0 ? false : checkedCount == selectedDays.Length ? true : null,
+            };
+            checkBox.Click += CalendarSlotToggle_Click;
+            CalendarSlotTogglePanel.Children.Add(checkBox);
+        }
+    }
+
+    private async void CalendarSlotToggle_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not CheckBox { Tag: long slotId } checkBox) return;
+        var enable = checkBox.IsChecked == true;
         await ExecuteAsync(async path =>
         {
-            var slots = await App.CourseSettings.GetTimeSlotsAsync(path);
-            var enabledIds = isOpen ? slots.Where(x => x.Active).Select(x => x.Id).ToArray() : [];
-            var note = CourseDayNote.Text;
-            foreach (var day in selected)
-                await App.CourseSettings.SaveCourseDayAsync(path, new CourseDay(day.Date, isOpen, string.IsNullOrEmpty(note) ? (isOpen ? "" : "休校") : note, enabledIds));
-        }, selected.Length == 1 ? (isOpen ? "開校日に設定しました" : "休校日に設定しました") : $"{selected.Length}件を{(isOpen ? "開校日" : "休校日")}に設定しました");
+            foreach (var date in _selectedDates)
+            {
+                var day = _courseDays.First(d => d.Date == date);
+                var slots = enable ? day.EnabledTimeSlotIds.Append(slotId).Distinct().ToArray() : day.EnabledTimeSlotIds.Where(id => id != slotId).ToArray();
+                await App.CourseSettings.SaveCourseDayAsync(path, new CourseDay(day.Date, day.IsOpen, day.Note, slots));
+            }
+        }, "選択日のコマを更新しました");
     }
 
-    private void CourseDays_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void CalendarAllSlots_Click(object sender, RoutedEventArgs e)
     {
-        if (_loading) return;
-        if (CourseDays.SelectedItems.Count == 1 && CourseDays.SelectedItems[0] is CourseDayItem selected) CourseDayNote.Text = selected.Note;
+        if (_selectedDates.Count == 0) { Show(InfoBarSeverity.Warning, "日付を選択してください", ""); return; }
+        var allSlotIds = _timeSlotItems.Where(x => x.Value.Active).Select(x => x.Value.Id).ToArray();
+        await ExecuteAsync(async path =>
+        {
+            foreach (var date in _selectedDates)
+            {
+                var day = _courseDays.First(d => d.Date == date);
+                await App.CourseSettings.SaveCourseDayAsync(path, new CourseDay(day.Date, day.IsOpen, day.Note, allSlotIds));
+            }
+        }, "選択日のコマを全コマに設定しました");
     }
+
+    private async void CalendarOpenAll_Click(object sender, RoutedEventArgs e)
+    {
+        var allSlotIds = _timeSlotItems.Where(x => x.Value.Active).Select(x => x.Value.Id).ToArray();
+        await ExecuteAsync(async path =>
+        {
+            foreach (var day in _courseDays)
+                await App.CourseSettings.SaveCourseDayAsync(path, new CourseDay(day.Date, true, day.Note, day.EnabledTimeSlotIds.Count == 0 ? allSlotIds : day.EnabledTimeSlotIds));
+        }, "期間内をすべて開校にしました");
+    }
+
+    private async void CalendarCloseWeekday_Click(object sender, RoutedEventArgs e)
+    {
+        var weekday = (DayOfWeek)CalendarWeekday.SelectedIndex;
+        await ExecuteAsync(async path =>
+        {
+            foreach (var day in _courseDays.Where(d => d.Date.DayOfWeek == weekday))
+                await App.CourseSettings.SaveCourseDayAsync(path, new CourseDay(day.Date, false, day.Note, day.EnabledTimeSlotIds));
+        }, "指定曜日を休校にしました");
+    }
+
+    private void CalendarSelectAll_Click(object sender, RoutedEventArgs e)
+    {
+        _selectedDates.Clear(); foreach (var day in _courseDays) _selectedDates.Add(day.Date);
+        RenderCourseDayCalendar(); RenderCalendarSlotToggles(); UpdateCalendarSelectionCount();
+    }
+
+    private void CalendarClearSelection_Click(object sender, RoutedEventArgs e)
+    {
+        _selectedDates.Clear();
+        RenderCourseDayCalendar(); RenderCalendarSlotToggles(); UpdateCalendarSelectionCount();
+    }
+
+    private async void CalendarOpenSelected_Click(object sender, RoutedEventArgs e) => await SetSelectedDatesOpenAsync(true);
+    private async void CalendarCloseSelected_Click(object sender, RoutedEventArgs e) => await SetSelectedDatesOpenAsync(false);
+
+    private async Task SetSelectedDatesOpenAsync(bool isOpen)
+    {
+        if (_selectedDates.Count == 0) { Show(InfoBarSeverity.Warning, "日付を選択してください", ""); return; }
+        var allSlotIds = _timeSlotItems.Where(x => x.Value.Active).Select(x => x.Value.Id).ToArray();
+        await ExecuteAsync(async path =>
+        {
+            foreach (var date in _selectedDates)
+            {
+                var day = _courseDays.First(d => d.Date == date);
+                var slots = isOpen && day.EnabledTimeSlotIds.Count == 0 ? allSlotIds : day.EnabledTimeSlotIds;
+                await App.CourseSettings.SaveCourseDayAsync(path, new CourseDay(day.Date, isOpen, isOpen ? day.Note : (string.IsNullOrEmpty(day.Note) ? "休校" : day.Note), slots));
+            }
+        }, $"選択した{_selectedDates.Count}日を{(isOpen ? "開校日" : "休校日")}に設定しました");
+    }
+
+    private void UpdateCalendarSelectionCount() => CalendarSelectionCount.Text = $"{_selectedDates.Count}件選択中";
 
     private async void TimeSlots_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)
     {
@@ -376,7 +513,9 @@ public sealed partial class SetupPage : WorkflowPageBase
             var slots = await App.CourseSettings.GetTimeSlotsAsync(path);
             _timeSlotItems.Clear();
             foreach (var item in slots.OrderBy(x => x.SortOrder).Select(x => new MasterItem<TimeSlot>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}　{x.StartTime:HH\\:mm}～{x.EndTime:HH\\:mm}"))) _timeSlotItems.Add(item);
-            CourseDays.ItemsSource = (await App.CourseSettings.GetCourseDaysAsync(path)).Select(x => new CourseDayItem(x.Date, x.IsOpen ? "開校" : "休校", x.IsOpen ? $"{x.EnabledTimeSlotIds.Count}コマ" : "-", x.Note)).ToArray();
+            _courseDays = (await App.CourseSettings.GetCourseDaysAsync(path)).OrderBy(x => x.Date).ToArray();
+            _selectedDates.IntersectWith(_courseDays.Select(x => x.Date));
+            RenderCourseDayCalendar(); RenderCalendarSlotToggles(); UpdateCalendarSelectionCount();
         }
         finally{_loading=false;}
     }
@@ -394,6 +533,5 @@ public sealed partial class SetupPage : WorkflowPageBase
 
     private void Show(InfoBarSeverity severity, string title, string message) { Status.Severity = severity; Status.Title = title; Status.Message = message; Status.IsOpen = true; }
 
-    private sealed record CourseDayItem(DateOnly Date, string StatusLabel, string SlotSummary, string Note);
     private sealed record MasterItem<T>(T Value,string Display){public override string ToString()=>Display;}
 }

@@ -47,11 +47,30 @@
                 </Grid><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="SlotActive" Content="有効" IsChecked="True"/><Button Content="新規入力" Click="NewSlot_Click"/></StackPanel>
                 <TextBlock Text="一覧をドラッグすると表示順を並べ替えられます。" TextWrapping="Wrap"/>
                 <ListView x:Name="TimeSlots" SelectionChanged="TimeSlots_SelectionChanged" CanReorderItems="True" AllowDrop="True" DragItemsCompleted="TimeSlots_DragItemsCompleted"/>
-                <TextBlock Margin="0,12,0,0" FontSize="18" FontWeight="SemiBold" Text="開校日・休校日"/>
-                <TextBlock Text="日付を選び、開校または休校へ切り替えます。「開校」は現在有効な全コマをその日に設定します。複数日を選ぶと一括で切り替えられます。" TextWrapping="Wrap"/>
-                <TextBox x:Name="CourseDayNote" Width="420" Header="備考（空欄なら既定値を使用）"/>
-                <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="開校（全コマ）" Click="SetOpenDay_Click"/><Button Content="休校" Click="SetClosedDay_Click"/></StackPanel>
-                <ListView x:Name="CourseDays" SelectionMode="Extended" SelectionChanged="CourseDays_SelectionChanged"><ListView.ItemTemplate><DataTemplate><StackPanel Orientation="Horizontal" Spacing="12"><TextBlock Width="120" Text="{Binding Date}"/><TextBlock Width="60" Text="{Binding StatusLabel}"/><TextBlock Text="{Binding SlotSummary}"/></StackPanel></DataTemplate></ListView.ItemTemplate></ListView>
+                <TextBlock Margin="0,12,0,0" FontSize="18" FontWeight="SemiBold" Text="開校日・休校日カレンダー"/>
+                <TextBlock x:Name="CourseDayPeriodLabel" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                <TextBlock Text="日付をクリックまたはチェックで選び、下の一括操作かコマのチェックで反映します。変更はすぐに保存されます。" TextWrapping="Wrap"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="期間内をすべて開校" Click="CalendarOpenAll_Click"/>
+                    <ComboBox x:Name="CalendarWeekday" Width="110" SelectedIndex="0"><ComboBoxItem Content="日曜日"/><ComboBoxItem Content="月曜日"/><ComboBoxItem Content="火曜日"/><ComboBoxItem Content="水曜日"/><ComboBoxItem Content="木曜日"/><ComboBoxItem Content="金曜日"/><ComboBoxItem Content="土曜日"/></ComboBox>
+                    <Button Content="指定曜日を休校" Click="CalendarCloseWeekday_Click"/>
+                    <Button Content="すべて選択" Click="CalendarSelectAll_Click"/>
+                    <Button Content="選択解除" Click="CalendarClearSelection_Click"/>
+                    <TextBlock x:Name="CalendarSelectionCount" VerticalAlignment="Center" Text="0件選択中"/>
+                    <Button Content="選択日を休校" Click="CalendarCloseSelected_Click"/>
+                    <Button Content="選択日を開校" Click="CalendarOpenSelected_Click" Style="{StaticResource AccentButtonStyle}"/>
+                </StackPanel>
+                <Border Padding="10" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="選択日に使用するコマ"/>
+                        <StackPanel x:Name="CalendarSlotTogglePanel" Orientation="Horizontal" Spacing="8"/>
+                        <Button Content="全コマ" Click="CalendarAllSlots_Click"/>
+                    </StackPanel>
+                </Border>
+                <Grid x:Name="CalendarWeekdayHeader" ColumnSpacing="2"/>
+                <ScrollViewer MaxHeight="440" HorizontalScrollBarVisibility="Disabled">
+                    <Grid x:Name="CourseDayCalendar" ColumnSpacing="2" RowSpacing="2"/>
+                </ScrollViewer>
             </StackPanel></TabViewItem>
         </TabView>
     </StackPanel></ScrollViewer>
