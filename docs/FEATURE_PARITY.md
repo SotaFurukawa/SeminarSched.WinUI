@@ -22,6 +22,7 @@
 | 通常授業・担当優先度 | regular lesson profile | 管理UI・SQLite upsert・優先度1〜5・1対1必須 | 実装済み | |
 | 受講希望・個別編集 | lesson request (StudentId,SubjectId)単位upsert | 「担当設定」タブへ受講希望の個別登録・編集・削除UIを追加（必要授業回数・通常担当講師＋優先度・第1〜3希望講師・1対1必須・最大連続コマ数上書き・空きコマ許可上書き・備考の全項目）。一覧から選択すると値を読み込んで編集できる。共通基本情報Excelでの一括編集も引き続き利用可能 | 実装済み | |
 | 共通基本情報Excel | master Excel service | 5sheet出力・全行preview・SHA再確認・transaction upsert・原本snapshot。講師対応科目・受講希望シートの全FK列（講師ID・科目コード・生徒ID・通常担当/希望講師ID）へ、ID/コード列自体のdropdown、名前選択dropdown（選択すると数式で自動的にIDへ変換）、確認用の逆引き名前列を追加（Python版の名前選択helper列を移植） | 実装済み | |
+| 共通名簿Excel（年度をまたぐ生徒・講師_基本情報） | shared_roster.py | `生徒・講師_基本情報.xlsx`（生徒/講師/科目/講師対応科目/通常授業の5sheet、姓名分割・学年Excel短縮コード）専用の`ISharedRosterImportService`を新設。全行preview・SHA再確認・transaction upsert・原本snapshotは共通基本情報Excelと同じ設計。①設定・プロジェクトタブに取込みボタンを追加 | 実装済み | 出力（write）機能はPython版にもあるが未移植（取込みのみ） |
 | 講習設定 | phase2 models/view model | 期間内日付・開校/休校・日別有効コマの保存UI。開校日一覧を複数選択可能にし、備考欄を追加。選択した全日付へ開校/休校と備考をまとめて適用する一括操作を実装 | 実装済み | |
 | コマ設定・並べ替え | phase2 UI/service | コマ追加・選択編集・使用停止・表示順・時刻範囲UI。一覧のdrag&dropで表示順を並べ替え、確定時にSortOrderをまとめて保存 | 実装済み | |
 | Google Forms作成kit | questionnaire script service | 設定値入りCode.gs・READMEのatomic生成UI。生徒フォームに学年ベースのpage分岐（小/中/高、科目をSchoolLevelから自動分類）と「他学年も受講する」分岐、特記事項・学力テスト希望を追加。講師指導可能科目用の別フォーム（`createTeacherQualificationForm`、学校段階別チェックボックス）を追加し、生徒・講師勤務可能日時・講師指導可能科目の3フォームを1つのCode.gsから生成するよう拡張 | 実装中 | 講師指導可能科目の回答は現状手動反映（自動列mapping・診断は未移植）。実際にGoogle上でスクリプトを実行しての動作確認は未実施（この環境からはGoogleへ到達できないため） |

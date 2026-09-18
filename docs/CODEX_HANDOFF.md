@@ -596,6 +596,27 @@ Feature Parity行「講師配布（学年順）」の残課題「A4サイズへ�
 - `docs/FEATURE_PARITY.md`の行47（manual/lock semantics）の備考に残っていた「Undo/Redoは未実装」という古い記述を削除（行48で実装済みであることを確認し修正、矛盾を解消）。
 - GitHub上に`v0.1.0`タグでDraft Releaseを作成した（公開はしない。ユーザーが内容を確認したうえで公開判断する）。
 
+### v0.1.0 checkpoint 55 (Claude)
+
+ユーザーが実際の本番データ（`生徒・講師_基本情報.xlsx`、F:ドライブ上）を取り込もうとしたところ、「受講希望 : 必須シートがありません。」という取込エラーで①〜③の作業が進められなくなった。
+
+**原因調査:** Python参照repoを調査し、Python版には別由来の2種類のExcel名簿形式が存在することを確認した。
+1. `master_data.xlsx`（共通基本情報Excel）— 生徒/講師/科目/講師対応科目/**受講希望**の5シート。既存`MasterDataWorkbookService`が対応する形式。
+2. `生徒・講師_基本情報.xlsx`（Python版`shared_roster.py`が生成する「年度をまたいで利用する」名簿）— 生徒/講師/科目/講師対応科目/**通常授業**の5シート（受講希望ではなく通常授業を含む）。姓・名を分けて入力し「氏名（確認）」列で確認する方式、学年はExcel短縮コード（S1〜S6/J1〜J3/H1〜H3）で保存され内部表記（小1〜小6等）への変換が必要、ID列はPython側の名前選択helper列による数式で解決済みの値としてそのまま保存されている。
+
+ユーザーの実ファイルは②の形式であり、①の形式しか読めない既存importerでは必須シート「受講希望」が見つからず失敗していた。
+
+**実装内容:**
+- `ISharedRosterImportService`（Application層、新規）・`SharedRosterImportService`（Infrastructure層、新規）を追加し、②の形式を専用に検証・取込みできるようにした。既存`MasterDataWorkbookService`と同じ設計（SHA256によるpreview/apply間の変更検知、transaction＋rollback、`ImportBatch`/`ImportSourceSnapshot`/`AuditLog`への証跡保存）を踏襲し、`ImportType='shared_roster'`で区別している。
+- ヘッダーの正規化を「最初の全角`（`より前だけを採用」という汎用ルールにした（Python側の注記パターンが`（必須）`・`（自動・入力不要）`・`（確認）`等多様なため、既存の`（必須）`限定除去より汎用化）。
+- 学年変換は`GradeFromExcelCode`辞書（Python版`domain/grades.py`の`grade_from_excel`相当）で実装。既に内部表記の値が来た場合はそのまま通す。
+- `RegularLessonProfile`向けに`UpsertRegularLessonsAsync`を新設（`SqliteMasterDataRepository`の同テーブル向けupsert SQLパターンを踏襲）。
+- `App.xaml.cs`へ`App.SharedRosterImport`を登録。`SetupPage`（①設定・プロジェクトタブ）へ「共通名簿Excel（生徒・講師_基本情報）」セクションと「共通名簿Excelを検証して取込み」ボタンを追加し、既存の共通基本情報Excelの取込みダイアログと同じUXパターン（preview→確認dialog→反映）で実装した。
+- 新規テスト（`SharedRosterImportServiceTests.cs`、架空データのみ使用）: 実ファイルと同じヘッダー構造の5シートを組み立てて全件取込み・学年変換（"J2"→"中2"）を検証するテスト、および「通常授業」シート欠落を正しく検出し「受講希望」を要求しないことを確認するテスト。
+- Release/x64 build: warning 0 / error 0。全105 tests passed。Privacy gate成功。
+
+**未解決・次回の課題:** ユーザーのF:ドライブには実際にPython版で使っていたGoogleフォームの生の回答CSV（`2026夏期講習 個別指導受講申込 回答原本...csv`等）もあり、これをC#版へ直接取り込む機能（Python版`application/course_survey_service.py`相当、990行規模の実機能）はまだ移植していない。次回はこの生CSV importerの移植に着手する必要がある。また、`C:\Users\sota1\AppData\Local\SummerScheduler`（ユーザー実機のPython版インストール先）は参考情報として提示されたが、まだ調査していない。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`
