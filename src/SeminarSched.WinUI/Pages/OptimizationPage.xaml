@@ -86,10 +86,18 @@
                             <TextBlock FontWeight="SemiBold" Text="未配置"/>
                             <ListView x:Name="UnplacedList" MaxHeight="480" CanDragItems="True" DragItemsStarting="UnplacedList_DragItemsStarting"/>
                         </StackPanel>
-                        <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="480">
+                        <ScrollViewer x:Name="BoardScroll" Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="480" ViewChanged="BoardScroll_ViewChanged">
                             <Grid x:Name="BoardGrid"/>
                         </ScrollViewer>
                     </Grid>
+                    <TextBlock Margin="0,12,0,0" FontSize="16" FontWeight="SemiBold" Text="複数コマ・複数講師の出勤可否を一括設定"/>
+                    <TextBlock Text="表示中の講師とこの日のコマをそれぞれ複数選び、まとめて出勤可否を切り替えます。" TextWrapping="Wrap"/>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4"><TextBlock Text="講師"/><ListView x:Name="BulkAvailabilityTeachers" SelectionMode="Multiple" MaxHeight="160" DisplayMemberPath="Label"/></StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="コマ"/><ListView x:Name="BulkAvailabilitySlots" SelectionMode="Multiple" MaxHeight="160" DisplayMemberPath="Label"/></StackPanel>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="選択を出勤不可にする" Click="BulkSetUnavailable_Click"/><Button Content="選択を出勤可能にする" Click="BulkSetAvailable_Click"/></StackPanel>
                 </StackPanel>
             </Border>
         </StackPanel>

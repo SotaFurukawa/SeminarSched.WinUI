@@ -67,7 +67,7 @@ public sealed class ExcelScheduleReportRenderer
         roster.Cell(row,1).Value="通常担当";roster.Cell(row,1).Style.Font.Bold=true;row++;
         foreach(var line in regular){roster.Cell(row,1).Value=line;row++;}
         row++;
-        roster.Cell(row,1).Value="講習担当（その他）";roster.Cell(row,1).Style.Font.Bold=true;row++;
+        roster.Cell(row,1).Value="講習担当";roster.Cell(row,1).Style.Font.Bold=true;row++;
         foreach(var line in others){roster.Cell(row,1).Value=line;row++;}
         roster.Column(1).AdjustToContents();
 

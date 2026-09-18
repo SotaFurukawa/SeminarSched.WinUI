@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `77c8a14`（v0.1.0 checkpoint 47, ⑥出力の個別file選択・OSアプリで開くUI）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
+Latest Development Checkpoint: checkpoint 48（講師配布roster「その他」区分の廃止、⑤時間割エディタの複数コマ×複数講師出勤可否一括設定・header/row scroll同期）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -485,6 +485,21 @@ Feature Parity行55「atomic export・上書き確認」の残課題「個別fil
 - 「選択したファイルを開く」ボタンで`Windows.Storage.StorageFile.GetFileFromPathAsync`＋`Windows.System.Launcher.LaunchFileAsync`によりOSの既定アプリ（Excel/PDFビューアなど）でファイルを開く。「出力フォルダーを開く」ボタンで同様にエクスプローラーを開く。
 - WinUI/UWPのLauncher APIはアプリ内蔵のpreview機能ではなく「OSの既定アプリに委譲する」設計のため、独自のExcel/PDFプレビューア実装は行わず、確実に動作するこの方式を採用した。
 - UI層のみの変更でサービス層に変更なし。Release/x64 build: warning 0 / error 0。全93 tests passed。Privacy gate成功。
+
+### v0.1.0 checkpoint 48 (Claude)
+
+ユーザーより2つの指示を受けた: (1)講師配布roster区分は元々「通常担当分」⇒「講習担当分」⇒「その他」の3区分だったが、「その他」は廃止し「通常担当分」⇒「講習担当分」の2区分のみでよいという明示的な方針決定。(2)⑤時間割エディタ（OptimizationPage）を、実機確認をしながら進めてよい（実機確認＝実際にアプリを起動して確認することを指す。ユーザーが離席する間はアプリを起動したまま他の作業を進めてよい、との許可）。
+
+**講師配布roster「その他」区分の廃止:**
+- `ExcelScheduleReportRenderer.RenderTeacherPacket`のroster区分見出しを「講習担当（その他）」から「講習担当」へ変更（実装は元々2区分だったが紛らわしいラベルが残っていたため修正）。
+- `SqliteOutputPackageServiceTests`の対応するアサーションを新しいラベルへ更新。Feature Parityの該当行の文言も2区分構成が最終仕様であることを明記するよう更新。
+
+**⑤時間割エディタ「日別グリッド編集」の残課題2件:**
+- Feature Parity行「検索・scroll同期」の残課題「header/row/grid間のscroll同期」を実装。グリッドの見出し行（講師名）・見出し列（コマ名）は本体セルと同じ`BoardGrid`（単一Grid、単一ScrollViewer）内にあるため、行・列を複製せず、見出しセルへ`TranslateTransform`（`_columnHeaderTransform`/`_rowHeaderTransform`/`_cornerTransform`）を適用し、`ScrollViewer.ViewChanged`で毎回オフセット分だけ逆方向へ平行移動させることで「見出しが常に画面内に固定表示される」Excelのウィンドウ枠固定に相当する見た目を実現した。見出しセルは`Canvas.SetZIndex`で本体セルより手前に描画し、不透明な背景色を設定してスクロールしてきた本体セルが透けないようにした（行・列の高さ/幅を複製grid間で同期させる必要がある従来手法より単純で、ずれのリスクが低い設計）。
+- Feature Parity行「講師一時表示・availability編集」の残課題「一括操作（複数コマ・複数講師まとめて設定）」を実装。`IScheduleEditorService.SetTeacherUnavailableManyAsync(path, openDateId, targets, unavailable)`を新設し、単一の`SetTeacherUnavailableAsync`はこれへ単一要素collectionを渡す委譲とした。実装は複数の(講師,コマ)組を単一transaction内で検証・適用し、途中で「既に配置がある」組が見つかった場合は例外をthrowして全体をrollbackする（部分適用を防止、checkpoint 44の`SetLevelsAsync`と同じ設計方針）。UIには講師・コマをそれぞれ複数選択できるListViewと「出勤不可/出勤可能にする」ボタンを追加した。
+- 新規テスト`SetTeacherUnavailableManyAsync_AppliesAllPairsInOneCallAndRollsBackOnConflict`で、複数組の一括適用と、一部が競合する場合に全体がrollbackされることを検証した。
+- **実機未確認事項**: この環境にはWinUIアプリを視覚的に操作・確認する手段（スクリーンショット・UI自動化ツール）が無いため、上記2機能（見出し固定表示の見た目、複数選択ListViewの操作感）はビルド成功・自動テスト成功のみで、実際の画面表示・ドラッグ操作感はユーザー自身の実機確認が必要。アプリを起動した状態で待機し、ユーザーに確認を依頼した。
+- Release/x64 build: warning 0 / error 0。全94 tests passed（新規1件）。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 

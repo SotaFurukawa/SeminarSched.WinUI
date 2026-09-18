@@ -44,13 +44,13 @@
 | drag/drop手動配置 | schedule edit service | カードのドラッグでセル間移動、未配置一覧からドラッグで新規配置。`MoveAsync`が資格・衝突・空き時間・講師上限をhard constraintとして再検証し、ロック済みは移動不可 | 実装中 | 実機での目視確認は未実施（ビルド・自動テストのみ確認） |
 | manual/lock semantics | manual edit tests | ④固定Assignment追加・解除UI、可否/資格/同時2名/1対1/必要回数検証。⑤に手動配置追加/削除/移動・ロック切替・自動配置だけリセットUIを追加し、`IsManual`は再最適化時も`IsLocked`と同様に保持・候補除外・AuditLog記録 | 実装中 | Undo/Redoは未実装 |
 | Undo/Redo | command stack | ⑤へ「元に戻す」「やり直す」を追加。Assignment/TeacherUnavailability全体のスナップショットをmemory上のstackで管理し、自動作成・手動編集すべての操作をカバー | 実装中 | process内のみ（再起動で消える）。粒度は操作単位ではなくテーブル全体のsnapshot |
-| 講師一時表示・availability編集 | editor UI/service | グリッドの「+講師を表示」で全コマ不可の講師も列表示でき、セル右上の丸/バツで`TeacherUnavailability`を切替。既存配置があるセルは不可へ変更不可 | 実装中 | 一括操作（複数コマ・複数講師まとめて設定）は未実装 |
-| 検索・scroll同期 | editor QML | 生徒名検索でグリッド内カードをハイライト表示 | 実装中 | header/row/grid間のscroll同期は未実装 |
+| 講師一時表示・availability編集 | editor UI/service | グリッドの「+講師を表示」で全コマ不可の講師も列表示でき、セル右上の丸/バツで`TeacherUnavailability`を切替。既存配置があるセルは不可へ変更不可。複数講師×複数コマを選択し出勤可否をまとめて設定する一括操作を追加（`SetTeacherUnavailableManyAsync`、単一transactionで一部競合時は全体rollback） | 実装済み | 実機でのUI操作感（ListView多重選択の使い勝手）は未確認 |
+| 検索・scroll同期 | editor QML | 生徒名検索でグリッド内カードをハイライト表示。見出し行（講師名）・見出し列（コマ名）を`TranslateTransform`でscroll位置に応じて逆方向へ平行移動させ、常に画面内に固定表示されるようにした（Excelのウィンドウ枠固定相当の見た目） | 実装済み | 実機での見た目（固定表示が正しく機能しているか）は未確認 |
 | 未配置・警告 | diagnostics/output | ⑥出力へ未配置一覧に加え、通常担当優先度の目標割合（5=100%〜2=25%）を下回る生徒・科目・不足回数を「通常担当不足」として出力 | 実装中 | 学年別上限超過などその他の診断種別は未移植 |
 | 全体時間割Excel/PDF | reporting/output service | 日曜始まり・土曜終わりの週単位、休校日を除いた日付を横に並べ、その日に配置がある講師だけを列として表示するgrid形式（`OverviewGridLayout`共通レイアウト）。コマを行、各セルへ学年・科目略称・生徒名を表示。配置が無いコマのうち、その講師がその日その時間帯に出勤不可（`TeacherUnavailability`）であるセルをExcel/PDF双方でgray表示 | 実装中 | 1セル最大2名の表示は横分割ではなく縦積み（同一セル内で改行） |
 | 生徒配布時間割Excel/PDF | reporting renderers | 生徒別sheet・PDF sectionを日曜始まり・土曜終わりの週calendar形式で生成（`WeeklyCalendarLayout`共通レイアウト）。講習に一度も参加しない生徒は個別calendarを作らず「講習欠席一覧」へ学年・氏名で一覧化 | 実装中 | セル内の科目略称・時刻の細かい書式はPython版と完全一致ではない |
 | 講師配布（学年順） | reporting renderers | 生徒sheetを学年・氏名順に生成。生徒名は姓のみ表示、同姓がいる場合だけ名の先頭1文字を付与 | 実装中 | A4サイズへの厳密な収まり調整は未検証 |
-| 講師配布（講師別） | reporting renderers | 講師別sheet・PDF sectionを週calendar形式で生成に加え、出力folder内に「講師別」sub folderを作り、講師ごとに`{講師名}t.xlsx`という個別ファイルを生成（担当一覧sheet＝通常担当を先に列挙→講習担当、時間割sheet＝週calendar） | 実装中 | 「その他」区分の1ページ4名レイアウトはExcel向けのため未実装。PDF個別ファイルは未対応（共通PDFのsectionのみ） |
+| 講師配布（講師別） | reporting renderers | 講師別sheet・PDF sectionを週calendar形式で生成に加え、出力folder内に「講師別」sub folderを作り、講師ごとに`{講師名}t.xlsx`という個別ファイルを生成（担当一覧sheet＝通常担当分→講習担当分の2区分で列挙、時間割sheet＝週calendar）。Python版にあった「その他」区分（3区分目）はユーザー指示により意図的に廃止し、通常担当分・講習担当分の2区分のみとする方針を確定 | 実装中 | PDF個別ファイルは未対応（共通PDFのsectionのみ） |
 | 未配置・警告一覧出力 | output service | 未配置回数・通常担当不足をExcel/PDFへ出力 | 実装中 | Python版のその他診断種別は未移植 |
 | atomic export・上書き確認 | output service | integrity再確認・新規一時folder・上書きなし。出力完了後、生成された全体時間割Excel/PDF・講師別個別fileの一覧を表示し、選択したfileや出力folderをOSの既定アプリで開けるUIを追加 | 実装済み | |
 | 設定・logging | settings/logging | `IAppLogger`/`FileAppLogger`を追加。`%LocalAppData%\SeminarSched.WinUI\logs\app-yyyyMMdd.log`へ日次でoperational logを記録（14日保持で自動削除）、未処理例外もWinUIの`UnhandledException`経由で記録。project作成/open/close/backup/restore、時間割自動作成、出力実行のログを追加。件数・成否のみでファイルパスや生徒・講師名は一切記録しない | 実装中 | project/import/scheduling以外の操作（①設定の個別保存など）はまだログ未対象。UIからログ閲覧・エクスポートする画面はない |

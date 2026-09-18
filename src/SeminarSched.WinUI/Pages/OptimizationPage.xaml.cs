@@ -21,6 +21,9 @@ public sealed partial class OptimizationPage : Page
     private readonly Stack<ScheduleSnapshot> _redoStack = new();
     private ScheduleBoard? _currentBoard;
     private long? _selectedDateId;
+    private readonly TranslateTransform _columnHeaderTransform = new();
+    private readonly TranslateTransform _rowHeaderTransform = new();
+    private readonly TranslateTransform _cornerTransform = new();
     private sealed record CellTag(long TimeSlotId, long TeacherId, bool Blocked);
 
     public OptimizationPage()
@@ -169,9 +172,12 @@ public sealed partial class OptimizationPage : Page
         if (_currentBoard is not { } board || board.Slots.Count == 0)
         {
             BoardGrid.Children.Add(new TextBlock { Text = "この日は開講コマがありません。", Margin = new Thickness(8) });
+            BulkAvailabilityTeachers.ItemsSource = null; BulkAvailabilitySlots.ItemsSource = null;
             return;
         }
         var search = BoardSearch.Text?.Trim() ?? "";
+        BulkAvailabilityTeachers.ItemsSource = board.Teachers;
+        BulkAvailabilitySlots.ItemsSource = board.Slots;
 
         BoardGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         foreach (var _ in board.Slots) BoardGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -185,20 +191,50 @@ public sealed partial class OptimizationPage : Page
             BoardGrid.Children.Add(element);
         }
 
-        Place(new TextBlock(), 0, 0);
+        // Header row/column stay pinned in the viewport while the body scrolls underneath: each header
+        // cell counter-translates by the scroll offset (set in BoardScroll_ViewChanged) and renders above
+        // the body cells via a higher ZIndex, with an opaque background so scrolled content doesn't show through.
+        var headerBackground = ResourceBrush("CardBackgroundFillColorDefaultBrush", Color.FromArgb(255, 250, 250, 250));
+        Border HeaderCell(FrameworkElement content, TranslateTransform transform) => new()
+        {
+            Background = headerBackground,
+            Padding = new Thickness(4),
+            RenderTransform = transform,
+            Child = content,
+        };
+
+        var corner = HeaderCell(new TextBlock(), _cornerTransform);
+        Canvas.SetZIndex(corner, 2);
+        Place(corner, 0, 0);
         for (var c = 0; c < board.Teachers.Count; c++)
-            Place(new TextBlock { Text = board.Teachers[c].Label, FontWeight = FontWeights.SemiBold, Margin = new Thickness(4), TextWrapping = TextWrapping.Wrap }, 0, c + 1);
+        {
+            var header = HeaderCell(new TextBlock { Text = board.Teachers[c].Label, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap }, _columnHeaderTransform);
+            Canvas.SetZIndex(header, 1);
+            Place(header, 0, c + 1);
+        }
 
         for (var r = 0; r < board.Slots.Count; r++)
         {
             var slot = board.Slots[r];
-            Place(new TextBlock { Text = slot.Label, FontWeight = FontWeights.SemiBold, Margin = new Thickness(4), VerticalAlignment = VerticalAlignment.Center }, r + 1, 0);
+            var header = HeaderCell(new TextBlock { Text = slot.Label, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center }, _rowHeaderTransform);
+            Canvas.SetZIndex(header, 1);
+            Place(header, r + 1, 0);
             for (var c = 0; c < board.Teachers.Count; c++)
             {
                 var teacher = board.Teachers[c];
                 Place(CreateCell(slot.TimeSlotId, teacher.TeacherId, board.Cell(slot.TimeSlotId, teacher.TeacherId), search), r + 1, c + 1);
             }
         }
+        _columnHeaderTransform.Y = BoardScroll.VerticalOffset;
+        _rowHeaderTransform.X = BoardScroll.HorizontalOffset;
+        _cornerTransform.X = BoardScroll.HorizontalOffset; _cornerTransform.Y = BoardScroll.VerticalOffset;
+    }
+
+    private void BoardScroll_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
+    {
+        _columnHeaderTransform.Y = BoardScroll.VerticalOffset;
+        _rowHeaderTransform.X = BoardScroll.HorizontalOffset;
+        _cornerTransform.X = BoardScroll.HorizontalOffset; _cornerTransform.Y = BoardScroll.VerticalOffset;
     }
 
     private Border CreateCell(long timeSlotId, long teacherId, BoardCell? cell, string search)
@@ -263,6 +299,20 @@ public sealed partial class OptimizationPage : Page
     {
         if (sender is not Button { Tag: CellTag cell } || App.ProjectService.Current?.Path is not { } path || _selectedDateId is not { } dateId) return;
         await ExecuteEditorAsync(() => App.ScheduleEditor.SetTeacherUnavailableAsync(path, cell.TeacherId, dateId, cell.TimeSlotId, !cell.Blocked), cell.Blocked ? "出勤可能にしました" : "出勤不可にしました");
+    }
+
+    private async void BulkSetUnavailable_Click(object sender, RoutedEventArgs e) => await BulkSetTeacherAvailabilityAsync(true);
+    private async void BulkSetAvailable_Click(object sender, RoutedEventArgs e) => await BulkSetTeacherAvailabilityAsync(false);
+
+    private async Task BulkSetTeacherAvailabilityAsync(bool unavailable)
+    {
+        if (App.ProjectService.Current?.Path is not { } path || _selectedDateId is not { } dateId) return;
+        var teachers = BulkAvailabilityTeachers.SelectedItems.Cast<BoardTeacherColumn>().ToArray();
+        var slots = BulkAvailabilitySlots.SelectedItems.Cast<BoardSlotRow>().ToArray();
+        if (teachers.Length == 0 || slots.Length == 0) { ShowEditorError("講師とコマをそれぞれ1件以上選択してください。"); return; }
+        var targets = teachers.SelectMany(teacher => slots.Select(slot => (teacher.TeacherId, slot.TimeSlotId))).ToArray();
+        await ExecuteEditorAsync(() => App.ScheduleEditor.SetTeacherUnavailableManyAsync(path, dateId, targets, unavailable),
+            $"{teachers.Length}名×{slots.Length}コマを{(unavailable ? "出勤不可" : "出勤可能")}にしました");
     }
 
     private void Cell_DragOver(object sender, DragEventArgs e)

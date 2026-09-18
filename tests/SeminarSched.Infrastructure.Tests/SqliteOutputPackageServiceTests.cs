@@ -107,7 +107,7 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         Assert.True(File.Exists(substituteFile));
         using var substituteWorkbook=new ClosedXML.Excel.XLWorkbook(substituteFile);
         var roster=substituteWorkbook.Worksheet("担当一覧");
-        Assert.Contains(roster.CellsUsed(),cell=>cell.GetString()=="講習担当（その他）");
+        Assert.Contains(roster.CellsUsed(),cell=>cell.GetString()=="講習担当");
         Assert.Contains(roster.CellsUsed(),cell=>cell.GetString().Contains("架空") && cell.GetString().Contains("数"));
         Assert.True(substituteWorkbook.Worksheets.Contains("時間割"));
     }

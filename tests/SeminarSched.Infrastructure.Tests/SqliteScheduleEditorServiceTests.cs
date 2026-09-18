@@ -102,6 +102,23 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SetTeacherUnavailableManyAsync_AppliesAllPairsInOneCallAndRollsBackOnConflict()
+    {
+        var state=await CreateBoardStateAsync();var editor=new SqliteScheduleEditorService();
+
+        await editor.SetTeacherUnavailableManyAsync(state.Path,state.DateId,[(state.Teacher1Id,state.Slot1Id),(state.Teacher1Id,state.Slot2Id),(state.Teacher2Id,state.Slot1Id),(state.Teacher2Id,state.Slot2Id)],true);
+        var board=await editor.GetBoardAsync(state.Path,state.DateId,[state.Teacher1Id,state.Teacher2Id]);
+        Assert.True(board.Cell(state.Slot1Id,state.Teacher1Id)!.Blocked);Assert.True(board.Cell(state.Slot2Id,state.Teacher1Id)!.Blocked);
+        Assert.True(board.Cell(state.Slot1Id,state.Teacher2Id)!.Blocked);Assert.True(board.Cell(state.Slot2Id,state.Teacher2Id)!.Blocked);
+
+        await editor.SetTeacherUnavailableManyAsync(state.Path,state.DateId,[(state.Teacher1Id,state.Slot1Id),(state.Teacher1Id,state.Slot2Id),(state.Teacher2Id,state.Slot1Id),(state.Teacher2Id,state.Slot2Id)],false);
+        await editor.AddManualAsync(state.Path,state.RequestId,state.Teacher1Id,state.DateId,state.Slot1Id,false);
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>editor.SetTeacherUnavailableManyAsync(state.Path,state.DateId,[(state.Teacher2Id,state.Slot2Id),(state.Teacher1Id,state.Slot1Id)],true));
+        var afterFailure=await editor.GetBoardAsync(state.Path,state.DateId,[state.Teacher1Id,state.Teacher2Id]);
+        Assert.False(afterFailure.Cell(state.Slot2Id,state.Teacher2Id)!.Blocked);
+    }
+
+    [Fact]
     public async Task SnapshotRoundTrip_RestoresPriorAssignmentsAndUnavailability()
     {
         var state=await CreateBoardStateAsync();var editor=new SqliteScheduleEditorService();

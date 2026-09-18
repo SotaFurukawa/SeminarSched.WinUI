@@ -166,25 +166,32 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
         => await new SqliteFixedLessonService().MoveAsync(projectPath,assignmentId,teacherId,openDateId,timeSlotId,cancellationToken).ConfigureAwait(false);
 
     public async Task SetTeacherUnavailableAsync(string projectPath,long teacherId,long openDateId,long timeSlotId,bool unavailable,CancellationToken cancellationToken=default)
+        => await SetTeacherUnavailableManyAsync(projectPath,openDateId,[(teacherId,timeSlotId)],unavailable,cancellationToken).ConfigureAwait(false);
+
+    public async Task SetTeacherUnavailableManyAsync(string projectPath,long openDateId,IReadOnlyCollection<(long TeacherId,long TimeSlotId)> targets,bool unavailable,CancellationToken cancellationToken=default)
     {
+        if(targets.Count==0)throw new InvalidOperationException("講師とコマを1件以上選択してください。");
         await using var connection=await OpenAsync(projectPath,cancellationToken).ConfigureAwait(false);await SqliteProjectSchema.EnsureCurrentAsync(connection,cancellationToken).ConfigureAwait(false);await using var transaction=(SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
-        if(unavailable)
+        foreach(var(teacherId,timeSlotId) in targets)
         {
-            await using var check=connection.CreateCommand();check.Transaction=transaction;check.CommandText="SELECT EXISTS(SELECT 1 FROM Assignment WHERE TeacherId=$teacher AND OpenDateId=$date AND TimeSlotId=$slot);";
-            check.Parameters.AddWithValue("$teacher",teacherId);check.Parameters.AddWithValue("$date",openDateId);check.Parameters.AddWithValue("$slot",timeSlotId);
-            if(Convert.ToInt64(await check.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!=0)
-                throw new InvalidOperationException("この日時には既に配置があります。先に配置を移動または削除してください。");
-            await using var insert=connection.CreateCommand();insert.Transaction=transaction;insert.CommandText="INSERT OR IGNORE INTO TeacherUnavailability(TeacherId,OpenDateId,TimeSlotId) VALUES($teacher,$date,$slot);";
-            insert.Parameters.AddWithValue("$teacher",teacherId);insert.Parameters.AddWithValue("$date",openDateId);insert.Parameters.AddWithValue("$slot",timeSlotId);
-            await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            if(unavailable)
+            {
+                await using var check=connection.CreateCommand();check.Transaction=transaction;check.CommandText="SELECT EXISTS(SELECT 1 FROM Assignment WHERE TeacherId=$teacher AND OpenDateId=$date AND TimeSlotId=$slot);";
+                check.Parameters.AddWithValue("$teacher",teacherId);check.Parameters.AddWithValue("$date",openDateId);check.Parameters.AddWithValue("$slot",timeSlotId);
+                if(Convert.ToInt64(await check.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!=0)
+                    throw new InvalidOperationException("この日時には既に配置がある講師が含まれています。先に配置を移動または削除してください。");
+                await using var insert=connection.CreateCommand();insert.Transaction=transaction;insert.CommandText="INSERT OR IGNORE INTO TeacherUnavailability(TeacherId,OpenDateId,TimeSlotId) VALUES($teacher,$date,$slot);";
+                insert.Parameters.AddWithValue("$teacher",teacherId);insert.Parameters.AddWithValue("$date",openDateId);insert.Parameters.AddWithValue("$slot",timeSlotId);
+                await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await using var delete=connection.CreateCommand();delete.Transaction=transaction;delete.CommandText="DELETE FROM TeacherUnavailability WHERE TeacherId=$teacher AND OpenDateId=$date AND TimeSlotId=$slot;";
+                delete.Parameters.AddWithValue("$teacher",teacherId);delete.Parameters.AddWithValue("$date",openDateId);delete.Parameters.AddWithValue("$slot",timeSlotId);
+                await delete.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
         }
-        else
-        {
-            await using var delete=connection.CreateCommand();delete.Transaction=transaction;delete.CommandText="DELETE FROM TeacherUnavailability WHERE TeacherId=$teacher AND OpenDateId=$date AND TimeSlotId=$slot;";
-            delete.Parameters.AddWithValue("$teacher",teacherId);delete.Parameters.AddWithValue("$date",openDateId);delete.Parameters.AddWithValue("$slot",timeSlotId);
-            await delete.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
-        await InsertAuditAsync(connection,transaction,"teacher_unavailability_changed",teacherId.ToString(CultureInfo.InvariantCulture),new{openDateId,timeSlotId,unavailable},cancellationToken).ConfigureAwait(false);
+        await InsertAuditAsync(connection,transaction,"teacher_unavailability_changed","bulk",new{openDateId,count=targets.Count,unavailable},cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
