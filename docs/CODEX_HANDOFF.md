@@ -680,6 +680,16 @@ checkpoint 55で共通名簿Excel（生徒・講師_基本情報.xlsx）を取�
 - カードのバッジ表示（①優先度5🔒✎⚠）・未配置カードの理由文・候補件数表示は未移植。
 - 再最適化後の差分表示（新規配置/日時変更/講師変更/未配置化）・監査ログの右ペイン表示は未移植。
 
+### v0.1.0 checkpoint 59 (Claude)
+
+checkpoint 58で追加したスタックトレース記録を活かし、実機ログに複数回残っていた`NullReferenceException`の原因調査を行った。
+
+**発見:** ④時間割編集・⑤時間割自動作成（`ScheduleEditorPage`/`OptimizationPage`）は`WorkflowPageBase`を継承しない素の`Page`のままで、画面全体を「プロジェクトが開かれているか」でガードしていなかった。⑤の実行ボタンだけは`IsEnabled`で個別に守られていたが、④の手動配置追加・削除・ロック切替・自動配置リセット・ドラッグ&ドロップセルなどは`App.ProjectService.Current!.Path`を直接force-unwrapしており、**プロジェクトを開いていない状態でこれらを操作すると確実に`NullReferenceException`で落ちる**ことをコードから確認した（実際にこの手順で再現させたわけではないが、他の全ページ（①②③⑥）を横断的に調査した結果、この2画面だけがこの種のガード漏れを持っていた唯一の箇所だった）。
+
+**対応:** 両ページを他の①②③⑥ページと同様に`WorkflowPageBase`へ変更し、`EnsureProject`で「プロジェクトを開いてください」のInfoBarを表示しつつ、操作可能な部分（`ScrollViewer`で包んだコンテンツ全体）を`IsEnabled=false`で無効化するよう統一した。`StackPanel`には`IsEnabled`が無い（`Control`ではなく`Panel`のため）ことに注意し、`ScrollViewer`（`ContentControl`派生）を無効化対象にした。
+
+**動作確認:** Release/x64 build警告0・エラー0、全114 tests passed、privacy gate成功。アプリの起動は確認したが、この特定の再現手順（プロジェクトを開かずに④⑤を操作する）をこの環境から対話的に実行して確認することはできていない。**次回ユーザーがこの操作を試して再発しないことを確認してほしい。** 再発する場合はcheckpoint 58で追加したスタックトレース付きログ（`%LocalAppData%\SeminarSched.WinUI\logs\app-yyyyMMdd.log`）を確認すること。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`
