@@ -64,6 +64,42 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetUnplacedSessionsAsync_ReportsReasonTextForZeroCandidateSessions()
+    {
+        var state=await CreateStateAsync();var editor=new SqliteScheduleEditorService();var master=new SqliteMasterDataRepository();
+
+        var subjectNoTeacher=await master.SaveSubjectAsync(state.Path,new Subject(0,"JH_NOTEACH","無資格科目","無資格","中学校",2));
+        long noTeacherRequestId;
+        await using(var connection=new SqliteConnection($"Data Source={state.Path};Pooling=False"))
+        {
+            await connection.OpenAsync();await using var command=connection.CreateCommand();
+            command.CommandText="INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions) SELECT 1,StudentId,$subject,1 FROM LessonRequest WHERE Id=$request;SELECT last_insert_rowid();";
+            command.Parameters.AddWithValue("$subject",subjectNoTeacher.Id);command.Parameters.AddWithValue("$request",state.RequestId);
+            noTeacherRequestId=Convert.ToInt64(await command.ExecuteScalarAsync());
+        }
+
+        var subjectOther=await master.SaveSubjectAsync(state.Path,new Subject(0,"JH_OTHER","他科目","他","中学校",3));
+        var teacherOther=await master.SaveTeacherAsync(state.Path,new Teacher(0,"T-OTHER","架空 他講師"));
+        await master.SaveQualificationAsync(state.Path,new TeacherQualification(teacherOther.Id,subjectOther.Id,true));
+        long otherRequestId;
+        await using(var connection=new SqliteConnection($"Data Source={state.Path};Pooling=False"))
+        {
+            await connection.OpenAsync();await using var command=connection.CreateCommand();
+            command.CommandText="INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions) SELECT 1,StudentId,$subject,1 FROM LessonRequest WHERE Id=$request;SELECT last_insert_rowid();";
+            command.Parameters.AddWithValue("$subject",subjectOther.Id);command.Parameters.AddWithValue("$request",state.RequestId);
+            otherRequestId=Convert.ToInt64(await command.ExecuteScalarAsync());
+        }
+        await editor.AddManualAsync(state.Path,otherRequestId,teacherOther.Id,state.DateId,state.SlotId,false);
+
+        var unplaced=await editor.GetUnplacedSessionsAsync(state.Path);
+        var noTeacher=Assert.Single(unplaced,u=>u.LessonRequestId==noTeacherRequestId);
+        Assert.Equal(0,noTeacher.CandidateCount);Assert.Equal("この科目を担当できる講師が設定されていません。",noTeacher.ReasonText);
+
+        var original=Assert.Single(unplaced,u=>u.LessonRequestId==state.RequestId);
+        Assert.Equal(0,original.CandidateCount);Assert.Equal("生徒の他の授業と重なるため配置できるコマがありません。",original.ReasonText);
+    }
+
+    [Fact]
     public async Task GetBoardAsync_PlacesCardsInCorrectCellAndListsUnplaced()
     {
         var state=await CreateBoardStateAsync();var editor=new SqliteScheduleEditorService();

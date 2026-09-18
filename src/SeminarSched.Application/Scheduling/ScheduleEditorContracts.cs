@@ -38,9 +38,9 @@ public sealed record ScheduleBoard(IReadOnlyList<BoardSlotRow> Slots, IReadOnlyL
 // 現時点で資格・空き時間の条件を満たす候補コマ数も表示する（講師の同時担当上限は候補数に含めない。
 // Python版のcandidateCountもsolverの候補生成と同じ定義=容量制約はsolver側の変数間制約であり
 // 候補列挙時点ではフィルタしないため、C#版もSqliteScheduleRunServiceの候補生成クエリをそのまま流用する）。
-public sealed record UnplacedSessionOption(long LessonRequestId, string Label, int Remaining, int CandidateCount)
+public sealed record UnplacedSessionOption(long LessonRequestId, string Label, int Remaining, int CandidateCount, string? ReasonText = null)
 {
-    public override string ToString() => $"{Label}　(残り{Remaining}回・候補{CandidateCount}枠{(CandidateCount == 0 ? "　⚠配置先なし" : "")})";
+    public override string ToString() => $"{Label}　(残り{Remaining}回・候補{CandidateCount}枠{(CandidateCount == 0 ? $"　⚠配置先なし：{ReasonText}" : "")})";
 }
 
 public sealed record AssignmentSnapshotRow(long Id, long LessonRequestId, long TeacherId, long OpenDateId, long TimeSlotId, bool IsLocked, string Source, int SessionIndex, long? OptimizationRunId, bool IsManual, string Note);
