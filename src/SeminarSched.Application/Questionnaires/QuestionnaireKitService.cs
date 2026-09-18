@@ -79,8 +79,10 @@ public sealed class QuestionnaireKitService
         function createSeminarSchedForms() {
           const student = createStudentForm();
           const teacher = createTeacherForm();
+          const teacherQualification = createTeacherQualificationForm();
           Logger.log('生徒回答URL: ' + student.getPublishedUrl());
           Logger.log('講師回答URL: ' + teacher.getPublishedUrl());
+          Logger.log('講師指導可能科目回答URL: ' + teacherQualification.getPublishedUrl());
         }
 
         function createStudentForm() {
@@ -152,6 +154,18 @@ public sealed class QuestionnaireKitService
               .setChoiceValues(CONFIG.timeSlots.map(x => x.code + ' ' + x.displayName + ' ' + x.start + '-' + x.end));
           });
         }
+
+        // Separate from createTeacherForm (availability) because qualification only needs to be
+        // collected once per teacher, not re-sent every time availability is surveyed.
+        function createTeacherQualificationForm() {
+          const form = FormApp.create('季節講習 講師指導可能科目アンケート');
+          form.addTextItem().setTitle('講師ID').setRequired(true);
+          addSubjectCheckboxIfAny(form, '指導可能科目（小学校）', CONFIG.subjectsByLevel.elementary);
+          addSubjectCheckboxIfAny(form, '指導可能科目（中学校）', CONFIG.subjectsByLevel.juniorHigh);
+          addSubjectCheckboxIfAny(form, '指導可能科目（高等学校）', CONFIG.subjectsByLevel.seniorHigh);
+          addSubjectCheckboxIfAny(form, '指導可能科目（その他）', CONFIG.subjectsByLevel.other);
+          return form;
+        }
         """;
 
     private const string Readme = """
@@ -160,7 +174,7 @@ public sealed class QuestionnaireKitService
         1. script.google.com で新しいプロジェクトを作成します。
         2. Code.gs の内容をすべて貼り付けます。
         3. createSeminarSchedForms を実行し、Googleの権限を承認します。
-        4. 実行ログに表示された生徒用・講師用回答URLを配布します。
-        5. 回答をCSVまたはXLSXで保存し、SeminarSchedの③アンケート取込みで読み込みます。
+        4. 実行ログに表示された生徒用・講師用（勤務可能日時）・講師指導可能科目用の3つの回答URLを配布します。講師指導可能科目は毎回の講習期間ごとではなく、初回または科目構成が変わった時のみ配布すれば十分です。
+        5. 生徒・講師（勤務可能日時）の回答をCSVまたはXLSXで保存し、SeminarSchedの③アンケート取込みで読み込みます。講師指導可能科目の回答は①設定の「担当設定」タブへ手動で反映してください（自動取込みは今後の課題です）。
         """;
 }

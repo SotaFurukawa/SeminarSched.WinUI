@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `ff133bc`（v0.1.0 checkpoint 44, availability複数日付×複数コマ一括適用）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
+Latest Development Checkpoint: checkpoint 45（講師指導可能科目用の別Google Formsを生成kitへ追加）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -456,6 +456,16 @@ Feature Parity行30「availability一括編集」の残課題「複数日付・�
 - `ImportPage`（③アンケート取込み）の可用性手動編集セクションへ「複数日付・複数コマへ一括適用」を新設。日付・コマをそれぞれ複数選択できるListViewと値ComboBoxを追加し、選択済みの対象（生徒/講師）×全日付×全コマの組み合わせへ一括適用するボタンを設けた。コマの選択肢は`App.CourseSettings.GetTimeSlotsAsync`から取得した有効な全コマ（特定の日付に限定しない）とし、日付ごとの開講状況の妥当性はサービス層の`SetLevelsAsync`が検証する。
 - 新規テスト2件（`SqliteAvailabilityMatrixServiceTests.cs`）: `SetLevelsAsync_AppliesToEveryDateAndSlotCombinationInOneCall`（2日×2コマの全組み合わせへの一括適用を検証）、`SetLevelsAsync_InvalidPairAmongManyRollsBackTheWholeBatch`（複数ペアの一部が無効な場合に、有効なペアも含めて全体がrollbackされ元の値のまま残ることを検証）。
 - Release/x64 build: warning 0 / error 0。全92 tests passed（新規2件）。Privacy gate成功。
+
+### v0.1.0 checkpoint 45 (Claude)
+
+Feature Parity行25「Google Forms作成kit」の残課題「講師指導可能科目用の別Apps Script」を実装した（ユーザーの許可のもと無人で継続）。
+
+- `QuestionnaireKitService`が生成する単一のCode.gsへ`createTeacherQualificationForm()`を追加。既存の生徒フォームと同じ`CONFIG.subjectsByLevel`（小/中/高/その他）を再利用し、講師IDテキスト項目＋学校段階別の指導可能科目チェックボックスを持つ、勤務可能日時アンケート（`createTeacherForm`）とは別のGoogleフォームを生成する。指導可能科目は講習期間ごとに毎回聞く必要がないため、意図的に別フォームとした（コード内コメントに理由を記載）。
+- `createSeminarSchedForms()`が生徒・講師（勤務可能日時）・講師指導可能科目の3フォームを作成し、3つの回答URLをすべてログ出力するよう更新。README（生成物内のREADME.txt）も3フォームの配布・反映手順に更新した。
+- 講師指導可能科目の回答自体の自動取込み（CSV列mapping、diagnostics）は今回のscope外とし、READMEには「①設定の担当設定タブへ手動反映」と明記した（正直な現状表示。Feature Parityにも残課題として明記）。
+- 既存テスト`GenerateAsync_WritesConfiguredAppsScriptAtomically`へ`createTeacherQualificationForm`の存在チェックを追加。
+- Release/x64 build: warning 0 / error 0。全92 tests passed。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 

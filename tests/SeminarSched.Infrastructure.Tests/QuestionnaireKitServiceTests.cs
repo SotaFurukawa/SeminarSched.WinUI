@@ -30,7 +30,7 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
 
         var script = await File.ReadAllTextAsync(Path.Combine(output, "Code.gs"));
         Assert.Contains("2026-07-20", script);
-        Assert.Contains("createSeminarSchedForms", script);Assert.Contains("createStudentForm", script);Assert.Contains("createTeacherForm", script);
+        Assert.Contains("createSeminarSchedForms", script);Assert.Contains("createStudentForm", script);Assert.Contains("createTeacherForm", script);Assert.Contains("createTeacherQualificationForm", script);
         Assert.Contains("GRADE_CHOICES", script);
 
         var jsonStart = script.IndexOf('{', script.IndexOf("const CONFIG", StringComparison.Ordinal));
