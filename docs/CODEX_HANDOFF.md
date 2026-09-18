@@ -633,6 +633,20 @@ checkpoint 55で共通名簿Excel（生徒・講師_基本情報.xlsx）を取�
 
 **未対応:** Python版`export_latest_combined`相当（取込結果を色付きの統合Excelとして出力する機能）は未移植。取込みのエビデンス自体（原本ファイルのsnapshot・監査ログ）は保存されるため、③〜⑤の業務flowを進める上での実質的なブロッカーではない。
 
+### v0.1.0 checkpoint 57 (Claude)
+
+ユーザーから3件の要望を受けた。(1) 共通基本情報Excelと共通名簿Excelの違いの説明。(2) 共通名簿はPython版同様、プロジェクトを開いていなくても使えるものとし、ホーム画面の上部に配置してほしい。(3) コマ設定をPython版同様のカレンダー方式にし、開校/休校だけでなく日付ごとにコマ構成も分けられるようにしてほしい（実際に送付したアンケートとGoogleフォーム作成キットの実例を参考にする）。
+
+**共通名簿の独立化:** これまでの共通名簿Excel取込み（checkpoint 55）はプロジェクトを開いている時にしか使えず、名簿データもプロジェクトごとに個別管理されていた。`ISharedRosterStore`/`SharedRosterStore`を新設し、`%LocalAppData%\SeminarSched.WinUI\Workspace\SharedRoster`に固定した共通正本（内部的には既存のプロジェクトschemaと同じSQLiteファイルを「ダミープロジェクト」として利用し、既存の`SqliteMasterDataRepository`・`SharedRosterImportService`をそのまま再利用）を管理する。新規に`SharedRosterWorkbookWriter`（`生徒・講師_基本情報.xlsx`形式の書き出し。Python版と異なりID列は数式・入力補助シートではなく既存ExternalIdを値としてそのまま書く簡易実装）を追加し、共通正本の内容をExcelへ書き出してから既存のimportサービスへ渡す形でプロジェクトへの反映を実現した。ホーム画面の最上部（プロジェクトカードより前）に「共通名簿」カードを追加し、Python版と同じ3操作（Excelで基本情報を編集＝既定アプリで直接開く、新規で基本情報を作成＝空テンプレート別名保存、作成した基本情報を反映＝検証・確認ダイアログ・反映、開いているプロジェクトへも自動反映）を実装。新規プロジェクト作成時は共通正本の内容を自動的にコピーする。
+
+**開校日・コマのカレンダー化:** Python版`OpenDateSettingsTab.qml`を参考に、①設定「コマ・開校日」タブの開校日UIをフラットな一覧から月表示カレンダー（動的に構築するGrid、`SetupPage.xaml.cs`）へ置き換えた。日付をタップして複数選択し、「選択日に使用するコマ」のチェックボックス（3値: 全選択日でON/OFF/一部）で日付ごとにコマの有効・無効を切り替えられるようにした。従来は「開校」ボタンが常に全有効コマを設定するのみで、日によってコマ数を変える手段がなかった。バックエンド（`CourseDay.EnabledTimeSlotIds`、`OpenDateTimeSlot`テーブル）は checkpoint 44前後から既に対応済みだったため、変更はUI層のみ。
+
+**Googleフォーム作成kitの全面書き直し（重大な不整合の発見と修正）:** ユーザーが指定した実際のPython生成済みキット（`C:\Users\sota1\AppData\Local\SummerScheduler\workspace\プロジェクト\Googleフォーム_...`）を調査したところ、C#版`QuestionnaireKitService`が生成するCode.gsは独自設計の簡易フォーム（参加可能コマの正の選択、受講回数なし、姓名分割なし）であり、Python版が実際に生成するフォーム、および checkpoint 56で実装した③アンケート取込み（`ICourseSurveyImportService`）が期待する列構成と一致していないことが判明した。つまり、C#版のkitで生成したフォームの回答は、C#版の取込み機能で読み込めない状態だった。実際のPython生成済み3ファイル（`create_student_questionnaire.gs`/`create_teacher_questionnaire.gs`/`create_teacher_subject_questionnaire.gs`）を仕様として、共通のApps Scriptテンプレート（`kind`・関数名・プロパティキーだけ差し替え）から3種類を生成するよう全面的に書き直した。生徒用は学年別page分岐、教科ごとの学校区分・受講教科・受講回数（最大4教科）、受講不可日時のcheckboxGrid、フォーム回答を取込み用の単一シート「Form Responses 1」へ自動整形するonFormSubmitトリガーまで含めて移植した。②アンケート作成に生徒用・講師用フォーム名・回答締切・問い合わせ先の入力欄を追加（Python版と同様、自由入力・既定値あり）。
+
+**動作確認:** 生成したキットのCONFIG構造を実際の参照ファイルと目視比較し一致を確認。新規・更新テスト（`QuestionnaireKitServiceTests.cs`、`SharedRosterStoreTests.cs`）を追加。Release/x64 build: warning 0 / error 0。全113 tests passed。Privacy gate成功。実機でのカレンダーUI・共通名簿UIの見た目確認はユーザー側で今後実施。
+
+**未対応:** ①設定・プロジェクトタブに残っているプロジェクト単体向けの共通名簿Excel取込み（checkpoint 55）はそのまま残した（新しいホーム画面の共通正本フローと機能は重複するが、開いているプロジェクトだけへ一時的に反映したい場合の代替経路として維持）。Googleフォーム側のGoogleでの実行確認は未実施（この環境からはGoogleへ到達できないため）。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`
