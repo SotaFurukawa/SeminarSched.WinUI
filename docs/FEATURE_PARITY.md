@@ -44,10 +44,10 @@
 | progress/cancel | worker / solver callback | 非同期progress DTO・cancel API | 実装中 | 実solverとUIへの接続は未実装 |
 | solver独立validator | result validation | 候補外・回数・衝突・容量・通常担当最低数・連続/空き時間をsolver外で再検証 | 実装中 | Python版全診断codeは未移植 |
 | optimization transaction保存 | optimization run service | 固定保持・未固定atomic置換・OptimizationRun入出力概要保存 | 実装中 | 安定したinput fingerprintと詳細penalty内訳は未実装 |
-| 時間割grid | schedule editor QML | ⑤に日付選択付きの行=コマ・列=講師グリッドを追加。カードはWinUIネイティブグリッドで生成 | 実装中 | virtualizationは未対応（開講コマ・講師数が多い場合の性能検証は今後） |
+| 時間割grid | ScheduleEditorPage.qml | Python版と同じく④時間割編集（新設・カード配置が主軸の画面）に日付選択付きの行=コマ・列=講師グリッドを設置。カードはWinUIネイティブグリッドで生成。⑤時間割自動作成はPython版同様、最適化品質設定と実行専用の薄い画面に分離した | 実装中 | virtualizationは未対応（開講コマ・講師数が多い場合の性能検証は今後）。Python版のような候補green/yellow/red判定・ソフト指標差分プレビューは未実装（現状は確定的に成功/失敗のみ） |
 | drag/drop手動配置 | schedule edit service | カードのドラッグでセル間移動、未配置一覧からドラッグで新規配置。`MoveAsync`が資格・衝突・空き時間・講師上限をhard constraintとして再検証し、ロック済みは移動不可 | 実装中 | 実機での目視確認は未実施（ビルド・自動テストのみ確認） |
-| manual/lock semantics | manual edit tests | ④固定Assignment追加・解除UI、可否/資格/同時2名/1対1/必要回数検証。⑤に手動配置追加/削除/移動・ロック切替・自動配置だけリセットUIを追加し、`IsManual`は再最適化時も`IsLocked`と同様に保持・候補除外・AuditLog記録 | 実装済み | |
-| Undo/Redo | command stack | ⑤へ「元に戻す」「やり直す」を追加。Assignment/TeacherUnavailability全体のスナップショットをmemory上のstackで管理し、自動作成・手動編集すべての操作をカバー | 実装中 | process内のみ（再起動で消える）。粒度は操作単位ではなくテーブル全体のsnapshot |
+| manual/lock semantics | manual edit tests / PreconfirmationPage.qml | Python版調査により、事前確定は専用の永続状態を持たず「手動配置（IsManual）＋ロック（IsLocked）」の組み合わせに過ぎないことを確認。旧`IFixedLessonService`の独自`preconfirmed`種別（Source列・isManual=false）を廃止し、`AddManualAsync(isLocked:true)`へ統一。旧「④ 事前確定」の独立ナビゲーション項目も廃止し、④時間割編集内の入力セクションへ統合（Python版もサイドバーに独立項目を持たず、編集画面のタブの1つ）。ロック済み手動配置は先にロック解除しないと削除できないようガードを追加。`IsManual`は再最適化時も`IsLocked`と同様に保持・候補除外・AuditLog記録 | 実装済み | |
+| Undo/Redo | command stack | ④⑤共通で「元に戻す」「やり直す」を使用。Assignment/TeacherUnavailability全体のスナップショットをmemory上のstackで管理し、自動作成・手動編集すべての操作をカバー。ページ遷移をまたいで履歴を保持する必要があるため、履歴をページインスタンスではなく静的な保持先（`ScheduleUndoState`）へ移した | 実装中 | process内のみ（再起動で消える）。粒度は操作単位ではなくテーブル全体のsnapshot |
 | 講師一時表示・availability編集 | editor UI/service | グリッドの「+講師を表示」で全コマ不可の講師も列表示でき、セル右上の丸/バツで`TeacherUnavailability`を切替。既存配置があるセルは不可へ変更不可。複数講師×複数コマを選択し出勤可否をまとめて設定する一括操作を追加（`SetTeacherUnavailableManyAsync`、単一transactionで一部競合時は全体rollback） | 実装済み | 実機でのUI操作感（ListView多重選択の使い勝手）は未確認 |
 | 検索・scroll同期 | editor QML | 生徒名検索でグリッド内カードをハイライト表示。見出し行（講師名）・見出し列（コマ名）を`TranslateTransform`でscroll位置に応じて逆方向へ平行移動させ、常に画面内に固定表示されるようにした（Excelのウィンドウ枠固定相当の見た目） | 実装済み | 実機での見た目（固定表示が正しく機能しているか）は未確認 |
 | 未配置・警告 | diagnostics/output | ⑥出力へ未配置一覧に加え、通常担当優先度の目標割合（5=100%〜2=25%）を下回る生徒・科目・不足回数を「通常担当不足」として出力 | 実装中 | 学年別上限超過などその他の診断種別は未移植 |
