@@ -26,11 +26,28 @@ public sealed class FileAppLoggerTests : IDisposable
         logger.Error("Schedule run failed", new InvalidOperationException("no candidates"));
 
         var path = Path.Combine(_directory, $"app-{DateTime.Now:yyyyMMdd}.log");
-        var line = Assert.Single(File.ReadAllLines(path));
+        var line = File.ReadAllLines(path)[0];
         Assert.Contains("[ERROR]", line);
         Assert.Contains("InvalidOperationException", line);
         Assert.Contains("no candidates", line);
     }
+
+    [Fact]
+    public void Error_WithThrownException_IncludesStackTrace()
+    {
+        var logger = new FileAppLogger(_directory);
+        Exception? caught = null;
+        try { ThrowNested(); }
+        catch (Exception exception) { caught = exception; }
+        logger.Error("Schedule run failed", caught);
+
+        var path = Path.Combine(_directory, $"app-{DateTime.Now:yyyyMMdd}.log");
+        var lines = File.ReadAllLines(path);
+        Assert.True(lines.Length > 1, "expected the stack trace to add at least one more line");
+        Assert.Contains(lines, line => line.Contains(nameof(ThrowNested)));
+    }
+
+    private static void ThrowNested() => throw new InvalidOperationException("nested failure");
 
     [Fact]
     public void Constructor_PurgesLogFilesOlderThanRetention()

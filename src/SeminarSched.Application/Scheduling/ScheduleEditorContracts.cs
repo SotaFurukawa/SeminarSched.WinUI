@@ -20,9 +20,11 @@ public sealed record BoardSlotRow(long TimeSlotId, string Label, int SortOrder);
 
 public sealed record BoardTeacherColumn(long TeacherId, string Label);
 
-public sealed record BoardCard(long AssignmentId, long TeacherId, long TimeSlotId, long StudentId, string StudentLabel, string SubjectLabel, bool IsManual, bool IsLocked)
+public sealed record BoardCard(long AssignmentId, long TeacherId, long TimeSlotId, long StudentId, string StudentLabel, string SubjectLabel, bool IsManual, bool IsLocked, bool OneToOneRequired, bool IsPriorityFive)
 {
-    public override string ToString() => $"{StudentLabel}　{SubjectLabel}{(IsManual ? "　[手動]" : "")}{(IsLocked ? "　[ロック]" : "")}";
+    // Python版のバッジ表示（①=1対1必須, P5=通常担当優先度5, 🔒=ロック, ✎=手動）に合わせる。
+    public override string ToString() =>
+        $"{StudentLabel}　{SubjectLabel}{(OneToOneRequired ? "　①" : "")}{(IsPriorityFive ? "　P5" : "")}{(IsLocked ? "　🔒" : "")}{(IsManual ? "　✎" : "")}";
 }
 
 public sealed record BoardCell(long TimeSlotId, long TeacherId, bool Blocked, IReadOnlyList<BoardCard> Cards);

@@ -124,8 +124,11 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
         await using(var command=connection.CreateCommand())
         {
             command.CommandText="""
-                SELECT a.Id,a.TeacherId,a.TimeSlotId,r.StudentId,st.ExternalId||' '||st.Name,su.DisplayName,a.IsManual,a.IsLocked
+                SELECT a.Id,a.TeacherId,a.TimeSlotId,r.StudentId,st.ExternalId||' '||st.Name,su.DisplayName,a.IsManual,a.IsLocked,
+                       CASE WHEN r.OneToOneRequired=1 OR COALESCE(p.OneToOneRequired,0)=1 THEN 1 ELSE 0 END,
+                       CASE WHEN COALESCE(r.RegularTeacherPriority,p.RegularTeacherPriority)=5 THEN 1 ELSE 0 END
                 FROM Assignment a JOIN LessonRequest r ON r.Id=a.LessonRequestId JOIN Student st ON st.Id=r.StudentId JOIN Subject su ON su.Id=r.SubjectId
+                LEFT JOIN RegularLessonProfile p ON p.ProjectId=r.ProjectId AND p.StudentId=r.StudentId AND p.SubjectId=r.SubjectId
                 WHERE a.OpenDateId=$date ORDER BY st.ExternalId;
                 """;
             command.Parameters.AddWithValue("$date",openDateId);
@@ -133,7 +136,7 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
             while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
                 var key=(reader.GetInt64(1),reader.GetInt64(2));
-                var card=new BoardCard(reader.GetInt64(0),reader.GetInt64(1),reader.GetInt64(2),reader.GetInt64(3),reader.GetString(4),reader.GetString(5),reader.GetBoolean(6),reader.GetBoolean(7));
+                var card=new BoardCard(reader.GetInt64(0),reader.GetInt64(1),reader.GetInt64(2),reader.GetInt64(3),reader.GetString(4),reader.GetString(5),reader.GetBoolean(6),reader.GetBoolean(7),reader.GetBoolean(8),reader.GetBoolean(9));
                 if(!cardsByCell.TryGetValue(key,out var list)){list=[];cardsByCell[key]=list;}
                 list.Add(card);
             }
