@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `4cc4575`（v0.1.0 checkpoint 46, 全体時間割の出勤不可コマgray表示）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
+Latest Development Checkpoint: checkpoint 47（⑥出力の個別file選択・OSアプリで開くUI）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -476,6 +476,15 @@ Feature Parity行50「全体時間割Excel/PDF」の残課題「コマ不可のg
 - `ExcelScheduleReportRenderer`/`PdfScheduleReportRenderer`の全体時間割セクションで、`Unavailable`かつ配置なしのセルへLightGray背景を適用。
 - 新規テスト`GenerateAsync_OverviewGrid_GraysOutUnavailableSlotForTeacherWithOtherAssignmentsThatDay`（`SqliteOutputPackageServiceTests.cs`）で、配置のあるコマは通常表示、出勤不可のコマだけgray表示されることをExcel出力から直接検証した。
 - Release/x64 build: warning 0 / error 0。全93 tests passed（新規1件）。Privacy gate成功。
+
+### v0.1.0 checkpoint 47 (Claude)
+
+Feature Parity行55「atomic export・上書き確認」の残課題「個別file選択とpreview」を実装した（ユーザーの許可のもと無人で継続）。
+
+- `OutputPage`の出力完了後に生成物一覧（全体時間割.xlsx・時間割.pdf・講師別folder内の全ファイル）をListViewへ表示する`OutputFilesPanel`を追加。
+- 「選択したファイルを開く」ボタンで`Windows.Storage.StorageFile.GetFileFromPathAsync`＋`Windows.System.Launcher.LaunchFileAsync`によりOSの既定アプリ（Excel/PDFビューアなど）でファイルを開く。「出力フォルダーを開く」ボタンで同様にエクスプローラーを開く。
+- WinUI/UWPのLauncher APIはアプリ内蔵のpreview機能ではなく「OSの既定アプリに委譲する」設計のため、独自のExcel/PDFプレビューア実装は行わず、確実に動作するこの方式を採用した。
+- UI層のみの変更でサービス層に変更なし。Release/x64 build: warning 0 / error 0。全93 tests passed。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 

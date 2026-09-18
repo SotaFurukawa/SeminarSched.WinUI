@@ -52,7 +52,7 @@
 | 講師配布（学年順） | reporting renderers | 生徒sheetを学年・氏名順に生成。生徒名は姓のみ表示、同姓がいる場合だけ名の先頭1文字を付与 | 実装中 | A4サイズへの厳密な収まり調整は未検証 |
 | 講師配布（講師別） | reporting renderers | 講師別sheet・PDF sectionを週calendar形式で生成に加え、出力folder内に「講師別」sub folderを作り、講師ごとに`{講師名}t.xlsx`という個別ファイルを生成（担当一覧sheet＝通常担当を先に列挙→講習担当、時間割sheet＝週calendar） | 実装中 | 「その他」区分の1ページ4名レイアウトはExcel向けのため未実装。PDF個別ファイルは未対応（共通PDFのsectionのみ） |
 | 未配置・警告一覧出力 | output service | 未配置回数・通常担当不足をExcel/PDFへ出力 | 実装中 | Python版のその他診断種別は未移植 |
-| atomic export・上書き確認 | output service | integrity再確認・新規一時folder・上書きなし | 実装中 | 個別file選択とpreviewは未実装 |
+| atomic export・上書き確認 | output service | integrity再確認・新規一時folder・上書きなし。出力完了後、生成された全体時間割Excel/PDF・講師別個別fileの一覧を表示し、選択したfileや出力folderをOSの既定アプリで開けるUIを追加 | 実装済み | |
 | 設定・logging | settings/logging | `IAppLogger`/`FileAppLogger`を追加。`%LocalAppData%\SeminarSched.WinUI\logs\app-yyyyMMdd.log`へ日次でoperational logを記録（14日保持で自動削除）、未処理例外もWinUIの`UnhandledException`経由で記録。project作成/open/close/backup/restore、時間割自動作成、出力実行のログを追加。件数・成否のみでファイルパスや生徒・講師名は一切記録しない | 実装中 | project/import/scheduling以外の操作（①設定の個別保存など）はまだログ未対象。UIからログ閲覧・エクスポートする画面はない |
 | 集団授業DB/service互換 | group lesson service | 未実装 | 保留 | v1.9.5同様UI停止中 |
 | Windows配布・受入 | packaging/release tests | 方針をMSIXサイドロードに確定（[ADR 0005](docs/adr/0005-windows-distribution.md)）。ローカル自己署名証明書の生成・署名付き`.msix`生成を行う`scripts\New-SigningCertificate.ps1`/`New-MsixPackage.ps1`を追加。署名済み`.msix`の生成と署名者検証は実機で確認済み | 実装中 | `Add-AppxPackage`によるインストールには管理者権限での証明書信頼（`LocalMachine\TrustedPeople`）が必要で、この環境には管理者権限がないため実インストールは未検証。ユーザー側での検証が必要 |
