@@ -23,12 +23,13 @@ public sealed class ExcelScheduleReportRenderer
         var overviewAssignments = report.Rows.Select(r => new OverviewAssignment(DateOnly.Parse(r.Date), teacherLabels[r.Teacher], r.TimeSlot, r.StudentGrade, r.SubjectShortName, studentLabels[r.Student])).ToArray();
         var overviewUnavailabilities = report.TeacherUnavailabilities.Select(u => new OverviewUnavailability(DateOnly.Parse(u.Date), teacherLabels[u.Teacher], u.TimeSlot)).ToArray();
         var grid = OverviewGridLayout.Build(report.StartDate, report.EndDate, report.OpenDates.ToHashSet(), report.SlotLabels, overviewAssignments, overviewUnavailabilities);
+        var slotDefinitionsByLabel = report.SlotDefinitions.ToDictionary(s => s.Label);
 
         var usedNames = new HashSet<string>(StringComparer.Ordinal) { "出力情報" };
         foreach (var week in grid.Weeks)
         {
             var sheet = workbook.AddWorksheet(UniqueSheetName(usedNames, $"週_{week.SundayStart:yyyyMMdd}"));
-            WriteOverviewWeekSheet(sheet, week, grid.SlotLabels);
+            WriteOverviewWeekSheet(sheet, week, grid.SlotLabels, slotDefinitionsByLabel);
         }
         workbook.SaveAs(path);
     }
@@ -38,8 +39,11 @@ public sealed class ExcelScheduleReportRenderer
     public void RenderTeacherHandouts(ScheduleReport report, string path) => RenderHandoutWorkbook(report, path, includeTeacher: true, ParticipatingStudents(report));
 
     /// <summary>
-    /// Python版6節「講師配布時間割（講師別）」相当。講師ごとに独立したファイルとして、その講師が担当する
-    /// 生徒（通常担当の生徒を先に、季節講習のみ担当する生徒を後に列挙）の個人時間割を1生徒1シートで生成する。
+    /// Python版6節「講師配布時間割（講師別）」相当。講師ごとに独立したファイルとして、参加する全生徒の
+    /// 個人時間割を1生徒1シートで生成する（フィルタはしない）。並び順だけがこの講師の通常担当の生徒→
+    /// この講師が今期担当する生徒→残り全員、という3段階（各段の中では元の学年順を維持）になる
+    /// （`build_teacher_packet_document`の`ordered_students`と同じロジック。他の全講師のファイルも
+    /// 中身の生徒集合は同じで、並び順だけがそれぞれの講師視点で変わる）。
     /// </summary>
     public void RenderTeacherPacket(ScheduleReport report, string teacherName, string path)
     {
@@ -48,16 +52,20 @@ public sealed class ExcelScheduleReportRenderer
         var usedNames = new HashSet<string>(StringComparer.Ordinal);
         if (report.AbsentStudents.Count > 0) WriteAbsenceSheet(workbook.AddWorksheet(UniqueSheetName(usedNames, "講習欠席一覧")), report);
 
-        var assigned = report.Rows.Where(x => x.Teacher == teacherName).Select(x => new { x.Student, x.StudentGrade }).Distinct().ToArray();
-        var regular = assigned.Where(s => report.Rows.Any(r => r.Teacher == teacherName && r.Student == s.Student && r.IsRegularTeacher)).OrderBy(s => GradeOrdering.SortKey(s.StudentGrade)).ThenBy(s => s.Student, StringComparer.Ordinal).ToArray();
-        var others = assigned.Except(regular).OrderBy(s => GradeOrdering.SortKey(s.StudentGrade)).ThenBy(s => s.Student, StringComparer.Ordinal).ToArray();
+        var allStudents = ParticipatingStudents(report);
+        var regularIds = report.Rows.Where(r => r.Teacher == teacherName && r.IsRegularTeacher).Select(r => r.Student).ToHashSet();
+        var seasonalIds = report.Rows.Where(r => r.Teacher == teacherName).Select(r => r.Student).ToHashSet();
+        var ordered = allStudents.Where(s => regularIds.Contains(s.Student))
+            .Concat(allStudents.Where(s => seasonalIds.Contains(s.Student) && !regularIds.Contains(s.Student)))
+            .Concat(allStudents.Where(s => !regularIds.Contains(s.Student) && !seasonalIds.Contains(s.Student)))
+            .ToArray();
 
-        foreach (var s in regular.Concat(others))
+        foreach (var s in ordered)
         {
-            var sheet = workbook.AddWorksheet(UniqueSheetName(usedNames, $"{s.StudentGrade}_{s.Student}_講師別"));
-            WriteStudentHandoutPage(sheet, report, s.Student, s.StudentGrade, includeTeacher: true, teacherLabels);
+            var sheet = workbook.AddWorksheet(UniqueSheetName(usedNames, $"{s.Grade}_{s.Student}_講師別"));
+            WriteStudentHandoutPage(sheet, report, s.Student, s.Grade, includeTeacher: true, teacherLabels);
         }
-        if (regular.Length == 0 && others.Length == 0 && report.AbsentStudents.Count == 0) workbook.AddWorksheet("出力対象がありません");
+        if (ordered.Length == 0 && report.AbsentStudents.Count == 0) workbook.AddWorksheet("出力対象がありません");
         workbook.SaveAs(path);
     }
 
@@ -125,9 +133,14 @@ public sealed class ExcelScheduleReportRenderer
     /// teacher_handouts・teacher_packetsの3レポートすべてがこの1メソッドを共有する（includeTeacherの
     /// 有無だけが異なる）。
     /// </summary>
+    private static readonly XLColor HandoutWeekdayFill = XLColor.FromHtml("#F2F2F2");
+    private static readonly XLColor HandoutMonthFill = XLColor.FromHtml("#0B3041");
+    private static readonly XLColor HandoutClosedFill = XLColor.FromHtml("#E8E8E8");
+    private static readonly XLColor HandoutOutOfRangeFill = XLColor.FromHtml("#0E2841");
+
     private static void WriteStudentHandoutPage(IXLWorksheet sheet, ScheduleReport report, string student, string grade, bool includeTeacher, IReadOnlyDictionary<string, string> teacherLabels)
     {
-        sheet.Column(1).Width = 9.0; sheet.Column(2).Width = 12.125; for (var c = 3; c <= 9; c++) sheet.Column(c).Width = 9.875;
+        sheet.Column(1).Width = 8.3; sheet.Column(2).Width = 11.4; for (var c = 3; c <= 9; c++) sheet.Column(c).Width = 9.2;
 
         sheet.Range(1, 1, 1, 9).Merge(); var title = sheet.Cell(1, 1);
         title.Value = $"{report.AcademicYear}　{report.SeasonName}　個別指導　受講日のご案内";
@@ -138,13 +151,6 @@ public sealed class ExcelScheduleReportRenderer
         sheet.Range(4, 6, 4, 7).Merge(); sheet.Cell(4, 6).Value = student; sheet.Cell(4, 8).Value = "様";
 
         var rows = report.Rows.Where(x => x.Student == student).ToArray();
-        if (includeTeacher)
-        {
-            var summary = rows.Where(x => x.IsRegularTeacher).Select(x => $"{x.SubjectShortName} {teacherLabels[x.Teacher]}t").Distinct().ToArray();
-            sheet.Range(5, 1, 5, 9).Merge();
-            sheet.Cell(5, 1).Value = summary.Length > 0 ? string.Join("　", summary) : "通常担当：―";
-        }
-
         var lessonTextByDateSlot = rows.ToDictionary(x => (DateOnly.Parse(x.Date), x.TimeSlot), string (x) => includeTeacher ? $"{x.SubjectShortName}　{teacherLabels[x.Teacher]}" : x.SubjectShortName);
         var weeks = HandoutPageLayout.Build(report.StartDate, report.EndDate, report.OpenDates.ToHashSet(), report.SlotLabels, lessonTextByDateSlot);
         var slotDefinitionsByLabel = report.SlotDefinitions.ToDictionary(s => s.Label);
@@ -155,31 +161,50 @@ public sealed class ExcelScheduleReportRenderer
             if (week.FullyClosed)
             {
                 sheet.Range(row, 1, row, 9).Merge();
-                sheet.Cell(row, 1).Value = $"{week.Days[0].Date.Month}/{week.Days[0].Date.Day} ~ {week.Days[6].Date.Month}/{week.Days[6].Date.Day}　休校日";
+                var closedCell = sheet.Cell(row, 1);
+                closedCell.Value = $"{week.Days[0].Date.Month}/{week.Days[0].Date.Day} ~ {week.Days[6].Date.Month}/{week.Days[6].Date.Day}　休校日";
+                closedCell.Style.Fill.BackgroundColor = HandoutClosedFill;
                 row++; continue;
             }
             var monthRow = row; var weekdayRow = row + 1; var dayRow = row + 2;
+            sheet.Cell(monthRow, 1).Style.Fill.BackgroundColor = HandoutWeekdayFill; sheet.Cell(monthRow, 2).Style.Fill.BackgroundColor = HandoutWeekdayFill;
             var col = 3;
             foreach (var monthGroup in week.Days.GroupBy(d => d.Date.Month))
             {
                 var span = monthGroup.Count();
                 var monthCell = sheet.Cell(monthRow, col);
-                monthCell.Value = $"{monthGroup.Key}月"; monthCell.Style.Font.Bold = true; monthCell.Style.Font.FontColor = XLColor.White; monthCell.Style.Fill.BackgroundColor = XLColor.FromHtml("#1F3864");
+                monthCell.Value = $"{monthGroup.Key}月"; monthCell.Style.Font.Bold = true; monthCell.Style.Font.FontColor = XLColor.White; monthCell.Style.Fill.BackgroundColor = HandoutMonthFill;
                 if (span > 1) sheet.Range(monthRow, col, monthRow, col + span - 1).Merge();
                 col += span;
             }
-            for (var i = 0; i < 7; i++) { sheet.Cell(weekdayRow, 3 + i).Value = WeeklyCalendarLayout.WeekdayHeaders[i]; sheet.Cell(dayRow, 3 + i).Value = week.Days[i].Date.Day.ToString(); }
+            for (var i = 0; i < 7; i++)
+            {
+                var weekdayCell = sheet.Cell(weekdayRow, 3 + i); weekdayCell.Value = WeeklyCalendarLayout.WeekdayHeaders[i]; weekdayCell.Style.Fill.BackgroundColor = HandoutWeekdayFill;
+                var dayCell = sheet.Cell(dayRow, 3 + i); dayCell.Value = week.Days[i].Date.Day.ToString(); dayCell.Style.Fill.BackgroundColor = HandoutWeekdayFill;
+            }
             row = dayRow + 1;
+            var slotBlockStartRow = row;
             foreach (var slotRow in week.SlotRows)
             {
                 var slotDefinition = slotDefinitionsByLabel[slotRow.SlotLabel];
                 sheet.Cell(row, 1).Value = $"{slotDefinition.Code}タイム"; sheet.Cell(row, 2).Value = slotDefinition.TimeRangeText;
                 for (var i = 0; i < 7; i++)
                 {
-                    var day = week.Days[i];
-                    sheet.Cell(row, 3 + i).Value = day.Kind switch { HandoutDayKind.OutOfRange => "指定範囲外", HandoutDayKind.ClosedDay => "休校日", _ => slotRow.LessonTextByDay[i] ?? "" };
+                    if (week.Days[i].Kind != HandoutDayKind.Open) continue;
+                    sheet.Cell(row, 3 + i).Value = slotRow.LessonTextByDay[i] ?? "";
                 }
                 row++;
+            }
+            // Python版は休校日・範囲外セルを日付列単位でコマ数ぶん縦結合し、1つの値だけを表示する。
+            var slotBlockRowCount = week.SlotRows.Count;
+            for (var i = 0; i < 7; i++)
+            {
+                var day = week.Days[i];
+                if (day.Kind == HandoutDayKind.Open) continue;
+                var cell = sheet.Cell(slotBlockStartRow, 3 + i);
+                cell.Value = day.Kind == HandoutDayKind.OutOfRange ? "指定範囲外" : "休校日";
+                cell.Style.Fill.BackgroundColor = day.Kind == HandoutDayKind.OutOfRange ? HandoutOutOfRangeFill : HandoutClosedFill;
+                if (slotBlockRowCount > 1) sheet.Range(slotBlockStartRow, 3 + i, slotBlockStartRow + slotBlockRowCount - 1, 3 + i).Merge();
             }
         }
 
@@ -213,84 +238,116 @@ public sealed class ExcelScheduleReportRenderer
         sheet.Cell(3, 1).Value = "更新日時"; sheet.Cell(3, 2).Value = report.GeneratedAtText;
     }
 
+    private static readonly XLColor OverviewTitleFill = XLColor.FromHtml("#D9EAF7");
+    private static readonly XLColor OverviewSubtitleFill = XLColor.FromHtml("#EAF0F6");
+    private static readonly XLColor OverviewHeaderFill = XLColor.FromHtml("#1F4E78");
+    private static readonly XLColor OverviewUnavailableFill = XLColor.FromHtml("#D9D9D9");
+    private static readonly XLColor OverviewFootnoteFill = XLColor.FromHtml("#F0F2F5");
+    private const string OverviewLegendText = "凡例　灰色: 勤務不可コマ　[1対1] 1対1　[集団] 集団授業　[固定] ロック　[警告] 警告　[手] 手動変更";
+    private const string OverviewFootnoteText = "日曜始まり・土曜終わりの週単位です。出勤予定の講師のみ表示します。";
+
     /// <summary>
-    /// Python版timetable_builder.pyの週単位grid相当。パネル共通の「コマ」ラベル列を先頭に1本だけ置き
-    /// （Python版はパネルごとにラベル列を持つが、視認性を優先しここでは1本へ共通化）、各日は
-    /// 出勤講師ごとに2列（最大同時2名までの並び表示）×コマごと3行（学年／科目略称／生徒名縦書き）で
-    /// 表示する。
+    /// Python版timetable_builder.pyの週単位grid相当。日付panelごとに専用の「コマ」ラベル列を持ち
+    /// （ラベル列＋出勤講師ごとに2列＝同時最大2名までの並び表示）、コマごと3行（学年／科目略称／
+    /// 生徒名縦書き）で表示する。該当日・出勤予定講師が1件も無い週もsheet自体は生成し、
+    /// 「対象となる開校日・出勤予定講師がありません」のplaceholderを表示する。
     /// </summary>
-    private static void WriteOverviewWeekSheet(IXLWorksheet sheet, OverviewWeek week, IReadOnlyList<string> slotLabels)
+    private static void WriteOverviewWeekSheet(IXLWorksheet sheet, OverviewWeek week, IReadOnlyList<string> slotLabels, IReadOnlyDictionary<string, SlotDefinition> slotDefinitionsByLabel)
     {
-        const int dayHeaderRow = 1, teacherHeaderRow = 2, slotStartRow = 3;
-        sheet.Cell(teacherHeaderRow, 1).Value = "コマ"; sheet.Cell(teacherHeaderRow, 1).Style.Font.Bold = true;
+        const int dateHeaderRow = 3, comaHeaderRow = 4, slotStartRow = 5;
+        sheet.Cell(1, 1).Value = "季節講習時間割"; sheet.Cell(1, 1).Style.Fill.BackgroundColor = OverviewTitleFill;
+        var sundayEnd = week.SundayStart.AddDays(6);
+        sheet.Cell(2, 1).Value = $"{week.SundayStart:yyyy/M/d}（{WeeklyCalendarLayout.WeekdayHeaders[0]}） ～ {sundayEnd:yyyy/M/d}（{WeeklyCalendarLayout.WeekdayHeaders[6]}）";
+        sheet.Cell(2, 1).Style.Fill.BackgroundColor = OverviewSubtitleFill;
 
-        var col = 2;
-        foreach (var day in week.Days)
+        int lastCol; int legendRow;
+        if (week.Days.Count == 0)
         {
-            var teacherCount = Math.Max(1, day.Teachers.Count);
-            var dayStartCol = col; var totalCols = teacherCount * 2;
-            var dayCell = sheet.Cell(dayHeaderRow, dayStartCol);
-            dayCell.Value = $"{day.Date:M/d}({WeeklyCalendarLayout.WeekdayHeaders[(int)day.Date.DayOfWeek]})";
-            dayCell.Style.Font.Bold = true; dayCell.Style.Fill.BackgroundColor = XLColor.LightGray; dayCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-            if (totalCols > 1) sheet.Range(dayHeaderRow, dayStartCol, dayHeaderRow, dayStartCol + totalCols - 1).Merge();
-
-            if (day.Teachers.Count == 0)
+            sheet.Cell(dateHeaderRow, 1).Value = "対象となる開校日・出勤予定講師がありません"; sheet.Cell(dateHeaderRow, 1).Style.Fill.BackgroundColor = OverviewSubtitleFill;
+            lastCol = 1; legendRow = dateHeaderRow + 1;
+        }
+        else
+        {
+            var col = 1;
+            foreach (var day in week.Days)
             {
-                var noneCell = sheet.Cell(teacherHeaderRow, dayStartCol); noneCell.Value = "出勤予定なし"; noneCell.Style.Fill.BackgroundColor = XLColor.LightGray;
-                sheet.Range(teacherHeaderRow, dayStartCol, teacherHeaderRow, dayStartCol + 1).Merge();
-                if (slotLabels.Count > 0) sheet.Range(slotStartRow, dayStartCol, slotStartRow + slotLabels.Count * 3 - 1, dayStartCol + 1).Style.Fill.BackgroundColor = XLColor.LightGray;
-                col += 2; continue;
-            }
+                var labelCol = col; col++;
+                var comaCell = sheet.Cell(comaHeaderRow, labelCol); comaCell.Value = "コマ"; comaCell.Style.Font.Bold = true; comaCell.Style.Fill.BackgroundColor = OverviewSubtitleFill;
 
-            foreach (var teacher in day.Teachers)
-            {
-                var teacherCell = sheet.Cell(teacherHeaderRow, col); teacherCell.Value = teacher.TeacherName; teacherCell.Style.Font.Bold = true;
-                sheet.Range(teacherHeaderRow, col, teacherHeaderRow, col + 1).Merge();
+                if (day.Teachers.Count == 0)
+                {
+                    var noneCell = sheet.Cell(comaHeaderRow, labelCol + 1); noneCell.Value = "出勤予定なし"; noneCell.Style.Fill.BackgroundColor = OverviewUnavailableFill;
+                    sheet.Range(comaHeaderRow, labelCol + 1, comaHeaderRow, labelCol + 2).Merge();
+                    if (slotLabels.Count > 0) sheet.Range(slotStartRow, labelCol + 1, slotStartRow + slotLabels.Count * 3 - 1, labelCol + 2).Style.Fill.BackgroundColor = OverviewUnavailableFill;
+                    col += 2;
+                }
+                else
+                {
+                    var teacherCol = labelCol + 1;
+                    foreach (var teacher in day.Teachers)
+                    {
+                        var teacherCell = sheet.Cell(comaHeaderRow, teacherCol); teacherCell.Value = teacher.TeacherName; teacherCell.Style.Font.Bold = true; teacherCell.Style.Font.FontColor = XLColor.White; teacherCell.Style.Fill.BackgroundColor = OverviewHeaderFill;
+                        sheet.Range(comaHeaderRow, teacherCol, comaHeaderRow, teacherCol + 1).Merge();
+
+                        for (var s = 0; s < slotLabels.Count; s++)
+                        {
+                            var rowBase = slotStartRow + s * 3; var cell = teacher.Cells[s];
+                            for (var sub = 0; sub < 2; sub++)
+                            {
+                                var cardCol = teacherCol + sub;
+                                if (sub < cell.Cards.Count)
+                                {
+                                    var card = cell.Cards[sub];
+                                    sheet.Cell(rowBase, cardCol).Value = card.Grade;
+                                    sheet.Cell(rowBase + 1, cardCol).Value = card.SubjectShortName;
+                                    var nameCell = sheet.Cell(rowBase + 2, cardCol); nameCell.Value = card.Student;
+                                    nameCell.Style.Alignment.TextRotation = 255; nameCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                                }
+                                else if (cell.Cards.Count == 0 && cell.Unavailable)
+                                {
+                                    for (var r = 0; r < 3; r++) sheet.Cell(rowBase + r, cardCol).Style.Fill.BackgroundColor = OverviewUnavailableFill;
+                                }
+                            }
+                            if (cell.Cards.Count > 2)
+                            {
+                                var overflow = string.Join("\n", cell.Cards.Skip(2).Select(c => $"{c.Grade} {c.SubjectShortName} {c.Student}"));
+                                var overflowCell = sheet.Cell(rowBase + 2, teacherCol + 1);
+                                overflowCell.Value = overflowCell.GetString().Length > 0 ? overflowCell.GetString() + "\n" + overflow : overflow;
+                                overflowCell.Style.Alignment.WrapText = true; overflowCell.Style.Alignment.TextRotation = 0;
+                            }
+                        }
+                        teacherCol += 2;
+                    }
+                    col = teacherCol;
+                }
+
+                if (col - labelCol > 1) sheet.Range(dateHeaderRow, labelCol, dateHeaderRow, col - 1).Merge();
+                var dateCell = sheet.Cell(dateHeaderRow, labelCol);
+                dateCell.Value = $"{day.Date:yyyy/M/d}（{WeeklyCalendarLayout.WeekdayHeaders[(int)day.Date.DayOfWeek]}）";
+                dateCell.Style.Font.Bold = true; dateCell.Style.Font.FontColor = XLColor.White; dateCell.Style.Fill.BackgroundColor = OverviewHeaderFill; dateCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
                 for (var s = 0; s < slotLabels.Count; s++)
                 {
-                    var rowBase = slotStartRow + s * 3; var cell = teacher.Cells[s];
-                    for (var sub = 0; sub < 2; sub++)
-                    {
-                        var cardCol = col + sub;
-                        if (sub < cell.Cards.Count)
-                        {
-                            var card = cell.Cards[sub];
-                            sheet.Cell(rowBase, cardCol).Value = card.Grade;
-                            sheet.Cell(rowBase + 1, cardCol).Value = card.SubjectShortName;
-                            var nameCell = sheet.Cell(rowBase + 2, cardCol); nameCell.Value = card.Student;
-                            nameCell.Style.Alignment.TextRotation = 255; nameCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                        }
-                        else if (cell.Cards.Count == 0 && cell.Unavailable)
-                        {
-                            for (var r = 0; r < 3; r++) sheet.Cell(rowBase + r, cardCol).Style.Fill.BackgroundColor = XLColor.LightGray;
-                        }
-                    }
-                    if (cell.Cards.Count > 2)
-                    {
-                        var overflow = string.Join("\n", cell.Cards.Skip(2).Select(c => $"{c.Grade} {c.SubjectShortName} {c.Student}"));
-                        var overflowCell = sheet.Cell(rowBase + 2, col + 1);
-                        overflowCell.Value = overflowCell.GetString().Length > 0 ? overflowCell.GetString() + "\n" + overflow : overflow;
-                        overflowCell.Style.Alignment.WrapText = true; overflowCell.Style.Alignment.TextRotation = 0;
-                    }
+                    var rowBase = slotStartRow + s * 3;
+                    var labelCell = sheet.Cell(rowBase, labelCol);
+                    labelCell.Value = slotDefinitionsByLabel[slotLabels[s]].OverviewLabelText;
+                    labelCell.Style.Font.Bold = true; labelCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center; labelCell.Style.Alignment.WrapText = true;
+                    labelCell.Style.Fill.BackgroundColor = OverviewSubtitleFill;
+                    if (slotLabels.Count > 0) sheet.Range(rowBase, labelCol, rowBase + 2, labelCol).Merge();
                 }
-                col += 2;
             }
+            lastCol = Math.Max(1, col - 1);
+            legendRow = slotStartRow + slotLabels.Count * 3;
         }
 
-        for (var s = 0; s < slotLabels.Count; s++)
+        var legendCell = sheet.Cell(legendRow, 1); legendCell.Value = OverviewLegendText; legendCell.Style.Fill.BackgroundColor = OverviewFootnoteFill;
+        var footnoteCell = sheet.Cell(legendRow + 1, 1); footnoteCell.Value = OverviewFootnoteText; footnoteCell.Style.Fill.BackgroundColor = OverviewFootnoteFill;
+        if (lastCol > 1)
         {
-            var rowBase = slotStartRow + s * 3;
-            var labelCell = sheet.Cell(rowBase, 1); labelCell.Value = slotLabels[s]; labelCell.Style.Font.Bold = true; labelCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center; labelCell.Style.Alignment.WrapText = true;
-            sheet.Range(rowBase, 1, rowBase + 2, 1).Merge();
+            sheet.Range(1, 1, 1, lastCol).Merge(); sheet.Range(2, 1, 2, lastCol).Merge();
+            sheet.Range(legendRow, 1, legendRow, lastCol).Merge(); sheet.Range(legendRow + 1, 1, legendRow + 1, lastCol).Merge();
+            sheet.Columns(1, lastCol).Width = 2.9;
         }
-
-        var lastCol = Math.Max(2, col - 1);
-        var legendRow = slotStartRow + slotLabels.Count * 3;
-        var legendCell = sheet.Cell(legendRow, 1); legendCell.Value = "凡例　灰色: 勤務不可コマ"; legendCell.Style.Font.Italic = true;
-        sheet.Range(legendRow, 1, legendRow, lastCol).Merge();
-
-        sheet.Column(1).Width = 10; sheet.Columns(2, lastCol).Width = 4.5;
         sheet.SheetView.FreezeRows(2);
     }
 

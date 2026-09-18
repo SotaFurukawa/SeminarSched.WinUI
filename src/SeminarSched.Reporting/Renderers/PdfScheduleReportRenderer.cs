@@ -42,10 +42,13 @@ public sealed class PdfScheduleReportRenderer
         EnsureFont(); var document = NewDocument(teacherName);
         var teacherLabels = WeeklyCalendarLayout.BuildTeacherLabels(report.Rows.Select(x => x.Teacher));
         AddAbsenceSection(document, report);
-        var assigned = report.Rows.Where(x => x.Teacher == teacherName).Select(x => new { x.Student, x.StudentGrade }).Distinct().ToArray();
-        var regular = assigned.Where(s => report.Rows.Any(r => r.Teacher == teacherName && r.Student == s.Student && r.IsRegularTeacher)).OrderBy(s => GradeOrdering.SortKey(s.StudentGrade)).ThenBy(s => s.Student, StringComparer.Ordinal).ToArray();
-        var others = assigned.Except(regular).OrderBy(s => GradeOrdering.SortKey(s.StudentGrade)).ThenBy(s => s.Student, StringComparer.Ordinal).ToArray();
-        foreach (var s in regular.Concat(others)) AddStudentCalendarSection(document, report, s.Student, s.StudentGrade, includeTeacher: true, teacherLabels);
+        var allStudents = report.Rows.GroupBy(x => new { x.Student, x.StudentGrade }).OrderBy(x => GradeOrdering.SortKey(x.Key.StudentGrade)).ThenBy(x => x.Key.Student, StringComparer.Ordinal).Select(g => (g.Key.Student, Grade: g.Key.StudentGrade)).ToArray();
+        var regularIds = report.Rows.Where(r => r.Teacher == teacherName && r.IsRegularTeacher).Select(r => r.Student).ToHashSet();
+        var seasonalIds = report.Rows.Where(r => r.Teacher == teacherName).Select(r => r.Student).ToHashSet();
+        var ordered = allStudents.Where(s => regularIds.Contains(s.Student))
+            .Concat(allStudents.Where(s => seasonalIds.Contains(s.Student) && !regularIds.Contains(s.Student)))
+            .Concat(allStudents.Where(s => !regularIds.Contains(s.Student) && !seasonalIds.Contains(s.Student)));
+        foreach (var s in ordered) AddStudentCalendarSection(document, report, s.Student, s.Grade, includeTeacher: true, teacherLabels);
         Save(document, path);
     }
 

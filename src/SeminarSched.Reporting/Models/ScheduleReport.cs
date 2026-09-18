@@ -7,8 +7,14 @@ public sealed record TeacherUnavailabilityCell(string Date,string TimeSlot,strin
 /// <summary>
 /// TimeSlot.Codeは表示名(DisplayName)とは別の短いコード（"A"等）。Python版の生徒配布handoutページは
 /// 「{code}タイム」列を使うため、結合済みラベル文字列を後から分割するのではなく、この専用フィールドを使う。
+/// 区切り文字はPython版の実出力でレポートごとに異なる（handoutページは全角チルダ「～」、全体時間割の
+/// コマラベルセルは改行＋enダッシュ「–」）ため、生の開始/終了時刻も別々に保持する。
 /// </summary>
-public sealed record SlotDefinition(string Label,string Code,string TimeRangeText);
+public sealed record SlotDefinition(string Label,string Code,string StartTimeText,string EndTimeText)
+{
+    public string TimeRangeText => $"{StartTimeText}～{EndTimeText}";
+    public string OverviewLabelText => $"{Code}\n{StartTimeText}–{EndTimeText}";
+}
 
 /// <summary>Python版issue_builder.pyの未配置一覧1行。</summary>
 public sealed record UnassignedRequestRow(string Student,string Subject,int Required,int Placed,int Missing,string MainReason,IReadOnlyList<string> ResolutionCandidates,int Priority,string? RegularTeacher,bool OneToOneRequired,string Note);

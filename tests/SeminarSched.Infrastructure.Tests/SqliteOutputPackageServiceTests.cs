@@ -183,14 +183,16 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         var overview=workbook.Worksheets.First(ws=>ws.Name.StartsWith("週_",StringComparison.Ordinal));
         // The project also carries the default A/B/C slots seeded by SqliteProjectRepository.CreateAsync
         // alongside this test's own "1限"/"2限" slots, so slot rows must be located by label text rather
-        // than by an assumed row offset from one another.
-        var slot1Row=overview.CellsUsed().First(cell=>cell.GetString()=="1限 09:00-10:00").Address.RowNumber;
-        var slot2Row=overview.CellsUsed().First(cell=>cell.GetString()=="2限 10:00-11:00").Address.RowNumber;
+        // than by an assumed row offset from one another. The overview grid's slot label cell is
+        // "{code}\n{start}–{end}" (code = TimeSlot.Code, here "1"/"2", not the DisplayName "1限"/"2限").
+        var unavailableFill=XLColor.FromHtml("#D9D9D9");
+        var slot1Row=overview.CellsUsed().First(cell=>cell.GetString()=="1\n09:00–10:00").Address.RowNumber;
+        var slot2Row=overview.CellsUsed().First(cell=>cell.GetString()=="2\n10:00–11:00").Address.RowNumber;
         var teacherCol=overview.CellsUsed().First(cell=>cell.GetString()=="架空").Address.ColumnNumber;
         Assert.Equal("中2",overview.Cell(slot1Row,teacherCol).GetString());
         Assert.Equal(string.Empty,overview.Cell(slot2Row,teacherCol).GetString());
-        Assert.Equal(XLColor.LightGray,overview.Cell(slot2Row,teacherCol).Style.Fill.BackgroundColor);
-        Assert.NotEqual(XLColor.LightGray,overview.Cell(slot1Row,teacherCol).Style.Fill.BackgroundColor);
+        Assert.Equal(unavailableFill,overview.Cell(slot2Row,teacherCol).Style.Fill.BackgroundColor);
+        Assert.NotEqual(unavailableFill,overview.Cell(slot1Row,teacherCol).Style.Fill.BackgroundColor);
     }
 
     public void Dispose(){if(Directory.Exists(_directory))Directory.Delete(_directory,true);}

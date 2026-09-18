@@ -86,7 +86,7 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
         }
 
         var openDates=new List<DateOnly>();await using(var q=c.CreateCommand()){q.CommandText="SELECT Date FROM OpenDate WHERE IsOpen=1 ORDER BY Date;";await using var r=await q.ExecuteReaderAsync(token);while(await r.ReadAsync(token))openDates.Add(DateOnly.Parse(r.GetString(0)));}
-        var slotDefinitions=new List<SlotDefinition>();await using(var q=c.CreateCommand()){q.CommandText="SELECT Code,DisplayName,StartTime,EndTime FROM TimeSlot WHERE Active=1 ORDER BY SortOrder;";await using var r=await q.ExecuteReaderAsync(token);while(await r.ReadAsync(token)){var code=r.GetString(0);var displayName=r.GetString(1);var start=r.GetString(2);var end=r.GetString(3);slotDefinitions.Add(new($"{displayName} {start}-{end}",code,$"{start}～{end}"));}}
+        var slotDefinitions=new List<SlotDefinition>();await using(var q=c.CreateCommand()){q.CommandText="SELECT Code,DisplayName,StartTime,EndTime FROM TimeSlot WHERE Active=1 ORDER BY SortOrder;";await using var r=await q.ExecuteReaderAsync(token);while(await r.ReadAsync(token)){var code=r.GetString(0);var displayName=r.GetString(1);var start=r.GetString(2);var end=r.GetString(3);slotDefinitions.Add(new($"{displayName} {start}-{end}",code,start,end));}}
         var rows=new List<ScheduleReportRow>();await using(var q=c.CreateCommand()){q.CommandText="""
             SELECT d.Date,ts.DisplayName||' '||ts.StartTime||'-'||ts.EndTime,s.Name,s.Grade,sub.DisplayName,COALESCE(NULLIF(sub.ShortName,''),sub.DisplayName),t.Name,a.IsLocked,
                    CASE WHEN a.TeacherId=COALESCE(r.RegularTeacherId,p.RegularTeacherId) THEN 1 ELSE 0 END
