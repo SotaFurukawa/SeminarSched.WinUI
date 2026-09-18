@@ -84,6 +84,11 @@ public partial class App : Application
     /// </summary>
     public App()
     {
+        // アプリ内の文言はすべて日本語決め打ちだが、パッケージの既定言語をOSの表示言語に委ねている
+        // ため、OSが英語環境（またはビルド機の既定言語がen-US）だとDatePicker/CalendarViewなど
+        // WinUI組み込みコントロールの内蔵リソース（曜日名・月名等）が英語で表示されていた。
+        // XAML読み込み前に明示的にja-JPへ固定する。
+        Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride = "ja-JP";
         InitializeComponent();
     }
 

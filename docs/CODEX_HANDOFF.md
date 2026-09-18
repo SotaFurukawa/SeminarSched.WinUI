@@ -874,6 +874,20 @@ checkpoint 65はPython版のソースコード（`reporting/*_builder.py`）を�
 
 **未対応・既知の制約:** タスクバー進捗色はWindows APIの制約上「緑（実行中）」「黄〜オレンジ寄り（完了、Paused状態）」の2色で、正確な「オレンジ」そのものは指定できない。CP-SATのSolutionCallbackは引き続き未接続で、進捗率は壁時計ベースの近似のまま。
 
+### v0.1.0 checkpoint 69 (Claude) — ホーム画面の年度既定値バグ修正・アプリ全体を日本語表示に固定
+
+ユーザーから「ホームで年度の初期値が今の年度になっていない（デフォルト値がほしい）」「月日選択のカレンダーが英語になっている。他にも日本語であるべきものが英語になっている箇所があるので判断して直してほしい」との指摘。
+
+**年度が既定値にならない不具合の原因:** `HomePage.Page_Loaded`に`if(AcademicYearBox.Value==0){年度・開始日・終了日の既定値設定、ProjectDefinition_Changedの購読}`という「初回のみ実行」のつもりのガードがあったが、WinUIの`NumberBox.Value`は未設定時`double.NaN`であり`0`ではないため、この条件は常にfalseで、このブロック自体が一度も実行されていなかった。年度の既定値が入らないだけでなく、開始日・終了日の既定値（今日／今日+30日）も入らず、年度・講習区分を変更しても自動生成タイトルが更新されない（`ProjectDefinition_Changed`が未購読のため）という3つの不具合が同時に発生していた。`double.IsNaN(...)`判定へ修正し、すべて解消。
+
+**カレンダーが英語になる原因:** アプリ内の文言はすべて日本語のハードコードだが、パッケージの既定言語をOSの表示言語に委ねていたため、ビルド環境やOSの表示言語がen-USだと、`CalendarDatePicker`等WinUI組み込みコントロールの内蔵リソース（曜日名・月名等、自前では文言を持たない部分）だけ英語になっていた。`App()`コンストラクタの先頭で`Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride="ja-JP"`をXAML読み込み前に設定し、組み込みコントロールの表示言語をja-JPへ固定。
+
+**日本語であるべき箇所の洗い出し:** XAML・codebehindを一通り検索し、`SettingsPage.xaml`（NavigationViewの既定Settings項目の遷移先）がVisual Studioの既定テンプレートのまま「Settings」「This is the Settings page」という未翻訳の英語プレースホルダーだったのを発見、日本語へ差し替えた（既存の「アプリ情報」ページと役割が重複するため、内容は最小限のまま）。ログメッセージ（`App.Logger.Info/Error`の引数、例："Schedule run completed"）は開発者向けの内部診断ログであり画面には表示されないため対象外とした。
+
+**動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全126 tests passed（挙動変更はUI層のみ）。アプリを再ビルド・起動確認済み。年度の初期値・カレンダーの表示言語・設定ページの文言は実機でユーザー側の確認をお願いしたい。
+
+**未対応:** 「あなたの判断で日本語に戻してください」との指示のうち、今回はXAML/codebehindの静的な文言と組み込みコントロールの言語設定のみを対象にした。実行時にしか現れないダイアログ・エラーメッセージ等で見落としがあれば、追加で報告してほしい。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

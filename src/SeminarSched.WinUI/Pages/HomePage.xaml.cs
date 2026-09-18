@@ -21,7 +21,10 @@ public sealed partial class HomePage : Page
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
-        if (AcademicYearBox.Value == 0)
+        // NumberBoxの未設定値はdouble.NaNであり0ではないため、この判定は常にfalseとなり
+        // 年度・開始/終了日の既定値設定とProjectDefinition_Changedの購読が一度も実行されない
+        // 不具合があった（ユーザー報告：年度の初期値が今の年度になっていない）。
+        if (double.IsNaN(AcademicYearBox.Value))
         {
             AcademicYearBox.Value = DateTime.Today.Year;
             StartDatePicker.Date = DateTimeOffset.Now.Date;

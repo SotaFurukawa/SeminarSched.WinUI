@@ -13,7 +13,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Settings" />
-        <TextBlock Grid.Row="1" Text="This is the Settings page" />
+        <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="設定" />
+        <TextBlock Grid.Row="1" Text="現在このアプリに個別の設定項目はありません。バージョン情報は「アプリ情報」をご覧ください。" TextWrapping="Wrap" />
     </Grid>
 </Page>
