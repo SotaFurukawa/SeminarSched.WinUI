@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題はv0.2.0以降）
-Latest Development Checkpoint: `999dc3c`（v0.1.0 checkpoint 54, 保存先・命名の一元管理）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint 51のproject open crash修正後、アプリはユーザー操作で終了した模様（新たなエラーログなし）。checkpoint 54の新Picker API（開始folder固定）も実機未確認。
+Latest Development Checkpoint: `037515d`（v0.1.0 checkpoint 54, 保存先・命名の一元管理 + v0.1.0 Draft Release作成）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
 Latest Draft Release: `v0.1.0`（GitHub上にDraftとして作成済み。ユーザーより「v1.9.5とほぼ同等の内容が実装できたと思ったらdraft releaseしてほしい」との指示を受け、checkpoint 54完了時点で作成）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -580,7 +580,7 @@ Feature Parity行「講師配布（学年順）」の残課題「A4サイズへ�
 - 共通基本情報Excel（SetupPage）・CSV/XLSX取込（ImportPage）はPython版も固定folder化していないため、旧`Windows.Storage.Pickers`のまま変更していない。
 - 新規テスト2件: `CreateAutomaticBackupAsync`のcross-project prune分離検証（`SqliteProjectRepositoryTests.cs`）、`DefaultProjectsAndBackupDirectories_AreCentralizedUnderLocalAppDataAndExist`（`ProjectServiceTests.cs`）。
 - Release/x64 build: warning 0 / error 0。全101 tests passed（新規1件、既存2件を仕様変更に追従）。Privacy gate成功。
-- **実機未確認**: 新しいPicker APIを使った実際のdialog操作感（開始folderが正しく`Workspace\Projects`等になっているか）は、この環境では視覚確認できないため、ユーザーによる実機確認が必要。
+- **実機確認済み**: ユーザーが実際にアプリを操作し、保存先が固定folderになっていることを確認した（2026-09-18）。project open crash修正（checkpoint 51）も、この確認操作を通じて間接的に動作を確認できた。
 
 ### v0.1.0 Draft Release作成 (Claude)
 
