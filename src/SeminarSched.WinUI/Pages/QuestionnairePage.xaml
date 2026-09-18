@@ -1,3 +1,14 @@
 <local:WorkflowPageBase x:Class="SeminarSched_WinUI.Pages.QuestionnairePage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:SeminarSched_WinUI.Pages" Loaded="Page_Loaded">
-    <StackPanel Padding="24" Spacing="16"><TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="② アンケート作成"/><InfoBar x:Name="ProjectRequired"/><InfoBar x:Name="Status" IsClosable="True"/><TextBlock Text="設定した開校日・コマ・科目から、生徒用と講師用のGoogleフォーム作成キットを生成します。" TextWrapping="Wrap"/><Button x:Name="GenerateButton" Content="作成キットを保存" Click="Generate_Click" Style="{StaticResource AccentButtonStyle}"/><TextBlock Text="生成されたCode.gsをGoogle Apps Scriptへ貼り付けて実行します。回答データを外部サービスへ自動送信しません。" TextWrapping="Wrap"/></StackPanel>
+    <ScrollViewer><StackPanel MaxWidth="720" Padding="24" HorizontalAlignment="Left" Spacing="16">
+        <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="② アンケート作成"/>
+        <InfoBar x:Name="ProjectRequired"/>
+        <InfoBar x:Name="Status" IsClosable="True"/>
+        <TextBlock Text="設定した開校日・コマ・科目から、生徒用・講師用・講師指導可能科目用のGoogleフォーム作成キット（3本のApps Script）を生成します。生成されるフォーム回答は③アンケート取込みでそのまま取り込めます。" TextWrapping="Wrap"/>
+        <TextBox x:Name="StudentTitleBox" Header="生徒用フォーム名"/>
+        <TextBox x:Name="TeacherTitleBox" Header="講師用フォーム名（勤務可能日時）"/>
+        <CalendarDatePicker x:Name="DeadlinePicker" Header="回答締切"/>
+        <TextBox x:Name="ContactBox" Header="問い合わせ先" Text="校舎へお問い合わせください"/>
+        <Button x:Name="GenerateButton" Content="作成キットを保存" Click="Generate_Click" Style="{StaticResource AccentButtonStyle}"/>
+        <TextBlock Text="生成されたCode.gsをGoogle Apps Scriptへ貼り付けて実行します。回答データを外部サービスへ自動送信しません。" TextWrapping="Wrap"/>
+    </StackPanel></ScrollViewer>
 </local:WorkflowPageBase>

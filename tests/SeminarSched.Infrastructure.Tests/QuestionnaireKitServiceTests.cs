@@ -13,35 +13,57 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "SeminarSched.Tests", Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public async Task GenerateAsync_WritesConfiguredAppsScriptAtomically()
+    public async Task GenerateAsync_WritesThreeAppsScriptsAtomicallyWithSurveyCompatibleHeaders()
     {
         var path = Path.Combine(_directory, "project.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
         var course = new SqliteCourseSettingsRepository();
         var master = new SqliteMasterDataRepository();
-        var slot = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "1", "1限", new TimeOnly(9, 0), new TimeOnly(10, 20), 1));
+        var slot = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "Z", "Z", new TimeOnly(15, 40), new TimeOnly(17, 0), 1));
         await course.SaveCourseDayAsync(path, new CourseDay(new DateOnly(2026, 7, 20), true, "", [slot.Id]));
-        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH", "算数", "算", "小学校", 1));
-        await master.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "数学", "数", "中学", 2));
-        await master.SaveSubjectAsync(path, new Subject(0, "HS_MATH", "数学", "数", "高等学校", 3));
-        await master.SaveSubjectAsync(path, new Subject(0, "ADULT_MATH", "数学（社会人）", "数", "社会人", 4));
+        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH", "小学校・算数", "算数", "小学校", 1));
+        await master.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "中学校・数学", "数学", "中学校", 2));
+        await master.SaveSubjectAsync(path, new Subject(0, "HS_MATH", "高校・数学IA", "数学IA", "高校", 3));
 
-        var output = await new QuestionnaireKitService(course, master).GenerateAsync(path, _directory);
+        var output = await new QuestionnaireKitService(course, master).GenerateAsync(path, _directory, "2026夏期講習", "2026夏期講習 個別指導受講申込", "2026夏期講習 非常勤勤務アンケート", "2026-07-06", "校舎へお問い合わせください");
 
-        var script = await File.ReadAllTextAsync(Path.Combine(output, "Code.gs"));
-        Assert.Contains("2026-07-20", script);
-        Assert.Contains("createSeminarSchedForms", script);Assert.Contains("createStudentForm", script);Assert.Contains("createTeacherForm", script);Assert.Contains("createTeacherQualificationForm", script);
-        Assert.Contains("GRADE_CHOICES", script);
+        var studentScript = await File.ReadAllTextAsync(Path.Combine(output, "create_student_questionnaire.gs"));
+        var teacherScript = await File.ReadAllTextAsync(Path.Combine(output, "create_teacher_questionnaire.gs"));
+        var teacherSubjectScript = await File.ReadAllTextAsync(Path.Combine(output, "create_teacher_subject_questionnaire.gs"));
+        Assert.True(File.Exists(Path.Combine(output, "Googleフォーム作成手順.txt")));
 
-        var jsonStart = script.IndexOf('{', script.IndexOf("const CONFIG", StringComparison.Ordinal));
-        var jsonEnd = script.IndexOf("};", jsonStart, StringComparison.Ordinal);
-        using var config = System.Text.Json.JsonDocument.Parse(script[jsonStart..(jsonEnd + 1)]);
-        var byLevel = config.RootElement.GetProperty("subjectsByLevel");
-        Assert.Equal("ES_MATH", byLevel.GetProperty("elementary")[0].GetProperty("Code").GetString());
-        Assert.Equal("JH_MATH", byLevel.GetProperty("juniorHigh")[0].GetProperty("Code").GetString());
-        Assert.Equal("HS_MATH", byLevel.GetProperty("seniorHigh")[0].GetProperty("Code").GetString());
-        Assert.Equal("ADULT_MATH", byLevel.GetProperty("other")[0].GetProperty("Code").GetString());
+        Assert.Contains("function createStudentQuestionnaire()", studentScript);
+        Assert.Contains("受講教科（${schoolLabel}${index}教科目）", studentScript);
+        Assert.Contains("受講不可日時（チェックしたコマは受講不可）", studentScript);
+        Assert.Contains("\"2026-07-20\"", studentScript);
+        Assert.Contains("\"Z 15:40～17:00\"", studentScript);
+        Assert.Contains("\"算数\"", studentScript);
+        Assert.DoesNotContain("小学校・算数", studentScript);
+
+        Assert.Contains("function createTeacherQuestionnaire()", teacherScript);
+        Assert.Contains("出勤不可日時（チェックしたコマは出勤不可）", teacherScript);
+        Assert.DoesNotContain("\"subjectsBySchoolLevel\"", teacherScript);
+
+        Assert.Contains("function createTeacherSubjectQuestionnaire()", teacherSubjectScript);
+        Assert.Contains("小学校・算数", teacherSubjectScript);
+        Assert.DoesNotContain("\"openDates\"", teacherSubjectScript);
+
         Assert.Empty(Directory.GetDirectories(_directory, "*.tmp-*"));
+    }
+
+    [Fact]
+    public async Task GenerateAsync_MissingSchoolLevelSubjects_Throws()
+    {
+        var path = Path.Combine(_directory, "project.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
+        var course = new SqliteCourseSettingsRepository();
+        var master = new SqliteMasterDataRepository();
+        var slot = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "Z", "Z", new TimeOnly(15, 40), new TimeOnly(17, 0), 1));
+        await course.SaveCourseDayAsync(path, new CourseDay(new DateOnly(2026, 7, 20), true, "", [slot.Id]));
+        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH", "小学校・算数", "算数", "小学校", 1));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new QuestionnaireKitService(course, master).GenerateAsync(path, _directory, "2026夏期講習", "生徒用", "講師用", "2026-07-06", "問い合わせ先"));
     }
 
     public void Dispose() { if (Directory.Exists(_directory)) Directory.Delete(_directory, true); }
