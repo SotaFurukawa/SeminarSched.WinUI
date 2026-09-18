@@ -9,7 +9,7 @@ using Windows.UI;
 
 namespace SeminarSched_WinUI.Pages;
 
-public sealed partial class ScheduleEditorPage : Page
+public sealed partial class ScheduleEditorPage : WorkflowPageBase
 {
     private readonly HashSet<long> _extraTeacherIds = [];
     private ScheduleBoard? _currentBoard;
@@ -27,8 +27,8 @@ public sealed partial class ScheduleEditorPage : Page
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         UpdateUndoRedoButtons();
-        var ready = App.ProjectService.Current is not null;
-        PreconfirmButton.IsEnabled = ready;
+        var ready = EnsureProject(ProjectRequired);
+        ContentPanel.IsEnabled = ready;
         if (ready) await ReloadEditorAsync();
     }
 

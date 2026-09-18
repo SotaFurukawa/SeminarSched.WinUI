@@ -5,7 +5,7 @@ using SeminarSched_WinUI.ViewModels;
 
 namespace SeminarSched_WinUI.Pages;
 
-public sealed partial class OptimizationPage : Page
+public sealed partial class OptimizationPage : WorkflowPageBase
 {
     private CancellationTokenSource? _saveDebounce;
     private bool _isLoaded;
@@ -25,7 +25,9 @@ public sealed partial class OptimizationPage : Page
             ViewModel.Select((int)settings.OptimizationQualityLevel);
             QualitySlider.Value = ViewModel.SliderValue;
             _isLoaded = true;
-            RunButton.IsEnabled = App.ProjectService.Current is not null;
+            var ready = EnsureProject(ProjectRequired);
+            ContentPanel.IsEnabled = ready;
+            RunButton.IsEnabled = ready;
         }
         catch (IOException)
         {

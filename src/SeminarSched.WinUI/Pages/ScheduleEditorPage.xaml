@@ -1,14 +1,17 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<Page
+<local:WorkflowPageBase
     x:Class="SeminarSched_WinUI.Pages.ScheduleEditorPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="using:SeminarSched_WinUI.Pages"
     Loaded="Page_Loaded"
     mc:Ignorable="d">
 
-    <ScrollViewer>
+    <StackPanel>
+        <InfoBar x:Name="ProjectRequired" Margin="24,16,24,0" />
+        <ScrollViewer x:Name="ContentPanel">
         <StackPanel MaxWidth="1200" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="20">
             <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="時間割編集" />
             <TextBlock
@@ -75,5 +78,6 @@
                 </StackPanel>
             </Border>
         </StackPanel>
-    </ScrollViewer>
-</Page>
+        </ScrollViewer>
+    </StackPanel>
+</local:WorkflowPageBase>
