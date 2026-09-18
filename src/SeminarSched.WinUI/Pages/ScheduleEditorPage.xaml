@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="SeminarSched_WinUI.Pages.ScheduleEditorPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Loaded="Page_Loaded"
+    mc:Ignorable="d">
+
+    <ScrollViewer>
+        <StackPanel MaxWidth="1200" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="20">
+            <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="時間割編集" />
+            <TextBlock
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="あらかじめ指定したいコマをドラッグ・ドロップで指定してください。未配置一覧からセルへドラッグして配置、配置済みカードはセル間や右クリックメニューで移動・ロック・削除できます。"
+                TextWrapping="Wrap" />
+            <InfoBar x:Name="EditorStatus" IsClosable="True" />
+
+            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                <StackPanel Spacing="12">
+                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="事前確定" />
+                    <TextBlock Text="あらかじめ調整された1枠を固定します。複数回登録する場合は1枠ずつ繰り返してください。ロックされた枠には自動作成で配置しません。" TextWrapping="Wrap" />
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <ComboBox x:Name="PreconfirmRequest" Header="生徒・科目" DisplayMemberPath="Label"/>
+                        <ComboBox x:Name="PreconfirmTeacher" Grid.Column="1" Header="担当講師" DisplayMemberPath="Label"/>
+                        <ComboBox x:Name="PreconfirmSlot" Grid.Column="2" Header="日付・コマ" DisplayMemberPath="Label"/>
+                    </Grid>
+                    <Button x:Name="PreconfirmButton" Content="この1枠を固定" Click="Preconfirm_Click" Style="{StaticResource AccentButtonStyle}"/>
+                </StackPanel>
+            </Border>
+
+            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                <StackPanel Spacing="12">
+                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="配置一覧・手動配置" />
+                    <TextBlock Text="手動配置は次回の自動作成でも位置を維持します。ロックすると自動作成でも移動・削除できなくなります。" TextWrapping="Wrap" />
+                    <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="ManualRequest" Header="受講希望"/><ComboBox x:Name="ManualTeacher" Grid.Column="1" Header="講師"/><ComboBox x:Name="ManualSlot" Grid.Column="2" Header="日時・コマ"/></Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="8"><CheckBox x:Name="ManualLocked" Content="ロックして追加"/><Button Content="手動配置を追加" Click="AddManual_Click" Style="{StaticResource AccentButtonStyle}"/><Button Content="選択した手動配置を削除" Click="RemoveManual_Click"/><Button Content="選択項目のロック切替" Click="ToggleLock_Click"/><Button Content="自動配置だけリセット" Click="ResetAutomatic_Click"/></StackPanel>
+                    <ListView x:Name="Assignments" MaxHeight="360" SelectionMode="Single"/>
+                </StackPanel>
+            </Border>
+
+            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                <StackPanel Spacing="12">
+                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="日別グリッド編集"/>
+                    <TextBlock Text="カードをドラッグしてセル間を移動、未配置一覧からはセルへドラッグして配置できます。右クリックでロック切替・削除、セル右上の丸印/バツ印で講師の出勤可否を切り替えられます。「元に戻す」「やり直す」で自動作成を含む直前の変更を取り消し・再適用できます（アプリを終了すると履歴は失われます）。" TextWrapping="Wrap"/>
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <ComboBox x:Name="BoardDate" Header="日付" DisplayMemberPath="Label" MinWidth="200" SelectionChanged="BoardDate_SelectionChanged"/>
+                        <TextBox x:Name="BoardSearch" Grid.Column="1" Header="生徒名検索" TextChanged="BoardSearch_TextChanged"/>
+                        <Button x:Name="UndoButton" Grid.Column="2" VerticalAlignment="Bottom" Content="元に戻す" IsEnabled="False" Click="Undo_Click"/>
+                        <Button x:Name="RedoButton" Grid.Column="3" VerticalAlignment="Bottom" Content="やり直す" IsEnabled="False" Click="Redo_Click"/>
+                        <Button x:Name="AddTeacherButton" Grid.Column="4" VerticalAlignment="Bottom" Content="+ 講師を表示" Click="AddTeacher_Click"/>
+                        <Button x:Name="GoToOptimizationButton" Grid.Column="5" VerticalAlignment="Bottom" Content="⑤ 時間割自動作成へ" Click="GoToOptimization_Click"/>
+                    </Grid>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <StackPanel Spacing="8">
+                            <TextBlock FontWeight="SemiBold" Text="未配置"/>
+                            <ListView x:Name="UnplacedList" MaxHeight="480" CanDragItems="True" DragItemsStarting="UnplacedList_DragItemsStarting"/>
+                        </StackPanel>
+                        <ScrollViewer x:Name="BoardScroll" Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="480" ViewChanged="BoardScroll_ViewChanged">
+                            <Grid x:Name="BoardGrid"/>
+                        </ScrollViewer>
+                    </Grid>
+                    <TextBlock Margin="0,12,0,0" FontSize="16" FontWeight="SemiBold" Text="複数コマ・複数講師の出勤可否を一括設定"/>
+                    <TextBlock Text="表示中の講師とこの日のコマをそれぞれ複数選び、まとめて出勤可否を切り替えます。" TextWrapping="Wrap"/>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4"><TextBlock Text="講師"/><ListView x:Name="BulkAvailabilityTeachers" SelectionMode="Multiple" MaxHeight="160" DisplayMemberPath="Label"/></StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="コマ"/><ListView x:Name="BulkAvailabilitySlots" SelectionMode="Multiple" MaxHeight="160" DisplayMemberPath="Label"/></StackPanel>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="選択を出勤不可にする" Click="BulkSetUnavailable_Click"/><Button Content="選択を出勤可能にする" Click="BulkSetAvailable_Click"/></StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

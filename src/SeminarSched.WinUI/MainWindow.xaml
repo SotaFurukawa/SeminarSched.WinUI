@@ -54,10 +54,10 @@
                 <NavigationViewItem Content="③ アンケート取込み" Tag="import">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE8B5;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="④ 事前確定" Tag="preconfirmation">
+                <NavigationViewItem Content="④ 時間割編集" Tag="scheduleEditor">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE73E;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="⑤ 時間割" Tag="optimization">
+                <NavigationViewItem Content="⑤ 時間割自動作成" Tag="optimization">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE9D9;" />
                     </NavigationViewItem.Icon>

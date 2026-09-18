@@ -20,8 +20,10 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
         var manual=Assert.Single(await editor.GetAssignmentsAsync(state.Path));Assert.True(manual.IsManual);Assert.False(manual.IsLocked);
         var optimized=await new SqliteScheduleRunService().RunAsync(state.Path,TimeSpan.FromSeconds(2));Assert.Equal(0,optimized.PlacedLessons);Assert.Equal(0,optimized.UnassignedLessons);manual=Assert.Single(await editor.GetAssignmentsAsync(state.Path));Assert.True(manual.IsManual);
         await editor.SetLockedAsync(state.Path,manual.Id,true);Assert.True(Assert.Single(await editor.GetAssignmentsAsync(state.Path)).IsLocked);
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>editor.RemoveManualAsync(state.Path,manual.Id));
+        await editor.SetLockedAsync(state.Path,manual.Id,false);
         await editor.RemoveManualAsync(state.Path,manual.Id);Assert.Empty(await editor.GetAssignmentsAsync(state.Path));
-        await using var connection=new SqliteConnection($"Data Source={state.Path};Pooling=False");await connection.OpenAsync();await using var command=connection.CreateCommand();command.CommandText="SELECT COUNT(*) FROM AuditLog WHERE Action IN('manual_assignment_added','assignment_lock_changed','manual_assignment_removed');";Assert.Equal(3L,Convert.ToInt64(await command.ExecuteScalarAsync()));
+        await using var connection=new SqliteConnection($"Data Source={state.Path};Pooling=False");await connection.OpenAsync();await using var command=connection.CreateCommand();command.CommandText="SELECT COUNT(*) FROM AuditLog WHERE Action IN('manual_assignment_added','assignment_lock_changed','manual_assignment_removed');";Assert.Equal(4L,Convert.ToInt64(await command.ExecuteScalarAsync()));
     }
 
     [Fact]

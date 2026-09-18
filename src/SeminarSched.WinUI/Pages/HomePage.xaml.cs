@@ -377,6 +377,7 @@ public sealed partial class HomePage : Page
 
     private void RefreshCurrentProject()
     {
+        ScheduleUndoState.Clear();
         var current = App.ProjectService.Current;
         CurrentProjectTitle.Text = current?.Title ?? "プロジェクトは開かれていません";
         CurrentProjectPeriod.Text = current is null

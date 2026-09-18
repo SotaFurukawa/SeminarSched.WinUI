@@ -58,8 +58,8 @@ public sealed partial class MainWindow : Window
                 case "import":
                     NavFrame.Navigate(typeof(ImportPage));
                     break;
-                case "preconfirmation":
-                    NavFrame.Navigate(typeof(PreconfirmationPage));
+                case "scheduleEditor":
+                    NavFrame.Navigate(typeof(ScheduleEditorPage));
                     break;
                 case "output":
                     NavFrame.Navigate(typeof(OutputPage));

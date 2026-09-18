@@ -47,24 +47,8 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
         return result;
     }
 
-    public async Task<IReadOnlyList<FixedLesson>> GetFixedLessonsAsync(string projectPath, CancellationToken cancellationToken = default)
-    {
-        await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
-        await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT a.Id,a.LessonRequestId,a.TeacherId,a.OpenDateId,a.TimeSlotId,d.Date||' '||ts.DisplayName||' / '||s.Name||' / '||te.Name FROM Assignment a JOIN LessonRequest r ON r.Id=a.LessonRequestId JOIN Student s ON s.Id=r.StudentId JOIN Teacher te ON te.Id=a.TeacherId JOIN OpenDate d ON d.Id=a.OpenDateId JOIN TimeSlot ts ON ts.Id=a.TimeSlotId WHERE a.IsLocked=1 ORDER BY d.Date,ts.SortOrder;";
-        var result = new List<FixedLesson>();
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            result.Add(new FixedLesson(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3), reader.GetInt64(4), reader.GetString(5)));
-        return result;
-    }
-
-    public async Task AddAsync(string projectPath, long requestId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken = default)
-        => await AddCoreAsync(projectPath, requestId, teacherId, openDateId, timeSlotId, true, false, "preconfirmed", cancellationToken).ConfigureAwait(false);
-
     internal async Task AddManualAsync(string projectPath, long requestId, long teacherId, long openDateId, long timeSlotId, bool isLocked, CancellationToken cancellationToken = default)
-        => await AddCoreAsync(projectPath, requestId, teacherId, openDateId, timeSlotId, isLocked, true, "manual", cancellationToken).ConfigureAwait(false);
+        => await AddCoreAsync(projectPath, requestId, teacherId, openDateId, timeSlotId, isLocked, cancellationToken).ConfigureAwait(false);
 
     internal async Task MoveAsync(string projectPath, long assignmentId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken = default)
     {
@@ -131,7 +115,9 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
             throw new InvalidOperationException("移動先の開講コマが無効です。");
     }
 
-    private static async Task AddCoreAsync(string projectPath, long requestId, long teacherId, long openDateId, long timeSlotId, bool isLocked, bool isManual, string source, CancellationToken cancellationToken)
+    // Python版と同様、事前確定は専用の種別を持たず「手動配置（IsManual=1）＋ロック（IsLocked=1)」として
+    // 保存する。isLockedの値だけで、通常の手動配置か事前確定かを監査ログ上区別する。
+    private static async Task AddCoreAsync(string projectPath, long requestId, long teacherId, long openDateId, long timeSlotId, bool isLocked, CancellationToken cancellationToken)
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
         await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
@@ -147,29 +133,17 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
         add.Transaction = transaction;
         add.CommandText = """
             INSERT INTO Assignment(LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source,SessionIndex,IsManual)
-            VALUES($request,$teacher,$date,$slot,$locked,$source,$session,$manual);
+            VALUES($request,$teacher,$date,$slot,$locked,'manual',$session,1);
             """;
         add.Parameters.AddWithValue("$request", requestId);
         add.Parameters.AddWithValue("$teacher", teacherId);
         add.Parameters.AddWithValue("$date", openDateId);
         add.Parameters.AddWithValue("$slot", timeSlotId);
         add.Parameters.AddWithValue("$locked", isLocked);
-        add.Parameters.AddWithValue("$source", source);
         add.Parameters.AddWithValue("$session", request.AssignedSessions + 1);
-        add.Parameters.AddWithValue("$manual", isManual);
         await add.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        await using var audit=connection.CreateCommand();audit.Transaction=transaction;audit.CommandText="INSERT INTO AuditLog(ProjectId,TimestampUtc,Action,EntityType,EntityId,AfterJson,Reason,Source,OperationId) VALUES(1,$utc,$action,'assignment',$entity,$after,$reason,'manual',$operation);";audit.Parameters.AddWithValue("$utc",DateTimeOffset.UtcNow.ToString("O",CultureInfo.InvariantCulture));audit.Parameters.AddWithValue("$action",isManual?"manual_assignment_added":"preconfirmed_assignment_added");audit.Parameters.AddWithValue("$entity",requestId.ToString(CultureInfo.InvariantCulture));audit.Parameters.AddWithValue("$after",JsonSerializer.Serialize(new{teacherId,openDateId,timeSlotId,isLocked,isManual}));audit.Parameters.AddWithValue("$reason",isManual?"時間割手動配置":"事前確定授業");audit.Parameters.AddWithValue("$operation",Guid.NewGuid().ToString("N"));await audit.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await using var audit=connection.CreateCommand();audit.Transaction=transaction;audit.CommandText="INSERT INTO AuditLog(ProjectId,TimestampUtc,Action,EntityType,EntityId,AfterJson,Reason,Source,OperationId) VALUES(1,$utc,$action,'assignment',$entity,$after,$reason,'manual',$operation);";audit.Parameters.AddWithValue("$utc",DateTimeOffset.UtcNow.ToString("O",CultureInfo.InvariantCulture));audit.Parameters.AddWithValue("$action",isLocked?"preconfirmed_assignment_added":"manual_assignment_added");audit.Parameters.AddWithValue("$entity",requestId.ToString(CultureInfo.InvariantCulture));audit.Parameters.AddWithValue("$after",JsonSerializer.Serialize(new{teacherId,openDateId,timeSlotId,isLocked}));audit.Parameters.AddWithValue("$reason",isLocked?"事前確定授業":"時間割手動配置");audit.Parameters.AddWithValue("$operation",Guid.NewGuid().ToString("N"));await audit.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    public async Task RemoveAsync(string projectPath, long assignmentId, CancellationToken cancellationToken = default)
-    {
-        await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
-        await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
-        await using var command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM Assignment WHERE Id=$id AND IsLocked=1;";
-        command.Parameters.AddWithValue("$id", assignmentId);
-        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<RequestState> ReadRequestAsync(SqliteConnection connection, SqliteTransaction transaction, long requestId, long openDateId, long timeSlotId, CancellationToken cancellationToken)
