@@ -49,6 +49,19 @@ public sealed record TeacherUnavailabilitySnapshotRow(long TeacherId, long OpenD
 
 public sealed record ScheduleSnapshot(IReadOnlyList<AssignmentSnapshotRow> Assignments, IReadOnlyList<TeacherUnavailabilitySnapshotRow> TeacherUnavailabilities);
 
+// 再最適化の差分表示（④「自動作成の差分」カード）でIDを人間可読な文字列へ解決するための
+// 軽量ルックアップ。プロジェクト全体のRequest/Teacher/Date/Slotを一括取得してUI側で使い回す。
+public sealed record ScheduleLabelSet(
+    IReadOnlyDictionary<long, string> RequestLabels,
+    IReadOnlyDictionary<long, string> TeacherLabels,
+    IReadOnlyDictionary<long, string> DateLabels,
+    IReadOnlyDictionary<long, string> SlotLabels)
+{
+    public string Request(long id) => RequestLabels.GetValueOrDefault(id, $"#{id}");
+    public string Teacher(long id) => TeacherLabels.GetValueOrDefault(id, $"#{id}");
+    public string DateSlot(long dateId, long slotId) => $"{DateLabels.GetValueOrDefault(dateId, $"#{dateId}")} {SlotLabels.GetValueOrDefault(slotId, $"#{slotId}")}";
+}
+
 public sealed record AuditHistoryEntry(DateTimeOffset TimestampUtc, string ActionLabel, string? Reason)
 {
     public override string ToString() => $"{TimestampUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}　{ActionLabel}{(string.IsNullOrWhiteSpace(Reason) ? "" : $"　({Reason})")}";
@@ -97,4 +110,5 @@ public interface IScheduleEditorService
     Task<ScheduleSnapshot> CaptureSnapshotAsync(string projectPath, CancellationToken cancellationToken = default);
     Task RestoreSnapshotAsync(string projectPath, ScheduleSnapshot snapshot, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AuditHistoryEntry>> GetAuditHistoryAsync(string projectPath, int limit = 50, CancellationToken cancellationToken = default);
+    Task<ScheduleLabelSet> GetLabelSetAsync(string projectPath, CancellationToken cancellationToken = default);
 }

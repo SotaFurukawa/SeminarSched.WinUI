@@ -42,6 +42,18 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetLabelSetAsync_ResolvesRequestTeacherDateAndSlotLabels()
+    {
+        var state=await CreateStateAsync();var editor=new SqliteScheduleEditorService();
+        var labels=await editor.GetLabelSetAsync(state.Path);
+        Assert.Contains("架空 編集生徒",labels.Request(state.RequestId));
+        Assert.Contains("編集科目",labels.Request(state.RequestId));
+        Assert.Contains("架空 編集講師",labels.Teacher(state.TeacherId));
+        Assert.Contains("1限",labels.DateSlot(state.DateId,state.SlotId));
+        Assert.StartsWith("#",labels.Teacher(-1));
+    }
+
+    [Fact]
     public async Task ResetAutomatic_LeavesManualAndLockedAssignments()
     {
         var state=await CreateStateAsync();var editor=new SqliteScheduleEditorService();await editor.AddManualAsync(state.Path,state.RequestId,state.TeacherId,state.DateId,state.SlotId,false);

@@ -93,31 +93,60 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
     {
         if (ScheduleUndoState.ReoptimizationBaseline is not { } baseline) { DiffCard.Visibility = Visibility.Collapsed; return; }
         var current = await App.ScheduleEditor.CaptureSnapshotAsync(path);
-        var (newlyPlaced, dateChanged, teacherChanged, unassigned) = ComputeDiff(baseline, current);
+        var labels = await App.ScheduleEditor.GetLabelSetAsync(path);
+        var (newlyPlaced, dateChanged, teacherChanged, unassigned, details) = ComputeDiff(baseline, current, labels);
+        DiffCard.Visibility = Visibility.Visible;
         if (newlyPlaced == 0 && dateChanged == 0 && teacherChanged == 0 && unassigned == 0)
         {
-            DiffCard.Visibility = Visibility.Visible;
             DiffSummary.Text = "比較対象との差分はありません。";
+            DiffDetailList.ItemsSource = null;
             return;
         }
-        DiffCard.Visibility = Visibility.Visible;
         DiffSummary.Text = $"新規配置: {newlyPlaced}件　日時変更: {dateChanged}件　講師変更: {teacherChanged}件　未配置化: {unassigned}件";
+        DiffDetailList.ItemsSource = details;
     }
 
-    private static (int NewlyPlaced, int DateChanged, int TeacherChanged, int Unassigned) ComputeDiff(ScheduleSnapshot before, ScheduleSnapshot after)
+    // Python版の差分タブはカード単位の詳細（誰が・どう変わったか）を表示するため、集計件数に加えて
+    // 受講希望（生徒/科目）ごとの変化内容も一覧化する。
+    private sealed record DiffDetail(string Kind, string CardLabel, string Detail)
+    {
+        public override string ToString() => $"[{Kind}] {CardLabel}　{Detail}";
+    }
+
+    private static (int NewlyPlaced, int DateChanged, int TeacherChanged, int Unassigned, IReadOnlyList<DiffDetail> Details) ComputeDiff(ScheduleSnapshot before, ScheduleSnapshot after, ScheduleLabelSet labels)
     {
         var beforeByKey = before.Assignments.ToDictionary(a => (a.LessonRequestId, a.SessionIndex));
         var afterByKey = after.Assignments.ToDictionary(a => (a.LessonRequestId, a.SessionIndex));
         var newlyPlaced = 0; var dateChanged = 0; var teacherChanged = 0; var unassigned = 0;
+        var details = new List<DiffDetail>();
         foreach (var (key, afterRow) in afterByKey)
         {
-            if (!beforeByKey.TryGetValue(key, out var beforeRow)) { newlyPlaced++; continue; }
-            if (beforeRow.OpenDateId != afterRow.OpenDateId || beforeRow.TimeSlotId != afterRow.TimeSlotId) dateChanged++;
-            if (beforeRow.TeacherId != afterRow.TeacherId) teacherChanged++;
+            var cardLabel = labels.Request(key.LessonRequestId);
+            if (!beforeByKey.TryGetValue(key, out var beforeRow))
+            {
+                newlyPlaced++;
+                details.Add(new DiffDetail("新規配置", cardLabel, $"{labels.DateSlot(afterRow.OpenDateId, afterRow.TimeSlotId)}（{labels.Teacher(afterRow.TeacherId)}）"));
+                continue;
+            }
+            if (beforeRow.OpenDateId != afterRow.OpenDateId || beforeRow.TimeSlotId != afterRow.TimeSlotId)
+            {
+                dateChanged++;
+                details.Add(new DiffDetail("日時変更", cardLabel, $"{labels.DateSlot(beforeRow.OpenDateId, beforeRow.TimeSlotId)} → {labels.DateSlot(afterRow.OpenDateId, afterRow.TimeSlotId)}"));
+            }
+            if (beforeRow.TeacherId != afterRow.TeacherId)
+            {
+                teacherChanged++;
+                details.Add(new DiffDetail("講師変更", cardLabel, $"{labels.Teacher(beforeRow.TeacherId)} → {labels.Teacher(afterRow.TeacherId)}"));
+            }
         }
         foreach (var key in beforeByKey.Keys)
-            if (!afterByKey.ContainsKey(key)) unassigned++;
-        return (newlyPlaced, dateChanged, teacherChanged, unassigned);
+        {
+            if (afterByKey.ContainsKey(key)) continue;
+            unassigned++;
+            var beforeRow = beforeByKey[key];
+            details.Add(new DiffDetail("未配置化", labels.Request(key.LessonRequestId), labels.DateSlot(beforeRow.OpenDateId, beforeRow.TimeSlotId)));
+        }
+        return (newlyPlaced, dateChanged, teacherChanged, unassigned, details);
     }
 
     private async void Preconfirm_Click(object sender, RoutedEventArgs e)

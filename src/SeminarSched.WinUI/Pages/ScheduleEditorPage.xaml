@@ -49,6 +49,7 @@
                     <TextBlock FontSize="20" FontWeight="SemiBold" Text="自動作成の差分"/>
                     <TextBlock Text="直前に⑤時間割自動作成を実行した時点からの変化です。" TextWrapping="Wrap"/>
                     <TextBlock x:Name="DiffSummary" TextWrapping="Wrap"/>
+                    <ListView x:Name="DiffDetailList" MaxHeight="240"/>
                 </StackPanel>
             </Border>
 

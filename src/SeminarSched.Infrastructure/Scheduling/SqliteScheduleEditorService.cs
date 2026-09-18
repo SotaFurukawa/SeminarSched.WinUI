@@ -308,6 +308,44 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
         return result;
     }
 
+    public async Task<ScheduleLabelSet> GetLabelSetAsync(string projectPath,CancellationToken cancellationToken=default)
+    {
+        await using var connection=await OpenAsync(projectPath,cancellationToken).ConfigureAwait(false);await SqliteProjectSchema.EnsureCurrentAsync(connection,cancellationToken).ConfigureAwait(false);
+        var requests=new Dictionary<long,string>();
+        await using(var command=connection.CreateCommand())
+        {
+            command.CommandText="SELECT r.Id,st.ExternalId||' '||st.Name||' / '||su.DisplayName FROM LessonRequest r JOIN Student st ON st.Id=r.StudentId JOIN Subject su ON su.Id=r.SubjectId;";
+            await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))requests[reader.GetInt64(0)]=reader.GetString(1);
+        }
+        var teachers=new Dictionary<long,string>();
+        await using(var command=connection.CreateCommand())
+        {
+            command.CommandText="SELECT Id,ExternalId||' '||Name FROM Teacher;";
+            await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))teachers[reader.GetInt64(0)]=reader.GetString(1);
+        }
+        var dates=new Dictionary<long,string>();
+        await using(var command=connection.CreateCommand())
+        {
+            command.CommandText="SELECT Id,Date FROM OpenDate;";
+            await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var date=DateOnly.Parse(reader.GetString(1),CultureInfo.InvariantCulture);
+                dates[reader.GetInt64(0)]=$"{date:yyyy-MM-dd}({JapaneseWeekday(date)})";
+            }
+        }
+        var slots=new Dictionary<long,string>();
+        await using(var command=connection.CreateCommand())
+        {
+            command.CommandText="SELECT Id,DisplayName FROM TimeSlot;";
+            await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))slots[reader.GetInt64(0)]=reader.GetString(1);
+        }
+        return new ScheduleLabelSet(requests,teachers,dates,slots);
+    }
+
     private static async Task InsertAuditAsync(SqliteConnection connection,SqliteTransaction transaction,string action,string entityId,object? summary,CancellationToken cancellationToken){await using var command=connection.CreateCommand();command.Transaction=transaction;command.CommandText="INSERT INTO AuditLog(ProjectId,TimestampUtc,Action,EntityType,EntityId,AfterJson,Reason,Source,OperationId) VALUES(1,$utc,$action,'assignment',$entity,$after,'時間割手動編集','manual',$operation);";command.Parameters.AddWithValue("$utc",DateTimeOffset.UtcNow.ToString("O",CultureInfo.InvariantCulture));command.Parameters.AddWithValue("$action",action);command.Parameters.AddWithValue("$entity",entityId);command.Parameters.AddWithValue("$after",summary is null?DBNull.Value:JsonSerializer.Serialize(summary));command.Parameters.AddWithValue("$operation",Guid.NewGuid().ToString("N"));await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);}
     private static async Task<SqliteConnection> OpenAsync(string path,CancellationToken cancellationToken){var connection=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.GetFullPath(path),Mode=SqliteOpenMode.ReadWrite,ForeignKeys=true,Pooling=false}.ToString());await connection.OpenAsync(cancellationToken).ConfigureAwait(false);return connection;}
 }
