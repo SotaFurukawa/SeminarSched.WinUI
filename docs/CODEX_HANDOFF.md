@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `38521e2`（v0.1.0 checkpoint 49, 講師配布個別PDFファイル）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち（アプリ起動済み）。
+Latest Development Checkpoint: checkpoint 50（簡易形式回答import diffの算出）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち（アプリ起動済み）。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -509,6 +509,17 @@ Feature Parity行「講師配布（講師別）」の残課題「PDF個別ファ
 - `SqliteOutputPackageService.GenerateAsync`が「講師別」folder内で講師ごとに`{講師名}t.xlsx`と`{講師名}t.pdf`の両方を生成するよう変更。`SanitizeTeacherFileName`へ拡張子引数を追加し、同じbase名でxlsx/pdfそれぞれ独立して重複回避する。
 - 既存テストへ、生成された講師別PDFファイルの存在と`%PDF`ヘッダーを確認するアサーションを追加。
 - Release/x64 build: warning 0 / error 0。全94 tests passed。Privacy gate成功。
+
+### v0.1.0 checkpoint 50 (Claude)
+
+Feature Parity行「import preview/diff」の残課題「簡易形式（必要回数・勤務不可）側のdiffは未算出」を実装した（⑤の実機確認待ちの間、並行して進めた）。
+
+- `CsvResponseImportService.ComputeDiff`が、生徒側は`日付`列（可用性形式）が無く`必要回数`列がある場合に`ComputeRequiredSessionsDiff`を、講師側は`日付`列が無く`勤務不可`列がある場合に`ComputeTeacherUnavailableListDiff`を呼ぶよう分岐を追加。
+  - `ComputeRequiredSessionsDiff`: 生徒ID・科目コードで既存の`LessonRequest.RequiredSessions`を検索し、無ければ追加・値が違えば変更・同じなら変更なしとして件数化する。
+  - `ComputeTeacherUnavailableListDiff`: Apply時が全置換（既存`TeacherUnavailability`を削除してから`勤務不可`列を再挿入）であることに合わせ、講師ごとの既存不可集合と新しい不可集合を完全一致比較する（既存0件→追加、集合が異なる→変更、同一→変更なし）。
+  - 削除候補一覧（`RemovalCandidates`）は可用性形式のみの概念のため、簡易形式では常に空のまま（Apply時に全置換で自然に反映されるため、Python版の対象外機能である旨は変更なし）。
+- 新規テスト`PreviewAsync_SimpleFormat_ComputesRequiredSessionsAndUnavailableListDiff`で、初回import（追加）→再import同一内容（変更なし）→内容変更後再import（変更）の3段階を検証した。
+- Release/x64 build: warning 0 / error 0。全95 tests passed（新規1件）。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 

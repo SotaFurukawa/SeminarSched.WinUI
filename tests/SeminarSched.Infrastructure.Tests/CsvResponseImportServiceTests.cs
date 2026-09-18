@@ -96,6 +96,32 @@ public sealed class CsvResponseImportServiceTests : IDisposable
         Assert.Equal(1, reader.GetInt32(2));
     }
     [Fact]
+    public async Task PreviewAsync_SimpleFormat_ComputesRequiredSessionsAndUnavailableListDiff()
+    {
+        Directory.CreateDirectory(_directory);var db=Path.Combine(_directory,"simple-diff.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(db,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20)));
+        var master=new SqliteMasterDataRepository();await master.SaveStudentAsync(db,new Student(0,"S-001","架空 生徒","中2"));await master.SaveTeacherAsync(db,new Teacher(0,"T-001","架空 講師"));await master.SaveSubjectAsync(db,new Subject(0,"JH_MATH","数学","数","中学",1));
+        var course=new SqliteCourseSettingsRepository();var slot=await course.SaveTimeSlotAsync(db,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));await course.SaveCourseDayAsync(db,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
+        var students=Path.Combine(_directory,"simple-students.csv");var teachers=Path.Combine(_directory,"simple-teachers.csv");
+        await File.WriteAllTextAsync(students,"生徒ID,科目コード,必要回数\nS-001,JH_MATH,3\n");await File.WriteAllTextAsync(teachers,"講師ID,勤務不可\nT-001,2026-07-20|1\n");
+        var service=new CsvResponseImportService();
+
+        var firstPreview=await service.PreviewAsync(db,students,teachers);
+        Assert.Equal(1,firstPreview.Diff.StudentAdded);Assert.Equal(0,firstPreview.Diff.StudentChanged);Assert.Equal(0,firstPreview.Diff.StudentUnchanged);
+        Assert.Equal(1,firstPreview.Diff.TeacherAdded);Assert.Equal(0,firstPreview.Diff.TeacherChanged);Assert.Equal(0,firstPreview.Diff.TeacherUnchanged);
+        await service.ApplyAsync(db,firstPreview);
+
+        var unchangedPreview=await service.PreviewAsync(db,students,teachers);
+        Assert.Equal(0,unchangedPreview.Diff.StudentAdded);Assert.Equal(0,unchangedPreview.Diff.StudentChanged);Assert.Equal(1,unchangedPreview.Diff.StudentUnchanged);
+        Assert.Equal(0,unchangedPreview.Diff.TeacherAdded);Assert.Equal(0,unchangedPreview.Diff.TeacherChanged);Assert.Equal(1,unchangedPreview.Diff.TeacherUnchanged);
+
+        await File.WriteAllTextAsync(students,"生徒ID,科目コード,必要回数\nS-001,JH_MATH,4\n");await File.WriteAllTextAsync(teachers,"講師ID,勤務不可\nT-001,\n");
+        var changedPreview=await service.PreviewAsync(db,students,teachers);
+        Assert.Equal(0,changedPreview.Diff.StudentAdded);Assert.Equal(1,changedPreview.Diff.StudentChanged);Assert.Equal(0,changedPreview.Diff.StudentUnchanged);
+        Assert.Equal(0,changedPreview.Diff.TeacherAdded);Assert.Equal(1,changedPreview.Diff.TeacherChanged);Assert.Equal(0,changedPreview.Diff.TeacherUnchanged);
+    }
+
+    [Fact]
     public async Task PreviewAsync_ComputesDiffAndRemovalCandidatesRequireExplicitConfirmation()
     {
         Directory.CreateDirectory(_directory);var db=Path.Combine(_directory,"diff.jukuschedule");

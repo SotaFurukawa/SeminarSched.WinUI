@@ -97,11 +97,76 @@ public sealed class CsvResponseImportService : IResponseImportService
     {
         var (studentAdded, studentChanged, studentUnchanged, studentRemovals) = students.Has("日付")
             ? ComputeAvailabilityDiff(connection, students, "生徒ID", "Student", "StudentAvailability", "StudentId", slotCodes)
-            : (0, 0, 0, (IReadOnlyList<AvailabilityDiffKey>)[]);
+            : students.Has("必要回数")
+                ? Flatten(ComputeRequiredSessionsDiff(connection, students))
+                : (0, 0, 0, (IReadOnlyList<AvailabilityDiffKey>)[]);
         var (teacherAdded, teacherChanged, teacherUnchanged, teacherRemovals) = teachers.Has("日付")
             ? ComputeAvailabilityDiff(connection, teachers, "講師ID", "Teacher", "TeacherAvailability", "TeacherId", slotCodes)
-            : (0, 0, 0, (IReadOnlyList<AvailabilityDiffKey>)[]);
+            : teachers.Has("勤務不可")
+                ? Flatten(ComputeTeacherUnavailableListDiff(connection, teachers))
+                : (0, 0, 0, (IReadOnlyList<AvailabilityDiffKey>)[]);
         return new(studentAdded, studentChanged, studentUnchanged, studentRemovals, teacherAdded, teacherChanged, teacherUnchanged, teacherRemovals);
+    }
+
+    private static (int, int, int, IReadOnlyList<AvailabilityDiffKey>) Flatten((int Added, int Changed, int Unchanged) diff) => (diff.Added, diff.Changed, diff.Unchanged, []);
+
+    /// <summary>簡易形式（生徒ID・科目コード・必要回数）のdiff。既存のLessonRequest.RequiredSessionsと比較する。</summary>
+    private static (int Added, int Changed, int Unchanged) ComputeRequiredSessionsDiff(SqliteConnection connection, TabularData data)
+    {
+        var added = 0; var changed = 0; var unchanged = 0;
+        foreach (var row in data.Rows)
+        {
+            var student = data.Value(row, "生徒ID"); var subject = data.Value(row, "科目コード");
+            if (student.Length == 0 || subject.Length == 0 || !int.TryParse(data.Value(row, "必要回数"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var count)) continue;
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT r.RequiredSessions FROM LessonRequest r
+                JOIN Student s ON s.Id=r.StudentId
+                JOIN Subject sub ON sub.Id=r.SubjectId
+                WHERE s.ExternalId=$student AND sub.Code=$subject;
+                """;
+            command.Parameters.AddWithValue("$student", student);
+            command.Parameters.AddWithValue("$subject", subject);
+            var existing = command.ExecuteScalar();
+            if (existing is null) added++;
+            else if (Convert.ToInt32(existing, CultureInfo.InvariantCulture) == count) unchanged++;
+            else changed++;
+        }
+        return (added, changed, unchanged);
+    }
+
+    /// <summary>簡易形式（講師ID・勤務不可）のdiff。Apply時は全置換のため、既存の不可集合との完全一致で比較する。</summary>
+    private static (int Added, int Changed, int Unchanged) ComputeTeacherUnavailableListDiff(SqliteConnection connection, TabularData data)
+    {
+        var added = 0; var changed = 0; var unchanged = 0;
+        foreach (var row in data.Rows)
+        {
+            var teacherId = data.Value(row, "講師ID");
+            if (teacherId.Length == 0) continue;
+            var incoming = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var token in SplitAvailability(data.Value(row, "勤務不可")))
+            {
+                var parts = token.Split('|');
+                if (parts.Length < 2 || !TryNormalizeDate(parts[0], out var date)) continue;
+                incoming.Add($"{date}|{parts[1].Trim()}");
+            }
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT d.Date,s.Code FROM TeacherUnavailability u
+                JOIN Teacher t ON t.Id=u.TeacherId
+                JOIN OpenDate d ON d.Id=u.OpenDateId
+                JOIN TimeSlot s ON s.Id=u.TimeSlotId
+                WHERE t.ExternalId=$teacher;
+                """;
+            command.Parameters.AddWithValue("$teacher", teacherId);
+            var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using (var reader = command.ExecuteReader())
+                while (reader.Read()) existing.Add($"{reader.GetString(0)}|{reader.GetString(1)}");
+            if (existing.SetEquals(incoming)) unchanged++;
+            else if (existing.Count == 0) added++;
+            else changed++;
+        }
+        return (added, changed, unchanged);
     }
 
     private static (int Added, int Changed, int Unchanged, IReadOnlyList<AvailabilityDiffKey> Removals) ComputeAvailabilityDiff(

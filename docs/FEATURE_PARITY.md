@@ -25,7 +25,7 @@
 | Google Forms作成kit | questionnaire script service | 設定値入りCode.gs・READMEのatomic生成UI。生徒フォームに学年ベースのpage分岐（小/中/高、科目をSchoolLevelから自動分類）と「他学年も受講する」分岐、特記事項・学力テスト希望を追加。講師指導可能科目用の別フォーム（`createTeacherQualificationForm`、学校段階別チェックボックス）を追加し、生徒・講師勤務可能日時・講師指導可能科目の3フォームを1つのCode.gsから生成するよう拡張 | 実装中 | 講師指導可能科目の回答は現状手動反映（自動列mapping・診断は未移植）。実際にGoogle上でスクリプトを実行しての動作確認は未実施（この環境からはGoogleへ到達できないため） |
 | 生徒回答・講師回答2file選択 | import UI/service | CSV/XLSXの2file選択UI | 実装中 | sheet選択とGoogle Forms生列mapping UIは未実装 |
 | CSV UTF-8/CP932・旧形式 | importing readers | quoted CSV・BOM/UTF-8/CP932自動判定・XLSX先頭sheet | 実装中 | 生Google Forms回答の自動mappingは未実装 |
-| import preview/diff | importing diff | 全行参照検証・issue一覧（エラー/警告を区別）・件数preview。可用性形式（日付列あり）は追加/変更/変更なし件数と、以前登録済みで新しい回答に含まれない日付を「削除候補」として一覧表示し、明示チェックなしでは削除しない | 実装中 | 簡易形式（必要回数・勤務不可）側のdiffは未算出。Google Forms生回答の列mappingは未実装 |
+| import preview/diff | importing diff | 全行参照検証・issue一覧（エラー/警告を区別）・件数preview。可用性形式（日付列あり）は追加/変更/変更なし件数と、以前登録済みで新しい回答に含まれない日付を「削除候補」として一覧表示し、明示チェックなしでは削除しない。簡易形式（必要回数・勤務不可）側も、既存の`LessonRequest.RequiredSessions`・`TeacherUnavailability`集合と比較した追加/変更/変更なし件数を算出するようにした | 実装中 | Google Forms生回答の列mappingは未実装 |
 | import transaction/AuditLog | availability import service | SHA-256再検証・単一transaction反映・ImportBatch・原本BLOB snapshot・AuditLog | 実装中 | 詳細diff表示とmapping保存は未実装 |
 | availability一括編集 | phase3 UI/service | 生徒/講師の日付・コマ別0/1/2取込、講師不可と同期。③へ複数選択→日付・コマ→値の一括適用UIと選択日の現在値preview gridを追加（`IAvailabilityMatrixService`）。複数日付×複数コマの全組み合わせへ一括適用する`SetLevelsAsync`（単一transaction、途中で無効な組み合わせがあれば全体をrollback）とその専用UIを追加 | 実装済み | 週単位の一覧表示（現在値のpreview gridは選択日1日分のみ）は未実装 |
 | candidate生成 | optimization candidates | 資格・開校・生徒/講師availability・固定生徒衝突を検証し、希望講師penalty付き候補を生成 | 実装中 | Python版の全診断理由codeは未移植 |
