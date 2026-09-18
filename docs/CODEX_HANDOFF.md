@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `91b7d62`（v0.1.0 checkpoint 50, 簡易形式回答import diffの算出）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち（アプリ起動済み）。
+Latest Development Checkpoint: checkpoint 51（project open時の未捕捉SqliteExceptionによるクラッシュを修正）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち（アプリ起動済み、checkpoint 51適用版で再起動）。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -520,6 +520,23 @@ Feature Parity行「import preview/diff」の残課題「簡易形式（必要�
   - 削除候補一覧（`RemovalCandidates`）は可用性形式のみの概念のため、簡易形式では常に空のまま（Apply時に全置換で自然に反映されるため、Python版の対象外機能である旨は変更なし）。
 - 新規テスト`PreviewAsync_SimpleFormat_ComputesRequiredSessionsAndUnavailableListDiff`で、初回import（追加）→再import同一内容（変更なし）→内容変更後再import（変更）の3段階を検証した。
 - Release/x64 build: warning 0 / error 0。全95 tests passed（新規1件）。Privacy gate成功。
+
+### v0.1.0 checkpoint 51 (Claude)
+
+ユーザーから「プロジェクトが開けない」との報告を受け、実機のログ（`%LocalAppData%\SeminarSched.WinUI\logs\`）を確認したところ、`[ERROR] Unhandled UI exception: SqliteException: SQLite Error 1: 'no such table: ApplicationMetadata'.`が2回記録されていた。原因を特定し修正した。
+
+**根本原因:**
+- `SqliteProjectSchema.ReadVersionAsync`は`ApplicationMetadata`テーブルへ直接SELECTするが、このテーブルが存在しないファイル（Python版が生成する`.jukuschedule`ファイルにはこのテーブルの概念自体が無い。または壊れた/無関係なSQLiteファイル）を開こうとすると、生の`SqliteException`をthrowしていた（テーブルは存在するが該当行が無い場合だけ、意図された案内メッセージ付き`InvalidDataException`になっていた）。
+- さらに`HomePage.xaml.cs`の全操作（開く・最近使ったプロジェクトを開く・バックアップ作成・復元・複製・新規作成）のcatch節はいずれも`Microsoft.Data.Sqlite.SqliteException`を捕捉対象に含めていなかったため、この例外が伝播し、WinUIの`UnhandledException`ハンドラーまで届いて（ログには記録されるが）操作自体は失敗としてユーザーへ通知されないまま終わっていた。
+- Python版が生成した実際の`.jukuschedule`ファイルを開こうとした場合に、まさにこの経路でクラッシュする（「このファイルは現在のWinUI版プロジェクトではありません」という本来出るはずの案内が表示されない）。
+
+**修正内容:**
+- `SqliteProjectSchema.ReadVersionAsync`: `ApplicationMetadata`へのSELECTを`try/catch(SqliteException)`で囲み、「このファイルはSeminarSched.WinUIのprojectファイルではありません。Python版projectのcopy-importは未実装です。」という案内付き`InvalidDataException`へ変換。
+- `SqliteProjectRepository.UpgradeIfNeededAsync`: 接続open自体（`inspection.OpenAsync`）も`try/catch(SqliteException)`で囲み、SQLiteとして開けないファイル（非DB形式）も「このファイルはSQLiteデータベースとして開けません。projectファイルが破損している可能性があります。」という案内付き`InvalidDataException`へ変換。
+- `HomePage.xaml.cs`: 新規作成・開く・最近使ったプロジェクトを開く・バックアップ作成・復元・複製の全catch節へ`SqliteException`を追加（`using Microsoft.Data.Sqlite;`を追加）。
+- 新規テスト2件（`SqliteProjectRepositoryTests.cs`）: `OpenAsync_SqliteFileWithoutApplicationMetadataTable_ThrowsFriendlyError`（Python版相当の無関係テーブルのみ持つSQLiteファイルを開こうとして案内付き例外になることを検証）、`OpenAsync_NotASqliteFile_ThrowsFriendlyError`（プレーンテキストファイルを開こうとして案内付き例外になることを検証）。
+- 実機で起動していたアプリ（修正前のbuildで動いていた）を一旦終了し、修正版で再起動した。
+- Release/x64 build: warning 0 / error 0。全97 tests passed（新規2件）。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 

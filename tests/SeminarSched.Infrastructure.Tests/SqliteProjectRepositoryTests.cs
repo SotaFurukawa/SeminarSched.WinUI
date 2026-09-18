@@ -119,6 +119,35 @@ public sealed class SqliteProjectRepositoryTests : IDisposable
         Assert.Equal(1L, Convert.ToInt64(await command.ExecuteScalarAsync()));
     }
 
+    [Fact]
+    public async Task OpenAsync_SqliteFileWithoutApplicationMetadataTable_ThrowsFriendlyError()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "python-era.jukuschedule");
+        await using (var connection = new SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using var seed = connection.CreateCommand();
+            seed.CommandText = "CREATE TABLE Unrelated(Id INTEGER PRIMARY KEY);";
+            await seed.ExecuteNonQueryAsync();
+        }
+
+        var repository = new SqliteProjectRepository();
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(() => repository.OpenAsync(path));
+        Assert.Contains("SeminarSched.WinUI", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OpenAsync_NotASqliteFile_ThrowsFriendlyError()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "not-a-database.jukuschedule");
+        await File.WriteAllTextAsync(path, "this is plain text, not a SQLite database");
+
+        var repository = new SqliteProjectRepository();
+        await Assert.ThrowsAsync<InvalidDataException>(() => repository.OpenAsync(path));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_directory))

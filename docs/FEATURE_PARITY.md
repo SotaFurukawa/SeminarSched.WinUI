@@ -12,6 +12,7 @@
 | 別名保存・複製 | project service | SQLite backup APIで検証付き複製を作成し、複製先へ切り替え | 実装済み | 元DB不変・上書き拒否を自動テスト |
 | 最近使用・非表示 | workspace view model | 最大10件の履歴・再open・欠損時自動除去・「表示しない」ボタンによる手動非表示 | 実装済み | |
 | migration・整合性確認 | Alembic / project service | schema v2・自動backup付きv1→v2 migration・共通製品識別 | 実装中 | rollback failure injectionと今後のversion追加testを継続 |
+| project open時の非WinUI・破損ファイル処理 | project service | Python版project等`ApplicationMetadata`テーブルを持たないSQLiteファイル・SQLiteとして開けないファイルを開こうとした際、未捕捉の`SqliteException`でアプリがクラッシュしていた不具合を修正。`ReadVersionAsync`/`UpgradeIfNeededAsync`で例外を捕捉し、案内メッセージ付きの`InvalidDataException`へ変換。HomePageの全操作（開く・最近使ったプロジェクト・バックアップ作成・復元・複製・新規作成）のcatch節へ`SqliteException`を追加 | 実装済み | |
 | 自動backup・世代管理 | recovery service | UIからのSQLite backup API検証付きsnapshot | 実装中 | 自動実行と世代管理は未実装 |
 | 復元・復元前backup | recovery service | 確認UI・復元前3世代backup・検証・rollback付きatomic restore | 実装中 | failure injection拡充は未実装 |
 | 生徒基本情報 | master repository/service | 追加・一覧・選択編集・使用停止UI、domain validation・SQLite CRUD。一覧をID・氏名・学年で絞り込む検索boxを追加。「IDを自動採番」ボタンで既存IDの命名パターン（prefix＋連番）から次の空きIDを自動入力（講師も同様） | 実装済み | |

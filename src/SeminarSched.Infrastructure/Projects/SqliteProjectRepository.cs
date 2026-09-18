@@ -358,7 +358,14 @@ public sealed class SqliteProjectRepository : IProjectRepository
     private static async Task UpgradeIfNeededAsync(string path, CancellationToken cancellationToken)
     {
         await using var inspection = CreateConnection(path, SqliteOpenMode.ReadOnly);
-        await inspection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await inspection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (SqliteException)
+        {
+            throw new InvalidDataException("このファイルはSQLiteデータベースとして開けません。projectファイルが破損している可能性があります。");
+        }
         var version = await SqliteProjectSchema.ReadVersionAsync(inspection, cancellationToken).ConfigureAwait(false);
         if (version == CurrentSchemaVersion)
         {

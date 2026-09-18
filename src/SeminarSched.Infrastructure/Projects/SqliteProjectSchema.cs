@@ -33,7 +33,17 @@ internal static class SqliteProjectSchema
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT SchemaVersion FROM ApplicationMetadata WHERE Id=1 AND Product=$product;";
         command.Parameters.AddWithValue("$product", ProductMarker);
-        var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+        object? value;
+        try
+        {
+            value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (SqliteException)
+        {
+            // Not every .jukuschedule-shaped file is one of ours: the Python reference app's own
+            // files (and any unrelated/corrupt SQLite file) predate this table entirely.
+            throw new InvalidDataException("このファイルはSeminarSched.WinUIのprojectファイルではありません。Python版projectのcopy-importは未実装です。");
+        }
         if (value is null or DBNull)
         {
             throw new InvalidDataException("現在のWinUI projectではありません。");

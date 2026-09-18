@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using SeminarSched.Application.Projects;
@@ -57,7 +58,7 @@ public sealed partial class HomePage : Page
             ShowStatus(InfoBarSeverity.Success, "プロジェクトを作成しました", summary.Title);
             App.Logger.Info("Project created");
         }
-        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException or SqliteException or InvalidDataException)
         {
             ShowStatus(InfoBarSeverity.Error, "プロジェクトを作成できませんでした", exception.Message);
             App.Logger.Error("Project creation failed", exception);
@@ -92,7 +93,7 @@ public sealed partial class HomePage : Page
             ShowStatus(InfoBarSeverity.Success, "プロジェクトを開きました", summary.Title);
             App.Logger.Info("Project opened");
         }
-        catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException or SqliteException)
         {
             ShowStatus(InfoBarSeverity.Error, "プロジェクトを開けませんでした", exception.Message);
             App.Logger.Error("Project open failed", exception);
@@ -133,7 +134,7 @@ public sealed partial class HomePage : Page
             await RefreshRecentProjectsAsync();
             ShowStatus(InfoBarSeverity.Warning, "プロジェクトが見つかりません", "履歴から削除しました。");
         }
-        catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException or SqliteException)
         {
             ShowStatus(InfoBarSeverity.Error, "プロジェクトを開けませんでした", exception.Message);
         }
@@ -197,7 +198,7 @@ public sealed partial class HomePage : Page
             ShowStatus(InfoBarSeverity.Success, "バックアップを作成しました", path);
             App.Logger.Info("Backup created");
         }
-        catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException or SqliteException)
         {
             ShowStatus(InfoBarSeverity.Error, "バックアップを作成できませんでした", exception.Message);
             App.Logger.Error("Backup creation failed", exception);
@@ -247,7 +248,7 @@ public sealed partial class HomePage : Page
             ShowStatus(InfoBarSeverity.Success, "プロジェクトを復元しました", restored.Title);
             App.Logger.Info("Project restored from backup");
         }
-        catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException or SqliteException)
         {
             ShowStatus(InfoBarSeverity.Error, "プロジェクトを復元できませんでした", exception.Message);
             App.Logger.Error("Project restore failed", exception);
@@ -261,7 +262,7 @@ public sealed partial class HomePage : Page
     private async void SaveAs_Click(object sender,RoutedEventArgs e)
     {
         var current=App.ProjectService.Current;if(current is null){ShowStatus(InfoBarSeverity.Warning,"複製できません","先にプロジェクトを開いてください。");return;}
-        try{var picker=new FolderPicker{SuggestedStartLocation=PickerLocationId.DocumentsLibrary};picker.FileTypeFilter.Add("*");InitializePicker(picker);var folder=await picker.PickSingleFolderAsync();if(folder is null)return;var name=$"{current.Title}_copy_{DateTime.Now:yyyyMMdd_HHmmss}{ProjectService.ProjectExtension}";SetBusy(true);var copy=await App.ProjectService.SaveAsAsync(Path.Combine(folder.Path,name));await App.RecentProjects.TouchAsync(copy.Path,copy.Title);RefreshCurrentProject();await RefreshRecentProjectsAsync();ShowStatus(InfoBarSeverity.Success,"複製へ切り替えました",copy.Path);}catch(Exception ex)when(ex is IOException or UnauthorizedAccessException or InvalidDataException){ShowStatus(InfoBarSeverity.Error,"複製できませんでした",ex.Message);}finally{SetBusy(false);}
+        try{var picker=new FolderPicker{SuggestedStartLocation=PickerLocationId.DocumentsLibrary};picker.FileTypeFilter.Add("*");InitializePicker(picker);var folder=await picker.PickSingleFolderAsync();if(folder is null)return;var name=$"{current.Title}_copy_{DateTime.Now:yyyyMMdd_HHmmss}{ProjectService.ProjectExtension}";SetBusy(true);var copy=await App.ProjectService.SaveAsAsync(Path.Combine(folder.Path,name));await App.RecentProjects.TouchAsync(copy.Path,copy.Title);RefreshCurrentProject();await RefreshRecentProjectsAsync();ShowStatus(InfoBarSeverity.Success,"複製へ切り替えました",copy.Path);}catch(Exception ex)when(ex is IOException or UnauthorizedAccessException or InvalidDataException or SqliteException){ShowStatus(InfoBarSeverity.Error,"複製できませんでした",ex.Message);}finally{SetBusy(false);}
     }
 
     private void ProjectDefinition_Changed(object sender, object e) => RefreshGeneratedTitle();
