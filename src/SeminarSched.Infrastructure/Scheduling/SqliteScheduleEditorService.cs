@@ -116,15 +116,18 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
             return false;
         }
 
+        // 出勤可否(TeacherAvailability)が一度も設定されていない講師は「常時出勤可能」と解釈されるため、
+        // 資格だけ持ち越されて今期の出勤可否を未設定のまま放置された講師が全日程に紛れ込んでいた。
+        // 明示的に一時表示(extraTeacherIds)された場合を除き、出勤可否データが無い講師は編集画面に出さない。
         var teachers=qualified
-            .Where(t=>extraTeacherIds.Contains(t.TeacherId)||slots.Any(s=>!IsBlocked(t.TeacherId,s.TimeSlotId)))
+            .Where(t=>extraTeacherIds.Contains(t.TeacherId)||(teachersWithAvailabilityRows.Contains(t.TeacherId)&&slots.Any(s=>!IsBlocked(t.TeacherId,s.TimeSlotId))))
             .ToList();
 
         var cardsByCell=new Dictionary<(long TeacherId,long TimeSlotId),List<BoardCard>>();
         await using(var command=connection.CreateCommand())
         {
             command.CommandText="""
-                SELECT a.Id,a.TeacherId,a.TimeSlotId,r.StudentId,st.ExternalId||' '||st.Name,su.DisplayName,a.IsManual,a.IsLocked,
+                SELECT a.Id,a.TeacherId,a.TimeSlotId,r.StudentId,st.Name,su.DisplayName,a.IsManual,a.IsLocked,
                        CASE WHEN r.OneToOneRequired=1 OR COALESCE(p.OneToOneRequired,0)=1 THEN 1 ELSE 0 END,
                        CASE WHEN COALESCE(r.RegularTeacherPriority,p.RegularTeacherPriority)=5 THEN 1 ELSE 0 END
                 FROM Assignment a JOIN LessonRequest r ON r.Id=a.LessonRequestId JOIN Student st ON st.Id=r.StudentId JOIN Subject su ON su.Id=r.SubjectId
@@ -151,67 +154,48 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
         return new ScheduleBoard(slots,teachers,cells);
     }
 
-    public async Task<IReadOnlyList<UnplacedSessionOption>> GetUnplacedSessionsAsync(string projectPath,CancellationToken cancellationToken=default)
+    // 生徒ID等は出さず、選択中の日付で実際に配置できる受講希望だけを一覧に出す（生徒がその日出席できない・
+    // 資格のある講師の空きが無い等の場合はそもそも一覧に出さない）。カードには氏名・学年・科目略称・
+    // 残り回数に加え、その日置ける具体的なコマ(コード)一覧を添える。
+    public async Task<IReadOnlyList<UnplacedSessionOption>> GetUnplacedSessionsAsync(string projectPath,long openDateId,CancellationToken cancellationToken=default)
     {
         await using var connection=await OpenAsync(projectPath,cancellationToken).ConfigureAwait(false);await SqliteProjectSchema.EnsureCurrentAsync(connection,cancellationToken).ConfigureAwait(false);
-        var rows=new List<(long Id,long SubjectId,string Label,int Remaining)>();
+        var rows=new List<(long Id,string StudentName,string Grade,string SubjectShortName,int Remaining)>();
         await using(var command=connection.CreateCommand())
         {
             command.CommandText="""
-                SELECT r.Id,r.SubjectId,st.ExternalId||' '||st.Name||' / '||su.DisplayName,r.RequiredSessions-COUNT(a.Id) AS remaining
+                SELECT r.Id,st.Name,st.Grade,COALESCE(NULLIF(su.ShortName,''),su.DisplayName),r.RequiredSessions-COUNT(a.Id) AS remaining
                 FROM LessonRequest r JOIN Student st ON st.Id=r.StudentId JOIN Subject su ON su.Id=r.SubjectId
                 LEFT JOIN Assignment a ON a.LessonRequestId=r.Id
                 GROUP BY r.Id HAVING remaining>0 ORDER BY st.ExternalId;
                 """;
             await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                rows.Add((reader.GetInt64(0),reader.GetInt64(1),reader.GetString(2),reader.GetInt32(3)));
+                rows.Add((reader.GetInt64(0),reader.GetString(1),reader.GetString(2),reader.GetString(3),reader.GetInt32(4)));
         }
 
-        // SqliteScheduleRunService.BuildProblemAsyncの候補生成クエリと同じ条件（資格・空き時間・出勤不可・
-        // 同時刻の生徒衝突）で、受講希望ごとに配置可能なコマ数を数える。講師の同時担当上限（2名まで）は
-        // solverの候補生成でも列挙時点ではフィルタしていないため、ここでも同様に含めない。
-        var candidateCounts=await CountCandidatesAsync(connection,includeStudentCollisionCheck:true,cancellationToken).ConfigureAwait(false);
+        var slotsByRequest=await GetAvailableSlotCodesForDateAsync(connection,openDateId,cancellationToken).ConfigureAwait(false);
 
-        // Python版のreasonText相当。候補0件の場合のみ追加で診断する：(1)科目を担当できる講師が
-        // そもそもいない、(2)講師はいるが空き時間・出勤可否の条件を満たすコマがない、(3)それ以外
-        // （生徒自身の他の授業と重なるコマしかない）の3段階。
-        var qualifiedSubjects=new HashSet<long>();
-        await using(var command=connection.CreateCommand())
-        {
-            command.CommandText="SELECT DISTINCT SubjectId FROM TeacherQualification q JOIN Teacher t ON t.Id=q.TeacherId WHERE q.CanTeach=1 AND t.Active=1;";
-            await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-            while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))qualifiedSubjects.Add(reader.GetInt64(0));
-        }
-        var candidateCountsIgnoringCollision=await CountCandidatesAsync(connection,includeStudentCollisionCheck:false,cancellationToken).ConfigureAwait(false);
-
-        return rows.Select(r=>
-        {
-            var candidateCount=candidateCounts.GetValueOrDefault(r.Id);
-            string? reason=null;
-            if(candidateCount==0)
-            {
-                reason=!qualifiedSubjects.Contains(r.SubjectId)
-                    ?"この科目を担当できる講師が設定されていません。"
-                    :candidateCountsIgnoringCollision.GetValueOrDefault(r.Id)==0
-                        ?"講師の空き時間・出勤可否の条件を満たすコマがありません。"
-                        :"生徒の他の授業と重なるため配置できるコマがありません。";
-            }
-            return new UnplacedSessionOption(r.Id,r.Label,r.Remaining,candidateCount,reason);
-        }).ToList();
+        return rows.Where(r=>slotsByRequest.ContainsKey(r.Id))
+            .Select(r=>new UnplacedSessionOption(r.Id,r.StudentName,r.Grade,r.SubjectShortName,r.Remaining,slotsByRequest[r.Id]))
+            .ToList();
     }
 
-    private static async Task<Dictionary<long,int>> CountCandidatesAsync(SqliteConnection connection,bool includeStudentCollisionCheck,CancellationToken cancellationToken)
+    /// <summary>
+    /// CountCandidatesAsync（旧実装）と同じ条件（資格・空き時間・出勤不可・同時刻の生徒衝突）を、
+    /// 日付を1つに絞って実際のコマコードを返す形に書き換えたもの。講師の同時担当上限（2名まで）は
+    /// solverの候補生成でも列挙時点ではフィルタしていないため、ここでも同様に含めない。
+    /// </summary>
+    private static async Task<Dictionary<long,IReadOnlyList<string>>> GetAvailableSlotCodesForDateAsync(SqliteConnection connection,long openDateId,CancellationToken cancellationToken)
     {
-        var counts=new Dictionary<long,int>();
+        var result=new Dictionary<long,List<string>>();
         await using var command=connection.CreateCommand();
-        command.CommandText=$"""
-            SELECT r.Id,COUNT(*)
+        command.CommandText="""
+            SELECT DISTINCT r.Id,ts.Code,ts.SortOrder
             FROM LessonRequest r
-            JOIN CourseProject cp ON cp.Id=r.ProjectId
             JOIN TeacherQualification tq ON tq.SubjectId=r.SubjectId AND tq.CanTeach=1
             JOIN Teacher t ON t.Id=tq.TeacherId AND t.Active=1
-            CROSS JOIN OpenDateTimeSlot ds
+            JOIN OpenDateTimeSlot ds ON ds.OpenDateId=$date
             JOIN OpenDate d ON d.Id=ds.OpenDateId AND d.IsOpen=1
             JOIN TimeSlot ts ON ts.Id=ds.TimeSlotId AND ts.Active=1
             LEFT JOIN StudentAvailability sa ON sa.ProjectId=r.ProjectId AND sa.StudentId=r.StudentId AND sa.OpenDateId=ds.OpenDateId AND sa.TimeSlotId=ds.TimeSlotId
@@ -219,13 +203,18 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
             WHERE (NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE ProjectId=r.ProjectId AND StudentId=r.StudentId) OR COALESCE(sa.AvailabilityLevel,0)>0)
               AND (NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=r.ProjectId AND TeacherId=tq.TeacherId) OR COALESCE(ta.AvailabilityLevel,0)>0)
               AND NOT EXISTS(SELECT 1 FROM TeacherUnavailability u WHERE u.TeacherId=tq.TeacherId AND u.OpenDateId=ds.OpenDateId AND u.TimeSlotId=ds.TimeSlotId)
-              {(includeStudentCollisionCheck?"AND NOT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest ar ON ar.Id=a.LessonRequestId WHERE (a.IsLocked=1 OR a.IsManual=1) AND a.OpenDateId=ds.OpenDateId AND a.TimeSlotId=ds.TimeSlotId AND ar.StudentId=r.StudentId)":"")}
-            GROUP BY r.Id;
+              AND NOT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest ar ON ar.Id=a.LessonRequestId WHERE (a.IsLocked=1 OR a.IsManual=1) AND a.OpenDateId=ds.OpenDateId AND a.TimeSlotId=ds.TimeSlotId AND ar.StudentId=r.StudentId)
+            ORDER BY r.Id,ts.SortOrder;
             """;
+        command.Parameters.AddWithValue("$date",openDateId);
         await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            counts[reader.GetInt64(0)]=reader.GetInt32(1);
-        return counts;
+        {
+            var id=reader.GetInt64(0);
+            if(!result.TryGetValue(id,out var codes)){codes=new List<string>();result[id]=codes;}
+            codes.Add(reader.GetString(1));
+        }
+        return result.ToDictionary(kv=>kv.Key,IReadOnlyList<string> (kv)=>kv.Value);
     }
 
     public async Task<EditPreview> PreviewMoveAsync(string projectPath,long assignmentId,long teacherId,long openDateId,long timeSlotId,CancellationToken cancellationToken=default)

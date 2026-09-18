@@ -34,13 +34,12 @@ public sealed record ScheduleBoard(IReadOnlyList<BoardSlotRow> Slots, IReadOnlyL
     public BoardCell? Cell(long timeSlotId, long teacherId) => Cells.FirstOrDefault(c => c.TimeSlotId == timeSlotId && c.TeacherId == teacherId);
 }
 
-// Python版の未配置カード表示（remainingCount/candidateCount）に合わせ、残り回数に加えて
-// 現時点で資格・空き時間の条件を満たす候補コマ数も表示する（講師の同時担当上限は候補数に含めない。
-// Python版のcandidateCountもsolverの候補生成と同じ定義=容量制約はsolver側の変数間制約であり
-// 候補列挙時点ではフィルタしないため、C#版もSqliteScheduleRunServiceの候補生成クエリをそのまま流用する）。
-public sealed record UnplacedSessionOption(long LessonRequestId, string Label, int Remaining, int CandidateCount, string? ReasonText = null)
+// 選択中の日付でこの受講希望が実際に置ける状態のときだけ一覧に出す（生徒がその日出席できない・
+// 資格のある講師の空きが無い等の場合は表示自体をしない）。カードには生徒ID等は出さず、氏名・学年・
+// 科目（略称）・残り回数・その日置ける具体的なコマだけを表示する。
+public sealed record UnplacedSessionOption(long LessonRequestId, string StudentName, string Grade, string SubjectShortName, int Remaining, IReadOnlyList<string> AvailableSlotCodes)
 {
-    public override string ToString() => $"{Label}　(残り{Remaining}回・候補{CandidateCount}枠{(CandidateCount == 0 ? $"　⚠配置先なし：{ReasonText}" : "")})";
+    public string AvailableSlotsText => $"配置可能: {string.Join("・", AvailableSlotCodes)}";
 }
 
 public sealed record AssignmentSnapshotRow(long Id, long LessonRequestId, long TeacherId, long OpenDateId, long TimeSlotId, bool IsLocked, string Source, int SessionIndex, long? OptimizationRunId, bool IsManual, string Note);
@@ -102,7 +101,7 @@ public interface IScheduleEditorService
     Task ResetAutomaticAsync(string projectPath, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<OpenDateOption>> GetOpenDatesAsync(string projectPath, CancellationToken cancellationToken = default);
     Task<ScheduleBoard> GetBoardAsync(string projectPath, long openDateId, IReadOnlyCollection<long> extraTeacherIds, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<UnplacedSessionOption>> GetUnplacedSessionsAsync(string projectPath, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<UnplacedSessionOption>> GetUnplacedSessionsAsync(string projectPath, long openDateId, CancellationToken cancellationToken = default);
     Task<EditPreview> PreviewMoveAsync(string projectPath, long assignmentId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken = default);
     Task MoveAsync(string projectPath, long assignmentId, long teacherId, long openDateId, long timeSlotId, bool confirmSoftWarnings = false, string? reason = null, CancellationToken cancellationToken = default);
     Task SetTeacherUnavailableAsync(string projectPath, long teacherId, long openDateId, long timeSlotId, bool unavailable, CancellationToken cancellationToken = default);

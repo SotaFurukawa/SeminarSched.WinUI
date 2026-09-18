@@ -176,7 +176,7 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         }
         _selectedDateId = date.Id;
         _currentBoard = await App.ScheduleEditor.GetBoardAsync(path, date.Id, _extraTeacherIds);
-        UnplacedList.ItemsSource = await App.ScheduleEditor.GetUnplacedSessionsAsync(path);
+        UnplacedList.ItemsSource = await App.ScheduleEditor.GetUnplacedSessionsAsync(path, date.Id);
         RenderBoard();
     }
 

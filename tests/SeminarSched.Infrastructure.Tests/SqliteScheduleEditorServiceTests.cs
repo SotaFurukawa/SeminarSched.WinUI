@@ -64,7 +64,7 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetUnplacedSessionsAsync_ReportsReasonTextForZeroCandidateSessions()
+    public async Task GetUnplacedSessionsAsync_HidesRequestsWithNoAvailableSlotOnTheSelectedDateAndOmitsStudentId()
     {
         var state=await CreateStateAsync();var editor=new SqliteScheduleEditorService();var master=new SqliteMasterDataRepository();
 
@@ -91,26 +91,49 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
         }
         await editor.AddManualAsync(state.Path,otherRequestId,teacherOther.Id,state.DateId,state.SlotId,false);
 
-        var unplaced=await editor.GetUnplacedSessionsAsync(state.Path);
-        var noTeacher=Assert.Single(unplaced,u=>u.LessonRequestId==noTeacherRequestId);
-        Assert.Equal(0,noTeacher.CandidateCount);Assert.Equal("この科目を担当できる講師が設定されていません。",noTeacher.ReasonText);
+        // noTeacherRequestId: no qualified teacher at all → never has an available slot.
+        // otherRequestId: already placed → RequiredSessions-COUNT(a.Id)==0, so it's not "unplaced" at all.
+        // state.RequestId: the student's own other lesson (otherRequestId) already occupies state.DateId/state.SlotId
+        // (the fixture's only slot that day), so on that date there is no remaining slot for it either.
+        // Net result: nothing is placeable on state.DateId, so the list is empty.
+        var unplaced=await editor.GetUnplacedSessionsAsync(state.Path,state.DateId);
+        Assert.Empty(unplaced);
+    }
 
-        var original=Assert.Single(unplaced,u=>u.LessonRequestId==state.RequestId);
-        Assert.Equal(0,original.CandidateCount);Assert.Equal("生徒の他の授業と重なるため配置できるコマがありません。",original.ReasonText);
+    [Fact]
+    public async Task GetUnplacedSessionsAsync_OnlyListsSlotsWhereTheStudentIsActuallyAvailable()
+    {
+        var state=await CreateBoardStateAsync();var editor=new SqliteScheduleEditorService();
+        await using(var connection=new SqliteConnection($"Data Source={state.Path};Pooling=False"))
+        {
+            await connection.OpenAsync();await using var command=connection.CreateCommand();
+            command.CommandText="""
+                INSERT INTO StudentAvailability(ProjectId,StudentId,OpenDateId,TimeSlotId,AvailabilityLevel)
+                SELECT 1,r.StudentId,$date,$slot1,0 FROM LessonRequest r WHERE r.Id=$request;
+                INSERT INTO StudentAvailability(ProjectId,StudentId,OpenDateId,TimeSlotId,AvailabilityLevel)
+                SELECT 1,r.StudentId,$date,$slot2,2 FROM LessonRequest r WHERE r.Id=$request;
+                """;
+            command.Parameters.AddWithValue("$date",state.DateId);command.Parameters.AddWithValue("$slot1",state.Slot1Id);command.Parameters.AddWithValue("$slot2",state.Slot2Id);command.Parameters.AddWithValue("$request",state.RequestId);
+            await command.ExecuteNonQueryAsync();
+        }
+        var unplaced=Assert.Single(await editor.GetUnplacedSessionsAsync(state.Path,state.DateId));
+        var slotCode=Assert.Single(unplaced.AvailableSlotCodes);
+        Assert.Equal("B2",slotCode);
     }
 
     [Fact]
     public async Task GetBoardAsync_PlacesCardsInCorrectCellAndListsUnplaced()
     {
         var state=await CreateBoardStateAsync();var editor=new SqliteScheduleEditorService();
-        var unplaced=Assert.Single(await editor.GetUnplacedSessionsAsync(state.Path));
-        Assert.Equal(4,unplaced.CandidateCount);
+        var unplaced=Assert.Single(await editor.GetUnplacedSessionsAsync(state.Path,state.DateId));
+        Assert.Equal(2,unplaced.AvailableSlotCodes.Count);Assert.Contains("B1",unplaced.AvailableSlotCodes);Assert.Contains("B2",unplaced.AvailableSlotCodes);
+        Assert.DoesNotContain("S-",unplaced.StudentName);
         await editor.AddManualAsync(state.Path,state.RequestId,state.Teacher1Id,state.DateId,state.Slot1Id,false);
-        Assert.Empty(await editor.GetUnplacedSessionsAsync(state.Path));
+        Assert.Empty(await editor.GetUnplacedSessionsAsync(state.Path,state.DateId));
         var board=await editor.GetBoardAsync(state.Path,state.DateId,[]);
         Assert.Equal(2,board.Slots.Count);Assert.Equal(2,board.Teachers.Count);
         var occupied=Assert.Single(board.Cell(state.Slot1Id,state.Teacher1Id)!.Cards);
-        Assert.StartsWith("S-BOARD",occupied.StudentLabel);Assert.Contains("盤生徒",occupied.StudentLabel);
+        Assert.DoesNotContain("S-",occupied.StudentLabel);Assert.Contains("盤生徒",occupied.StudentLabel);
         Assert.Empty(board.Cell(state.Slot2Id,state.Teacher2Id)!.Cards);
         Assert.False(board.Cell(state.Slot1Id,state.Teacher1Id)!.Blocked);
     }
@@ -308,6 +331,15 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
         var slot2=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"B2","2限",new TimeOnly(10,10),new TimeOnly(11,10),2));
         await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot1.Id,slot2.Id]));
         await using var connection=new SqliteConnection($"Data Source={path};Pooling=False");await connection.OpenAsync();
+        // GetBoardAsyncは出勤可否データが一件も無い講師を編集画面に表示しない（資格だけ持ち越されて
+        // 出勤可否を未設定のまま放置された講師が全日程に紛れ込む不具合の修正）。このfixtureの講師は
+        // 明示的に「出勤可能」として登録し、通常どおり盤に表示されるようにする。
+        await using(var availability=connection.CreateCommand())
+        {
+            availability.CommandText="INSERT INTO TeacherAvailability(ProjectId,TeacherId,OpenDateId,TimeSlotId,AvailabilityLevel) SELECT 1,t.Id,d.Id,ts.Id,2 FROM Teacher t CROSS JOIN OpenDate d CROSS JOIN TimeSlot ts WHERE t.Id IN($teacher1,$teacher2) AND ts.Id IN($slot1,$slot2);";
+            availability.Parameters.AddWithValue("$teacher1",teacher1.Id);availability.Parameters.AddWithValue("$teacher2",teacher2.Id);availability.Parameters.AddWithValue("$slot1",slot1.Id);availability.Parameters.AddWithValue("$slot2",slot2.Id);
+            await availability.ExecuteNonQueryAsync();
+        }
         await using var command=connection.CreateCommand();command.CommandText="INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,$student,$subject,1);SELECT last_insert_rowid();";
         command.Parameters.AddWithValue("$student",student.Id);command.Parameters.AddWithValue("$subject",subject.Id);
         var request=Convert.ToInt64(await command.ExecuteScalarAsync());
