@@ -32,7 +32,10 @@ public static class ScheduleSolutionValidator
         if (teacherLoads.GroupBy(item => (item.TeacherId, item.OpenDateId, item.TimeSlotId)).Any(group => group.Sum(item => item.Load) > 2))
             throw new InvalidDataException("Teacher capacity violation detected.");
 
-        ValidateRegularTeacherMinimums(problem, solution);
+        // Regular-teacher minimums are enforced by CpSatScheduleSolver as a penalized soft target
+        // (AddRegularTeacherMinimums), not a hard requirement - two demands for the same student
+        // can each look individually achievable yet still collide, so a solution that falls short
+        // of one or more targets is a valid, structurally-correct outcome and not checked here.
         ValidateStudentSequences(problem, solution, candidatesByKey);
 
         var expected = problem.Demands.Sum(demand => Math.Max(
@@ -40,20 +43,6 @@ public static class ScheduleSolutionValidator
             demand.RequiredSessions - demand.AlreadyFixedSessions - solution.Placements.Count(placement => placement.RequestId == demand.RequestId)));
         if (expected != solution.UnassignedLessons)
             throw new InvalidDataException("Unassigned lesson count is inconsistent.");
-    }
-
-    private static void ValidateRegularTeacherMinimums(ScheduleProblem problem, ScheduleSolution solution)
-    {
-        foreach (var demand in problem.Demands.Where(item => item.RegularTeacherId is not null && item.RegularTeacherPriority >= 2))
-        {
-            var configuredMinimum = CpSatScheduleSolver.MinimumRegularTeacherSessions(demand.RequiredSessions, demand.RegularTeacherPriority);
-            var remainingMinimum = Math.Max(0, configuredMinimum - demand.FixedRegularTeacherSessions);
-            var availableRegularCandidates = problem.Candidates.Count(candidate => candidate.RequestId == demand.RequestId && candidate.TeacherId == demand.RegularTeacherId);
-            var requiredFromSolution = Math.Min(remainingMinimum, availableRegularCandidates);
-            var actual = solution.Placements.Count(placement => placement.RequestId == demand.RequestId && placement.TeacherId == demand.RegularTeacherId);
-            if (actual < requiredFromSolution)
-                throw new InvalidDataException("Regular teacher minimum was not satisfied.");
-        }
     }
 
     private static void ValidateStudentSequences(

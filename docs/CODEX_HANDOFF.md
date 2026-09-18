@@ -733,6 +733,25 @@ checkpoint 58で追加したスタックトレース記録を活かし、実機�
 
 **動作確認:** Release/x64 build警告0・エラー0。修正後に実機で2回再起動し、ログにエラーが記録されていないことを確認した（22:36:16・22:41:57起動、以降エラーなし）。ボタン分離後のCSV検証・反映の実際のクリック操作による確認はユーザー側で今後実施。
 
+### v0.1.0 checkpoint 62 (Claude)
+
+checkpoint 61の修正直後、ユーザーが実際に③アンケート取込みで実CSV（生徒57名分の実回答・講師16名分の実回答）を投入したところ、「[エラー] 行1 [生徒回答] 必須列がありません: 生徒ID, 科目コード, 日付」等のエラーになるスクリーンショットが届いた。
+
+**原因1（UIの見分けがつかない）:** エラーメッセージ文言（「生徒ID」「科目コード」）から、ユーザーが使ったのはchekcpoint 61で新設した①簡易形式（旧形式、生徒ID・科目コードを直接指定するCSV用）のボタン列だったと判明した。②Googleフォーム生回答セクションのボタンと、ラベルが「生徒回答ファイルを選択」対「生徒の生回答ファイルを選択」という僅かな差異しかなく、かつ両セクションとも枠のないフラットな並びだったため、スクロールした状態や流し見では容易に混同する。実際にこのバグでユーザーの操作が失敗した。
+
+**対応1:** `ImportPage.xaml`のレイアウトを刷新。②Googleフォーム生回答セクションを最上部へ移動し、アクセントカラーの太枠＋「🟦 Googleフォーム回答の取込み（通常はこちらを使う）」の見出し、ボタンに①②③④の番号を振って操作順を明示。①簡易形式セクションは下部へ移動し、淡色背景＋「⬜ 旧形式（...Googleフォームの回答ではこちらは使わない）」という明示的な注記を付けた。
+
+**原因2（②Googleフォーム生回答自体は正常）とその検証方法:** ①のボタンを使った場合の動作は仕様通り（生徒ID・科目コード形式のパーサーへ本物のアンケート回答CSVを渡せばエラーになるのは当然）であり、②自体にバグがあるか確認するため、ユーザーが「2026夏期講習.jukuschedule」（実プロジェクト）と実CSV2件をこの会話に貼り付けた。実データを保護するため、`%LocalAppData%\SeminarSched.WinUI\Workspace\Projects\2026夏期講習.jukuschedule`をセッションのscratchpad配下へ複製し、複製に対してのみ検証・反映・自動作成を実行し、検証後にscratchpad配下は全て削除した（実データはリポジトリにもログにも一切書き込んでいない）。結果：`CourseSurveyImportService.PreviewAsync`/`ApplyAsync`は生徒57名・講師16名・受講希望83件をエラー0件・警告0件で正しく反映した。②のロジック自体に問題はないと確認できた。
+
+**発見2（真のバグ、より重大）:** 上記の実プロジェクトへ反映した状態で⑤の`SqliteScheduleRunService.RunAsync`（CP-SAT自動作成）を実行したところ、`InvalidOperationException: 時間割を作成できませんでした: Infeasible`で失敗した。ユーザーからの「もし正しくできているとなったら最後の計算までできるかも含めてやってほしい」という指示に基づき原因を追跡した。
+
+- `CpSatScheduleSolver.AddRegularTeacherMinimums`が、通常担当講師優先度2以上のLessonRequestごとに「その通常担当講師との最低実施回数」を**ハード制約**（`model.Add(sum(regular)>=Math.Min(remainingMinimum,regular.Length))`）として課していた。コード内コメントには「Capacity shortages must not make the entire model infeasible」とあり、個々のrequestが自分の候補数を超えて要求されないようMath.Minで守ってはいたが、**複数のrequest間の衝突**（同じ生徒の別科目がそれぞれ別の通常担当講師の最低回数を要求し、その両方の「強制的に選ばれる」候補が同じ日時に重なるケース）までは考慮していなかった。
+- 実データで検証：`RegularLessonProfile`が生徒75名全員に対して`RegularTeacherId`（共通名簿Excelの「通常授業」シート由来）を持ち、優先度は列が未入力のため既定値3（`SharedRosterImportService.ParseRegularLesson`の`row.Integer("担当講師優先度", false, 3, 1, 5)`）で全件揃っていた。これにより83件中67件のLessonRequestがこの強制最低回数の対象になり、うち16名以上の生徒が2件以上の強制対象を同時に持っていた。二分探索的にbisectionした結果（`AddStudentConsecutiveAndGapConstraints`単体では発生せず、`AddRegularTeacherMinimums`単体で再現）、この関数が原因と断定した。
+- **対応:** `AddRegularTeacherMinimums`をハード下限からソフト化した。各requestごとに`shortfall`という`IntVar(0, achievable)`を導入し、`sum(regular)+shortfall>=achievable`という常に充足可能な制約にし、未達分（shortfall）を目的関数で重くペナルティ（`-100,000`/回、未配置ペナルティ1,000,000より弱くday-dispersion10,000より強い）を課す方式に変更。これにより「できる限り通常担当講師に割り当てる」という意図は保ちつつ、他の生徒・科目との衝突があってもモデル全体がInfeasibleにならないようにした。あわせて`ScheduleSolutionValidator.ValidateRegularTeacherMinimums`（ソルバーのハード制約が守られたかを検証する側のテスト）も削除し、対応するテスト`Validator_RejectsUnsatisfiedRegularTeacherMinimum`を`Validator_AcceptsUnsatisfiedRegularTeacherMinimum`へ置き換え、新規に衝突再現テスト`SolveAsync_RegularTeacherMinimumBecomesSoftWhenTwoDemandsCollide`を追加した（`tests/SeminarSched.Optimization.Tests/CpSatScheduleSolverTests.cs`）。
+- **修正後の実データ再検証:** 同じ複製プロジェクト・同じ実CSVで①検証→②反映→③自動作成をフルパイプラインで再実行し、**placed=458 / unassigned=0**（必要回数の合計458件全件を配置、未配置0件）で成功することを確認した。elapsed約21秒（quality設定は20秒のtime limitで検証、実アプリの⑤画面ではユーザー設定のquality levelに応じた時間制限が使われる）。
+
+**動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全122 tests passed（Infrastructure 80・Application 12・Optimization 21・Domain 7・Architecture 2、Optimizationは差し替え後+1件）。実データでのフルパイプライン検証（import→schedule run）は上記の通りscratchpad上の複製プロジェクトで実施し完全成功、検証後にscratchpadは削除済み。ユーザーの実プロジェクト（`2026夏期講習.jukuschedule`）そのものは今回一切書き換えていない。実機アプリでの③②セクションの見分けやすさ、⑤自動作成の実行結果はユーザー側で改めて確認してほしい。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

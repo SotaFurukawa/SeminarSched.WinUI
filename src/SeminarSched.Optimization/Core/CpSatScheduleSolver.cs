@@ -42,17 +42,19 @@ public sealed class CpSatScheduleSolver
             model.Add(LinearExpr.Sum(weighted) <= 2 - fixedLoad);
         }
 
-        AddRegularTeacherMinimums(model, problem, variables);
+        var regularTeacherShortfallTerms = AddRegularTeacherMinimums(model, problem, variables).ToArray();
         AddStudentConsecutiveAndGapConstraints(model, problem, variables);
 
         // Assignment count dominates every soft penalty, so a prettier timetable can never
         // replace an otherwise assignable lesson with an unassigned lesson. Day-spread ranks
         // above teacher-preference matching per the Python reference's lexicographic order
         // (v1.9.5 objectives.py), so it is weighted above the *100 preference term but stays
-        // far below the 1,000,000-per-placement floor.
+        // far below the 1,000,000-per-placement floor. The regular-teacher shortfall penalty
+        // (see AddRegularTeacherMinimums) ranks between day-spread and the placement floor.
         var objectiveTerms = variables.Select(item =>
             LinearExpr.Term(item.variable, 1_000_000L - (item.candidate.PreferencePenalty * 100L) + item.candidate.AvailabilityPreference))
-            .Concat(BuildDayDispersionTerms(model, variables));
+            .Concat(BuildDayDispersionTerms(model, variables))
+            .Concat(regularTeacherShortfallTerms);
         model.Maximize(LinearExpr.Sum(objectiveTerms));
 
         var solver = new CpSolver
@@ -110,7 +112,21 @@ public sealed class CpSatScheduleSolver
         }
     }
 
-    private static void AddRegularTeacherMinimums(
+    private const long RegularTeacherShortfallWeight = 100_000L;
+
+    /// <summary>
+    /// A student's several regular-teacher requirements (one per subject) each independently look
+    /// satisfiable from their own candidate pool, but the pools are not independent: two subjects
+    /// sharing the same student compete for the same limited (date, slot) capacity, and a fixed
+    /// regular teacher's own availability is shared across every student assigned to them. Forcing
+    /// every demand's minimum as a hard lower bound (as a naive per-demand cap-at-candidate-count
+    /// guard alone would do) can therefore still make the whole model Infeasible once two demands'
+    /// forced slots collide - confirmed against a real 57-student/16-teacher import where every
+    /// student had a regular teacher recorded and about a quarter had two. So each shortfall below
+    /// the achievable minimum is tracked with a slack variable and only penalized in the objective,
+    /// never forced, keeping a schedule findable even when not every regular-teacher target fits.
+    /// </summary>
+    private static IEnumerable<LinearExpr> AddRegularTeacherMinimums(
         CpModel model,
         ScheduleProblem problem,
         IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables)
@@ -124,9 +140,11 @@ public sealed class CpSatScheduleSolver
                 .Where(item => item.candidate.RequestId == demand.RequestId && item.candidate.TeacherId == demand.RegularTeacherId)
                 .Select(item => item.variable)
                 .ToArray();
-            // Capacity shortages must not make the entire model infeasible. Require as much
-            // of the configured minimum as the actual candidate set can supply.
-            model.Add(LinearExpr.Sum(regular) >= Math.Min(remainingMinimum, regular.Length));
+            var achievable = Math.Min(remainingMinimum, regular.Length);
+            if (achievable == 0) continue;
+            var shortfall = model.NewIntVar(0, achievable, $"regular_shortfall_{demand.RequestId}");
+            model.Add(LinearExpr.Sum(regular) + shortfall >= achievable);
+            yield return LinearExpr.Term(shortfall, -RegularTeacherShortfallWeight);
         }
     }
 

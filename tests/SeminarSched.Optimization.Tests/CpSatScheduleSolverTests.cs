@@ -131,13 +131,41 @@ public sealed class CpSatScheduleSolverTests
     }
 
     [Fact]
-    public void Validator_RejectsUnsatisfiedRegularTeacherMinimum()
+    public void Validator_AcceptsUnsatisfiedRegularTeacherMinimum()
     {
+        // The regular-teacher minimum is a penalized soft target inside the solver (see
+        // SolveAsync_RegularTeacherMinimumBecomesSoftWhenTwoDemandsCollide below), not a hard
+        // invariant every structurally-valid solution must meet, so the validator must not reject
+        // a solution just because it fell short of one.
         var problem = new ScheduleProblem(
             [new LessonDemand(1,10,1,0,RegularTeacherId:100,RegularTeacherPriority:5)],
             [new PlacementCandidate(1,10,100,1,1),new PlacementCandidate(1,10,200,1,1)]);
-        var invalid = new ScheduleSolution([new SchedulePlacement(1,10,200,1,1)],0,0,TimeSpan.Zero);
+        var solution = new ScheduleSolution([new SchedulePlacement(1,10,200,1,1)],0,0,TimeSpan.Zero);
 
-        Assert.Throws<InvalidDataException>(()=>ScheduleSolutionValidator.Validate(problem,invalid));
+        ScheduleSolutionValidator.Validate(problem,solution);
+    }
+
+    [Fact]
+    public async Task SolveAsync_RegularTeacherMinimumBecomesSoftWhenTwoDemandsCollide()
+    {
+        // Reproduces the real-world infeasibility found against a real 57-student import: two
+        // subjects for the same student each have exactly one available candidate slot, both at
+        // the same (student, date, slot), and each subject's regular-teacher minimum is fully
+        // achievable from its own candidate pool in isolation. Forcing both as hard lower bounds
+        // (the old behavior) made the whole model Infeasible, since the student can only occupy
+        // that slot once. The solver must still return a solution instead of throwing.
+        var demandA = new LessonDemand(1, 10, 2, 0, RegularTeacherId: 100, RegularTeacherPriority: 5);
+        var demandB = new LessonDemand(2, 10, 2, 0, RegularTeacherId: 200, RegularTeacherPriority: 5);
+        var candidates = new[]
+        {
+            new PlacementCandidate(1, 10, 100, 1, 1),
+            new PlacementCandidate(2, 10, 200, 1, 1),
+        };
+        var problem = new ScheduleProblem([demandA, demandB], candidates);
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(problem, TimeSpan.FromSeconds(2));
+
+        Assert.True(solution.Placements.Count <= 1);
+        ScheduleSolutionValidator.Validate(problem, solution);
     }
 }
