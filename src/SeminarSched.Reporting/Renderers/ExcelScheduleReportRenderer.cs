@@ -13,7 +13,8 @@ public sealed class ExcelScheduleReportRenderer
 
         var overview=workbook.AddWorksheet("全体時間割");
         var overviewAssignments=report.Rows.Select(r=>new OverviewAssignment(DateOnly.Parse(r.Date),r.Teacher,r.TimeSlot,r.StudentGrade,r.SubjectShortName,studentLabels[r.Student])).ToArray();
-        var grid=OverviewGridLayout.Build(report.StartDate,report.EndDate,report.OpenDates.ToHashSet(),report.SlotLabels,overviewAssignments);
+        var overviewUnavailabilities=report.TeacherUnavailabilities.Select(u=>new OverviewUnavailability(DateOnly.Parse(u.Date),u.Teacher,u.TimeSlot)).ToArray();
+        var grid=OverviewGridLayout.Build(report.StartDate,report.EndDate,report.OpenDates.ToHashSet(),report.SlotLabels,overviewAssignments,overviewUnavailabilities);
         WriteOverview(overview,grid);
 
         var flatSheet=workbook.AddWorksheet("配置一覧");
@@ -124,6 +125,7 @@ public sealed class ExcelScheduleReportRenderer
                         var cell=sheet.Cell(slotStartRow+s,col);cell.Style.Alignment.WrapText=true;
                         var cards=teacher.Cells[s].Cards;
                         if(cards.Count>0)cell.Value=string.Join("\n",cards.Select(c=>$"{c.Grade} {c.SubjectShortName} {c.Student}"));
+                        else if(teacher.Cells[s].Unavailable)cell.Style.Fill.BackgroundColor=XLColor.LightGray;
                     }
                     col++;
                 }

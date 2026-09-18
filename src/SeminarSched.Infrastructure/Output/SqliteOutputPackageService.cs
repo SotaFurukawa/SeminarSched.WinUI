@@ -66,7 +66,14 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
         var missing=new List<string>();await using(var q=c.CreateCommand()){q.CommandText="SELECT s.Name||' / '||sub.DisplayName||' : '||(r.RequiredSessions-COUNT(a.Id))||'回' FROM LessonRequest r JOIN Student s ON s.Id=r.StudentId JOIN Subject sub ON sub.Id=r.SubjectId LEFT JOIN Assignment a ON a.LessonRequestId=r.Id GROUP BY r.Id HAVING COUNT(a.Id)<r.RequiredSessions ORDER BY s.ExternalId,sub.SortOrder;";await using var r=await q.ExecuteReaderAsync(token);while(await r.ReadAsync(token))missing.Add(r.GetString(0));}
         var absent=new List<AbsentStudent>();await using(var q=c.CreateCommand()){q.CommandText="SELECT s.Grade,s.Name FROM Student s WHERE s.Active=1 AND NOT EXISTS(SELECT 1 FROM LessonRequest r WHERE r.StudentId=s.Id) ORDER BY s.ExternalId;";await using var r=await q.ExecuteReaderAsync(token);while(await r.ReadAsync(token))absent.Add(new(r.GetString(0),r.GetString(1)));}
         var shortfalls=await LoadRegularTeacherShortfallsAsync(c,token);
-        return new(Path.GetFileNameWithoutExtension(path)+" 時間割",startDate,endDate,openDates,slotLabels,rows,missing,absent,shortfalls);
+        var unavailabilities=new List<TeacherUnavailabilityCell>();await using(var q=c.CreateCommand()){q.CommandText="""
+            SELECT d.Date,ts.DisplayName||' '||ts.StartTime||'-'||ts.EndTime,t.Name
+            FROM TeacherUnavailability u
+            JOIN OpenDate d ON d.Id=u.OpenDateId
+            JOIN TimeSlot ts ON ts.Id=u.TimeSlotId
+            JOIN Teacher t ON t.Id=u.TeacherId;
+            """;await using var r=await q.ExecuteReaderAsync(token);while(await r.ReadAsync(token))unavailabilities.Add(new(r.GetString(0),r.GetString(1),r.GetString(2)));}
+        return new(Path.GetFileNameWithoutExtension(path)+" 時間割",startDate,endDate,openDates,slotLabels,rows,missing,absent,shortfalls,unavailabilities);
     }
 
     /// <summary>

@@ -17,7 +17,8 @@ public sealed class PdfScheduleReportRenderer
 
         var overviewLabels=WeeklyCalendarLayout.BuildStudentLabels(report.Rows.Select(x=>x.Student));
         var overviewAssignments=report.Rows.Select(r=>new OverviewAssignment(DateOnly.Parse(r.Date),r.Teacher,r.TimeSlot,r.StudentGrade,r.SubjectShortName,overviewLabels[r.Student])).ToArray();
-        var overviewGrid=OverviewGridLayout.Build(report.StartDate,report.EndDate,report.OpenDates.ToHashSet(),report.SlotLabels,overviewAssignments);
+        var overviewUnavailabilities=report.TeacherUnavailabilities.Select(u=>new OverviewUnavailability(DateOnly.Parse(u.Date),u.Teacher,u.TimeSlot)).ToArray();
+        var overviewGrid=OverviewGridLayout.Build(report.StartDate,report.EndDate,report.OpenDates.ToHashSet(),report.SlotLabels,overviewAssignments,overviewUnavailabilities);
         AddOverview(section,overviewGrid);
 
         if(report.Unassigned.Count>0){section.AddParagraph("未配置").Format.Font.Bold=true;foreach(var item in report.Unassigned)section.AddParagraph("・"+item);}
@@ -81,8 +82,14 @@ public sealed class PdfScheduleReportRenderer
             {
                 var row=table.AddRow();row.Cells[0].AddParagraph(grid.SlotLabels[s]).Format.Font.Bold=true;
                 foreach(var(teacher,teacherCol) in teacherColumns)
-                    foreach(var card in teacher.Cells[s].Cards)
-                        row.Cells[teacherCol].AddParagraph($"{card.Grade} {card.SubjectShortName} {card.Student}");
+                {
+                    var cell=teacher.Cells[s];
+                    if(cell.Cards.Count>0)
+                        foreach(var card in cell.Cards)
+                            row.Cells[teacherCol].AddParagraph($"{card.Grade} {card.SubjectShortName} {card.Student}");
+                    else if(cell.Unavailable)
+                        row.Cells[teacherCol].Shading.Color=Colors.LightGray;
+                }
             }
         }
     }

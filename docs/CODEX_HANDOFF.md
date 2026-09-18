@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `693100d`（v0.1.0 checkpoint 45, 講師指導可能科目用の別Google Formsを生成kitへ追加）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
+Latest Development Checkpoint: checkpoint 46（全体時間割の出勤不可コマgray表示）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -466,6 +466,16 @@ Feature Parity行25「Google Forms作成kit」の残課題「講師指導可能�
 - 講師指導可能科目の回答自体の自動取込み（CSV列mapping、diagnostics）は今回のscope外とし、READMEには「①設定の担当設定タブへ手動反映」と明記した（正直な現状表示。Feature Parityにも残課題として明記）。
 - 既存テスト`GenerateAsync_WritesConfiguredAppsScriptAtomically`へ`createTeacherQualificationForm`の存在チェックを追加。
 - Release/x64 build: warning 0 / error 0。全92 tests passed。Privacy gate成功。
+
+### v0.1.0 checkpoint 46 (Claude)
+
+Feature Parity行50「全体時間割Excel/PDF」の残課題「コマ不可のgray表示」を実装した（ユーザーの許可のもと無人で継続）。
+
+- `ScheduleReport`へ`TeacherUnavailabilityCell(Date,TimeSlot,Teacher)`のリストを追加。`SqliteOutputPackageService`が`TeacherUnavailability`テーブルをTeacher/OpenDate/TimeSlotとJOINして取得する（`ScheduleReportRow`の日付・コマ文字列表現と完全に一致する式を使用し、Overview側の照合キーを揃えた）。
+- `OverviewGridLayout`へ`OverviewUnavailability`と`OverviewCell.Unavailable`を追加。`Build()`は「配置が0件」かつ「(日付,講師,コマ)が出勤不可集合に含まれる」場合にのみ`Unavailable=true`とする。講師列自体はその日に他の配置がある場合のみ表示されるため（既存仕様のまま）、この機能は「部分的に出勤不可な講師」のケースのみを対象とする（終日不可で配置ゼロの講師は元々列として現れない）。
+- `ExcelScheduleReportRenderer`/`PdfScheduleReportRenderer`の全体時間割セクションで、`Unavailable`かつ配置なしのセルへLightGray背景を適用。
+- 新規テスト`GenerateAsync_OverviewGrid_GraysOutUnavailableSlotForTeacherWithOtherAssignmentsThatDay`（`SqliteOutputPackageServiceTests.cs`）で、配置のあるコマは通常表示、出勤不可のコマだけgray表示されることをExcel出力から直接検証した。
+- Release/x64 build: warning 0 / error 0。全93 tests passed（新規1件）。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 

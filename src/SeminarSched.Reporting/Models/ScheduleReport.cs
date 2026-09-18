@@ -2,6 +2,7 @@ namespace SeminarSched.Reporting.Models;
 
 public sealed record ScheduleReportRow(string Date,string TimeSlot,string Student,string StudentGrade,string Subject,string SubjectShortName,string Teacher,bool IsLocked,bool IsRegularTeacher);
 public sealed record AbsentStudent(string Grade,string Name);
+public sealed record TeacherUnavailabilityCell(string Date,string TimeSlot,string Teacher);
 public sealed record ScheduleReport(
     string Title,
     DateOnly StartDate,
@@ -11,4 +12,5 @@ public sealed record ScheduleReport(
     IReadOnlyList<ScheduleReportRow> Rows,
     IReadOnlyList<string> Unassigned,
     IReadOnlyList<AbsentStudent> AbsentStudents,
-    IReadOnlyList<string> RegularTeacherShortfalls);
+    IReadOnlyList<string> RegularTeacherShortfalls,
+    IReadOnlyList<TeacherUnavailabilityCell> TeacherUnavailabilities);
