@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `de99dc4`（v0.1.0 checkpoint 52, project openごとの自動backup・世代管理）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち（アプリ起動済み、checkpoint 51適用版で再起動）。
+Latest Development Checkpoint: checkpoint 53（週calendar PDFのA4横向き列幅修正）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint 51のproject open crash修正後、アプリはユーザー操作で終了した模様（新たなエラーログなし）。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -547,6 +547,15 @@ Feature Parity行「自動backup・世代管理」の残課題「自動実行と
 - `ProjectService.OpenAsync`が`OpenAsync`成功直後に自動で`CreateAutomaticBackupAsync(path, 5)`を呼ぶよう変更（世代数5は明確なPython版仕様が無いための暫定値、既存の「復元前3世代backup」とは別枠）。
 - 新規テスト2件: `CreateAutomaticBackupAsync_KeepsOnlyTheNewestGenerationsAndNeverThrows`（4回連続実行して直近3世代のみ残ること、整合性が保たれること、存在しないpathでも例外を投げないことを検証）、`OpenAsync_TriggersAutomaticBackupWithFiveGenerations`（`ProjectService.OpenAsync`が正しい引数で自動backupを呼ぶことをApplication層のfakeで検証）。
 - Release/x64 build: warning 0 / error 0。全99 tests passed（新規3件）。Privacy gate成功。
+
+### v0.1.0 checkpoint 53 (Claude)
+
+Feature Parity行「講師配布（学年順）」の残課題「A4サイズへの厳密な収まり調整は未検証」を検証・修正した。実機で視覚確認する手段が無い環境のため、実際にPDFを描画してPdfSharpでページ寸法を読み取り、MigraDocの既定余白（`PageSetup.DefaultPageSetup`: A4・左右2.5cm・上2.5cm・下2cm）と突き合わせる方法で数値的に検証した。
+
+- `PdfScheduleReportRenderer.AddCalendar`（生徒配布・講師配布・講師別いずれの週calendarページでも共通利用される）の7列テーブルが列幅3.6cm（合計25.2cm）だったが、A4横向きの使用可能幅（29.7cm－左2.5cm－右2.5cm＝24.7cm）を0.5cm超過していたため、右余白へはみ出していた。列幅を3.5cm（合計24.5cm）へ修正し、余白内に収まるようにした。
+- 検証手順: (1) `MigraDoc.DocumentObjectModel.PageSetup.DefaultPageSetup`を直接読み取り、既定がA4・Portrait・左右2.5cm・上2.5cm・下2cmであることを確認。(2) 実際に`PdfScheduleReportRenderer.RenderTeacherPacket`でPDFを生成し、`PdfSharp.Pdf.IO.PdfReader`で開いてPage.Width/Heightを計測し、Landscape指定時に29.7cm×21.0cmへ正しく回転することを確認。(3) 7×3.6cm＞24.7cmであることを算出し、3.5cmへ修正。
+- 新規テスト`WeeklyCalendarColumnWidth_FitsWithinA4LandscapeUsableWidth`（`PdfScheduleReportRendererLayoutTests.cs`）で、この算出根拠（`PageSetup.DefaultPageSetup`から求めた使用可能幅と列幅合計の比較）を恒久的な回帰テストとして固定した。
+- Release/x64 build: warning 0 / error 0。全100 tests passed（新規1件）。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 

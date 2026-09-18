@@ -125,7 +125,9 @@ public sealed class PdfScheduleReportRenderer
     private static void AddCalendar(Section section,DateOnly start,DateOnly end,IReadOnlyDictionary<DateOnly,IReadOnlyList<string>> linesByDate)
     {
         var weeks=WeeklyCalendarLayout.Build(start,end,linesByDate);
-        var table=section.AddTable();table.Borders.Width=.5;for(var i=0;i<7;i++)table.AddColumn(Unit.FromCentimeter(3.6));
+        // 7 columns must fit within A4 landscape's usable width (29.7cm page - 2.5cm left/right margins =
+        // 24.7cm); 3.6cm/column (25.2cm total) overflowed into the right margin, so this uses 3.5cm (24.5cm).
+        var table=section.AddTable();table.Borders.Width=.5;for(var i=0;i<7;i++)table.AddColumn(Unit.FromCentimeter(3.5));
         var header=table.AddRow();header.Shading.Color=Colors.LightGray;
         for(var i=0;i<7;i++){header.Cells[i].AddParagraph(WeeklyCalendarLayout.WeekdayHeaders[i]);header.Cells[i].Format.Font.Bold=true;}
         foreach(var week in weeks)

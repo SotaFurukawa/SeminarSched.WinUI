@@ -50,7 +50,7 @@
 | 未配置・警告 | diagnostics/output | ⑥出力へ未配置一覧に加え、通常担当優先度の目標割合（5=100%〜2=25%）を下回る生徒・科目・不足回数を「通常担当不足」として出力 | 実装中 | 学年別上限超過などその他の診断種別は未移植 |
 | 全体時間割Excel/PDF | reporting/output service | 日曜始まり・土曜終わりの週単位、休校日を除いた日付を横に並べ、その日に配置がある講師だけを列として表示するgrid形式（`OverviewGridLayout`共通レイアウト）。コマを行、各セルへ学年・科目略称・生徒名を表示。配置が無いコマのうち、その講師がその日その時間帯に出勤不可（`TeacherUnavailability`）であるセルをExcel/PDF双方でgray表示 | 実装中 | 1セル最大2名の表示は横分割ではなく縦積み（同一セル内で改行） |
 | 生徒配布時間割Excel/PDF | reporting renderers | 生徒別sheet・PDF sectionを日曜始まり・土曜終わりの週calendar形式で生成（`WeeklyCalendarLayout`共通レイアウト）。講習に一度も参加しない生徒は個別calendarを作らず「講習欠席一覧」へ学年・氏名で一覧化 | 実装中 | セル内の科目略称・時刻の細かい書式はPython版と完全一致ではない |
-| 講師配布（学年順） | reporting renderers | 生徒sheetを学年・氏名順に生成。生徒名は姓のみ表示、同姓がいる場合だけ名の先頭1文字を付与 | 実装中 | A4サイズへの厳密な収まり調整は未検証 |
+| 講師配布（学年順） | reporting renderers | 生徒sheetを学年・氏名順に生成。生徒名は姓のみ表示、同姓がいる場合だけ名の先頭1文字を付与 | 実装済み | PDF週calendarの列幅を検証したところ、3.6cm×7列＝25.2cmがA4横向きの既定余白適用後の使用可能幅24.7cmを0.5cm超過していたため3.5cm×7列＝24.5cmへ修正。実際にPDFを描画してページ寸法・既定余白を計測して確認した（目視ではなく数値検証） |
 | 講師配布（講師別） | reporting renderers | 講師別sheet・PDF sectionを週calendar形式で生成に加え、出力folder内に「講師別」sub folderを作り、講師ごとに`{講師名}t.xlsx`と`{講師名}t.pdf`の個別ファイルを両方生成（担当一覧＝通常担当分→講習担当分の2区分で列挙、時間割＝週calendar）。Python版にあった「その他」区分（3区分目）はユーザー指示により意図的に廃止し、通常担当分・講習担当分の2区分のみとする方針を確定 | 実装済み | |
 | 未配置・警告一覧出力 | output service | 未配置回数・通常担当不足をExcel/PDFへ出力 | 実装中 | Python版のその他診断種別は未移植 |
 | atomic export・上書き確認 | output service | integrity再確認・新規一時folder・上書きなし。出力完了後、生成された全体時間割Excel/PDF・講師別個別fileの一覧を表示し、選択したfileや出力folderをOSの既定アプリで開けるUIを追加 | 実装済み | |
