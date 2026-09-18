@@ -22,34 +22,22 @@
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Spacing="12">
                     <TextBlock FontSize="20" FontWeight="SemiBold" Text="最適化品質" />
-                    <Grid ColumnSpacing="12">
-                        <TextBlock Text="高速" />
-                        <TextBlock HorizontalAlignment="Right" Text="最高品質" />
-                    </Grid>
-                    <Slider
-                        x:Name="QualitySlider"
-                        Minimum="1"
-                        Maximum="5"
-                        StepFrequency="1"
-                        TickFrequency="1"
-                        TickPlacement="BottomRight"
-                        SnapsTo="StepValues"
-                        Value="3"
-                        ValueChanged="QualitySlider_ValueChanged" />
-                    <Grid ColumnSpacing="8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock HorizontalAlignment="Center" Text="1" />
-                        <TextBlock Grid.Column="1" HorizontalAlignment="Center" Text="2" />
-                        <TextBlock Grid.Column="2" HorizontalAlignment="Center" Text="3" />
-                        <TextBlock Grid.Column="3" HorizontalAlignment="Center" Text="4" />
-                        <TextBlock Grid.Column="4" HorizontalAlignment="Center" Text="5" />
-                    </Grid>
+                    <StackPanel MaxWidth="480" HorizontalAlignment="Left" Spacing="0">
+                        <Grid ColumnSpacing="12">
+                            <TextBlock Text="高速" />
+                            <TextBlock HorizontalAlignment="Right" Text="最高品質" />
+                        </Grid>
+                        <Slider
+                            x:Name="QualitySlider"
+                            Minimum="1"
+                            Maximum="5"
+                            StepFrequency="1"
+                            TickFrequency="1"
+                            TickPlacement="BottomRight"
+                            SnapsTo="StepValues"
+                            Value="3"
+                            ValueChanged="QualitySlider_ValueChanged" />
+                    </StackPanel>
 
                     <TextBlock Margin="0,8,0,0" FontSize="18" FontWeight="SemiBold" Text="{x:Bind ViewModel.LevelText, Mode=OneWay}" />
                     <TextBlock FontSize="16" Text="{x:Bind ViewModel.DisplayName, Mode=OneWay}" />

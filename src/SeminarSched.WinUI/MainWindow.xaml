@@ -71,6 +71,21 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
+            <NavigationView.PaneFooter>
+                <StackPanel
+                    x:Name="OptimizationStatusPanel"
+                    Margin="12,4,12,12"
+                    Padding="8"
+                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                    CornerRadius="4"
+                    Spacing="4"
+                    Tapped="OptimizationStatusPanel_Tapped"
+                    Visibility="Collapsed">
+                    <TextBlock FontSize="12" FontWeight="SemiBold" Text="⑤ 自動作成 実行中" TextWrapping="Wrap" />
+                    <ProgressBar x:Name="OptimizationStatusBar" Maximum="100" Minimum="0" Value="0" />
+                    <TextBlock x:Name="OptimizationStatusText" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+            </NavigationView.PaneFooter>
             <Frame x:Name="NavFrame" />
         </NavigationView>
     </Grid>

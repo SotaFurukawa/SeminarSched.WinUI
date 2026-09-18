@@ -857,6 +857,23 @@ checkpoint 65はPython版のソースコード（`reporting/*_builder.py`）を�
 
 **未対応:** 「講師の同時担当上限（2名まで）は候補コマの列挙に含めない」という既存方針は維持したため、まれに候補コマとして出た枠が実際にはドロップ時に講師定員超過でREDになるケースが起こり得る（旧実装から変わらない既知の挙動）。
 
+### v0.1.0 checkpoint 68 (Claude) — ⑤時間割自動作成：画面外でも実行継続・進捗の常設表示・タスクバー連携
+
+ユーザーから⑤について複数の指摘。「最適化品質スライダーが長く、目盛りの数字と実際の位置がずれている」「残り時間などの表示を動的に変化させてほしい（現状ほぼ固まって見える）」「自動作成中に別画面へ切り替えると中断してしまう現象がある（実際は動いているかもしれない）。別画面にいても進行状況が分かるよう左下（Settingsの上あたり）に表示しておいてほしい」「Windowsタスクバーのアイコンにも進行中は緑の進捗、完了時はオレンジで点滅するお知らせを出してほしい」。
+
+**調査（コード読み取りのみ）:** `ScheduleOptimizer.RunAsync`の`progress?.Report()`はストラテジーの開始・終了時にしか呼ばれず、1ストラテジーの持ち時間は品質帯によっては数十秒〜数分になる（「最高品質」は1ストラテジーあたり約216秒）。そのためUIの経過/残り時間表示は実質「その報告が来るまで固まって見える」状態だった。また、`Run_Click`は`await App.ScheduleRun.RunAsync(...)`を直接待つ実装で、実行状態（`OptimizationRunControl`・進捗）はすべて`OptimizationPage`インスタンスのフィールドに閉じていた。WinUIの`Frame.Navigate`は画面遷移のたびに新しいPageインスタンスを作るため、実行中に他画面へ切り替えて戻ると（Task自体は裏で継続していても）新しいPageインスタンスには進捗情報が無く、UI上は「中断したように見える」。
+
+**実装:**
+- 新設`OptimizationRunState`（`SeminarSched.WinUI`直下、`ScheduleUndoState`と同じ「Pageの外に置く」設計）が実行制御・最新進捗・直近の結果をアプリ全体で1つ保持する。`StartAsync`が実行前スナップショットのpush・実際の`RunAsync`呼び出し・失敗時のロールバックまで一括で行うため、Page側は`await OptimizationRunState.StartAsync(path,profile)`を呼んで最新状態を読み直すだけでよい。1秒間隔の`DispatcherTimer`を内蔵し、直近の進捗報告値から経過時間を毎秒外挿して`Changed`イベントを発火するため、ストラテジー境界の間も残り時間表示が滑らかに動く。
+- `OptimizationPage`は`Page_Loaded`で`OptimizationRunState.Changed`を購読し、`RefreshRunUi()`で現在の状態をそのまま反映するだけの薄い実装へ書き換えた。画面を離れて戻ってきても（新しいPageインスタンスでも）実行中なら進捗がそのまま復元される。
+- `MainWindow`のナビゲーションペイン下部（`NavigationView.PaneFooter`、既定のSettings項目の直前）に、⑤実行中だけ表示される小さな進捗パネル（パーセント・残り時間目安、タップで⑤へ遷移）を追加。
+- 新設`TaskbarProgress`（`ITaskbarList3`のCOM相互運用、追加パッケージ不要）で、実行中はタスクバーのアプリアイコンに緑の進捗バーを表示し、完了時は`SetProgressState(Paused)`（黄〜オレンジ寄りの配色。Windowsの`ITaskbarList3`はNormal/Error/Pausedの3色しか無く、指定の「オレンジ」の代替）と`FlashWindowEx`（タスクバーボタンの点滅、フォーカスが戻るまで継続）を組み合わせて完了を知らせる。
+- `OptimizationPage.xaml`の品質スライダーを`MaxWidth="480"`のStackPanelへ収め、Sliderネイティブの目盛り位置とずれていた手描きの「1 2 3 4 5」数値行を削除（下の「品質レベル X/5」テキストと重複していたため実質的な情報損失は無い）。
+
+**動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全126 tests passed（挙動変更はUI層のみのためInfrastructure等のテストに影響なし）。アプリを再ビルド・起動確認済み。COM相互運用・タイマー・ナビゲーションペインの実際の見た目、画面切替時に本当に進捗が継続表示されるか、タスクバーの色・点滅は実機でのユーザー確認が必要（この環境からは対話的なGUI操作・タスクバー描画の確認ができないため）。
+
+**未対応・既知の制約:** タスクバー進捗色はWindows APIの制約上「緑（実行中）」「黄〜オレンジ寄り（完了、Paused状態）」の2色で、正確な「オレンジ」そのものは指定できない。CP-SATのSolutionCallbackは引き続き未接続で、進捗率は壁時計ベースの近似のまま。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

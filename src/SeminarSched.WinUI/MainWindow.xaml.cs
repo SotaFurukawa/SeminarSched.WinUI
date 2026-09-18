@@ -1,6 +1,7 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using SeminarSched_WinUI.Pages;
 
 // To learn more about WinUI, the WinUI project structure,
@@ -18,6 +19,36 @@ public sealed partial class MainWindow : Window
         SetTitleBar(AppTitleBar);
         AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
         AppWindow.SetIcon("Assets/AppIcon.ico");
+
+        // ⑤時間割自動作成は別画面(OptimizationPage)に切り替えても裏で継続するため、どの画面を
+        // 見ていても進行状況が分かるようナビゲーションペイン下部（既定のSettings項目のすぐ上）に
+        // 常設インジケーターを表示する。
+        OptimizationRunState.Changed += OnOptimizationRunStateChanged;
+        Closed += (_, _) => OptimizationRunState.Changed -= OnOptimizationRunStateChanged;
+        RefreshOptimizationStatus();
+    }
+
+    private void OnOptimizationRunStateChanged() => DispatcherQueue.TryEnqueue(RefreshOptimizationStatus);
+
+    private void RefreshOptimizationStatus()
+    {
+        var running = OptimizationRunState.IsRunning;
+        OptimizationStatusPanel.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
+        if (!running) return;
+        var (percent, _, remaining) = OptimizationRunState.Estimate();
+        OptimizationStatusBar.Value = percent;
+        OptimizationStatusText.Text = $"{percent:F0}%　残り目安 {FormatDuration(remaining)}";
+    }
+
+    private static string FormatDuration(TimeSpan span) => span.TotalMinutes >= 1 ? $"{(int)span.TotalMinutes}分{span.Seconds}秒" : $"{span.TotalSeconds:F0}秒";
+
+    private void OptimizationStatusPanel_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        NavFrame.Navigate(typeof(OptimizationPage));
+        foreach (var item in NavView.MenuItems.OfType<NavigationViewItem>())
+        {
+            if ((string)item.Tag == "optimization") { NavView.SelectedItem = item; break; }
+        }
     }
 
     private void TitleBar_PaneToggleRequested(TitleBar sender, object args)
