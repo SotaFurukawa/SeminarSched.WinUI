@@ -4,21 +4,53 @@ using Microsoft.Data.Sqlite;
 using SeminarSched.Application.Scheduling;
 using SeminarSched.Infrastructure.Projects;
 using SeminarSched.Optimization.Core;
+using SeminarSched.Optimization.Execution;
+using SeminarSched.Optimization.Profiles;
 
 namespace SeminarSched.Infrastructure.Scheduling;
 
 public sealed class SqliteScheduleRunService : IScheduleRunService
 {
+    // 呼び出し元がTimeSpanだけを渡す旧来の1戦略呼び出し（既存テストが依存）。単一ステージ・
+    // StandardCpSat 1本のプロファイルへ変換し、下のマルチ戦略経路をそのまま再利用する。
     public async Task<ScheduleRunSummary> RunAsync(string projectPath, TimeSpan maximumDuration, CancellationToken cancellationToken = default)
+    {
+        var profile = new OptimizationProfile(
+            OptimizationQualityLevel.Fast, "single", "single", "single",
+            maximumDuration, maximumDuration,
+            [new OptimizationStageDefinition(OptimizationStageKind.InitialExploration, 1.0, 1, [OptimizationStrategyKind.StandardCpSat])]);
+        using var control = new OptimizationRunControl();
+        return await RunAsync(projectPath, profile, control, progress: null, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<ScheduleRunSummary> RunAsync(
+        string projectPath,
+        OptimizationProfile profile,
+        OptimizationRunControl control,
+        IProgress<OptimizationProgress>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
         await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
         var problem = await BuildProblemAsync(connection, cancellationToken).ConfigureAwait(false);
-        var solution = await new CpSatScheduleSolver().SolveAsync(problem, maximumDuration, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var optimizer = new ScheduleOptimizer<ScheduleProblem, ScheduleSolution>(CreateStrategies());
+        var result = await optimizer.RunAsync(problem, profile, control, progress, cancellationToken).ConfigureAwait(false);
+        if (result.Best is null)
+            throw new InvalidOperationException("時間割を作成できませんでした: すべての戦略で解が得られませんでした。");
+
+        var solution = result.Best.Solution;
         ScheduleSolutionValidator.Validate(problem, solution);
-        await SaveValidatedAsync(connection, problem, solution, maximumDuration, cancellationToken).ConfigureAwait(false);
-        return new ScheduleRunSummary(solution.Placements.Count, solution.UnassignedLessons, solution.Elapsed);
+        await SaveValidatedAsync(connection, problem, solution, profile.MaximumDuration, cancellationToken).ConfigureAwait(false);
+        return new ScheduleRunSummary(solution.Placements.Count, solution.UnassignedLessons, result.Elapsed, result.Best.Strategy.ToString());
     }
+
+    private static IEnumerable<IScheduleStrategy<ScheduleProblem, ScheduleSolution>> CreateStrategies() =>
+    [
+        new StandardCpSatStrategy(), new SeededCpSatAStrategy(), new SeededCpSatBStrategy(), new SeededCpSatCStrategy(),
+        new AlternateDecisionStrategy(), new MultiStageStrategy(), new HintImprovementStrategy(),
+        new NeighborhoodRepairStrategy(), new FinalPolishingStrategy(),
+    ];
 
     private static async Task<ScheduleProblem> BuildProblemAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {

@@ -770,8 +770,30 @@ checkpoint 61の修正直後、ユーザーが実際に③アンケート取込�
 **動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全122 tests passed。実機アプリを再起動しログにエラーが無いことを確認。①③④の各画面の実際の見た目・スクロール動作の確認はユーザー側で改めて実施してほしい。
 
 **未対応（次checkpointへ持ち越し）:**
-- ⑤時間割自動作成：複数ソルバー戦略の追加、実行中の進捗（ゲージ・パーセンテージ・残り時間予測・現在の処理内容表示）の実装。
 - ⑥出力：ExcelのカラムレイアウトをPython版と完全一致させる対応（PDFは当面xlsx変換のままでよいとユーザーから明示的に許可されている。はみ出し修正は将来対応）。
+
+### v0.1.0 checkpoint 64 (Claude) — ⑤時間割自動作成：複数戦略・進捗UI
+
+ユーザーから「複数戦略を行っていくために、他のソルバーなどもどんどん追加していってください。自動作成中に中断したくなることもあるはずなので、進捗ゲージ・パーセンテージ・残り時間予測・現在の処理内容を表示してほしい（スピナー演出は残す）」との指示。
+
+**発見：スケルトンは既に存在していた。** `src/SeminarSched.Optimization/Execution/`・`Profiles/`配下に、`IScheduleStrategy<TInput,TSolution>`・`ScheduleOptimizer`（ステージ×戦略の実行エンジン、時間配分・停滞検知・「現在のベストを採用して中断」・進捗通知を完備）・`OptimizationProfileCatalog`（品質5段階×ステージ×戦略構成）・`ScheduleEvaluation`（8段階の辞書式比較）が、テスト付きで既に実装済みだった。`OptimizationPage`のコメント「現時点のv0.1.0 solverは単一CP-SAT戦略です。複数戦略はv0.2.0で接続します」が示す通り、前セッション（Codex）が設計・実装したがCP-SAT本体・UIへの配線が未着手のままだったv0.2.0計画そのものだった。今回はこの既存エンジンに実際のCP-SAT戦略9種を実装して接続した。
+
+**実装:**
+- `CpSatScheduleSolver`に`CpSatSolveOptions`（乱数シード・並列ワーカー数・search_branching・hint・LNS用の自由request集合）を追加し、`CpModel.AddHint`（ヒント）と`model.Add(variable==0/1)`（LNSの固定）を実装。
+- `OptimizationStrategyKind`の9種すべてに実装を追加（`Execution/CpSatStrategies.cs`）：StandardCpSat（標準）・SeededCpSatA/B/C（乱数シード違いの多重試行）・AlternateDecision（`search_branching:PORTFOLIO_SEARCH`）・MultiStage/HintImprovement（直前の最良解をhintに再探索）・NeighborhoodRepair（受講希望の約25%だけを自由にし残りをhintの値へ固定するLarge Neighborhood Search、hint自体が全ハード制約を満たす解のため必ず実行可能）・FinalPolishing（最終段の仕上げ探索）。
+- `ScheduleEvaluationCalculator`を新設し、`ScheduleSolution`から`ScheduleEvaluation`（未配置数・通常担当講師不足・希望講師penalty・分散penalty等）を計算する処理を実装。
+- `IScheduleRunService`/`SqliteScheduleRunService`に`RunAsync(path, OptimizationProfile, OptimizationRunControl, IProgress<OptimizationProgress>?, CancellationToken)`を追加し、内部で`ScheduleOptimizer`へ委譲。既存の`RunAsync(path, TimeSpan, ...)`は単一ステージ・StandardCpSat1本のプロファイルへ変換する後方互換ラッパーとして残し、既存テスト（`SqliteScheduleRunServiceTests`等）は無変更のまま通る。
+- `OptimizationPage`：進捗ゲージ（`ProgressBar`＋経過/残り時間予測＋パーセンテージ＋現在のステージ・戦略名を日本語ラベルで表示）を追加し、既存のスピナー（`ProgressRing`）はそのまま維持。「中断して現在の結果を採用」ボタンを追加し`OptimizationRunControl.AcceptCurrentBest()`を呼ぶ。
+
+**発見した重大な性能退行とその修正:** 実データ（生徒57名・受講希望83件・必要回数計458件・候補変数41,575個）で「高速」プロファイルを検証したところ、複数戦略で時間を均等分割すると全戦略が失敗する退行を発見した。原因は二重：(1) `OptimizationProfileCatalog`の「高速」がステージ内3戦略で60秒を均等分割し1戦略20秒しか使えなかったため、単一戦略時代の所要時間（21〜31秒）に届かなかった。(2) より深刻な原因として、`CpSatSolveOptions.NumSearchWorkers`の既定値を`1`（単一スレッド）にしていたが、実データで直接比較したところ`num_search_workers:1`は40秒経過しても実行可能解にすら到達せず、旧実装が使っていた`num_search_workers:0`（自動）はわずか32.4秒で解けることを確認した。既定値を`0`へ修正し、`OptimizationProfileCatalog`の「高速」「やや高速」も総時間を底上げ（60→120秒、180→240秒）・戦略数を調整して1戦略あたりの持ち時間を単一戦略時代以上に確保した。修正後、実データで「高速」「やや高速」、および全4ステージ・全9戦略中5種（1戦略はカタログの各段に重複あり）を強制実行するカスタムプロファイルの3パターンすべてで検証し、458件全件配置・エラーなしを確認した（LNSの`NeighborhoodRepair`はhintで温めた上で2.8秒という高速さで完了し、部分固定の仕組みが正しく機能していることも確認できた）。
+
+**テスト:** `CpSatScheduleSolverTests`にhint/LNS固定の動作確認テスト2件、`CpSatStrategyIntegrationTests`に9戦略すべてを通しで実行する結合テストを追加。`OptimizationProfileCatalogTests`・`ScheduleOptimizerTests`は「高速」カタログの戦略構成変更に合わせて更新（後者はカタログの実際の構成に依存しない自前プロファイルへ変更し、将来のカタログ再調整に対して頑健にした）。
+
+**動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全125 tests passed（Infrastructure 80・Application 12・Optimization 24・Domain 7・Architecture 2）。実データでの検証は使い捨てスクリプトでscratchpad上の複製プロジェクトに対して実施し、検証後に削除済み（実データはコミット・ログへ一切書き込んでいない）。実機アプリでの進捗UI・中断ボタンの見た目・実際のクリック操作はユーザー側で改めて確認してほしい。
+
+**未対応:**
+- CP-SATの`SolutionCallback`（解が改善されるたびに呼ばれるコールバック）は未接続。進捗の経過時間・残り時間予測は壁時計ベースの近似（`OptimizationProgress.Elapsed`/`MaximumTime`）で、ソルバー内部の探索進捗そのものではない。
+- 「標準」「高品質」「最高品質」帯は今回のworkers修正後に実データでは未再検証（「高速」「やや高速」および全ステージ強制実行プロファイルでの検証により、同じ仕組みを使う以上おそらく問題ないと判断しているが、実際のユーザー操作での確認は未実施）。
 
 ### 次回最初に確認するファイル
 

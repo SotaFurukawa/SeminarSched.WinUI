@@ -69,9 +69,24 @@
                 <StackPanel Spacing="12">
                     <TextBlock FontSize="20" FontWeight="SemiBold" Text="自動作成"/>
                     <InfoBar x:Name="RunStatus" IsClosable="True"/>
-                    <Button x:Name="RunButton" Content="時間割を自動作成" Click="Run_Click" Style="{StaticResource AccentButtonStyle}"/>
-                    <ProgressRing x:Name="RunProgress" IsActive="False" HorizontalAlignment="Left"/>
-                    <TextBlock Text="現時点のv0.1.0 solverは単一CP-SAT戦略です。複数戦略はv0.2.0で接続します。" TextWrapping="Wrap"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="RunButton" Content="時間割を自動作成" Click="Run_Click" Style="{StaticResource AccentButtonStyle}"/>
+                        <Button x:Name="AcceptBestButton" Content="中断して現在の結果を採用" Click="AcceptBest_Click" IsEnabled="False"/>
+                    </StackPanel>
+                    <Grid x:Name="ProgressPanel" ColumnSpacing="12" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <TextBlock x:Name="RunStageText" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="RunPercentText" Grid.Column="1" FontWeight="SemiBold" Margin="8,0,0,0"/>
+                            </Grid>
+                            <ProgressBar x:Name="RunProgressBar" Minimum="0" Maximum="100" Value="0"/>
+                            <TextBlock x:Name="RunEtaText" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+                        <ProgressRing x:Name="RunProgress" Grid.Column="1" IsActive="False" Width="36" Height="36"/>
+                    </Grid>
+                    <TextBlock Text="品質設定に応じて複数のCP-SAT探索戦略（複数の乱数シード・ポートフォリオ探索・近傍再探索・仕上げ探索など）を順に実行し、最も良い結果を採用します。進行中に「中断して現在の結果を採用」を押すと、その時点までに見つかった最良の結果をすぐに使用します。" TextWrapping="Wrap"/>
                     <Button Content="④ 時間割編集で結果を確認" Click="GoToEditor_Click"/>
                 </StackPanel>
             </Border>

@@ -4,6 +4,29 @@ using Google.OrTools.Sat;
 
 namespace SeminarSched.Optimization.Core;
 
+/// <summary>
+/// Tuning knobs shared by every CP-SAT-based strategy. <see cref="Hint"/> is a previously found
+/// solution used to warm-start the search (via CpModel.AddHint); when <see cref="FreeRequestIds"/>
+/// is also supplied, every request NOT in that set is additionally hard-fixed to its hint decision
+/// (Large Neighborhood Search: re-optimize only the "free" requests' neighborhood while trusting the
+/// rest of a known-good solution unchanged - always feasible, since the hint itself already satisfies
+/// every hard constraint).
+/// </summary>
+/// <remarks>
+/// <see cref="NumSearchWorkers"/> defaults to 0 ("let OR-Tools decide"), not 1. Measured directly
+/// against a real 57-student/83-request import (41,575 candidate variables): num_search_workers:1
+/// (true single-threaded search) never even reached a feasible solution in 40 seconds, while 0 solved
+/// it in 32.4s - CP-SAT's own automatic parallelism matters enormously at this problem size, so no
+/// caller should have to remember to override this just to get the previously-working behavior back.
+/// </remarks>
+public sealed record CpSatSolveOptions(
+    TimeSpan MaximumDuration,
+    int RandomSeed = 1,
+    int NumSearchWorkers = 0,
+    string? SearchBranching = null,
+    ScheduleSolution? Hint = null,
+    IReadOnlySet<long>? FreeRequestIds = null);
+
 public sealed class CpSatScheduleSolver
 {
     public Task<ScheduleSolution> SolveAsync(
@@ -13,10 +36,19 @@ public sealed class CpSatScheduleSolver
         CancellationToken cancellationToken = default)
     {
         if (maximumDuration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(maximumDuration));
-        return Task.Run(() => Solve(problem, maximumDuration, randomSeed, cancellationToken), cancellationToken);
+        return SolveAsync(problem, new CpSatSolveOptions(maximumDuration, randomSeed), cancellationToken);
     }
 
-    private static ScheduleSolution Solve(ScheduleProblem problem, TimeSpan maximum, int seed, CancellationToken cancellationToken)
+    public Task<ScheduleSolution> SolveAsync(
+        ScheduleProblem problem,
+        CpSatSolveOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        if (options.MaximumDuration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(options));
+        return Task.Run(() => Solve(problem, options, cancellationToken), cancellationToken);
+    }
+
+    private static ScheduleSolution Solve(ScheduleProblem problem, CpSatSolveOptions options, CancellationToken cancellationToken)
     {
         var watch = Stopwatch.StartNew();
         var model = new CpModel();
@@ -44,6 +76,7 @@ public sealed class CpSatScheduleSolver
 
         var regularTeacherShortfallTerms = AddRegularTeacherMinimums(model, problem, variables).ToArray();
         AddStudentConsecutiveAndGapConstraints(model, problem, variables);
+        ApplyHintAndNeighborhoodFreeze(model, variables, options);
 
         // Assignment count dominates every soft penalty, so a prettier timetable can never
         // replace an otherwise assignable lesson with an unassigned lesson. Day-spread ranks
@@ -57,10 +90,9 @@ public sealed class CpSatScheduleSolver
             .Concat(regularTeacherShortfallTerms);
         model.Maximize(LinearExpr.Sum(objectiveTerms));
 
-        var solver = new CpSolver
-        {
-            StringParameters = $"max_time_in_seconds:{maximum.TotalSeconds.ToString(CultureInfo.InvariantCulture)} random_seed:{seed} num_search_workers:0",
-        };
+        var parameters = $"max_time_in_seconds:{options.MaximumDuration.TotalSeconds.ToString(CultureInfo.InvariantCulture)} random_seed:{options.RandomSeed} num_search_workers:{options.NumSearchWorkers}";
+        if (options.SearchBranching is not null) parameters += $" search_branching:{options.SearchBranching}";
+        var solver = new CpSolver { StringParameters = parameters };
         using var registration = cancellationToken.Register(solver.StopSearch);
         var status = solver.Solve(model);
         cancellationToken.ThrowIfCancellationRequested();
@@ -84,6 +116,25 @@ public sealed class CpSatScheduleSolver
         var solution = new ScheduleSolution(placements, unassigned, objective, watch.Elapsed);
         ScheduleSolutionValidator.Validate(problem, solution);
         return solution;
+    }
+
+    private static void ApplyHintAndNeighborhoodFreeze(
+        CpModel model,
+        IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables,
+        CpSatSolveOptions options)
+    {
+        if (options.Hint is null) return;
+        var hintedKeys = options.Hint.Placements
+            .Select(p => (p.RequestId, p.TeacherId, p.OpenDateId, p.TimeSlotId))
+            .ToHashSet();
+        foreach (var (candidate, variable) in variables)
+        {
+            var isHinted = hintedKeys.Contains((candidate.RequestId, candidate.TeacherId, candidate.OpenDateId, candidate.TimeSlotId));
+            if (options.FreeRequestIds is not null && !options.FreeRequestIds.Contains(candidate.RequestId))
+                model.Add(variable == (isHinted ? 1 : 0));
+            else
+                model.AddHint(variable, isHinted);
+        }
     }
 
     private const long DayDispersionWeight = 10_000L;

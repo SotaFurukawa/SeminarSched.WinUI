@@ -39,7 +39,7 @@
 | 辞書式目的・公平性 | objectives | 単一weighted-sum内でtier順に重みを分離する近似方式（真の逐次lexicographic解法ではない）。未配置数（最優先）→通常担当・希望講師の一致は既存のPreferencePenaltyへ通常担当優先度も合成済み→本checkpointで生徒の同一日集中を抑制するday-dispersion項を追加 | 実装中 | 分散が悪い受講希望の改善、生徒週偏り、同一生徒科目の担当講師分散抑制、講師稼働率公平性、講師出勤日数圧縮は未実装 |
 | 高速/標準/高品質 | optimization view model | 未実装 | 未実装 | 30/120/600秒 |
 | 5段階の最適化品質profile | 追加仕様 | profile catalog / slider / JSON設定 | 実装中 | strategy実装・実行中UIは未完了 |
-| 高品質トーナメント探索 | 追加仕様 | 共通optimizer orchestration・候補選抜 | 実装中 | 実CP-SAT複数戦略とbenchmarkは後段へ保留 |
+| 複数戦略・トーナメント探索 | 追加仕様/OptimizationPage | 品質5段階（高速〜最高品質）ごとにステージ・戦略構成を持つ`ScheduleOptimizer`（前セッションが実装済みだった`Execution`/`Profiles`のオーケストレーションエンジン）へ、実際のCP-SAT戦略9種（標準・乱数シード違い3種・別探索方式・hint再探索2種・近傍再探索（LNS）・最終仕上げ）を接続（checkpoint 64）。実データ（受講希望83件・必要回数計458件）で全戦略・全ステージを検証し正しく動作することを確認。⑤画面に進捗ゲージ・経過/残り時間予測・現在の戦略名表示・「中断して現在の結果を採用」ボタンを追加（スピナー演出は維持） | 実装済み | CP-SATのSolutionCallbackは未接続のため進捗は壁時計ベースの近似。「標準」以上の品質帯は実データでの動作確認が未実施（同じ仕組みのため問題ない見込み） |
 | 現在best採用/キャンセル分離 | 追加仕様 | execution API上で分離・部分結果test | 実装中 | UI接続とvalidator・transaction境界は未実装 |
 | progress/cancel | worker / solver callback | 非同期progress DTO・cancel API | 実装中 | 実solverとUIへの接続は未実装 |
 | solver独立validator | result validation | 候補外・回数・衝突・容量・連続/空き時間をsolver外で再検証。通常担当最低数は目的関数内のソフト制約（未達を許容しうる）になったためcheckpoint 61でこのvalidatorのハード検証からは除外した | 実装中 | Python版全診断codeは未移植 |

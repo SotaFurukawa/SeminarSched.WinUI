@@ -18,7 +18,16 @@ public sealed class ScheduleOptimizerTests
         var optimizer = new ScheduleOptimizer<string, string>(strategies);
         using var control = new OptimizationRunControl();
 
-        var result = await optimizer.RunAsync("input", OptimizationProfileCatalog.Get(OptimizationQualityLevel.Fast), control);
+        // A profile referencing all three fakes directly (see the comment in
+        // RunAsync_AcceptCurrentBestStopsWorkWithoutBehavingLikeCancel below for why this test
+        // should not depend on a real quality level's exact strategy list).
+        var profile = new OptimizationProfile(
+            OptimizationQualityLevel.Fast, "test", "test", "test",
+            TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30),
+            [new OptimizationStageDefinition(OptimizationStageKind.InitialExploration, 1.0, 1,
+                [OptimizationStrategyKind.StandardCpSat, OptimizationStrategyKind.SeededCpSatA, OptimizationStrategyKind.AlternateDecision])]);
+
+        var result = await optimizer.RunAsync("input", profile, control);
 
         Assert.Equal("best", result.Best?.Solution);
         Assert.Equal(2, result.ImprovementCount);
@@ -34,7 +43,19 @@ public sealed class ScheduleOptimizerTests
         var optimizer = new ScheduleOptimizer<string, string>([first, blocking, final]);
         using var control = new OptimizationRunControl();
 
-        var run = optimizer.RunAsync("input", OptimizationProfileCatalog.Get(OptimizationQualityLevel.Fast), control);
+        // A profile built just for this test, rather than OptimizationProfileCatalog.Get(...): this
+        // test is exercising the generic engine's accept-early behavior with three sequential fake
+        // strategies, not any particular catalog tuning, and pinning it to a real quality level's
+        // exact strategy list makes it fragile against future catalog retuning (as happened once
+        // already - Fast dropped SeededCpSatA when its time-per-strategy budget proved too short
+        // for real data).
+        var profile = new OptimizationProfile(
+            OptimizationQualityLevel.Fast, "test", "test", "test",
+            TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30),
+            [new OptimizationStageDefinition(OptimizationStageKind.InitialExploration, 1.0, 1,
+                [OptimizationStrategyKind.StandardCpSat, OptimizationStrategyKind.SeededCpSatA, OptimizationStrategyKind.AlternateDecision])]);
+
+        var run = optimizer.RunAsync("input", profile, control);
         await blocking.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
         control.AcceptCurrentBest();
         var result = await run;
@@ -54,9 +75,14 @@ public sealed class ScheduleOptimizerTests
              Strategy(OptimizationStrategyKind.AlternateDecision, null)]);
         using var control = new OptimizationRunControl();
         using var cancellation = new CancellationTokenSource();
+        var profile = new OptimizationProfile(
+            OptimizationQualityLevel.Fast, "test", "test", "test",
+            TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30),
+            [new OptimizationStageDefinition(OptimizationStageKind.InitialExploration, 1.0, 1,
+                [OptimizationStrategyKind.StandardCpSat, OptimizationStrategyKind.SeededCpSatA, OptimizationStrategyKind.AlternateDecision])]);
 
         var run = optimizer.RunAsync(
-            "input", OptimizationProfileCatalog.Get(OptimizationQualityLevel.Fast), control,
+            "input", profile, control,
             cancellationToken: cancellation.Token);
         await blocking.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
         cancellation.Cancel();

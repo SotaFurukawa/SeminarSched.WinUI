@@ -19,7 +19,10 @@ public sealed class OptimizationProfileCatalogTests
     {
         var ordered = OptimizationProfileCatalog.All.OrderBy(profile => profile.Level).ToArray();
 
-        Assert.Equal([60, 180, 600, 1800, 3600], ordered.Select(item => (int)item.MaximumDuration.TotalSeconds));
+        // Fast/Fasterは実データ検証（生徒57名・必要回数計458件）で、複数戦略への均等分割後に
+        // 1戦略あたりの持ち時間が単一戦略時代のcold-start所要時間（約21〜31秒）を下回り、
+        // 全戦略が失敗する退行を確認したため、総時間を底上げしてある（OptimizationProfileCatalog参照）。
+        Assert.Equal([120, 240, 600, 1800, 3600], ordered.Select(item => (int)item.MaximumDuration.TotalSeconds));
         Assert.True(ordered.Zip(ordered.Skip(1)).All(pair => pair.First.StrategyCount <= pair.Second.StrategyCount));
     }
 

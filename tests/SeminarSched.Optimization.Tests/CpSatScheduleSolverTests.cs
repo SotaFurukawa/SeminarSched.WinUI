@@ -21,6 +21,57 @@ public sealed class CpSatScheduleSolverTests
         Assert.Equal(2,solution.UnassignedLessons);Assert.Empty(solution.Placements);
     }
     [Fact]
+    public async Task SolveAsync_FreeRequestIdsFreezesEverythingElseToTheHint()
+    {
+        // Two independent demands, each with two equally-cheap slots on different days. Left
+        // unconstrained, the solver is free to pick either day for either demand. With a hint plus
+        // an empty FreeRequestIds set, every candidate must match the hint's decision exactly -
+        // a solver still picks *a* solution, but it must be the hinted one, not a fresh optimum.
+        var problem = new ScheduleProblem(
+            [new LessonDemand(1, 10, 1, 0), new LessonDemand(2, 20, 1, 0)],
+            [
+                new PlacementCandidate(1, 10, 100, 1, 1),
+                new PlacementCandidate(1, 10, 100, 2, 1),
+                new PlacementCandidate(2, 20, 200, 1, 1),
+                new PlacementCandidate(2, 20, 200, 2, 1),
+            ]);
+        var hint = new ScheduleSolution(
+            [new SchedulePlacement(1, 10, 100, 2, 1), new SchedulePlacement(2, 20, 200, 2, 1)],
+            0, 0, TimeSpan.Zero);
+
+        var solver = new CpSatScheduleSolver();
+        var frozen = await solver.SolveAsync(problem, new CpSatSolveOptions(TimeSpan.FromSeconds(5), Hint: hint, FreeRequestIds: new HashSet<long>()));
+
+        Assert.Equal(2, frozen.Placements.Count);
+        Assert.All(frozen.Placements, placement => Assert.Equal(2L, placement.OpenDateId));
+        ScheduleSolutionValidator.Validate(problem, frozen);
+    }
+
+    [Fact]
+    public async Task SolveAsync_FreeRequestIdsLeavesListedRequestsFreeToChange()
+    {
+        // Same setup as above, but demand 2 is listed as "free": the solver may move it away from
+        // the hinted day while demand 1 (not listed) must still match the hint exactly.
+        var problem = new ScheduleProblem(
+            [new LessonDemand(1, 10, 1, 0), new LessonDemand(2, 20, 1, 0)],
+            [
+                new PlacementCandidate(1, 10, 100, 1, 1),
+                new PlacementCandidate(1, 10, 100, 2, 1),
+                new PlacementCandidate(2, 20, 200, 1, 1, PreferencePenalty: 5),
+                new PlacementCandidate(2, 20, 200, 2, 1, PreferencePenalty: 0),
+            ]);
+        var hint = new ScheduleSolution(
+            [new SchedulePlacement(1, 10, 100, 2, 1), new SchedulePlacement(2, 20, 200, 2, 1)],
+            0, 0, TimeSpan.Zero);
+
+        var solver = new CpSatScheduleSolver();
+        var partiallyFrozen = await solver.SolveAsync(problem, new CpSatSolveOptions(TimeSpan.FromSeconds(5), Hint: hint, FreeRequestIds: new HashSet<long> { 2 }));
+
+        Assert.Equal(2L, Assert.Single(partiallyFrozen.Placements, p => p.RequestId == 1).OpenDateId);
+        ScheduleSolutionValidator.Validate(problem, partiallyFrozen);
+    }
+
+    [Fact]
     public void Validator_RejectsCandidateOutsideInput()
     {
         var problem=new ScheduleProblem([new LessonDemand(1,10,1,0)],[]);var solution=new ScheduleSolution([new SchedulePlacement(1,10,1,1,1)],0,0,TimeSpan.Zero);
