@@ -120,6 +120,29 @@ public sealed class SqliteProjectRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateAutomaticBackupAsync_KeepsOnlyTheNewestGenerationsAndNeverThrows()
+    {
+        var repository = new SqliteProjectRepository();
+        var path = Path.Combine(_directory, "auto-backup.jukuschedule");
+        await repository.CreateAsync(path, CourseProjectDefinition.Create(
+            2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 22)));
+        var backupDirectory = Path.Combine(_directory, "auto-backup_backups");
+
+        for (var i = 0; i < 4; i++)
+        {
+            await repository.CreateAutomaticBackupAsync(path, maxGenerations: 3);
+            await Task.Delay(10);
+        }
+
+        var backups = Directory.GetFiles(backupDirectory, "auto-backup_auto_*.jukuschedule");
+        Assert.Equal(3, backups.Length);
+        Assert.All(backups, file => Assert.True((repository.CheckIntegrityAsync(file).GetAwaiter().GetResult()).IsValid));
+
+        // Best-effort: a nonexistent source path must not throw.
+        await repository.CreateAutomaticBackupAsync(Path.Combine(_directory, "missing.jukuschedule"), maxGenerations: 3);
+    }
+
+    [Fact]
     public async Task OpenAsync_SqliteFileWithoutApplicationMetadataTable_ThrowsFriendlyError()
     {
         Directory.CreateDirectory(_directory);

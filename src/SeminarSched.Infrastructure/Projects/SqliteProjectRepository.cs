@@ -148,6 +148,40 @@ public sealed class SqliteProjectRepository : IProjectRepository
         }
     }
 
+    public async Task CreateAutomaticBackupAsync(
+        string path,
+        int maxGenerations,
+        CancellationToken cancellationToken = default)
+    {
+        if (maxGenerations <= 0) throw new ArgumentOutOfRangeException(nameof(maxGenerations));
+        try
+        {
+            var source = Path.GetFullPath(path);
+            var directory = Path.GetDirectoryName(source);
+            if (directory is null || !File.Exists(source)) return;
+
+            var baseName = Path.GetFileNameWithoutExtension(source);
+            var extension = Path.GetExtension(source);
+            var backupDirectory = Path.Combine(directory, $"{baseName}_backups");
+            Directory.CreateDirectory(backupDirectory);
+            var backupPath = Path.Combine(backupDirectory, $"{baseName}_auto_{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}{extension}");
+            await CreateBackupAsync(source, backupPath, cancellationToken).ConfigureAwait(false);
+
+            var stale = Directory.GetFiles(backupDirectory, $"{baseName}_auto_*{extension}")
+                .OrderByDescending(candidate => candidate, StringComparer.Ordinal)
+                .Skip(maxGenerations);
+            foreach (var file in stale)
+            {
+                File.Delete(file);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            // Automatic backups are a best-effort safety net; a failure here (read-only folder, full
+            // disk, transient lock) must never block the caller's primary open/restore operation.
+        }
+    }
+
     public async Task RestoreBackupAsync(
         string backupPath,
         string targetPath,

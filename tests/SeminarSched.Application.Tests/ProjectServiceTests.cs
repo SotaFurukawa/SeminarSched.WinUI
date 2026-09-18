@@ -44,6 +44,20 @@ public sealed class ProjectServiceTests : IDisposable
         Assert.Equal(source, service.Current?.Path);
     }
 
+    [Fact]
+    public async Task OpenAsync_TriggersAutomaticBackupWithFiveGenerations()
+    {
+        Directory.CreateDirectory(_directory);
+        var source = Path.Combine(_directory, "source.jukuschedule");
+        await File.WriteAllTextAsync(source, "source-content");
+        var repository = new FileBackedProjectRepository();
+        var service = new ProjectService(repository);
+
+        await service.OpenAsync(source);
+
+        Assert.Equal((source, 5), repository.LastAutomaticBackupCall);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_directory))
@@ -54,6 +68,8 @@ public sealed class ProjectServiceTests : IDisposable
 
     private sealed class FileBackedProjectRepository : IProjectRepository
     {
+        public (string Path, int MaxGenerations)? LastAutomaticBackupCall { get; private set; }
+
         public Task<ProjectSummary> CreateAsync(string path, CourseProjectDefinition definition, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
@@ -71,5 +87,11 @@ public sealed class ProjectServiceTests : IDisposable
 
         public Task RestoreBackupAsync(string backupPath, string targetPath, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task CreateAutomaticBackupAsync(string path, int maxGenerations, CancellationToken cancellationToken = default)
+        {
+            LastAutomaticBackupCall = (path, maxGenerations);
+            return Task.CompletedTask;
+        }
     }
 }

@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `dfe62fb`（v0.1.0 checkpoint 51, project open時の未捕捉SqliteExceptionによるクラッシュを修正）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち（アプリ起動済み、checkpoint 51適用版で再起動）。
+Latest Development Checkpoint: checkpoint 52（project openごとの自動backup・世代管理）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち（アプリ起動済み、checkpoint 51適用版で再起動）。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -537,6 +537,16 @@ Feature Parity行「import preview/diff」の残課題「簡易形式（必要�
 - 新規テスト2件（`SqliteProjectRepositoryTests.cs`）: `OpenAsync_SqliteFileWithoutApplicationMetadataTable_ThrowsFriendlyError`（Python版相当の無関係テーブルのみ持つSQLiteファイルを開こうとして案内付き例外になることを検証）、`OpenAsync_NotASqliteFile_ThrowsFriendlyError`（プレーンテキストファイルを開こうとして案内付き例外になることを検証）。
 - 実機で起動していたアプリ（修正前のbuildで動いていた）を一旦終了し、修正版で再起動した。
 - Release/x64 build: warning 0 / error 0。全97 tests passed（新規2件）。Privacy gate成功。
+
+### v0.1.0 checkpoint 52 (Claude)
+
+Feature Parity行「自動backup・世代管理」の残課題「自動実行と世代管理」を実装した（ユーザーの「残っている項目も実装してください」との指示のもと継続）。
+
+- `IProjectRepository.CreateAutomaticBackupAsync(path, maxGenerations)`を新設。project直下に`{ファイル名}_backups`folderを作り、`{ファイル名}_auto_{yyyyMMdd_HHmmss_fff}.jukuschedule`形式でtimestamp付きbackupを1件作成し、同folder内の`_auto_`backupを新しい順に数えて`maxGenerations`件を超える分を自動削除する。既存の`CreateBackupAsync`（一時file→整合性確認→`OpenAsync`検証→atomic move）をそのまま再利用する。
+- 失敗（読み取り専用folder・disk容量不足など）はbest-effortで握り潰し、呼び出し元の主目的（project open）を妨げない設計とした（`IProjectRepository`のXML docにその契約を明記）。
+- `ProjectService.OpenAsync`が`OpenAsync`成功直後に自動で`CreateAutomaticBackupAsync(path, 5)`を呼ぶよう変更（世代数5は明確なPython版仕様が無いための暫定値、既存の「復元前3世代backup」とは別枠）。
+- 新規テスト2件: `CreateAutomaticBackupAsync_KeepsOnlyTheNewestGenerationsAndNeverThrows`（4回連続実行して直近3世代のみ残ること、整合性が保たれること、存在しないpathでも例外を投げないことを検証）、`OpenAsync_TriggersAutomaticBackupWithFiveGenerations`（`ProjectService.OpenAsync`が正しい引数で自動backupを呼ぶことをApplication層のfakeで検証）。
+- Release/x64 build: warning 0 / error 0。全99 tests passed（新規3件）。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 

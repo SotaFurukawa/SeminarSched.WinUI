@@ -5,6 +5,7 @@ namespace SeminarSched.Application.Projects;
 public sealed class ProjectService
 {
     public const string ProjectExtension = ".jukuschedule";
+    private const int AutomaticBackupGenerations = 5;
 
     private readonly IProjectRepository _repository;
 
@@ -42,6 +43,7 @@ public sealed class ProjectService
         }
 
         Current = await _repository.OpenAsync(normalized, cancellationToken).ConfigureAwait(false);
+        await _repository.CreateAutomaticBackupAsync(normalized, AutomaticBackupGenerations, cancellationToken).ConfigureAwait(false);
         return Current;
     }
 
