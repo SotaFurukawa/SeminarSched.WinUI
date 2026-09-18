@@ -8,6 +8,16 @@ public sealed class ProjectServiceTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), $"SeminarSched.ProjectService.{Guid.NewGuid():N}");
 
     [Fact]
+    public void DefaultProjectsAndBackupDirectories_AreCentralizedUnderLocalAppDataAndExist()
+    {
+        var appDataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SeminarSched.WinUI", "Workspace");
+        Assert.Equal(Path.Combine(appDataRoot, "Projects"), ProjectService.DefaultProjectsDirectory);
+        Assert.Equal(Path.Combine(appDataRoot, "Backups"), ProjectService.DefaultBackupDirectory);
+        Assert.True(Directory.Exists(ProjectService.DefaultProjectsDirectory));
+        Assert.True(Directory.Exists(ProjectService.DefaultBackupDirectory));
+    }
+
+    [Fact]
     public async Task SaveAsAsync_CopiesProjectAndSwitchesCurrentWithoutChangingSource()
     {
         Directory.CreateDirectory(_directory);
@@ -55,7 +65,7 @@ public sealed class ProjectServiceTests : IDisposable
 
         await service.OpenAsync(source);
 
-        Assert.Equal((source, 5), repository.LastAutomaticBackupCall);
+        Assert.Equal((source, ProjectService.DefaultBackupDirectory, 5), repository.LastAutomaticBackupCall);
     }
 
     public void Dispose()
@@ -68,7 +78,7 @@ public sealed class ProjectServiceTests : IDisposable
 
     private sealed class FileBackedProjectRepository : IProjectRepository
     {
-        public (string Path, int MaxGenerations)? LastAutomaticBackupCall { get; private set; }
+        public (string Path, string BackupDirectory, int MaxGenerations)? LastAutomaticBackupCall { get; private set; }
 
         public Task<ProjectSummary> CreateAsync(string path, CourseProjectDefinition definition, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
@@ -88,9 +98,9 @@ public sealed class ProjectServiceTests : IDisposable
         public Task RestoreBackupAsync(string backupPath, string targetPath, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task CreateAutomaticBackupAsync(string path, int maxGenerations, CancellationToken cancellationToken = default)
+        public Task CreateAutomaticBackupAsync(string path, string backupDirectory, int maxGenerations, CancellationToken cancellationToken = default)
         {
-            LastAutomaticBackupCall = (path, maxGenerations);
+            LastAutomaticBackupCall = (path, backupDirectory, maxGenerations);
             return Task.CompletedTask;
         }
     }

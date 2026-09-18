@@ -7,6 +7,23 @@ public sealed class ProjectService
     public const string ProjectExtension = ".jukuschedule";
     private const int AutomaticBackupGenerations = 5;
 
+    /// <summary>Fixed, centralized folder for new/opened/duplicated project files, mirroring the Python
+    /// reference app's AppData-based workspace instead of always starting pickers at a generic folder.</summary>
+    public static readonly string DefaultProjectsDirectory = EnsureDirectory("Projects");
+
+    /// <summary>Fixed, centralized folder all backups (automatic-on-open and manually created) are
+    /// written to, regardless of where the source project file lives.</summary>
+    public static readonly string DefaultBackupDirectory = EnsureDirectory("Backups");
+
+    private static string EnsureDirectory(string name)
+    {
+        var path = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "SeminarSched.WinUI", "Workspace", name);
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
     private readonly IProjectRepository _repository;
 
     public ProjectService(IProjectRepository repository)
@@ -43,7 +60,7 @@ public sealed class ProjectService
         }
 
         Current = await _repository.OpenAsync(normalized, cancellationToken).ConfigureAwait(false);
-        await _repository.CreateAutomaticBackupAsync(normalized, AutomaticBackupGenerations, cancellationToken).ConfigureAwait(false);
+        await _repository.CreateAutomaticBackupAsync(normalized, DefaultBackupDirectory, AutomaticBackupGenerations, cancellationToken).ConfigureAwait(false);
         return Current;
     }
 

@@ -26,12 +26,14 @@ public interface IProjectRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Creates a timestamped backup of <paramref name="path"/> in its dedicated "_backups" folder and
-    /// prunes older automatic backups beyond <paramref name="maxGenerations"/>. Best-effort: failures
-    /// (e.g. a read-only backup folder) are swallowed so this never blocks the caller's primary operation.
+    /// Creates a timestamped backup of <paramref name="path"/> inside <paramref name="backupDirectory"/>
+    /// and prunes older automatic backups of that same project beyond <paramref name="maxGenerations"/>.
+    /// Best-effort: failures (e.g. a read-only backup folder) are swallowed so this never blocks the
+    /// caller's primary operation.
     /// </summary>
     Task CreateAutomaticBackupAsync(
         string path,
+        string backupDirectory,
         int maxGenerations,
         CancellationToken cancellationToken = default);
 }

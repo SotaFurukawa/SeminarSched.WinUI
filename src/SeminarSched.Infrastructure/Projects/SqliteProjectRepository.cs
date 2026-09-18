@@ -150,6 +150,7 @@ public sealed class SqliteProjectRepository : IProjectRepository
 
     public async Task CreateAutomaticBackupAsync(
         string path,
+        string backupDirectory,
         int maxGenerations,
         CancellationToken cancellationToken = default)
     {
@@ -157,17 +158,16 @@ public sealed class SqliteProjectRepository : IProjectRepository
         try
         {
             var source = Path.GetFullPath(path);
-            var directory = Path.GetDirectoryName(source);
-            if (directory is null || !File.Exists(source)) return;
+            if (!File.Exists(source)) return;
 
             var baseName = Path.GetFileNameWithoutExtension(source);
             var extension = Path.GetExtension(source);
-            var backupDirectory = Path.Combine(directory, $"{baseName}_backups");
-            Directory.CreateDirectory(backupDirectory);
-            var backupPath = Path.Combine(backupDirectory, $"{baseName}_auto_{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}{extension}");
+            var directory = Path.GetFullPath(backupDirectory);
+            Directory.CreateDirectory(directory);
+            var backupPath = Path.Combine(directory, $"{baseName}_auto_{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}{extension}");
             await CreateBackupAsync(source, backupPath, cancellationToken).ConfigureAwait(false);
 
-            var stale = Directory.GetFiles(backupDirectory, $"{baseName}_auto_*{extension}")
+            var stale = Directory.GetFiles(directory, $"{baseName}_auto_*{extension}")
                 .OrderByDescending(candidate => candidate, StringComparer.Ordinal)
                 .Skip(maxGenerations);
             foreach (var file in stale)

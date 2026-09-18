@@ -126,11 +126,11 @@ public sealed class SqliteProjectRepositoryTests : IDisposable
         var path = Path.Combine(_directory, "auto-backup.jukuschedule");
         await repository.CreateAsync(path, CourseProjectDefinition.Create(
             2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 22)));
-        var backupDirectory = Path.Combine(_directory, "auto-backup_backups");
+        var backupDirectory = Path.Combine(_directory, "centralized-backups");
 
         for (var i = 0; i < 4; i++)
         {
-            await repository.CreateAutomaticBackupAsync(path, maxGenerations: 3);
+            await repository.CreateAutomaticBackupAsync(path, backupDirectory, maxGenerations: 3);
             await Task.Delay(10);
         }
 
@@ -138,8 +138,16 @@ public sealed class SqliteProjectRepositoryTests : IDisposable
         Assert.Equal(3, backups.Length);
         Assert.All(backups, file => Assert.True((repository.CheckIntegrityAsync(file).GetAwaiter().GetResult()).IsValid));
 
+        // A different project's automatic backups in the same centralized folder must not be pruned.
+        var otherPath = Path.Combine(_directory, "other-project.jukuschedule");
+        await repository.CreateAsync(otherPath, CourseProjectDefinition.Create(
+            2026, CourseSeason.Winter, new DateOnly(2026, 12, 20), new DateOnly(2026, 12, 22)));
+        await repository.CreateAutomaticBackupAsync(otherPath, backupDirectory, maxGenerations: 3);
+        Assert.Equal(3, Directory.GetFiles(backupDirectory, "auto-backup_auto_*.jukuschedule").Length);
+        Assert.Single(Directory.GetFiles(backupDirectory, "other-project_auto_*.jukuschedule"));
+
         // Best-effort: a nonexistent source path must not throw.
-        await repository.CreateAutomaticBackupAsync(Path.Combine(_directory, "missing.jukuschedule"), maxGenerations: 3);
+        await repository.CreateAutomaticBackupAsync(Path.Combine(_directory, "missing.jukuschedule"), backupDirectory, maxGenerations: 3);
     }
 
     [Fact]

@@ -1,10 +1,11 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.Windows.Storage.Pickers;
 using SeminarSched.Application.Projects;
 using SeminarSched.Application.Settings;
 using SeminarSched.Domain.Projects;
-using Windows.Storage.Pickers;
 using WinRT.Interop;
 
 namespace SeminarSched_WinUI.Pages;
@@ -37,12 +38,7 @@ public sealed partial class HomePage : Page
         try
         {
             var definition = BuildDefinition();
-            var picker = new FolderPicker
-            {
-                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
-            };
-            picker.FileTypeFilter.Add("*");
-            InitializePicker(picker);
+            var picker = new FolderPicker(GetWindowId()) { SuggestedFolder = ProjectService.DefaultProjectsDirectory };
             var folder = await picker.PickSingleFolderAsync();
             if (folder is null)
             {
@@ -73,12 +69,8 @@ public sealed partial class HomePage : Page
     {
         try
         {
-            var picker = new FileOpenPicker
-            {
-                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
-            };
+            var picker = new FileOpenPicker(GetWindowId()) { SuggestedFolder = ProjectService.DefaultProjectsDirectory };
             picker.FileTypeFilter.Add(ProjectService.ProjectExtension);
-            InitializePicker(picker);
             var file = await picker.PickSingleFileAsync();
             if (file is null)
             {
@@ -183,18 +175,9 @@ public sealed partial class HomePage : Page
 
         try
         {
-            var picker = new FolderPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
-            picker.FileTypeFilter.Add("*");
-            InitializePicker(picker);
-            var folder = await picker.PickSingleFolderAsync();
-            if (folder is null)
-            {
-                return;
-            }
-
             var backupName = $"{current.Title}_backup_{DateTime.Now:yyyyMMdd_HHmmss}{ProjectService.ProjectExtension}";
             SetBusy(true);
-            var path = await App.ProjectService.CreateBackupAsync(Path.Combine(folder.Path, backupName));
+            var path = await App.ProjectService.CreateBackupAsync(Path.Combine(ProjectService.DefaultBackupDirectory, backupName));
             ShowStatus(InfoBarSeverity.Success, "バックアップを作成しました", path);
             App.Logger.Info("Backup created");
         }
@@ -219,9 +202,8 @@ public sealed partial class HomePage : Page
 
         try
         {
-            var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
+            var picker = new FileOpenPicker(GetWindowId()) { SuggestedFolder = ProjectService.DefaultBackupDirectory };
             picker.FileTypeFilter.Add(ProjectService.ProjectExtension);
-            InitializePicker(picker);
             var file = await picker.PickSingleFileAsync();
             if (file is null)
             {
@@ -262,7 +244,7 @@ public sealed partial class HomePage : Page
     private async void SaveAs_Click(object sender,RoutedEventArgs e)
     {
         var current=App.ProjectService.Current;if(current is null){ShowStatus(InfoBarSeverity.Warning,"複製できません","先にプロジェクトを開いてください。");return;}
-        try{var picker=new FolderPicker{SuggestedStartLocation=PickerLocationId.DocumentsLibrary};picker.FileTypeFilter.Add("*");InitializePicker(picker);var folder=await picker.PickSingleFolderAsync();if(folder is null)return;var name=$"{current.Title}_copy_{DateTime.Now:yyyyMMdd_HHmmss}{ProjectService.ProjectExtension}";SetBusy(true);var copy=await App.ProjectService.SaveAsAsync(Path.Combine(folder.Path,name));await App.RecentProjects.TouchAsync(copy.Path,copy.Title);RefreshCurrentProject();await RefreshRecentProjectsAsync();ShowStatus(InfoBarSeverity.Success,"複製へ切り替えました",copy.Path);}catch(Exception ex)when(ex is IOException or UnauthorizedAccessException or InvalidDataException or SqliteException){ShowStatus(InfoBarSeverity.Error,"複製できませんでした",ex.Message);}finally{SetBusy(false);}
+        try{var picker=new FolderPicker(GetWindowId()){SuggestedFolder=ProjectService.DefaultProjectsDirectory};var folder=await picker.PickSingleFolderAsync();if(folder is null)return;var name=$"{current.Title}_copy_{DateTime.Now:yyyyMMdd_HHmmss}{ProjectService.ProjectExtension}";SetBusy(true);var copy=await App.ProjectService.SaveAsAsync(Path.Combine(folder.Path,name));await App.RecentProjects.TouchAsync(copy.Path,copy.Title);RefreshCurrentProject();await RefreshRecentProjectsAsync();ShowStatus(InfoBarSeverity.Success,"複製へ切り替えました",copy.Path);}catch(Exception ex)when(ex is IOException or UnauthorizedAccessException or InvalidDataException or SqliteException){ShowStatus(InfoBarSeverity.Error,"複製できませんでした",ex.Message);}finally{SetBusy(false);}
     }
 
     private void ProjectDefinition_Changed(object sender, object e) => RefreshGeneratedTitle();
@@ -309,10 +291,10 @@ public sealed partial class HomePage : Page
         CurrentProjectPath.Text = current?.Path ?? string.Empty;
     }
 
-    private static void InitializePicker(object picker)
+    private static WindowId GetWindowId()
     {
         var window = App.MainWindow ?? throw new InvalidOperationException("The main window is not available.");
-        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(window));
+        return Win32Interop.GetWindowIdFromWindow(WindowNative.GetWindowHandle(window));
     }
 
     private void SetBusy(bool isBusy) => IsEnabled = !isBusy;

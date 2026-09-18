@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `700c80a`（v0.1.0 checkpoint 53, 週calendar PDFのA4横向き列幅修正）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint 51のproject open crash修正後、アプリはユーザー操作で終了した模様（新たなエラーログなし）。
+Latest Development Checkpoint: checkpoint 54（保存先・命名の一元管理）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint 51のproject open crash修正後、アプリはユーザー操作で終了した模様（新たなエラーログなし）。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -556,6 +556,31 @@ Feature Parity行「講師配布（学年順）」の残課題「A4サイズへ�
 - 検証手順: (1) `MigraDoc.DocumentObjectModel.PageSetup.DefaultPageSetup`を直接読み取り、既定がA4・Portrait・左右2.5cm・上2.5cm・下2cmであることを確認。(2) 実際に`PdfScheduleReportRenderer.RenderTeacherPacket`でPDFを生成し、`PdfSharp.Pdf.IO.PdfReader`で開いてPage.Width/Heightを計測し、Landscape指定時に29.7cm×21.0cmへ正しく回転することを確認。(3) 7×3.6cm＞24.7cmであることを算出し、3.5cmへ修正。
 - 新規テスト`WeeklyCalendarColumnWidth_FitsWithinA4LandscapeUsableWidth`（`PdfScheduleReportRendererLayoutTests.cs`）で、この算出根拠（`PageSetup.DefaultPageSetup`から求めた使用可能幅と列幅合計の比較）を恒久的な回帰テストとして固定した。
 - Release/x64 build: warning 0 / error 0。全100 tests passed（新規1件）。Privacy gate成功。
+
+### v0.1.0 checkpoint 54 (Claude)
+
+ユーザーから「保存先を選んで作成する際の名前・場所を一律に決めておいてほしい。Python版は`%LocalAppData%`配下で一括管理していたが、WinUI版はどうなっているか」との質問・要望を受けた。読み取り専用のPython参照repoを調査し、2段階のAskUserQuestionでユーザーの希望を確認したうえで実装した。
+
+**調査結果（要約）:**
+- Python版は`%LocalAppData%\SummerScheduler\`配下に設定・DB・log・backup・workspace（生徒/講師/プロジェクト）を完全固定folderで管理し、出力・Googleフォームkitはfolder選択dialogを出すが既定folderを事前選択、ファイル名は常にtemplate化されている（手入力させない）。
+- 一方WinUI版はsettings.json/logのみ`%LocalAppData%\SeminarSched.WinUI\`に固定されており、project・backup・出力・Googleフォームkitは全てdialogが汎用の「ドキュメント」folderから開始し、ファイル名の一貫性もなかった。
+
+**ユーザーの決定（2問）:**
+1. バックアップ・出力・Googleフォームなど「作ったものを保存する場所」→ **folder選択dialogを廃止し、固定folderへ自動保存**（推奨案を採用）。
+2. 新規プロジェクト作成・開く → **folder選択dialogは残すが、最初に開かれるfolderを既定のfolderに固定する**（Python版と同じ方針）。
+
+**技術調査:** 従来使っていた`Windows.Storage.Pickers`（UWP由来）は開始folderを`PickerLocationId`列挙型（Desktop/Documents等）にしか設定できず、任意pathを指定するAPIが無いことを確認。WindowsAppSDK 2.4.0に含まれる新しい`Microsoft.Windows.Storage.Pickers`（`Microsoft.WindowsAppSDK.Foundation`パッケージ由来）を調査したところ、`FolderPicker`/`FileOpenPicker`/`FileSavePicker`いずれも`SuggestedFolder`（文字列path）で任意の開始folderを指定できることを実機ビルドで確認し、こちらへ移行した（コンストラクターが`WindowId`を要求するため`Microsoft.UI.Win32Interop.GetWindowIdFromWindow`で取得する新パターンに統一）。
+
+**実装内容:**
+- `ProjectService`（Application層）へ`DefaultProjectsDirectory`・`DefaultBackupDirectory`（いずれも`%LocalAppData%\SeminarSched.WinUI\Workspace\{Projects,Backups}`、初回アクセス時に自動作成）を追加。
+- `IProjectRepository.CreateAutomaticBackupAsync`のシグネチャを変更し、backup保存先を呼び出し側から明示的に渡すようにした（従来は`{project直下}\{名前}_backups`を内部計算していたが、Python版と同様に全projectで共有する一元backup folderへ変更。同一folder内でも`{名前}_auto_*`のprefixで世代管理のprune対象を正しくproject単位に絞ることを新規testで確認）。
+- `WorkspacePaths`（WinUI層、`Output`・`Forms`）を新設。
+- `OutputPage`（⑥出力）・`QuestionnairePage`（②アンケート作成）: folder選択dialogを完全に廃止し、`WorkspacePaths.Output`/`WorkspacePaths.Forms`へ直接生成するよう変更。
+- `HomePage`: 新規作成・開く・複製は`Microsoft.Windows.Storage.Pickers`へ移行し`SuggestedFolder`で`ProjectService.DefaultProjectsDirectory`を初期folderに設定。バックアップ作成はdialogを完全に廃止し`DefaultBackupDirectory`へ自動保存。復元は引き続きdialogを使うが初期folderを`DefaultBackupDirectory`に設定。
+- 共通基本情報Excel（SetupPage）・CSV/XLSX取込（ImportPage）はPython版も固定folder化していないため、旧`Windows.Storage.Pickers`のまま変更していない。
+- 新規テスト2件: `CreateAutomaticBackupAsync`のcross-project prune分離検証（`SqliteProjectRepositoryTests.cs`）、`DefaultProjectsAndBackupDirectories_AreCentralizedUnderLocalAppDataAndExist`（`ProjectServiceTests.cs`）。
+- Release/x64 build: warning 0 / error 0。全101 tests passed（新規1件、既存2件を仕様変更に追従）。Privacy gate成功。
+- **実機未確認**: 新しいPicker APIを使った実際のdialog操作感（開始folderが正しく`Workspace\Projects`等になっているか）は、この環境では視覚確認できないため、ユーザーによる実機確認が必要。
 
 ### 次回最初に確認するファイル
 
