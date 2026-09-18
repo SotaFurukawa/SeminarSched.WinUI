@@ -83,6 +83,7 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         var path=App.ProjectService.Current?.Path;if(path is null)return;
         PreconfirmRequest.ItemsSource=await App.FixedLessons.GetRequestsAsync(path);PreconfirmTeacher.ItemsSource=await App.FixedLessons.GetTeachersAsync(path);PreconfirmSlot.ItemsSource=await App.FixedLessons.GetSlotsAsync(path);
         ManualRequest.ItemsSource=await App.FixedLessons.GetRequestsAsync(path);ManualTeacher.ItemsSource=await App.FixedLessons.GetTeachersAsync(path);ManualSlot.ItemsSource=await App.FixedLessons.GetSlotsAsync(path);Assignments.ItemsSource=await App.ScheduleEditor.GetAssignmentsAsync(path);
+        HistoryList.ItemsSource=await App.ScheduleEditor.GetAuditHistoryAsync(path);
         await ReloadBoardDatesAsync(path);
         await ReloadBoardAsync();
     }

@@ -27,6 +27,20 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetAuditHistoryAsync_ReturnsSchedulingActionsNewestFirstWithJapaneseLabels()
+    {
+        var state=await CreateStateAsync();var editor=new SqliteScheduleEditorService();
+        await editor.AddManualAsync(state.Path,state.RequestId,state.TeacherId,state.DateId,state.SlotId,true);
+        var added=Assert.Single(await editor.GetAssignmentsAsync(state.Path));
+        await editor.SetLockedAsync(state.Path,added.Id,false);
+
+        var history=await editor.GetAuditHistoryAsync(state.Path);
+        Assert.Equal(2,history.Count);
+        Assert.Equal("ロック状態を変更",history[0].ActionLabel);
+        Assert.Equal("事前確定として追加",history[1].ActionLabel);
+    }
+
+    [Fact]
     public async Task ResetAutomatic_LeavesManualAndLockedAssignments()
     {
         var state=await CreateStateAsync();var editor=new SqliteScheduleEditorService();await editor.AddManualAsync(state.Path,state.RequestId,state.TeacherId,state.DateId,state.SlotId,false);

@@ -244,6 +244,34 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    private static readonly Dictionary<string,string> AuditActionLabels = new()
+    {
+        ["manual_assignment_added"]="手動配置を追加",
+        ["preconfirmed_assignment_added"]="事前確定として追加",
+        ["manual_assignment_moved"]="配置を移動",
+        ["manual_assignment_removed"]="手動配置を削除",
+        ["assignment_lock_changed"]="ロック状態を変更",
+        ["automatic_assignments_reset"]="自動配置をリセット",
+        ["teacher_unavailability_changed"]="出勤可否を変更",
+        ["schedule_snapshot_restored"]="元に戻す・やり直すを実行",
+    };
+
+    public async Task<IReadOnlyList<AuditHistoryEntry>> GetAuditHistoryAsync(string projectPath,int limit=50,CancellationToken cancellationToken=default)
+    {
+        await using var connection=await OpenAsync(projectPath,cancellationToken).ConfigureAwait(false);await SqliteProjectSchema.EnsureCurrentAsync(connection,cancellationToken).ConfigureAwait(false);
+        await using var command=connection.CreateCommand();
+        command.CommandText="SELECT TimestampUtc,Action,Reason FROM AuditLog WHERE Action IN ('manual_assignment_added','preconfirmed_assignment_added','manual_assignment_moved','manual_assignment_removed','assignment_lock_changed','automatic_assignments_reset','teacher_unavailability_changed','schedule_snapshot_restored') ORDER BY Id DESC LIMIT $limit;";
+        command.Parameters.AddWithValue("$limit",limit);
+        var result=new List<AuditHistoryEntry>();
+        await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var action=reader.GetString(1);
+            result.Add(new AuditHistoryEntry(DateTimeOffset.Parse(reader.GetString(0),CultureInfo.InvariantCulture),AuditActionLabels.GetValueOrDefault(action,action),reader.IsDBNull(2)?null:reader.GetString(2)));
+        }
+        return result;
+    }
+
     private static async Task InsertAuditAsync(SqliteConnection connection,SqliteTransaction transaction,string action,string entityId,object? summary,CancellationToken cancellationToken){await using var command=connection.CreateCommand();command.Transaction=transaction;command.CommandText="INSERT INTO AuditLog(ProjectId,TimestampUtc,Action,EntityType,EntityId,AfterJson,Reason,Source,OperationId) VALUES(1,$utc,$action,'assignment',$entity,$after,'時間割手動編集','manual',$operation);";command.Parameters.AddWithValue("$utc",DateTimeOffset.UtcNow.ToString("O",CultureInfo.InvariantCulture));command.Parameters.AddWithValue("$action",action);command.Parameters.AddWithValue("$entity",entityId);command.Parameters.AddWithValue("$after",summary is null?DBNull.Value:JsonSerializer.Serialize(summary));command.Parameters.AddWithValue("$operation",Guid.NewGuid().ToString("N"));await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);}
     private static async Task<SqliteConnection> OpenAsync(string path,CancellationToken cancellationToken){var connection=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.GetFullPath(path),Mode=SqliteOpenMode.ReadWrite,ForeignKeys=true,Pooling=false}.ToString());await connection.OpenAsync(cancellationToken).ConfigureAwait(false);return connection;}
 }

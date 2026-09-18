@@ -46,6 +46,14 @@
 
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Spacing="12">
+                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="変更履歴"/>
+                    <TextBlock Text="手動配置・事前確定・ロック・出勤可否・元に戻す/やり直すの直近の操作を新しい順に表示します。" TextWrapping="Wrap"/>
+                    <ListView x:Name="HistoryList" MaxHeight="240"/>
+                </StackPanel>
+            </Border>
+
+            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                <StackPanel Spacing="12">
                     <TextBlock FontSize="20" FontWeight="SemiBold" Text="日別グリッド編集"/>
                     <TextBlock Text="カードをドラッグしてセル間を移動、未配置一覧からはセルへドラッグして配置できます。右クリックでロック切替・削除、セル右上の丸印/バツ印で講師の出勤可否を切り替えられます。「元に戻す」「やり直す」で自動作成を含む直前の変更を取り消し・再適用できます（アプリを終了すると履歴は失われます）。" TextWrapping="Wrap"/>
                     <Grid ColumnSpacing="12">
