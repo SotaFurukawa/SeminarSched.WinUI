@@ -9,9 +9,9 @@
     Loaded="Page_Loaded"
     mc:Ignorable="d">
 
-    <StackPanel>
-        <InfoBar x:Name="ProjectRequired" Margin="24,16,24,0" />
-        <ScrollViewer x:Name="ContentPanel">
+    <Grid RowDefinitions="Auto,*">
+        <InfoBar Grid.Row="0" x:Name="ProjectRequired" Margin="24,16,24,0" />
+        <ScrollViewer Grid.Row="1" x:Name="ContentPanel">
         <StackPanel MaxWidth="1200" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="20">
             <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="時間割自動作成" />
             <TextBlock
@@ -77,5 +77,5 @@
             </Border>
         </StackPanel>
         </ScrollViewer>
-    </StackPanel>
+    </Grid>
 </local:WorkflowPageBase>

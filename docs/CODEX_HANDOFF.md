@@ -752,6 +752,27 @@ checkpoint 61の修正直後、ユーザーが実際に③アンケート取込�
 
 **動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全122 tests passed（Infrastructure 80・Application 12・Optimization 21・Domain 7・Architecture 2、Optimizationは差し替え後+1件）。実データでのフルパイプライン検証（import→schedule run）は上記の通りscratchpad上の複製プロジェクトで実施し完全成功、検証後にscratchpadは削除済み。ユーザーの実プロジェクト（`2026夏期講習.jukuschedule`）そのものは今回一切書き換えていない。実機アプリでの③②セクションの見分けやすさ、⑤自動作成の実行結果はユーザー側で改めて確認してほしい。
 
+### v0.1.0 checkpoint 63 (Claude)
+
+実機で①時間割編集まで一通り動作したユーザーから、「途中で止まらず、キューの末尾に追加していく形で」という指示のもと①設定画面の細かい修正一式と、③④⑤⑥への追加要望を連続して受け取った。以下①③④まで対応（⑤⑥は次checkpointで対応）。
+
+**①設定画面:**
+- **生徒タブ:** 一覧が単一文字列の連結表示で生徒ID・氏名・学年の桁がずれて見えていた問題を、ヘッダー行＋`ListView.ItemTemplate`（固定幅Grid列）による本物のカラム表示に変更（`生徒ID|生徒氏名|学年|状態`）。`MasterItem<T>`にActive/StatusTextを追加。
+- **担当設定タブ:** 「講師対応科目」の入力＋フラット一覧を、添付画像と同じ講師×科目のマトリクス表（行=講師、列=科目を校種でグループ化しヘッダー2段、セルの○をクリックしてCanTeachをトグル）へ置き換え（`RenderQualificationMatrix`/`QualificationCell_Click`）。個別の備考編集は上部の単票フォームに残した。
+- **受講希望:** ①から完全に削除し、③アンケート取込みページの「Googleフォーム回答の取込み」カードの直後（かつ「可用性の手動編集」カードの直前）へ移設。表示を生徒ID/科目コードから生徒氏名/科目名へ変更し、こちらもヘッダー＋固定幅Gridで列ずれを解消（`LessonRequestRow`表示レコード）。
+- **コマ設定:** 新規プロジェクト作成時のデフォルトを従来のZ/A/B/C 4枠からA/B/C 3枠へ変更（`SqliteProjectRepository.DefaultTimeSlots`からZを削除）。一覧の各行に削除ボタン（×）を追加し`ICourseSettingsRepository.DeleteTimeSlotAsync`を新設（Assignmentが`ON DELETE RESTRICT`のため使用中のコマは削除できずSqliteExceptionを分かりやすいメッセージに変換）。開始・終了のTimePicker列幅が110pxで狭く分単位が見えなかった問題を160px相当へ拡幅して解消。
+- 関連テスト`QuestionnaireKitServiceTests`のZスロット依存アサーションを`"A 17:10～18:30"`へ更新。
+
+**③アンケート取込み:** ユーザーから「旧形式（簡易形式CSV）は消してよい」との指示を受け、checkpoint 61で追加した「⬜ 旧形式」カードとその専用コードビハインド（`Select/Verify/Apply_Click`・`RenderDiff`等）を削除した。バックエンドの`IResponseImportService`/`ResponseImportService`自体はUI呼び出し元が無くなり事実上orphan状態だが、今回は削除せず残した（テスト付きの独立した機能でありUIから見えなくなっただけで実害はないため。将来的な完全撤去は未着手）。
+
+**④スクロールバー:** `ScheduleEditorPage`・`OptimizationPage`はcheckpoint 59で「`ProjectRequired`のInfoBarはプロジェクト未選択時も操作可能に保ちたいが、コンテンツ本体（`ScrollViewer`）はグレーアウトしたい」という理由でルートを`<StackPanel><InfoBar/><ScrollViewer x:Name="ContentPanel">...</ScrollViewer></StackPanel>`という構造にしていた。`StackPanel`は子要素に無限の高さを与えて計測するため、内側の`ScrollViewer`が「自分に割り当てられた領域を超えたらスクロールする」という判断ができず、スクロールバー自体が出ないままウィンドウ下端でコンテンツが見えなくなる、という実害のあるレイアウトバグだった。ルートを`<Grid RowDefinitions="Auto,*">`（Row0=InfoBar、Row1=ScrollViewer）へ変更し、`ScrollViewer`が残り領域ぶんだけの確定した高さを受け取れるようにして解消した。同じ症状が出ていないか他ページのルート構造も全て確認し、`OutputPage`（⑥出力）だけがそもそも`ScrollViewer`を持たない素の`StackPanel`ルートだったため、他ページと同じ「`ScrollViewer`を直接ルートにする」パターンでラップして予防した。`ImportPage`・`SetupPage`・`QuestionnairePage`・`HomePage`は元から`ScrollViewer`が直接ルートの安全な構造だったため変更不要。
+
+**動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全122 tests passed。実機アプリを再起動しログにエラーが無いことを確認。①③④の各画面の実際の見た目・スクロール動作の確認はユーザー側で改めて実施してほしい。
+
+**未対応（次checkpointへ持ち越し）:**
+- ⑤時間割自動作成：複数ソルバー戦略の追加、実行中の進捗（ゲージ・パーセンテージ・残り時間予測・現在の処理内容表示）の実装。
+- ⑥出力：ExcelのカラムレイアウトをPython版と完全一致させる対応（PDFは当面xlsx変換のままでよいとユーザーから明示的に許可されている。はみ出し修正は将来対応）。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

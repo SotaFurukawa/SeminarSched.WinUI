@@ -34,7 +34,7 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
         Assert.Contains("受講教科（${schoolLabel}${index}教科目）", studentScript);
         Assert.Contains("受講不可日時（チェックしたコマは受講不可）", studentScript);
         Assert.Contains("\"2026-07-20\"", studentScript);
-        Assert.Contains("\"Z 15:40～17:00\"", studentScript);
+        Assert.Contains("\"A 17:10～18:30\"", studentScript);
         Assert.Contains("\"算数\"", studentScript);
         Assert.DoesNotContain("小学校・算数", studentScript);
 

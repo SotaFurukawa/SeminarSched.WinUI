@@ -12,7 +12,6 @@ public sealed class SqliteProjectRepository : IProjectRepository
 
     private static readonly (string Code, string Start, string End)[] DefaultTimeSlots =
     [
-        ("Z", "15:40", "17:00"),
         ("A", "17:10", "18:30"),
         ("B", "18:40", "20:00"),
         ("C", "20:10", "21:30"),

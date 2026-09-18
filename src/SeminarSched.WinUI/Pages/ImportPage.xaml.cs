@@ -3,73 +3,27 @@ using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using SeminarSched.Application.Importing;
+using SeminarSched.Domain.MasterData;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
 namespace SeminarSched_WinUI.Pages;
 public sealed partial class ImportPage : WorkflowPageBase
 {
-    private ResponseImportPreview? _preview;
     private CourseSurveyPreview? _surveyPreview;
     private bool _loaded;
-    private string? _studentPath;
-    private string? _teacherPath;
     private string? _surveyStudentPath;
     private string? _surveyTeacherPath;
+    private MasterItem<Student>[] _studentItems=[];
+    private MasterItem<Subject>[] _subjectItems=[];
+    private MasterItem<Teacher?>[] _nullableTeacherItems=[];
     public ImportPage() => InitializeComponent();
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         _loaded=true;
         var ready=EnsureProject(ProjectRequired);
-        SelectStudentButton.IsEnabled=ready;SelectTeacherButton.IsEnabled=ready;
         SurveySelectStudentButton.IsEnabled=ready;SurveySelectTeacherButton.IsEnabled=ready;
-        if(ready)await ReloadMatrixAsync();
+        if(ready){await ReloadMatrixAsync();await ReloadLessonRequestsAsync();}
     }
-
-    private async void SelectStudent_Click(object sender,RoutedEventArgs e)
-    {
-        var path=await PickResponseAsync();if(path is null)return;
-        _studentPath=path;_preview=null;ApplyButton.IsEnabled=false;
-        UpdateSelectedFilesText();
-    }
-    private async void SelectTeacher_Click(object sender,RoutedEventArgs e)
-    {
-        var path=await PickResponseAsync();if(path is null)return;
-        _teacherPath=path;_preview=null;ApplyButton.IsEnabled=false;
-        UpdateSelectedFilesText();
-    }
-    private void UpdateSelectedFilesText()
-    {
-        SelectedFilesText.Text=$"生徒回答: {(_studentPath is null?"未選択":Path.GetFileName(_studentPath))}　/　講師回答: {(_teacherPath is null?"未選択":Path.GetFileName(_teacherPath))}";
-        VerifyButton.IsEnabled=_studentPath is not null&&_teacherPath is not null;
-    }
-
-    private async void Verify_Click(object sender,RoutedEventArgs e)
-    {
-        if(_studentPath is not{}student||_teacherPath is not{}teacher)return;
-        try
-        {
-            IsEnabled=false;
-            _preview=await App.ResponseImport.PreviewAsync(App.ProjectService.Current!.Path,student,teacher);
-            Issues.ItemsSource=_preview.Issues.Select(x=>$"{(x.IsError?"[エラー]":"[警告]")} 行{x.Row} [{x.Field}] {x.Message}").ToArray();
-            ApplyButton.IsEnabled=_preview.CanApply;
-            Status.Severity=_preview.CanApply?InfoBarSeverity.Success:InfoBarSeverity.Error;
-            Status.Title=_preview.CanApply?$"検証成功（生徒{_preview.StudentRowCount}行・講師{_preview.TeacherRowCount}行）":"検証エラーがあります";
-            Status.IsOpen=true;
-            RenderDiff(_preview.Diff);
-        }
-        catch(Exception ex)when(ex is IOException or InvalidDataException){ShowError(ex.Message);}finally{IsEnabled=true;}
-    }
-
-    private void RenderDiff(SeminarSched.Application.Importing.ResponseImportDiff diff)
-    {
-        DiffSummary.Visibility=Visibility.Visible;
-        DiffSummary.Text=$"生徒: 追加{diff.StudentAdded}件・変更{diff.StudentChanged}件・変更なし{diff.StudentUnchanged}件 / 講師: 追加{diff.TeacherAdded}件・変更{diff.TeacherChanged}件・変更なし{diff.TeacherUnchanged}件";
-        RemovalPanel.Visibility=diff.HasRemovalCandidates?Visibility.Visible:Visibility.Collapsed;
-        RemoveUnlisted.IsChecked=false;
-        RemovalList.ItemsSource=diff.StudentRemovalCandidates.Select(x=>$"生徒 {x}").Concat(diff.TeacherRemovalCandidates.Select(x=>$"講師 {x}")).ToArray();
-    }
-
-    private async void Apply_Click(object sender,RoutedEventArgs e){if(_preview is null)return;try{IsEnabled=false;await App.ResponseImport.ApplyAsync(App.ProjectService.Current!.Path,_preview,RemoveUnlisted.IsChecked==true);Status.Severity=InfoBarSeverity.Success;Status.Title="回答を反映しました";Status.IsOpen=true;ApplyButton.IsEnabled=false;}catch(Exception ex)when(ex is IOException or InvalidOperationException or Microsoft.Data.Sqlite.SqliteException){ShowError(ex.Message);}finally{IsEnabled=true;}}
 
     private async void SurveySelectStudent_Click(object sender,RoutedEventArgs e)
     {
@@ -125,6 +79,110 @@ public sealed partial class ImportPage : WorkflowPageBase
     }
     private async Task<string?> PickResponseAsync(){var p=new FileOpenPicker{SuggestedStartLocation=PickerLocationId.DocumentsLibrary};p.FileTypeFilter.Add(".csv");p.FileTypeFilter.Add(".xlsx");InitializeWithWindow.Initialize(p,WindowNative.GetWindowHandle(App.MainWindow!));return (await p.PickSingleFileAsync())?.Path;}
     private void ShowError(string message){Status.Severity=InfoBarSeverity.Error;Status.Title="処理できませんでした";Status.Message=message;Status.IsOpen=true;}
+
+    private async Task ReloadLessonRequestsAsync()
+    {
+        var path=App.ProjectService.Current?.Path;if(path is null)return;
+        var studentValues=await App.MasterData.GetStudentsAsync(path);var teacherValues=await App.MasterData.GetTeachersAsync(path);var subjectValues=await App.MasterData.GetSubjectsAsync(path);
+        var studentItems=studentValues.Select(x=>new MasterItem<Student>(x,$"{(x.Active?"":"[停止] ")}{x.ExternalId}　{x.Name}　{x.Grade}")).ToArray();
+        var subjectItems=subjectValues.Select(x=>new MasterItem<Subject>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}")).ToArray();
+        _studentItems=studentItems;_subjectItems=subjectItems;
+        _nullableTeacherItems=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[停止] ")}{x.ExternalId}　{x.Name}"))).ToArray();
+        RequestStudent.ItemsSource=studentItems;RequestSubject.ItemsSource=subjectItems;
+        RequestRegularTeacher.ItemsSource=_nullableTeacherItems;RequestPreferred1.ItemsSource=_nullableTeacherItems;RequestPreferred2.ItemsSource=_nullableTeacherItems;RequestPreferred3.ItemsSource=_nullableTeacherItems;
+        if(RequestRegularTeacher.SelectedIndex<0)RequestRegularTeacher.SelectedIndex=0;if(RequestPreferred1.SelectedIndex<0)RequestPreferred1.SelectedIndex=0;if(RequestPreferred2.SelectedIndex<0)RequestPreferred2.SelectedIndex=0;if(RequestPreferred3.SelectedIndex<0)RequestPreferred3.SelectedIndex=0;
+        var lessonRequests=await App.MasterData.GetLessonRequestsAsync(path);
+        LessonRequests.ItemsSource=lessonRequests.Select(value=>new LessonRequestRow(value,
+            studentValues.Single(x=>x.Id==value.StudentId).Name,
+            subjectValues.Single(x=>x.Id==value.SubjectId).DisplayName,
+            value.RegularTeacherId is long rid?teacherValues.Single(x=>x.Id==rid).Name:"指定なし")).ToArray();
+    }
+
+    private async void SaveLessonRequest_Click(object sender,RoutedEventArgs e)
+    {
+        try
+        {
+            if(RequestStudent.SelectedItem is not MasterItem<Student> student||RequestSubject.SelectedItem is not MasterItem<Subject> subject)throw new ArgumentException("生徒と科目を選択してください。");
+            var regularTeacher=(RequestRegularTeacher.SelectedItem as MasterItem<Teacher?>)?.Value;
+            var priority=checked((int)RequestRegularPriority.Value);
+            if(priority==5&&regularTeacher is null)throw new ArgumentException("担当講師優先度5では通常担当講師の指定が必須です。");
+            var preferred1=(RequestPreferred1.SelectedItem as MasterItem<Teacher?>)?.Value;
+            var preferred2=(RequestPreferred2.SelectedItem as MasterItem<Teacher?>)?.Value;
+            var preferred3=(RequestPreferred3.SelectedItem as MasterItem<Teacher?>)?.Value;
+            var maxOverride=RequestMaxConsecutiveOverride.Value<=0?(int?)null:checked((int)RequestMaxConsecutiveOverride.Value);
+            var gapOverride=RequestAllowGapOverride.SelectedIndex switch{1=>true,2=>false,_=>(bool?)null};
+            IsEnabled=false;
+            var path=App.ProjectService.Current?.Path??throw new InvalidOperationException("プロジェクトが開かれていません。");
+            await App.MasterData.SaveLessonRequestAsync(path,new LessonRequest(0,student.Value.Id,subject.Value.Id,checked((int)RequestRequiredSessions.Value),
+                regularTeacher?.Id,priority,preferred1?.Id,preferred2?.Id,preferred3?.Id,RequestOneToOne.IsChecked==true,maxOverride,gapOverride,RequestNote.Text));
+            ResetLessonRequest();
+            await ReloadLessonRequestsAsync();
+            Status.Severity=InfoBarSeverity.Success;Status.Title="受講希望を保存しました";Status.Message="";Status.IsOpen=true;
+        }
+        catch(Exception exception)when(exception is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException or OverflowException)
+        {
+            ShowError(exception.Message);
+        }
+        finally{IsEnabled=true;}
+    }
+
+    private void NewLessonRequest_Click(object sender,RoutedEventArgs e)=>ResetLessonRequest();
+
+    private void LessonRequests_SelectionChanged(object sender,SelectionChangedEventArgs e)
+    {
+        if(LessonRequests.SelectedItem is not LessonRequestRow selected)return;
+        var value=selected.Value;
+        RequestStudent.SelectedItem=_studentItems.FirstOrDefault(item=>item.Value.Id==value.StudentId);
+        RequestSubject.SelectedItem=_subjectItems.FirstOrDefault(item=>item.Value.Id==value.SubjectId);
+        RequestRequiredSessions.Value=value.RequiredSessions;
+        RequestRegularTeacher.SelectedItem=_nullableTeacherItems.FirstOrDefault(item=>item.Value?.Id==value.RegularTeacherId);
+        RequestRegularPriority.Value=value.RegularTeacherPriority;
+        RequestPreferred1.SelectedItem=_nullableTeacherItems.FirstOrDefault(item=>item.Value?.Id==value.PreferredTeacher1Id);
+        RequestPreferred2.SelectedItem=_nullableTeacherItems.FirstOrDefault(item=>item.Value?.Id==value.PreferredTeacher2Id);
+        RequestPreferred3.SelectedItem=_nullableTeacherItems.FirstOrDefault(item=>item.Value?.Id==value.PreferredTeacher3Id);
+        RequestOneToOne.IsChecked=value.OneToOneRequired;
+        RequestMaxConsecutiveOverride.Value=value.MaxConsecutiveSlotsOverride??0;
+        RequestAllowGapOverride.SelectedIndex=value.AllowGapOverride switch{true=>1,false=>2,_=>0};
+        RequestNote.Text=value.Note;
+    }
+
+    private async void DeleteLessonRequest_Click(object sender,RoutedEventArgs e)
+    {
+        if(LessonRequests.SelectedItem is not LessonRequestRow selected){Show(InfoBarSeverity.Warning,"一覧から削除する行を選択してください");return;}
+        try
+        {
+            IsEnabled=false;
+            var path=App.ProjectService.Current?.Path??throw new InvalidOperationException("プロジェクトが開かれていません。");
+            await App.MasterData.DeleteLessonRequestAsync(path,selected.Value.StudentId,selected.Value.SubjectId);
+            ResetLessonRequest();
+            await ReloadLessonRequestsAsync();
+            Status.Severity=InfoBarSeverity.Success;Status.Title="受講希望を削除しました";Status.Message="";Status.IsOpen=true;
+        }
+        catch(Exception exception)when(exception is InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            ShowError(exception.Message);
+        }
+        finally{IsEnabled=true;}
+    }
+
+    private void ResetLessonRequest()
+    {
+        LessonRequests.SelectedItem=null;
+        RequestStudent.SelectedItem=null;RequestSubject.SelectedItem=null;RequestRequiredSessions.Value=1;
+        RequestRegularTeacher.SelectedIndex=0;RequestRegularPriority.Value=3;
+        RequestPreferred1.SelectedIndex=0;RequestPreferred2.SelectedIndex=0;RequestPreferred3.SelectedIndex=0;
+        RequestOneToOne.IsChecked=false;RequestMaxConsecutiveOverride.Value=0;RequestAllowGapOverride.SelectedIndex=0;RequestNote.Text="";
+    }
+
+    private void Show(InfoBarSeverity severity,string title){Status.Severity=severity;Status.Title=title;Status.Message="";Status.IsOpen=true;}
+
+    private sealed record MasterItem<T>(T Value,string Display){public override string ToString()=>Display;}
+
+    private sealed record LessonRequestRow(LessonRequest Value,string StudentName,string SubjectName,string RegularTeacherName)
+    {
+        public string OneToOneText=>Value.OneToOneRequired?"○":"";
+        public override string ToString()=>$"{StudentName}　{SubjectName}　必要{Value.RequiredSessions}回　通常担当:{RegularTeacherName}　優先度{Value.RegularTeacherPriority}　{(Value.OneToOneRequired?"1対1":"通常")}";
+    }
 
     private AvailabilityEntityKind CurrentMatrixKind => MatrixTeacherKind.IsChecked==true ? AvailabilityEntityKind.Teacher : AvailabilityEntityKind.Student;
 

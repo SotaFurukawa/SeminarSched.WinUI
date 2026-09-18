@@ -9,16 +9,38 @@
         <ListView x:Name="SurveyIssues" MaxHeight="240"/>
     </StackPanel>
 </Border>
-<Border Padding="24" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="8">
-    <StackPanel Spacing="12">
-        <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="⬜ 旧形式（生徒ID・科目コードを直接指定するCSV。Googleフォームの回答ではこちらは使わない）"/>
-        <TextBlock Text="簡易形式: 生徒ID・科目コード・必要回数／講師ID・勤務不可。可用性形式: ID・日付・各コマの0/1/2。CSVはUTF-8/CP932、XLSXに対応します。" TextWrapping="Wrap"/>
-        <StackPanel Orientation="Horizontal" Spacing="8"><Button x:Name="SelectStudentButton" Content="旧形式：生徒ファイルを選ぶ" Click="SelectStudent_Click"/><Button x:Name="SelectTeacherButton" Content="旧形式：講師ファイルを選ぶ" Click="SelectTeacher_Click"/><Button x:Name="VerifyButton" Content="検証する" IsEnabled="False" Click="Verify_Click"/><Button x:Name="ApplyButton" Content="反映する" IsEnabled="False" Click="Apply_Click" Style="{StaticResource AccentButtonStyle}"/></StackPanel>
-        <TextBlock x:Name="SelectedFilesText" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-        <TextBlock x:Name="DiffSummary" TextWrapping="Wrap" Visibility="Collapsed"/>
-        <StackPanel x:Name="RemovalPanel" Spacing="8" Visibility="Collapsed"><TextBlock FontWeight="SemiBold" Text="削除候補（新しい回答に含まれない、以前登録済みの日付）"/><TextBlock Text="チェックした場合のみ、これらの可用性を反映と同時に削除します。未チェックなら既存データはそのまま残ります。" TextWrapping="Wrap"/><ListView x:Name="RemovalList" MaxHeight="200"/><CheckBox x:Name="RemoveUnlisted" Content="削除候補を反映と同時に削除する"/></StackPanel>
-        <TextBlock FontWeight="SemiBold" Text="検証結果"/>
-        <ListView x:Name="Issues"/>
+<Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+    <StackPanel Spacing="10">
+        <TextBlock FontSize="18" FontWeight="SemiBold" Text="受講希望"/>
+        <TextBlock Text="生徒ごとの受講希望（必要授業回数・希望講師）を個別に登録・編集します。通常はアンケート取込みで自動反映されますが、ここで個別に追加・修正できます。一覧から選ぶと編集できます。" TextWrapping="Wrap"/>
+        <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/><ColumnDefinition Width="120"/></Grid.ColumnDefinitions>
+            <ComboBox x:Name="RequestStudent" Header="生徒"/><ComboBox x:Name="RequestSubject" Grid.Column="1" Header="科目"/><NumberBox x:Name="RequestRequiredSessions" Grid.Column="2" Header="必要授業回数" Minimum="1" Value="1"/><ComboBox x:Name="RequestRegularTeacher" Grid.Column="3" Header="通常担当講師（任意）"/><NumberBox x:Name="RequestRegularPriority" Grid.Column="4" Header="優先度 1～5" Minimum="1" Maximum="5" Value="3"/>
+        </Grid>
+        <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <ComboBox x:Name="RequestPreferred1" Header="第1希望講師（任意）"/><ComboBox x:Name="RequestPreferred2" Grid.Column="1" Header="第2希望講師（任意）"/><ComboBox x:Name="RequestPreferred3" Grid.Column="2" Header="第3希望講師（任意）"/>
+        </Grid>
+        <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="260"/><ColumnDefinition Width="200"/></Grid.ColumnDefinitions>
+            <CheckBox x:Name="RequestOneToOne" Content="1対1必須" VerticalAlignment="Bottom"/><NumberBox x:Name="RequestMaxConsecutiveOverride" Grid.Column="1" Header="最大連続コマ数上書き（0=既定値）" Minimum="0" Value="0"/><ComboBox x:Name="RequestAllowGapOverride" Grid.Column="2" Header="空きコマ許可上書き" SelectedIndex="0"><ComboBoxItem Content="指定なし"/><ComboBoxItem Content="許可"/><ComboBoxItem Content="不許可"/></ComboBox>
+        </Grid>
+        <TextBox x:Name="RequestNote" Header="備考"/>
+        <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="保存" Click="SaveLessonRequest_Click" Style="{StaticResource AccentButtonStyle}"/><Button Content="新規入力" Click="NewLessonRequest_Click"/><Button Content="選択した行を削除" Click="DeleteLessonRequest_Click"/></StackPanel>
+        <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="160"/><ColumnDefinition Width="70"/><ColumnDefinition Width="160"/><ColumnDefinition Width="60"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions>
+            <TextBlock FontWeight="SemiBold" Text="生徒氏名"/><TextBlock Grid.Column="1" FontWeight="SemiBold" Text="科目名"/><TextBlock Grid.Column="2" FontWeight="SemiBold" Text="必要回数"/><TextBlock Grid.Column="3" FontWeight="SemiBold" Text="通常担当講師"/><TextBlock Grid.Column="4" FontWeight="SemiBold" Text="優先度"/><TextBlock Grid.Column="5" FontWeight="SemiBold" Text="1対1"/>
+        </Grid>
+        <ListView x:Name="LessonRequests" SelectionChanged="LessonRequests_SelectionChanged" MaxHeight="360">
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid ColumnSpacing="8" Padding="4"><Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="160"/><ColumnDefinition Width="70"/><ColumnDefinition Width="160"/><ColumnDefinition Width="60"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding StudentName}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding SubjectName}"/>
+                        <TextBlock Grid.Column="2" Text="{Binding Value.RequiredSessions}"/>
+                        <TextBlock Grid.Column="3" Text="{Binding RegularTeacherName}"/>
+                        <TextBlock Grid.Column="4" Text="{Binding Value.RegularTeacherPriority}"/>
+                        <TextBlock Grid.Column="5" Text="{Binding OneToOneText}"/>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
     </StackPanel>
 </Border>
 <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">

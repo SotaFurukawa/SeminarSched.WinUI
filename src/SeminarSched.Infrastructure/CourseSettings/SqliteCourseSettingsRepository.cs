@@ -31,6 +31,19 @@ public sealed class SqliteCourseSettingsRepository : ICourseSettingsRepository
         return slot with { Id = slot.Id == 0 ? value : slot.Id };
     }
 
+    // Assignment.TimeSlotId は ON DELETE RESTRICT なので、既に時間割配置で使われているコマを
+    // 削除しようとするとSqliteExceptionが飛ぶ（呼び出し側で捕捉してエラー表示する）。
+    // OpenDateTimeSlot・各種Availability・Unavailabilityは ON DELETE CASCADE で自動的に削除される。
+    public async Task DeleteTimeSlotAsync(string projectPath, long timeSlotId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken); await EnsureSchemaAsync(connection, cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM TimeSlot WHERE Id=@id; SELECT changes();";
+        command.Parameters.AddWithValue("@id", timeSlotId);
+        var changed = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken));
+        if (changed != 1) throw new InvalidOperationException("削除対象のコマが見つかりません。");
+    }
+
     public async Task<IReadOnlyList<CourseDay>> GetCourseDaysAsync(string projectPath, CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken); await EnsureSchemaAsync(connection, cancellationToken);
