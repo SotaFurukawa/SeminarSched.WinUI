@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using SeminarSched_WinUI.Pages;
+using WinRT.Interop;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -26,6 +27,14 @@ public sealed partial class MainWindow : Window
         OptimizationRunState.Changed += OnOptimizationRunStateChanged;
         Closed += (_, _) => OptimizationRunState.Changed -= OnOptimizationRunStateChanged;
         RefreshOptimizationStatus();
+
+        // タスクバーの完了バッジ（オレンジの丸）はあくまで「他の画面を見ている間の通知」目的なので、
+        // このウィンドウへ戻ってきた（フォアグラウンドになった）時点で消す。
+        Activated += (_, args) =>
+        {
+            if (args.WindowActivationState != WindowActivationState.Deactivated)
+                TaskbarProgress.ClearCompletionBadge(WindowNative.GetWindowHandle(this));
+        };
     }
 
     private void OnOptimizationRunStateChanged() => DispatcherQueue.TryEnqueue(RefreshOptimizationStatus);

@@ -35,7 +35,11 @@ internal static class OptimizationRunState
     public static (double Percent, TimeSpan Elapsed, TimeSpan Remaining) Estimate()
     {
         if (LatestProgress is null) return (0, TimeSpan.Zero, MaximumDuration);
-        var elapsed = IsRunning ? _lastReportedElapsed + (DateTime.UtcNow - _lastReportedAtUtc) : _lastReportedElapsed;
+        // 停滞検知や「中断して現在の結果を採用」で持ち時間を使い切る前に終了することがあり、その場合
+        // 経過/持ち時間の比率は100%未満のまま止まって見える。実行が終わっている（成功・失敗問わず）
+        // 時点で、ユーザーから見れば「もう終わった」ので100%・残り0として表示する。
+        if (!IsRunning) return (100, _lastReportedElapsed, TimeSpan.Zero);
+        var elapsed = _lastReportedElapsed + (DateTime.UtcNow - _lastReportedAtUtc);
         var percent = MaximumDuration.TotalSeconds <= 0 ? 0 : Math.Clamp(elapsed.TotalSeconds / MaximumDuration.TotalSeconds * 100.0, 0, 100);
         var remaining = MaximumDuration - elapsed;
         if (remaining < TimeSpan.Zero) remaining = TimeSpan.Zero;

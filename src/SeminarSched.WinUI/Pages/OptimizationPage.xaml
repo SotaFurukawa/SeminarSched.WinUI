@@ -85,7 +85,7 @@
                                 <TextBlock x:Name="RunStageText" FontWeight="SemiBold" TextWrapping="Wrap"/>
                                 <TextBlock x:Name="RunPercentText" Grid.Column="1" FontWeight="SemiBold" Margin="8,0,0,0"/>
                             </Grid>
-                            <ProgressBar x:Name="RunProgressBar" Minimum="0" Maximum="100" Value="0"/>
+                            <ProgressBar x:Name="RunProgressBar" Height="24" Minimum="0" Maximum="100" Value="0"/>
                             <TextBlock x:Name="RunEtaText" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                         </StackPanel>
                         <ProgressRing x:Name="RunProgress" Grid.Column="1" IsActive="False" Width="36" Height="36"/>

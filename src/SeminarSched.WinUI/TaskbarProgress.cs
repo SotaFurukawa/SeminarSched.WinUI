@@ -4,9 +4,11 @@ namespace SeminarSched_WinUI;
 
 /// <summary>
 /// Windowsタスクバーのアプリアイコンに、⑤時間割自動作成の進行状況を反映する。緑の進捗バーは
-/// <c>ITaskbarList3</c>（標準COM、追加パッケージ不要）、完了時の点滅は<c>FlashWindowEx</c>で行う。
-/// ITaskbarList3は<c>SetProgressState</c>のNormal(緑)/Paused(オレンジ寄りの黄)/Error(赤)の3色しか
-/// 選べないため、「完了をオレンジで」という要望はPausedへ割り当てている。
+/// <c>ITaskbarList3.SetProgressState/SetProgressValue</c>（標準COM、追加パッケージ不要）。完了通知は
+/// <c>SetProgressState</c>の既定色（緑/赤/黄）だけでは「オレンジ」を表現できないため、代わりに
+/// <c>SetOverlayIcon</c>でオレンジの丸バッジをタスクバーアイコンへ重ね描きする（アイコンは実行時に
+/// AND/XORマスクから直接生成し、追加の画像アセットは不要）。バッジはこのウィンドウがフォアグラウンドへ
+/// 戻った時点（<see cref="MainWindow"/>の<c>Activated</c>）でクリアする。
 /// </summary>
 internal static class TaskbarProgress
 {
@@ -18,15 +20,26 @@ internal static class TaskbarProgress
         taskbar.SetProgressValue(hwnd, (ulong)Math.Clamp(percent, 0, 100), 100);
     }
 
-    public static void Clear(IntPtr hwnd) => GetTaskbar()?.SetProgressState(hwnd, TbpFlag.NoProgress);
+    public static void Clear(IntPtr hwnd)
+    {
+        var taskbar = GetTaskbar();
+        taskbar?.SetProgressState(hwnd, TbpFlag.NoProgress);
+        taskbar?.SetOverlayIcon(hwnd, IntPtr.Zero, "");
+    }
 
     public static void NotifyCompleted(IntPtr hwnd)
     {
         var taskbar = GetTaskbar();
         if (taskbar is not null)
         {
-            taskbar.SetProgressValue(hwnd, 100, 100);
-            taskbar.SetProgressState(hwnd, TbpFlag.Paused);
+            // 進捗バー自体はここで終了（緑は「実行中」だけの意味にする）。完了はオレンジのバッジで示す。
+            taskbar.SetProgressState(hwnd, TbpFlag.NoProgress);
+            var icon = CreateOrangeBadgeIcon();
+            if (icon != IntPtr.Zero)
+            {
+                taskbar.SetOverlayIcon(hwnd, icon, "時間割の自動作成が完了しました");
+                DestroyIcon(icon);
+            }
         }
         var info = new FlashWInfo
         {
@@ -37,6 +50,45 @@ internal static class TaskbarProgress
             Timeout = 0,
         };
         FlashWindowEx(ref info);
+    }
+
+    /// <summary>ウィンドウがフォアグラウンドへ戻ったときに呼び、通知目的だけのオレンジバッジを消す。</summary>
+    public static void ClearCompletionBadge(IntPtr hwnd) => GetTaskbar()?.SetOverlayIcon(hwnd, IntPtr.Zero, "");
+
+    // AND/XORマスクから16x16の円形バッジアイコンを生成する。CreateIconの1bit ANDマスク＋32bit XORマスクは
+    // どのWindowsバージョンでも確実に透過が効く古典的な方式（アルファ付きアイコン専用のCreateIconIndirect等
+    // より依存が少ない）。色はDarkOrange(#FF8C00)。
+    private static IntPtr CreateOrangeBadgeIcon()
+    {
+        const int size = 16;
+        const int andRowBytes = size / 8;
+        var and = new byte[andRowBytes * size];
+        var xor = new byte[size * size * 4];
+        const double center = (size - 1) / 2.0;
+        const double radius = size / 2.0 - 0.5;
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                var dx = x - center; var dy = y - center;
+                var inside = dx * dx + dy * dy <= radius * radius;
+                var xorOffset = (y * size + x) * 4;
+                if (inside)
+                {
+                    xor[xorOffset + 0] = 0x00; // B
+                    xor[xorOffset + 1] = 0x8C; // G
+                    xor[xorOffset + 2] = 0xFF; // R  -> #FF8C00 DarkOrange
+                    xor[xorOffset + 3] = 0xFF; // A
+                }
+                else
+                {
+                    var andByteIndex = y * andRowBytes + x / 8;
+                    var bit = 7 - (x % 8);
+                    and[andByteIndex] |= (byte)(1 << bit);
+                }
+            }
+        }
+        return CreateIcon(IntPtr.Zero, size, size, 1, 32, and, xor);
     }
 
     private static ITaskbarList3? _instance;
@@ -73,9 +125,9 @@ internal static class TaskbarProgress
         Paused = 0x8,
     }
 
-    // vtableの先頭からSetProgressStateまでを宣言順どおりに並べる必要がある（ITaskbarList3が
-    // 継承するITaskbarList/ITaskbarList2のメソッドを省略できないため）。使わない後続メソッド
-    // （RegisterTab以降）は宣言自体を省略してよい。
+    // vtableの先頭からSetOverlayIconまでを宣言順どおりに並べる必要がある（ITaskbarList3が継承する
+    // ITaskbarList/ITaskbarList2のメソッドを省略できないため）。RegisterTab〜ThumbBarSetImageListは
+    // 実際には呼ばないが、vtableの位置合わせのためだけに宣言している。
     [ComImport]
     [Guid("ea1afb91-9e28-4b86-90e9-9e9f8a5eefaf")]
     [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -89,6 +141,14 @@ internal static class TaskbarProgress
         void MarkFullscreenWindow(IntPtr hwnd, [MarshalAs(UnmanagedType.Bool)] bool fullscreen);
         void SetProgressValue(IntPtr hwnd, ulong completed, ulong total);
         void SetProgressState(IntPtr hwnd, TbpFlag state);
+        void RegisterTab(IntPtr hwndTab, IntPtr hwndMdi);
+        void UnregisterTab(IntPtr hwndTab);
+        void SetTabOrder(IntPtr hwndTab, IntPtr hwndInsertBefore);
+        void SetTabActive(IntPtr hwndTab, IntPtr hwndMdi, uint reserved);
+        void ThumbBarAddButtons(IntPtr hwnd, uint count, IntPtr buttons);
+        void ThumbBarUpdateButtons(IntPtr hwnd, uint count, IntPtr buttons);
+        void ThumbBarSetImageList(IntPtr hwnd, IntPtr imageList);
+        void SetOverlayIcon(IntPtr hwnd, IntPtr icon, [MarshalAs(UnmanagedType.LPWStr)] string description);
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -107,4 +167,10 @@ internal static class TaskbarProgress
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool FlashWindowEx(ref FlashWInfo pwfi);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr CreateIcon(IntPtr hInstance, int nWidth, int nHeight, byte cPlanes, byte cBitsPixel, byte[] lpbAndBits, byte[] lpbXorBits);
+
+    [DllImport("user32.dll")]
+    private static extern bool DestroyIcon(IntPtr icon);
 }
