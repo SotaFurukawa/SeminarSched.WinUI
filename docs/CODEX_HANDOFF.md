@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: checkpoint 48（講師配布roster「その他」区分の廃止、⑤時間割エディタの複数コマ×複数講師出勤可否一括設定・header/row scroll同期）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
+Latest Development Checkpoint: `9c153ad`（v0.1.0 checkpoint 48, 講師配布roster「その他」区分の廃止、⑤時間割エディタの複数コマ×複数講師出勤可否一括設定・header/row scroll同期）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。⑤の新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち（アプリ起動済み）。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
