@@ -27,7 +27,7 @@
 | CSV UTF-8/CP932・旧形式 | importing readers | quoted CSV・BOM/UTF-8/CP932自動判定・XLSX先頭sheet | 実装中 | 生Google Forms回答の自動mappingは未実装 |
 | import preview/diff | importing diff | 全行参照検証・issue一覧（エラー/警告を区別）・件数preview。可用性形式（日付列あり）は追加/変更/変更なし件数と、以前登録済みで新しい回答に含まれない日付を「削除候補」として一覧表示し、明示チェックなしでは削除しない | 実装中 | 簡易形式（必要回数・勤務不可）側のdiffは未算出。Google Forms生回答の列mappingは未実装 |
 | import transaction/AuditLog | availability import service | SHA-256再検証・単一transaction反映・ImportBatch・原本BLOB snapshot・AuditLog | 実装中 | 詳細diff表示とmapping保存は未実装 |
-| availability一括編集 | phase3 UI/service | 生徒/講師の日付・コマ別0/1/2取込、講師不可と同期。③へ複数選択→日付・コマ→値の一括適用UIと選択日の現在値preview gridを追加（`IAvailabilityMatrixService`） | 実装中 | 複数日付・複数コマへ同時適用する一括操作、週単位の一覧編集は未実装 |
+| availability一括編集 | phase3 UI/service | 生徒/講師の日付・コマ別0/1/2取込、講師不可と同期。③へ複数選択→日付・コマ→値の一括適用UIと選択日の現在値preview gridを追加（`IAvailabilityMatrixService`）。複数日付×複数コマの全組み合わせへ一括適用する`SetLevelsAsync`（単一transaction、途中で無効な組み合わせがあれば全体をrollback）とその専用UIを追加 | 実装済み | 週単位の一覧表示（現在値のpreview gridは選択日1日分のみ）は未実装 |
 | candidate生成 | optimization candidates | 資格・開校・生徒/講師availability・固定生徒衝突を検証し、希望講師penalty付き候補を生成 | 実装中 | Python版の全診断理由codeは未移植 |
 | greedy初期解・complete hint | initial solution | 未実装 | 未実装 | v0.2.0複数strategy側で実装 |
 | CP-SAT hard constraints | OR-Tools optimizer | 要求回数・生徒衝突・講師同時2名/1対1・固定保持・最大連続・空き時間禁止 | 実装中 | 学年別/日別上限等の残制約を継続移植 |

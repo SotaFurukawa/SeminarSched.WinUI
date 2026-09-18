@@ -17,4 +17,5 @@ public interface IAvailabilityMatrixService
     Task<IReadOnlyList<AvailabilitySlotOption>> GetSlotsForDateAsync(string projectPath, long openDateId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AvailabilityMatrixRow>> GetDayMatrixAsync(string projectPath, AvailabilityEntityKind kind, long openDateId, IReadOnlyCollection<long> entityIds, CancellationToken cancellationToken = default);
     Task SetLevelAsync(string projectPath, AvailabilityEntityKind kind, IReadOnlyCollection<long> entityIds, long openDateId, long timeSlotId, int level, CancellationToken cancellationToken = default);
+    Task SetLevelsAsync(string projectPath, AvailabilityEntityKind kind, IReadOnlyCollection<long> entityIds, IReadOnlyCollection<(long OpenDateId, long TimeSlotId)> slots, int level, CancellationToken cancellationToken = default);
 }

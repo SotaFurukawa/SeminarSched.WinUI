@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `344b841`（v0.1.0 checkpoint 43, 生徒・講師IDの自動採番ボタン）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
+Latest Development Checkpoint: checkpoint 44（availability複数日付×複数コマ一括適用）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -446,6 +446,16 @@ Feature Parity行17「ID自動採番wizard」を実装した（ユーザーの�
 - `SetupPage`の生徒・講師タブへ「IDを自動採番」ボタンを追加。既存の全ID（`_studentItems`/`_teacherItems`）を正規表現`^(.*?)(\d+)$`で prefix と数値末尾に分解し、最も件数の多いprefixグループの最大値+1を、既存の桁数に合わせて0埋めして採番する（例: S-001〜S-009が既存なら次はS-010）。既存IDが無ければ既定値`S-001`/`T-001`から開始する。
 - 単純なUIヘルパー（既存の`_studentItems`/`_teacherItems`キャッシュを読むだけで新規のrepository/serviceは不要）のため、既存の自動テストの対象範囲外（WinUIページのcode-behindは元々テスト対象外という既存方針を踏襲）。
 - Release/x64 build: warning 0 / error 0。全90 tests passed。Privacy gate成功。
+
+### v0.1.0 checkpoint 44 (Claude)
+
+Feature Parity行30「availability一括編集」の残課題「複数日付・複数コマへ同時適用する一括操作」を実装した（ユーザーの許可のもと無人で継続）。
+
+- `IAvailabilityMatrixService`へ`SetLevelsAsync(projectPath, kind, entityIds, IReadOnlyCollection<(long OpenDateId,long TimeSlotId)> slots, level)`を追加。既存の`SetLevelAsync`（単一日付・単一コマ）はこの新メソッドへ単一要素のcollectionを渡すだけの委譲に変更した。
+- `SqliteAvailabilityMatrixService`の実装は、指定された全ての`(OpenDateId,TimeSlotId)`ペアと全ての対象（生徒/講師）の組み合わせへ、単一のtransaction内でupsertとTeacherUnavailability同期を行う。ループ中に未開校のペアが見つかった場合は例外をthrowしてtransactionをrollbackし、それまでに適用した分も含めて全体を無効化する（部分適用を防止）。
+- `ImportPage`（③アンケート取込み）の可用性手動編集セクションへ「複数日付・複数コマへ一括適用」を新設。日付・コマをそれぞれ複数選択できるListViewと値ComboBoxを追加し、選択済みの対象（生徒/講師）×全日付×全コマの組み合わせへ一括適用するボタンを設けた。コマの選択肢は`App.CourseSettings.GetTimeSlotsAsync`から取得した有効な全コマ（特定の日付に限定しない）とし、日付ごとの開講状況の妥当性はサービス層の`SetLevelsAsync`が検証する。
+- 新規テスト2件（`SqliteAvailabilityMatrixServiceTests.cs`）: `SetLevelsAsync_AppliesToEveryDateAndSlotCombinationInOneCall`（2日×2コマの全組み合わせへの一括適用を検証）、`SetLevelsAsync_InvalidPairAmongManyRollsBackTheWholeBatch`（複数ペアの一部が無効な場合に、有効なペアも含めて全体がrollbackされ元の値のまま残ることを検証）。
+- Release/x64 build: warning 0 / error 0。全92 tests passed（新規2件）。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 

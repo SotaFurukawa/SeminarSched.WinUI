@@ -55,6 +55,9 @@ public sealed partial class ImportPage : WorkflowPageBase
         var dates=await App.AvailabilityMatrix.GetOpenDatesAsync(path);
         MatrixDate.ItemsSource=dates;
         MatrixDate.SelectedItem=dates.Count==0?null:dates.FirstOrDefault(d=>d.OpenDateId==previousDate)??dates[0];
+        BulkMatrixDates.ItemsSource=dates;
+        var slots=await App.CourseSettings.GetTimeSlotsAsync(path);
+        BulkMatrixSlots.ItemsSource=slots.Where(x=>x.Active).OrderBy(x=>x.SortOrder).Select(x=>new AvailabilitySlotOption(x.Id,$"{x.DisplayName} {x.StartTime:HH\\:mm}～{x.EndTime:HH\\:mm}")).ToArray();
     }
 
     private async void MatrixKind_Changed(object sender,RoutedEventArgs e)=>await ReloadMatrixAsync();
@@ -120,6 +123,27 @@ public sealed partial class ImportPage : WorkflowPageBase
             await App.AvailabilityMatrix.SetLevelAsync(path,CurrentMatrixKind,selected,date.OpenDateId,slot.TimeSlotId,MatrixLevel.SelectedIndex);
             await RefreshMatrixGridAsync();
             Status.Severity=InfoBarSeverity.Success;Status.Title="可用性を更新しました";Status.Message="";Status.IsOpen=true;
+        }
+        catch(Exception exception)when(exception is InvalidOperationException or Microsoft.Data.Sqlite.SqliteException){ShowError(exception.Message);}
+        finally{IsEnabled=true;}
+    }
+
+    private async void ApplyBulkMatrix_Click(object sender,RoutedEventArgs e)
+    {
+        var path=App.ProjectService.Current?.Path;
+        var selectedEntities=MatrixEntities.SelectedItems.Cast<AvailabilityEntityOption>().Select(x=>x.Id).ToArray();
+        var selectedDates=BulkMatrixDates.SelectedItems.Cast<AvailabilityDateOption>().ToArray();
+        var selectedSlots=BulkMatrixSlots.SelectedItems.Cast<AvailabilitySlotOption>().ToArray();
+        if(path is null||BulkMatrixLevel.SelectedIndex<0){ShowError("値を選択してください。");return;}
+        if(selectedEntities.Length==0){ShowError("対象を1件以上選択してください。");return;}
+        if(selectedDates.Length==0||selectedSlots.Length==0){ShowError("日付とコマをそれぞれ1件以上選択してください。");return;}
+        var pairs=selectedDates.SelectMany(d=>selectedSlots.Select(s=>(d.OpenDateId,s.TimeSlotId))).ToArray();
+        try
+        {
+            IsEnabled=false;
+            await App.AvailabilityMatrix.SetLevelsAsync(path,CurrentMatrixKind,selectedEntities,pairs,BulkMatrixLevel.SelectedIndex);
+            await RefreshMatrixGridAsync();
+            Status.Severity=InfoBarSeverity.Success;Status.Title="可用性を一括更新しました";Status.Message=$"{selectedEntities.Length}件×{selectedDates.Length}日×{selectedSlots.Length}コマへ適用しました";Status.IsOpen=true;
         }
         catch(Exception exception)when(exception is InvalidOperationException or Microsoft.Data.Sqlite.SqliteException){ShowError(exception.Message);}
         finally{IsEnabled=true;}

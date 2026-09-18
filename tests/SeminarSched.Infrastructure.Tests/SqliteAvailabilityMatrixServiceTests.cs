@@ -63,6 +63,50 @@ public sealed class SqliteAvailabilityMatrixServiceTests : IDisposable
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.SetLevelAsync(state.Path, AvailabilityEntityKind.Student, [state.Student1Id], state.DateId, state.SlotId + 999, 1));
     }
 
+    [Fact]
+    public async Task SetLevelsAsync_AppliesToEveryDateAndSlotCombinationInOneCall()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, $"{Guid.NewGuid():N}.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 21)));
+        var master = new SqliteMasterDataRepository();
+        var student = await master.SaveStudentAsync(path, new Student(0, "S-BULK", "架空 生徒", "中2"));
+        var course = new SqliteCourseSettingsRepository();
+        var slot1 = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "1", "1限", new TimeOnly(9, 0), new TimeOnly(10, 0), 1));
+        var slot2 = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "2", "2限", new TimeOnly(10, 0), new TimeOnly(11, 0), 2));
+        await course.SaveCourseDayAsync(path, new CourseDay(new DateOnly(2026, 7, 20), true, "", [slot1.Id, slot2.Id]));
+        await course.SaveCourseDayAsync(path, new CourseDay(new DateOnly(2026, 7, 21), true, "", [slot1.Id, slot2.Id]));
+        long date1, date2;
+        await using (var connection = new SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT Id FROM OpenDate ORDER BY Date;";
+            await using var reader = await command.ExecuteReaderAsync();
+            await reader.ReadAsync(); date1 = reader.GetInt64(0);
+            await reader.ReadAsync(); date2 = reader.GetInt64(0);
+        }
+
+        var service = new SqliteAvailabilityMatrixService();
+        await service.SetLevelsAsync(path, AvailabilityEntityKind.Student, [student.Id], [(date1, slot1.Id), (date1, slot2.Id), (date2, slot1.Id), (date2, slot2.Id)], 0);
+
+        var day1 = Assert.Single(await service.GetDayMatrixAsync(path, AvailabilityEntityKind.Student, date1, [student.Id]));
+        var day2 = Assert.Single(await service.GetDayMatrixAsync(path, AvailabilityEntityKind.Student, date2, [student.Id]));
+        Assert.Equal(0, day1.LevelsBySlot[slot1.Id]); Assert.Equal(0, day1.LevelsBySlot[slot2.Id]);
+        Assert.Equal(0, day2.LevelsBySlot[slot1.Id]); Assert.Equal(0, day2.LevelsBySlot[slot2.Id]);
+    }
+
+    [Fact]
+    public async Task SetLevelsAsync_InvalidPairAmongManyRollsBackTheWholeBatch()
+    {
+        var state = await CreateStateAsync();
+        var service = new SqliteAvailabilityMatrixService();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SetLevelsAsync(
+            state.Path, AvailabilityEntityKind.Student, [state.Student1Id], [(state.DateId, state.SlotId), (state.DateId, state.SlotId + 999)], 0));
+        var after = Assert.Single(await service.GetDayMatrixAsync(state.Path, AvailabilityEntityKind.Student, state.DateId, [state.Student1Id]));
+        Assert.Equal(1, after.LevelsBySlot[state.SlotId]);
+    }
+
     private async Task<State> CreateStateAsync()
     {
         Directory.CreateDirectory(_directory);

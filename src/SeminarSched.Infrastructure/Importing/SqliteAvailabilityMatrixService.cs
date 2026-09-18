@@ -94,56 +94,65 @@ public sealed class SqliteAvailabilityMatrixService : IAvailabilityMatrixService
     }
 
     public async Task SetLevelAsync(string projectPath, AvailabilityEntityKind kind, IReadOnlyCollection<long> entityIds, long openDateId, long timeSlotId, int level, CancellationToken cancellationToken = default)
+        => await SetLevelsAsync(projectPath, kind, entityIds, [(openDateId, timeSlotId)], level, cancellationToken).ConfigureAwait(false);
+
+    public async Task SetLevelsAsync(string projectPath, AvailabilityEntityKind kind, IReadOnlyCollection<long> entityIds, IReadOnlyCollection<(long OpenDateId, long TimeSlotId)> slots, int level, CancellationToken cancellationToken = default)
     {
         if (level is < 0 or > 2) throw new ArgumentOutOfRangeException(nameof(level));
         if (entityIds.Count == 0) throw new InvalidOperationException("対象を1件以上選択してください。");
+        if (slots.Count == 0) throw new InvalidOperationException("日付・コマを1件以上選択してください。");
         var (entityTable, availabilityTable, entityColumn) = TableNames(kind);
 
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
         await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
-        await using (var check = connection.CreateCommand())
-        {
-            check.CommandText = "SELECT EXISTS(SELECT 1 FROM OpenDateTimeSlot WHERE OpenDateId=$date AND TimeSlotId=$slot);";
-            check.Parameters.AddWithValue("$date", openDateId);
-            check.Parameters.AddWithValue("$slot", timeSlotId);
-            if (Convert.ToInt64(await check.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 0)
-                throw new InvalidOperationException("この日付では使用できないコマです。");
-        }
 
         await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
-        foreach (var entityId in entityIds)
+        foreach (var (openDateId, timeSlotId) in slots)
         {
-            await using var upsert = connection.CreateCommand();
-            upsert.Transaction = transaction;
-            upsert.CommandText = $"""
-                INSERT INTO {availabilityTable}(ProjectId,{entityColumn},OpenDateId,TimeSlotId,AvailabilityLevel)
-                VALUES(1,$entity,$date,$slot,$level)
-                ON CONFLICT(ProjectId,{entityColumn},OpenDateId,TimeSlotId) DO UPDATE SET AvailabilityLevel=excluded.AvailabilityLevel;
-                """;
-            upsert.Parameters.AddWithValue("$entity", entityId);
-            upsert.Parameters.AddWithValue("$date", openDateId);
-            upsert.Parameters.AddWithValue("$slot", timeSlotId);
-            upsert.Parameters.AddWithValue("$level", level);
-            await upsert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-
-            if (kind == AvailabilityEntityKind.Teacher)
+            await using (var check = connection.CreateCommand())
             {
-                await using var removeUnavailable = connection.CreateCommand();
-                removeUnavailable.Transaction = transaction;
-                removeUnavailable.CommandText = "DELETE FROM TeacherUnavailability WHERE TeacherId=$entity AND OpenDateId=$date AND TimeSlotId=$slot;";
-                removeUnavailable.Parameters.AddWithValue("$entity", entityId);
-                removeUnavailable.Parameters.AddWithValue("$date", openDateId);
-                removeUnavailable.Parameters.AddWithValue("$slot", timeSlotId);
-                await removeUnavailable.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-                if (level == 0)
+                check.Transaction = transaction;
+                check.CommandText = "SELECT EXISTS(SELECT 1 FROM OpenDateTimeSlot WHERE OpenDateId=$date AND TimeSlotId=$slot);";
+                check.Parameters.AddWithValue("$date", openDateId);
+                check.Parameters.AddWithValue("$slot", timeSlotId);
+                if (Convert.ToInt64(await check.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 0)
+                    throw new InvalidOperationException("この日付では使用できないコマが選択されています。");
+            }
+
+            foreach (var entityId in entityIds)
+            {
+                await using var upsert = connection.CreateCommand();
+                upsert.Transaction = transaction;
+                upsert.CommandText = $"""
+                    INSERT INTO {availabilityTable}(ProjectId,{entityColumn},OpenDateId,TimeSlotId,AvailabilityLevel)
+                    VALUES(1,$entity,$date,$slot,$level)
+                    ON CONFLICT(ProjectId,{entityColumn},OpenDateId,TimeSlotId) DO UPDATE SET AvailabilityLevel=excluded.AvailabilityLevel;
+                    """;
+                upsert.Parameters.AddWithValue("$entity", entityId);
+                upsert.Parameters.AddWithValue("$date", openDateId);
+                upsert.Parameters.AddWithValue("$slot", timeSlotId);
+                upsert.Parameters.AddWithValue("$level", level);
+                await upsert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+
+                if (kind == AvailabilityEntityKind.Teacher)
                 {
-                    await using var insertUnavailable = connection.CreateCommand();
-                    insertUnavailable.Transaction = transaction;
-                    insertUnavailable.CommandText = "INSERT OR IGNORE INTO TeacherUnavailability(TeacherId,OpenDateId,TimeSlotId) VALUES($entity,$date,$slot);";
-                    insertUnavailable.Parameters.AddWithValue("$entity", entityId);
-                    insertUnavailable.Parameters.AddWithValue("$date", openDateId);
-                    insertUnavailable.Parameters.AddWithValue("$slot", timeSlotId);
-                    await insertUnavailable.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                    await using var removeUnavailable = connection.CreateCommand();
+                    removeUnavailable.Transaction = transaction;
+                    removeUnavailable.CommandText = "DELETE FROM TeacherUnavailability WHERE TeacherId=$entity AND OpenDateId=$date AND TimeSlotId=$slot;";
+                    removeUnavailable.Parameters.AddWithValue("$entity", entityId);
+                    removeUnavailable.Parameters.AddWithValue("$date", openDateId);
+                    removeUnavailable.Parameters.AddWithValue("$slot", timeSlotId);
+                    await removeUnavailable.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                    if (level == 0)
+                    {
+                        await using var insertUnavailable = connection.CreateCommand();
+                        insertUnavailable.Transaction = transaction;
+                        insertUnavailable.CommandText = "INSERT OR IGNORE INTO TeacherUnavailability(TeacherId,OpenDateId,TimeSlotId) VALUES($entity,$date,$slot);";
+                        insertUnavailable.Parameters.AddWithValue("$entity", entityId);
+                        insertUnavailable.Parameters.AddWithValue("$date", openDateId);
+                        insertUnavailable.Parameters.AddWithValue("$slot", timeSlotId);
+                        await insertUnavailable.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                    }
                 }
             }
         }
@@ -155,7 +164,7 @@ public sealed class SqliteAvailabilityMatrixService : IAvailabilityMatrixService
             audit.Parameters.AddWithValue("$utc", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
             audit.Parameters.AddWithValue("$entityType", kind == AvailabilityEntityKind.Student ? "student_availability" : "teacher_availability");
             audit.Parameters.AddWithValue("$entityIds", string.Join(",", entityIds));
-            audit.Parameters.AddWithValue("$after", JsonSerializer.Serialize(new { openDateId, timeSlotId, level, count = entityIds.Count }));
+            audit.Parameters.AddWithValue("$after", JsonSerializer.Serialize(new { slotCount = slots.Count, level, entityCount = entityIds.Count }));
             await audit.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
