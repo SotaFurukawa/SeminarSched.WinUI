@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using Microsoft.Data.Sqlite;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Windows.Storage.Pickers;
+using SeminarSched.Application.MasterData;
 using SeminarSched.Application.Projects;
 using SeminarSched.Application.Settings;
 using SeminarSched.Domain.Projects;
@@ -30,7 +32,98 @@ public sealed partial class HomePage : Page
 
         RefreshGeneratedTitle();
         RefreshCurrentProject();
+        SharedRosterPathText.Text = $"保存先: {App.SharedRosterStore.WorkbookPath}";
         await RefreshRecentProjectsAsync();
+    }
+
+    private async void EditSharedRoster_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            SetBusy(true);
+            var path = await App.SharedRosterStore.EnsureWorkbookAsync();
+            SharedRosterPathText.Text = $"保存先: {path}";
+            var started = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            ShowStatus(started is null ? InfoBarSeverity.Warning : InfoBarSeverity.Success, started is null ? "既定のアプリで開けませんでした" : "共通名簿Excelを開きました", path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SqliteException or InvalidDataException or System.ComponentModel.Win32Exception)
+        {
+            ShowStatus(InfoBarSeverity.Error, "共通名簿Excelを開けませんでした", exception.Message);
+        }
+        finally { SetBusy(false); }
+    }
+
+    private async void NewSharedRosterTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new FileSavePicker(GetWindowId()) { SuggestedFolder = ProjectService.DefaultProjectsDirectory, SuggestedFileName = "生徒・講師_基本情報" };
+            picker.FileTypeChoices.Add("Excelブック", [".xlsx"]);
+            var file = await picker.PickSaveFileAsync();
+            if (file is null) return;
+            SetBusy(true);
+            await App.SharedRosterStore.ExportBlankTemplateAsync(file.Path);
+            ShowStatus(InfoBarSeverity.Success, "新しい基本情報テンプレートを保存しました", file.Path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            ShowStatus(InfoBarSeverity.Error, "テンプレートを保存できませんでした", exception.Message);
+        }
+        finally { SetBusy(false); }
+    }
+
+    private async void ImportSharedRoster_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new FileOpenPicker(GetWindowId()) { SuggestedFolder = ProjectService.DefaultProjectsDirectory };
+            picker.FileTypeFilter.Add(".xlsx");
+            var file = await picker.PickSingleFileAsync();
+            if (file is null) return;
+
+            SetBusy(true);
+            var preview = await App.SharedRosterStore.PreviewImportAsync(file.Path);
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = preview.HasErrors ? "取込エラーがあります" : "共通名簿へ反映しますか？",
+                Content = new ScrollViewer { MaxHeight = 480, Content = new TextBlock { Text = BuildSharedRosterPreviewSummary(preview), TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true } },
+                CloseButtonText = preview.HasErrors ? "閉じる" : "キャンセル",
+                PrimaryButtonText = preview.HasErrors ? null : "反映する",
+                DefaultButton = preview.HasErrors ? ContentDialogButton.Close : ContentDialogButton.Primary,
+            };
+            SetBusy(false);
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+            SetBusy(true);
+            var result = await App.SharedRosterStore.ApplyImportAsync(preview);
+            var message = $"{result.ImportedRows}行（警告{result.WarningCount}件）";
+            if (App.ProjectService.Current is { } current)
+            {
+                var projectResult = await App.SharedRosterStore.CopyIntoProjectAsync(current.Path);
+                if (projectResult is not null) message += "。現在開いているプロジェクトへも反映しました";
+            }
+            ShowStatus(InfoBarSeverity.Success, "共通名簿を反映しました", message);
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException or SqliteException)
+        {
+            ShowStatus(InfoBarSeverity.Error, "反映できませんでした", exception.Message);
+        }
+        finally { SetBusy(false); }
+    }
+
+    private static string BuildSharedRosterPreviewSummary(SharedRosterPreview preview)
+    {
+        var lines = new List<string> { "シート                         件数" };
+        foreach (var (name, count) in new (string, int)[] { ("生徒", preview.StudentCount), ("講師", preview.TeacherCount), ("科目", preview.SubjectCount), ("講師対応科目", preview.QualificationCount), ("通常授業", preview.RegularLessonCount) })
+            lines.Add($"{name,-14} {count,4}");
+        if (preview.Issues.Count != 0)
+        {
+            lines.Add(""); lines.Add($"検証結果（エラー{preview.Issues.Count(issue => issue.Severity == SharedRosterIssueSeverity.Error)}件・警告{preview.Issues.Count(issue => issue.Severity == SharedRosterIssueSeverity.Warning)}件）");
+            lines.AddRange(preview.Issues.Take(100).Select(issue => $"{issue.SheetName} {(issue.RowNumber is null ? "" : $"{issue.RowNumber}行 ")}{issue.ColumnName}: {issue.Message}"));
+            if (preview.Issues.Count > 100) lines.Add($"ほか{preview.Issues.Count - 100}件");
+        }
+        return string.Join(Environment.NewLine, lines);
     }
 
     private async void CreateProject_Click(object sender, RoutedEventArgs e)
@@ -48,13 +141,14 @@ public sealed partial class HomePage : Page
             var path = Path.Combine(folder.Path, definition.Title + ProjectService.ProjectExtension);
             SetBusy(true);
             var summary = await App.ProjectService.CreateAsync(path, definition);
+            var sharedRosterResult = await App.SharedRosterStore.CopyIntoProjectAsync(summary.Path);
             await App.RecentProjects.TouchAsync(summary.Path, summary.Title);
             RefreshCurrentProject();
             await RefreshRecentProjectsAsync();
-            ShowStatus(InfoBarSeverity.Success, "プロジェクトを作成しました", summary.Title);
+            ShowStatus(InfoBarSeverity.Success, "プロジェクトを作成しました", sharedRosterResult is null ? summary.Title : $"{summary.Title}（共通名簿から{sharedRosterResult.ImportedRows}行を反映）");
             App.Logger.Info("Project created");
         }
-        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException or SqliteException or InvalidDataException)
+        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException or SqliteException or InvalidDataException or InvalidOperationException)
         {
             ShowStatus(InfoBarSeverity.Error, "プロジェクトを作成できませんでした", exception.Message);
             App.Logger.Error("Project creation failed", exception);

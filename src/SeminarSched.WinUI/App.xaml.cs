@@ -58,6 +58,8 @@ public partial class App : Application
 
     public static ISharedRosterImportService SharedRosterImport { get; } = new SharedRosterImportService();
 
+    public static ISharedRosterStore SharedRosterStore { get; } = new SharedRosterStore(SharedRosterImport, MasterData);
+
     public static ICourseSettingsRepository CourseSettings { get; } = new SqliteCourseSettingsRepository();
 
     public static QuestionnaireKitService QuestionnaireKit { get; } = new(CourseSettings, MasterData);

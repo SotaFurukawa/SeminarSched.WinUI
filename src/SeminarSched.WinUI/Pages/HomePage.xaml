@@ -15,6 +15,19 @@
 
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Spacing="14">
+                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="共通名簿" />
+                    <TextBlock Text="年度をまたいで使う生徒・講師の共通名簿です。プロジェクトを開いていなくても編集でき、新規プロジェクト作成時に自動で反映されます。" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Click="EditSharedRoster_Click" Content="Excelで基本情報を編集" Style="{StaticResource AccentButtonStyle}" />
+                        <Button Click="NewSharedRosterTemplate_Click" Content="新規で基本情報を作成" />
+                        <Button Click="ImportSharedRoster_Click" Content="作成した基本情報を反映" />
+                    </StackPanel>
+                    <TextBlock x:Name="SharedRosterPathText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                <StackPanel Spacing="14">
                     <TextBlock FontSize="20" FontWeight="SemiBold" Text="現在のプロジェクト" />
                     <TextBlock x:Name="CurrentProjectTitle" FontSize="18" Text="プロジェクトは開かれていません" />
                     <TextBlock x:Name="CurrentProjectPeriod" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
