@@ -10,6 +10,14 @@ public sealed class SqliteProjectRepository : IProjectRepository
     private const int CurrentSchemaVersion = SqliteProjectSchema.CurrentVersion;
     private const string ProductMarker = SqliteProjectSchema.ProductMarker;
 
+    private static readonly (string Code, string Start, string End)[] DefaultTimeSlots =
+    [
+        ("Z", "15:40", "17:00"),
+        ("A", "17:10", "18:30"),
+        ("B", "18:40", "20:00"),
+        ("C", "20:10", "21:30"),
+    ];
+
     public async Task<ProjectSummary> CreateAsync(
         string path,
         CourseProjectDefinition definition,
@@ -373,14 +381,36 @@ public sealed class SqliteProjectRepository : IProjectRepository
             await metadata.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        var openDateIds = new List<long>();
         for (var date = definition.StartDate; date <= definition.EndDate; date = date.AddDays(1))
         {
             await using var openDate = connection.CreateCommand();
             openDate.Transaction = (SqliteTransaction)transaction;
-            openDate.CommandText = "INSERT INTO OpenDate (ProjectId, Date) VALUES (1, $date);";
+            openDate.CommandText = "INSERT INTO OpenDate (ProjectId, Date) VALUES (1, $date); SELECT last_insert_rowid();";
             openDate.Parameters.AddWithValue("$date", date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-            await openDate.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            openDateIds.Add(Convert.ToInt64(await openDate.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture));
         }
+
+        // 実運用でほぼ必ず使う4コマ（Z/A/B/C）を既定値としてあらかじめ用意し、生成した全開校日へ割り当てる。
+        // 手入力の手間を省くための初期値であり、①設定でいつでも追加・編集・削除できる。
+        var defaultSlotIds = new List<long>();
+        foreach (var (code, start, end) in DefaultTimeSlots)
+        {
+            await using var slot = connection.CreateCommand();
+            slot.Transaction = (SqliteTransaction)transaction;
+            slot.CommandText = "INSERT INTO TimeSlot(Code,DisplayName,StartTime,EndTime,SortOrder,Active) VALUES($code,$code,$start,$end,$sort,1); SELECT last_insert_rowid();";
+            slot.Parameters.AddWithValue("$code", code); slot.Parameters.AddWithValue("$start", start); slot.Parameters.AddWithValue("$end", end); slot.Parameters.AddWithValue("$sort", defaultSlotIds.Count + 1);
+            defaultSlotIds.Add(Convert.ToInt64(await slot.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture));
+        }
+        foreach (var openDateId in openDateIds)
+            foreach (var slotId in defaultSlotIds)
+            {
+                await using var link = connection.CreateCommand();
+                link.Transaction = (SqliteTransaction)transaction;
+                link.CommandText = "INSERT INTO OpenDateTimeSlot(OpenDateId,TimeSlotId) VALUES($date,$slot);";
+                link.Parameters.AddWithValue("$date", openDateId); link.Parameters.AddWithValue("$slot", slotId);
+                await link.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);

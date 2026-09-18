@@ -50,6 +50,7 @@ public sealed class CsvResponseImportServiceTests : IDisposable
         var teacher = await master.SaveTeacherAsync(db, new Teacher(0, "T-001", "架空 講師"));
         var subject = await master.SaveSubjectAsync(db, new Subject(0, "JH_MATH", "数学", "数", "中学", 1));
         var course = new SqliteCourseSettingsRepository();
+        await DeactivateDefaultSlotsAsync(db, course);
         var slot = await course.SaveTimeSlotAsync(db, new TimeSlot(0, "1", "1限", new TimeOnly(9, 0), new TimeOnly(10, 0), 1));
         await course.SaveCourseDayAsync(db, new CourseDay(new DateOnly(2026, 7, 20), true, "", [slot.Id]));
 
@@ -127,7 +128,7 @@ public sealed class CsvResponseImportServiceTests : IDisposable
         Directory.CreateDirectory(_directory);var db=Path.Combine(_directory,"diff.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(db,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,21)));
         var master=new SqliteMasterDataRepository();await master.SaveStudentAsync(db,new Student(0,"S-001","架空 生徒","中2"));await master.SaveTeacherAsync(db,new Teacher(0,"T-001","架空 講師"));await master.SaveSubjectAsync(db,new Subject(0,"JH_MATH","数学","数","中学",1));
-        var course=new SqliteCourseSettingsRepository();var slot=await course.SaveTimeSlotAsync(db,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));
+        var course=new SqliteCourseSettingsRepository();await DeactivateDefaultSlotsAsync(db,course);var slot=await course.SaveTimeSlotAsync(db,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));
         await course.SaveCourseDayAsync(db,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));await course.SaveCourseDayAsync(db,new CourseDay(new DateOnly(2026,7,21),true,"",[slot.Id]));
 
         var service=new CsvResponseImportService();
@@ -152,4 +153,12 @@ public sealed class CsvResponseImportServiceTests : IDisposable
     }
 
     public void Dispose(){if(Directory.Exists(_directory))Directory.Delete(_directory,true);}
+
+    // 新規プロジェクトには既定でZ/A/B/Cの4コマが自動生成されるため、テスト独自のコマ（コード"1"）だけを
+    // 有効にしたい場合は既定コマを先に無効化しておく。
+    private static async Task DeactivateDefaultSlotsAsync(string path, SqliteCourseSettingsRepository course)
+    {
+        foreach (var slot in await course.GetTimeSlotsAsync(path))
+            await course.SaveTimeSlotAsync(path, new TimeSlot(slot.Id, slot.Code, slot.DisplayName, slot.StartTime, slot.EndTime, slot.SortOrder, false));
+    }
 }

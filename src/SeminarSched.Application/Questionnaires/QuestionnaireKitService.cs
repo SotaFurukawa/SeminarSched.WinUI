@@ -23,12 +23,13 @@ public sealed class QuestionnaireKitService
     public QuestionnaireKitService(ICourseSettingsRepository courseSettings, IMasterDataRepository masterData)
     { _courseSettings = courseSettings; _masterData = masterData; }
 
-    public async Task<string> GenerateAsync(string projectPath, string parentDirectory, string projectTitle, string studentTitle, string teacherTitle, string deadline, string contact, CancellationToken cancellationToken = default)
+    public async Task<string> GenerateAsync(string projectPath, string parentDirectory, string projectTitle, string studentTitle, string teacherTitle, string studentDeadline, string teacherDeadline, string contact, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectTitle);
         ArgumentException.ThrowIfNullOrWhiteSpace(studentTitle);
         ArgumentException.ThrowIfNullOrWhiteSpace(teacherTitle);
-        ArgumentException.ThrowIfNullOrWhiteSpace(deadline);
+        ArgumentException.ThrowIfNullOrWhiteSpace(studentDeadline);
+        ArgumentException.ThrowIfNullOrWhiteSpace(teacherDeadline);
         ArgumentException.ThrowIfNullOrWhiteSpace(contact);
 
         var days = (await _courseSettings.GetCourseDaysAsync(projectPath, cancellationToken).ConfigureAwait(false)).Where(x => x.IsOpen).OrderBy(x => x.Date).ToArray();
@@ -74,7 +75,7 @@ public sealed class QuestionnaireKitService
             {
                 kind = "student",
                 title = studentTitle,
-                deadline,
+                deadline = studentDeadline,
                 contact,
                 description = "個別指導コースの受講申込フォームです。メールアドレス、お子様のお名前、学年、受講教科・回数、受講できない日時をご回答ください。\n\n回答は講習の受付、時間割作成、内容確認、必要な連絡にだけ使用します。回答先スプレッドシートの閲覧者は担当者に限定してください。",
                 openDates,
@@ -91,7 +92,7 @@ public sealed class QuestionnaireKitService
             {
                 kind = "teacher",
                 title = teacherTitle,
-                deadline,
+                deadline = teacherDeadline,
                 contact,
                 description = "講習の出勤可能日時を確認するフォームです。出勤できない日時にだけチェックを入れてください。\n\n回答は勤務希望の確認、時間割作成、内容確認、必要な連絡にだけ使用します。回答先スプレッドシートの閲覧者は担当者に限定してください。",
                 openDates,
@@ -101,7 +102,7 @@ public sealed class QuestionnaireKitService
             {
                 kind = "teacher_subject",
                 title = $"{projectTitle} 講師 指導可能科目アンケート",
-                deadline,
+                deadline = teacherDeadline,
                 contact,
                 description = "現在、講師本人が単独で授業を進められる指導可能科目を確認するフォームです。小学校・中学校・高校から、該当する科目をすべて選択してください。\n\n回答は講師マスターの更新、担当可能科目の確認、時間割作成にだけ使用します。回答先スプレッドシートの閲覧者は担当者に限定してください。",
                 subjectsBySchoolLevel = teacherSubjectsBySchoolLevel,
