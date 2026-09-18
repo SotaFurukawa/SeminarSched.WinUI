@@ -64,6 +64,8 @@ public partial class App : Application
 
     public static IResponseImportService ResponseImport { get; } = new CsvResponseImportService();
 
+    public static ICourseSurveyImportService CourseSurveyImport { get; } = new CourseSurveyImportService();
+
     public static IAvailabilityMatrixService AvailabilityMatrix { get; } = new SqliteAvailabilityMatrixService();
 
     public static IFixedLessonService FixedLessons { get; } = new SqliteFixedLessonService();

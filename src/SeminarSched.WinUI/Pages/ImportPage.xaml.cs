@@ -9,10 +9,12 @@ namespace SeminarSched_WinUI.Pages;
 public sealed partial class ImportPage : WorkflowPageBase
 {
     private ResponseImportPreview? _preview;
+    private CourseSurveyPreview? _surveyPreview;
     public ImportPage() => InitializeComponent();
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         SelectButton.IsEnabled=EnsureProject(ProjectRequired);
+        SurveySelectButton.IsEnabled=SelectButton.IsEnabled;
         if(SelectButton.IsEnabled)await ReloadMatrixAsync();
     }
     private async void Select_Click(object sender,RoutedEventArgs e)
@@ -42,6 +44,41 @@ public sealed partial class ImportPage : WorkflowPageBase
     }
 
     private async void Apply_Click(object sender,RoutedEventArgs e){if(_preview is null)return;try{IsEnabled=false;await App.ResponseImport.ApplyAsync(App.ProjectService.Current!.Path,_preview,RemoveUnlisted.IsChecked==true);Status.Severity=InfoBarSeverity.Success;Status.Title="回答を反映しました";Status.IsOpen=true;ApplyButton.IsEnabled=false;}catch(Exception ex)when(ex is IOException or InvalidOperationException or Microsoft.Data.Sqlite.SqliteException){ShowError(ex.Message);}finally{IsEnabled=true;}}
+
+    private async void SurveySelect_Click(object sender,RoutedEventArgs e)
+    {
+        var student=await PickResponseAsync();if(student is null)return;var teacher=await PickResponseAsync();if(teacher is null)return;
+        try
+        {
+            IsEnabled=false;
+            _surveyPreview=await App.CourseSurveyImport.PreviewAsync(App.ProjectService.Current!.Path,student,teacher);
+            SurveyIssues.ItemsSource=_surveyPreview.Issues.Select(x=>$"{(x.Severity==CourseSurveyIssueSeverity.Error?"[エラー]":"[警告]")} {x.Source} 行{x.Row} {x.PersonName}: {x.Message}（{x.Resolution}）").ToArray();
+            SurveyApplyButton.IsEnabled=!_surveyPreview.HasErrors;
+            SurveySummary.Visibility=Visibility.Visible;
+            SurveySummary.Text=$"生徒{_surveyPreview.StudentCount}件・講師{_surveyPreview.TeacherCount}件・受講希望{_surveyPreview.RequestCount}件（エラー{_surveyPreview.Issues.Count(x=>x.Severity==CourseSurveyIssueSeverity.Error)}件・警告{_surveyPreview.Issues.Count(x=>x.Severity==CourseSurveyIssueSeverity.Warning)}件）";
+            Status.Severity=_surveyPreview.HasErrors?InfoBarSeverity.Error:InfoBarSeverity.Success;
+            Status.Title=_surveyPreview.HasErrors?"検証エラーがあります":"検証成功";
+            Status.Message="";
+            Status.IsOpen=true;
+        }
+        catch(Exception ex)when(ex is IOException or InvalidDataException){ShowError(ex.Message);}finally{IsEnabled=true;}
+    }
+
+    private async void SurveyApply_Click(object sender,RoutedEventArgs e)
+    {
+        if(_surveyPreview is null)return;
+        try
+        {
+            IsEnabled=false;
+            var result=await App.CourseSurveyImport.ApplyAsync(App.ProjectService.Current!.Path,_surveyPreview);
+            Status.Severity=InfoBarSeverity.Success;
+            Status.Title="アンケート回答を反映しました";
+            Status.Message=$"生徒{result.Students}件（体験生{result.TrialStudents}件を新規登録）・講師{result.Teachers}件・受講希望{result.LessonRequests}件";
+            Status.IsOpen=true;
+            SurveyApplyButton.IsEnabled=false;
+        }
+        catch(Exception ex)when(ex is IOException or InvalidOperationException or Microsoft.Data.Sqlite.SqliteException){ShowError(ex.Message);}finally{IsEnabled=true;}
+    }
     private async Task<string?> PickResponseAsync(){var p=new FileOpenPicker{SuggestedStartLocation=PickerLocationId.DocumentsLibrary};p.FileTypeFilter.Add(".csv");p.FileTypeFilter.Add(".xlsx");InitializeWithWindow.Initialize(p,WindowNative.GetWindowHandle(App.MainWindow!));return (await p.PickSingleFileAsync())?.Path;}
     private void ShowError(string message){Status.Severity=InfoBarSeverity.Error;Status.Title="処理できませんでした";Status.Message=message;Status.IsOpen=true;}
 
