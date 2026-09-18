@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.1.0 (beta)`（実装中・未Release）
-Latest Development Checkpoint: `9c153ad`（v0.1.0 checkpoint 48, 講師配布roster「その他」区分の廃止、⑤時間割エディタの複数コマ×複数講師出勤可否一括設定・header/row scroll同期）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。⑤の新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち（アプリ起動済み）。
+Latest Development Checkpoint: checkpoint 49（講師配布個別PDFファイル）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち（アプリ起動済み）。
 Latest Draft Release: `v0.0.0`（GitHub上にDraftとして作成済み）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -500,6 +500,15 @@ Feature Parity行55「atomic export・上書き確認」の残課題「個別fil
 - 新規テスト`SetTeacherUnavailableManyAsync_AppliesAllPairsInOneCallAndRollsBackOnConflict`で、複数組の一括適用と、一部が競合する場合に全体がrollbackされることを検証した。
 - **実機未確認事項**: この環境にはWinUIアプリを視覚的に操作・確認する手段（スクリーンショット・UI自動化ツール）が無いため、上記2機能（見出し固定表示の見た目、複数選択ListViewの操作感）はビルド成功・自動テスト成功のみで、実際の画面表示・ドラッグ操作感はユーザー自身の実機確認が必要。アプリを起動した状態で待機し、ユーザーに確認を依頼した。
 - Release/x64 build: warning 0 / error 0。全94 tests passed（新規1件）。Privacy gate成功。
+
+### v0.1.0 checkpoint 49 (Claude)
+
+Feature Parity行「講師配布（講師別）」の残課題「PDF個別ファイルは未対応（共通PDFのsectionのみ）」を実装した（アプリを実機確認用に起動して待機している間、並行して進めた）。
+
+- `PdfScheduleReportRenderer.RenderTeacherPacket(report, teacherName, path)`を新設。Excel版`RenderTeacherPacket`と同じ構成（担当一覧＝通常担当→講習担当の2区分の一覧＋週calendar）を独立したPDFファイルとして出力する。
+- `SqliteOutputPackageService.GenerateAsync`が「講師別」folder内で講師ごとに`{講師名}t.xlsx`と`{講師名}t.pdf`の両方を生成するよう変更。`SanitizeTeacherFileName`へ拡張子引数を追加し、同じbase名でxlsx/pdfそれぞれ独立して重複回避する。
+- 既存テストへ、生成された講師別PDFファイルの存在と`%PDF`ヘッダーを確認するアサーションを追加。
+- Release/x64 build: warning 0 / error 0。全94 tests passed。Privacy gate成功。
 
 ### 次回最初に確認するファイル
 

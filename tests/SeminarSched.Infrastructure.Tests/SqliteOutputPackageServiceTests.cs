@@ -110,6 +110,11 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         Assert.Contains(roster.CellsUsed(),cell=>cell.GetString()=="講習担当");
         Assert.Contains(roster.CellsUsed(),cell=>cell.GetString().Contains("架空") && cell.GetString().Contains("数"));
         Assert.True(substituteWorkbook.Worksheets.Contains("時間割"));
+
+        var substitutePdf=Path.Combine(result.TeacherPacketDirectory,"架空 代講t.pdf");
+        Assert.True(File.Exists(substitutePdf));
+        var pdfBytes=await File.ReadAllBytesAsync(substitutePdf);
+        Assert.Equal("%PDF",System.Text.Encoding.ASCII.GetString(pdfBytes,0,4));
     }
 
     [Fact]

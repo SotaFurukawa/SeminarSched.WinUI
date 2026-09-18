@@ -47,6 +47,34 @@ public sealed class PdfScheduleReportRenderer
         var renderer=new PdfDocumentRenderer{Document=document};renderer.RenderDocument();renderer.PdfDocument.Save(path);
     }
 
+    /// <summary>
+    /// PDF版の講師別個別ファイル。Excel版RenderTeacherPacketと同じ担当一覧（通常担当→講習担当の2区分）
+    /// ＋週calendarの構成だが、独立したPDFファイルとして出力する。
+    /// </summary>
+    public void RenderTeacherPacket(ScheduleReport report,string teacherName,string path)
+    {
+        EnsureFont();
+        var teacherRows=report.Rows.Where(x=>x.Teacher==teacherName).ToArray();
+        var studentLabels=WeeklyCalendarLayout.BuildStudentLabels(report.Rows.Select(x=>x.Student));
+        var document=new Document();document.Info.Title=teacherName;var normal=document.Styles[StyleNames.Normal]!;normal.Font.Name="SeminarSchedJapanese";normal.Font.Size=9;
+
+        var roster=document.AddSection();
+        roster.AddParagraph($"{teacherName} 担当一覧").Format.Font.Size=16;
+        var regular=teacherRows.Where(x=>x.IsRegularTeacher).Select(x=>$"{studentLabels[x.Student]} {x.SubjectShortName}").Distinct().OrderBy(x=>x,StringComparer.Ordinal).ToArray();
+        var others=teacherRows.Where(x=>!x.IsRegularTeacher).Select(x=>$"{studentLabels[x.Student]} {x.SubjectShortName}").Distinct().OrderBy(x=>x,StringComparer.Ordinal).ToArray();
+        roster.AddParagraph("通常担当").Format.Font.Bold=true;
+        foreach(var line in regular)roster.AddParagraph("・"+line);
+        roster.AddParagraph("講習担当").Format.Font.Bold=true;
+        foreach(var line in others)roster.AddParagraph("・"+line);
+
+        var calendar=document.AddSection();calendar.PageSetup.Orientation=Orientation.Landscape;
+        calendar.AddParagraph($"{teacherName} 時間割").Format.Font.Size=15;
+        var linesByDate=teacherRows.GroupBy(x=>DateOnly.Parse(x.Date)).ToDictionary(g=>g.Key,IReadOnlyList<string> (g)=>g.OrderBy(x=>x.TimeSlot).Select(x=>$"{x.SubjectShortName} {studentLabels[x.Student]}").ToArray());
+        AddCalendar(calendar,report.StartDate,report.EndDate,linesByDate);
+
+        var renderer=new PdfDocumentRenderer{Document=document};renderer.RenderDocument();renderer.PdfDocument.Save(path);
+    }
+
     private static void AddOverview(Section section,OverviewGrid grid)
     {
         foreach(var week in grid.Weeks)

@@ -22,8 +22,10 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
             var usedNames=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach(var teacherName in report.Rows.Select(x=>x.Teacher).Distinct().OrderBy(x=>x,StringComparer.Ordinal))
             {
-                var fileName=SanitizeTeacherFileName(teacherName,usedNames);
-                await Task.Run(()=>new ExcelScheduleReportRenderer().RenderTeacherPacket(report,teacherName,Path.Combine(teacherPacketDirectory,fileName)),cancellationToken);
+                var excelFileName=SanitizeTeacherFileName(teacherName,"xlsx",usedNames);
+                await Task.Run(()=>new ExcelScheduleReportRenderer().RenderTeacherPacket(report,teacherName,Path.Combine(teacherPacketDirectory,excelFileName)),cancellationToken);
+                var pdfFileName=SanitizeTeacherFileName(teacherName,"pdf",usedNames);
+                await Task.Run(()=>new PdfScheduleReportRenderer().RenderTeacherPacket(report,teacherName,Path.Combine(teacherPacketDirectory,pdfFileName)),cancellationToken);
             }
 
             Directory.Move(temporary,target);
@@ -32,14 +34,14 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
         finally{if(Directory.Exists(temporary))Directory.Delete(temporary,true);}
     }
 
-    private static string SanitizeTeacherFileName(string teacherName,HashSet<string> usedNames)
+    private static string SanitizeTeacherFileName(string teacherName,string extension,HashSet<string> usedNames)
     {
         var invalid=Path.GetInvalidFileNameChars();
         var sanitized=new string(teacherName.Where(ch=>!invalid.Contains(ch)).ToArray()).Trim();
         if(sanitized.Length==0)sanitized="講師";
-        var candidate=$"{sanitized}t.xlsx";
+        var candidate=$"{sanitized}t.{extension}";
         var suffix=2;
-        while(!usedNames.Add(candidate))candidate=$"{sanitized}t_{suffix++}.xlsx";
+        while(!usedNames.Add(candidate))candidate=$"{sanitized}t_{suffix++}.{extension}";
         return candidate;
     }
     private static async Task<ScheduleReport> LoadAndValidate(string path,CancellationToken token)
