@@ -83,7 +83,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <NumberBox x:Name="AcademicYearBox" Header="年度" Minimum="2000" Maximum="2200" SpinButtonPlacementMode="Compact" />
+                        <DatePicker x:Name="AcademicYearPicker" Header="年度" DayVisible="False" MonthVisible="False" YearVisible="True" />
                         <ComboBox x:Name="SeasonBox" Grid.Column="1" Header="講習区分" SelectedIndex="1">
                             <ComboBoxItem Content="春期講習" Tag="1" />
                             <ComboBoxItem Content="夏期講習" Tag="2" />

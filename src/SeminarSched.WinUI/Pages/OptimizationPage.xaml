@@ -22,7 +22,7 @@
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Spacing="12">
                     <TextBlock FontSize="20" FontWeight="SemiBold" Text="最適化品質" />
-                    <StackPanel MaxWidth="480" HorizontalAlignment="Left" Spacing="0">
+                    <StackPanel MaxWidth="760" HorizontalAlignment="Left" Spacing="0">
                         <Grid ColumnSpacing="12">
                             <TextBlock Text="高速" />
                             <TextBlock HorizontalAlignment="Right" Text="最高品質" />
@@ -37,6 +37,22 @@
                             SnapsTo="StepValues"
                             Value="3"
                             ValueChanged="QualitySlider_ValueChanged" />
+                        <!-- Sliderのトラックはthumb半径ぶん左右に内側マージンがあるため、目盛り数字の
+                             行も同じだけ内側へ寄せないと数字がtick位置とずれる（以前の不具合）。 -->
+                        <Grid Margin="12,4,12,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock HorizontalAlignment="Left" Text="1" />
+                            <TextBlock Grid.Column="1" HorizontalAlignment="Center" Text="2" />
+                            <TextBlock Grid.Column="2" HorizontalAlignment="Center" Text="3" />
+                            <TextBlock Grid.Column="3" HorizontalAlignment="Center" Text="4" />
+                            <TextBlock Grid.Column="4" HorizontalAlignment="Right" Text="5" />
+                        </Grid>
                     </StackPanel>
 
                     <TextBlock Margin="0,8,0,0" FontSize="18" FontWeight="SemiBold" Text="{x:Bind ViewModel.LevelText, Mode=OneWay}" />

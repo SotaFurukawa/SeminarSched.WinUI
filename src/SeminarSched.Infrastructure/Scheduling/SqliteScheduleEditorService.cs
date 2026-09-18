@@ -43,6 +43,14 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
         await using var command=connection.CreateCommand();command.Transaction=transaction;command.CommandText="DELETE FROM Assignment WHERE IsLocked=0 AND IsManual=0;";var removed=await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);await InsertAuditAsync(connection,transaction,"automatic_assignments_reset","project:1",new{removed},cancellationToken).ConfigureAwait(false);await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    // 「自動配置だけリセット」と異なり、ロック済み・手動配置も含めた配置を全件削除する。ユーザー要望：
+    // 時間割編集の受講状況をまっさらに戻したいことがある（自動作成前のやり直し等）。
+    public async Task ResetAllAsync(string projectPath,CancellationToken cancellationToken=default)
+    {
+        await using var connection=await OpenAsync(projectPath,cancellationToken).ConfigureAwait(false);await SqliteProjectSchema.EnsureCurrentAsync(connection,cancellationToken).ConfigureAwait(false);await using var transaction=(SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command=connection.CreateCommand();command.Transaction=transaction;command.CommandText="DELETE FROM Assignment;";var removed=await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);await InsertAuditAsync(connection,transaction,"all_assignments_reset","project:1",new{removed},cancellationToken).ConfigureAwait(false);await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<OpenDateOption>> GetOpenDatesAsync(string projectPath,CancellationToken cancellationToken=default)
     {
         await using var connection=await OpenAsync(projectPath,cancellationToken).ConfigureAwait(false);await SqliteProjectSchema.EnsureCurrentAsync(connection,cancellationToken).ConfigureAwait(false);
@@ -306,6 +314,7 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
         ["manual_assignment_removed"]="手動配置を削除",
         ["assignment_lock_changed"]="ロック状態を変更",
         ["automatic_assignments_reset"]="自動配置をリセット",
+        ["all_assignments_reset"]="すべての配置をリセット",
         ["teacher_unavailability_changed"]="出勤可否を変更",
         ["schedule_snapshot_restored"]="元に戻す・やり直すを実行",
     };
@@ -314,7 +323,7 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
     {
         await using var connection=await OpenAsync(projectPath,cancellationToken).ConfigureAwait(false);await SqliteProjectSchema.EnsureCurrentAsync(connection,cancellationToken).ConfigureAwait(false);
         await using var command=connection.CreateCommand();
-        command.CommandText="SELECT TimestampUtc,Action,Reason FROM AuditLog WHERE Action IN ('manual_assignment_added','preconfirmed_assignment_added','manual_assignment_moved','manual_assignment_removed','assignment_lock_changed','automatic_assignments_reset','teacher_unavailability_changed','schedule_snapshot_restored') ORDER BY Id DESC LIMIT $limit;";
+        command.CommandText="SELECT TimestampUtc,Action,Reason FROM AuditLog WHERE Action IN ('manual_assignment_added','preconfirmed_assignment_added','manual_assignment_moved','manual_assignment_removed','assignment_lock_changed','automatic_assignments_reset','all_assignments_reset','teacher_unavailability_changed','schedule_snapshot_restored') ORDER BY Id DESC LIMIT $limit;";
         command.Parameters.AddWithValue("$limit",limit);
         var result=new List<AuditHistoryEntry>();
         await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);

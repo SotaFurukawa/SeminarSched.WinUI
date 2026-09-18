@@ -19,17 +19,20 @@ public sealed partial class HomePage : Page
         InitializeComponent();
     }
 
+    private bool _initialized;
+
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
-        // NumberBoxの未設定値はdouble.NaNであり0ではないため、この判定は常にfalseとなり
-        // 年度・開始/終了日の既定値設定とProjectDefinition_Changedの購読が一度も実行されない
-        // 不具合があった（ユーザー報告：年度の初期値が今の年度になっていない）。
-        if (double.IsNaN(AcademicYearBox.Value))
+        // 旧実装はNumberBox.Valueが未設定時double.NaNであることを見落とし、"==0"で初回判定していた
+        // ため既定値設定・イベント購読が一度も走らないバグがあった（年度の初期値が今の年度にならない）。
+        // 年度はDatePicker（年のみのドラムロール）へ置き換えたことで既定値は自然に「今日」になるため、
+        // ここでは明示的なbool flagで「このPageインスタンスでは初回だけ」実行する。
+        if (!_initialized)
         {
-            AcademicYearBox.Value = DateTime.Today.Year;
+            _initialized = true;
             StartDatePicker.Date = DateTimeOffset.Now.Date;
             EndDatePicker.Date = DateTimeOffset.Now.Date.AddDays(30);
-            AcademicYearBox.ValueChanged += ProjectDefinition_Changed;
+            AcademicYearPicker.DateChanged += ProjectDefinition_Changed;
             SeasonBox.SelectionChanged += ProjectDefinition_Changed;
         }
 
@@ -344,7 +347,7 @@ public sealed partial class HomePage : Page
         try{var picker=new FolderPicker(GetWindowId()){SuggestedFolder=ProjectService.DefaultProjectsDirectory};var folder=await picker.PickSingleFolderAsync();if(folder is null)return;var name=$"{current.Title}_copy_{DateTime.Now:yyyyMMdd_HHmmss}{ProjectService.ProjectExtension}";SetBusy(true);var copy=await App.ProjectService.SaveAsAsync(Path.Combine(folder.Path,name));await App.RecentProjects.TouchAsync(copy.Path,copy.Title);RefreshCurrentProject();await RefreshRecentProjectsAsync();ShowStatus(InfoBarSeverity.Success,"複製へ切り替えました",copy.Path);}catch(Exception ex)when(ex is IOException or UnauthorizedAccessException or InvalidDataException or SqliteException){ShowStatus(InfoBarSeverity.Error,"複製できませんでした",ex.Message);}finally{SetBusy(false);}
     }
 
-    private void ProjectDefinition_Changed(object sender, object e) => RefreshGeneratedTitle();
+    private void ProjectDefinition_Changed(object? sender, object e) => RefreshGeneratedTitle();
 
     private CourseProjectDefinition BuildDefinition()
     {
@@ -360,7 +363,7 @@ public sealed partial class HomePage : Page
         var end = EndDatePicker.Date
             ?? throw new ArgumentException("終了日を選択してください。");
         return CourseProjectDefinition.Create(
-            checked((int)AcademicYearBox.Value),
+            AcademicYearPicker.Date.Year,
             (CourseSeason)seasonValue,
             DateOnly.FromDateTime(start.DateTime),
             DateOnly.FromDateTime(end.DateTime));

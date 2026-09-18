@@ -399,6 +399,13 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
     }
     private async void ResetAutomatic_Click(object sender,RoutedEventArgs e)=>await ExecuteEditorAsync(async()=>await App.ScheduleEditor.ResetAutomaticAsync(App.ProjectService.Current!.Path),"自動配置をリセットしました",clearsHistory:true);
 
+    private async void ResetAll_Click(object sender,RoutedEventArgs e)
+    {
+        var dialog=new ContentDialog{XamlRoot=XamlRoot,Title="すべての配置をリセットしますか？",Content="ロック済み・手動配置を含む、この受講希望のすべての配置を削除します。元に戻す操作は使えません。",PrimaryButtonText="すべて削除",CloseButtonText="キャンセル",DefaultButton=ContentDialogButton.Close};
+        if(await dialog.ShowAsync()!=ContentDialogResult.Primary)return;
+        await ExecuteEditorAsync(async()=>await App.ScheduleEditor.ResetAllAsync(App.ProjectService.Current!.Path),"すべての配置をリセットしました",clearsHistory:true);
+    }
+
     // ドラッグ移動の実行前にPython版と同じgreen/yellow/red判定を行う。redはエラー表示して中止、
     // yellowはソフト指標の悪化内容を確認ダイアログで提示し、ユーザーが理由を入力・確認した場合のみ
     // 実行を許可する（confirmSoftWarnings:trueで再度MoveAsyncを呼ぶ）。

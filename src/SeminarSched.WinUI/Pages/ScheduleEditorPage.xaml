@@ -101,7 +101,7 @@
                                 <TextBlock FontSize="16" FontWeight="SemiBold" Text="配置一覧・手動配置" />
                                 <TextBlock Text="手動配置は次回の自動作成でも位置を維持します。ロックすると自動作成でも移動・削除できなくなります。" TextWrapping="Wrap" />
                                 <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="ManualRequest" Header="受講希望"/><ComboBox x:Name="ManualTeacher" Grid.Column="1" Header="講師"/><ComboBox x:Name="ManualSlot" Grid.Column="2" Header="日時・コマ"/></Grid>
-                                <StackPanel Orientation="Horizontal" Spacing="8"><CheckBox x:Name="ManualLocked" Content="ロックして追加"/><Button Content="手動配置を追加" Click="AddManual_Click" Style="{StaticResource AccentButtonStyle}"/><Button Content="選択した手動配置を削除" Click="RemoveManual_Click"/><Button Content="選択項目のロック切替" Click="ToggleLock_Click"/><Button Content="自動配置だけリセット" Click="ResetAutomatic_Click"/></StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8"><CheckBox x:Name="ManualLocked" Content="ロックして追加"/><Button Content="手動配置を追加" Click="AddManual_Click" Style="{StaticResource AccentButtonStyle}"/><Button Content="選択した手動配置を削除" Click="RemoveManual_Click"/><Button Content="選択項目のロック切替" Click="ToggleLock_Click"/><Button Content="自動配置だけリセット" Click="ResetAutomatic_Click"/><Button Content="すべてリセット" Click="ResetAll_Click"/></StackPanel>
                                 <ListView x:Name="Assignments" MaxHeight="360" SelectionMode="Single"/>
                             </StackPanel>
                         </StackPanel>

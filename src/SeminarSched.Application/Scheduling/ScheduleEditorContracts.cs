@@ -99,6 +99,7 @@ public interface IScheduleEditorService
     Task RemoveManualAsync(string projectPath, long assignmentId, CancellationToken cancellationToken = default);
     Task SetLockedAsync(string projectPath, long assignmentId, bool isLocked, CancellationToken cancellationToken = default);
     Task ResetAutomaticAsync(string projectPath, CancellationToken cancellationToken = default);
+    Task ResetAllAsync(string projectPath, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<OpenDateOption>> GetOpenDatesAsync(string projectPath, CancellationToken cancellationToken = default);
     Task<ScheduleBoard> GetBoardAsync(string projectPath, long openDateId, IReadOnlyCollection<long> extraTeacherIds, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UnplacedSessionOption>> GetUnplacedSessionsAsync(string projectPath, long openDateId, CancellationToken cancellationToken = default);
