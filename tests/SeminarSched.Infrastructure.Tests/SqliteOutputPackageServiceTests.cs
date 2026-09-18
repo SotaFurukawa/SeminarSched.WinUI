@@ -1,3 +1,4 @@
+using ClosedXML.Excel;
 using Microsoft.Data.Sqlite;
 using SeminarSched.Domain.CourseSettings;
 using SeminarSched.Domain.MasterData;
@@ -12,17 +13,52 @@ namespace SeminarSched.Infrastructure.Tests;
 public sealed class SqliteOutputPackageServiceTests : IDisposable
 {
     private readonly string _directory=Path.Combine(Path.GetTempPath(),"SeminarSched.Tests",Guid.NewGuid().ToString("N"));
+
     [Fact]
-    public async Task GenerateAsync_CreatesExcelAndJapanesePdfAtomically()
+    public async Task GenerateAsync_CreatesAllFiveReportKindsAtomically()
     {
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"report.jukuschedule");await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20)));
         var m=new SqliteMasterDataRepository();var st=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));var te=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 講師"));var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));var course=new SqliteCourseSettingsRepository();var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
         await using(var c=new SqliteConnection($"Data Source={path};Pooling=False")){await c.OpenAsync();await using var q=c.CreateCommand();q.CommandText=$"INSERT INTO LessonRequest(Id,ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,1,{st.Id},{sub.Id},1);INSERT INTO Assignment(Id,LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source) SELECT 1,1,{te.Id},d.Id,{slot.Id},0,'test' FROM OpenDate d LIMIT 1;";await q.ExecuteNonQueryAsync();}
-        var result=await new SqliteOutputPackageService().GenerateAsync(path,_directory);Assert.True(File.Exists(result.ExcelPath));Assert.True(File.Exists(result.PdfPath));Assert.True(new FileInfo(result.ExcelPath).Length>1000);var bytes=await File.ReadAllBytesAsync(result.PdfPath);Assert.Equal("%PDF",System.Text.Encoding.ASCII.GetString(bytes,0,4));Assert.Empty(Directory.GetDirectories(_directory,"*.tmp-*"));
+
+        var result=await new SqliteOutputPackageService().GenerateAsync(path,_directory);
+        foreach(var xlsx in new[]{result.OverallExcelPath,result.StudentHandoutsExcelPath,result.TeacherHandoutsExcelPath,result.IssuesExcelPath})
+            Assert.True(new FileInfo(xlsx).Length>500,$"{xlsx} should be a non-trivial workbook.");
+        foreach(var pdf in new[]{result.OverallPdfPath,result.StudentHandoutsPdfPath,result.TeacherHandoutsPdfPath,result.IssuesPdfPath})
+        {
+            var bytes=await File.ReadAllBytesAsync(pdf);Assert.Equal("%PDF",System.Text.Encoding.ASCII.GetString(bytes,0,4));
+        }
+        Assert.Empty(Directory.GetDirectories(_directory,"*.tmp-*"));
+
+        using var overall=new XLWorkbook(result.OverallExcelPath);
+        Assert.True(overall.Worksheets.Contains("出力情報"));
+        Assert.Equal("季節講習時間割",overall.Worksheet("出力情報").Cell(1,2).GetString());
+        Assert.Contains(overall.Worksheets,ws=>ws.Name.StartsWith("週_",StringComparison.Ordinal));
+
+        using var studentHandouts=new XLWorkbook(result.StudentHandoutsExcelPath);
+        Assert.Contains(studentHandouts.Worksheets,ws=>ws.Name=="中2_架空 生徒");
+        var studentCells=studentHandouts.Worksheet("中2_架空 生徒").CellsUsed().Select(cell=>cell.GetString()).ToArray();
+        Assert.Contains(studentCells,text=>text=="数");
+        Assert.DoesNotContain(studentCells,text=>text.Contains("架空",StringComparison.Ordinal)&&text.Contains("数",StringComparison.Ordinal));
+
+        using var teacherHandouts=new XLWorkbook(result.TeacherHandoutsExcelPath);
+        var teacherCells=teacherHandouts.Worksheet("中2_架空 生徒").CellsUsed().Select(cell=>cell.GetString()).ToArray();
+        Assert.Contains(teacherCells,text=>text.Contains("数",StringComparison.Ordinal)&&text.Contains("架空",StringComparison.Ordinal));
+
+        using var issues=new XLWorkbook(result.IssuesExcelPath);
+        Assert.True(issues.Worksheets.Contains("未配置一覧"));Assert.True(issues.Worksheets.Contains("警告一覧"));
+        Assert.Equal("生徒",issues.Worksheet("未配置一覧").Cell(1,1).GetString());
+        Assert.Equal("severity",issues.Worksheet("警告一覧").Cell(1,1).GetString());
+
+        Assert.True(Directory.Exists(result.TeacherPacketDirectory));
+        var teacherPacket=Path.Combine(result.TeacherPacketDirectory,"架空 講師t.xlsx");
+        Assert.True(File.Exists(teacherPacket));
+        using var packet=new XLWorkbook(teacherPacket);
+        Assert.Contains(packet.Worksheets,ws=>ws.Name.EndsWith("_講師別",StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task GenerateAsync_MultiWeekPeriod_RendersWeeklyCalendarWithLabelsAndAbsenceList()
+    public async Task GenerateAsync_MultiWeekPeriod_RendersPerWeekOverviewSheetsAndAbsenceList()
     {
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"multiweek.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,8,10)));
@@ -52,25 +88,24 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         }
 
         var result=await new SqliteOutputPackageService().GenerateAsync(path,_directory);
-        Assert.True(new FileInfo(result.ExcelPath).Length>1000);
-        var pdfBytes=await File.ReadAllBytesAsync(result.PdfPath);Assert.Equal("%PDF",System.Text.Encoding.ASCII.GetString(pdfBytes,0,4));
 
-        using var workbook=new ClosedXML.Excel.XLWorkbook(result.ExcelPath);
-        var studentSheets=workbook.Worksheets.Where(ws=>ws.Name.StartsWith("生徒",StringComparison.Ordinal)).ToArray();
-        Assert.Contains(studentSheets,ws=>ws.Cell(1,1).GetString()=="中2 田中太");
-        Assert.Contains(studentSheets,ws=>ws.Cell(1,1).GetString()=="中1 田中次");
-        var issuesSheet=workbook.Worksheet("未配置・警告");
-        Assert.Contains(issuesSheet.CellsUsed(),cell=>cell.GetString()=="架空 欠席生徒");
+        using var studentHandouts=new XLWorkbook(result.StudentHandoutsExcelPath);
+        Assert.Contains(studentHandouts.Worksheets,ws=>ws.Name=="中2_田中 太郎");
+        Assert.Contains(studentHandouts.Worksheets,ws=>ws.Name=="中1_田中 次郎");
+        Assert.True(studentHandouts.Worksheets.Contains("講習欠席一覧"));
+        var absenceCells=studentHandouts.Worksheet("講習欠席一覧").CellsUsed().Select(cell=>cell.GetString()).ToArray();
+        Assert.Contains(absenceCells,text=>text=="架空 欠席生徒");
 
-        var overviewSheet=workbook.Worksheet("全体時間割");
-        var overviewCells=overviewSheet.CellsUsed().Select(cell=>cell.GetString()).ToArray();
-        Assert.Contains(overviewCells,text=>text.Contains("架空 講師"));
-        Assert.Contains(overviewCells,text=>text.Contains("中2 数 田中太")||text.Contains("中1 数 田中次"));
-        Assert.DoesNotContain(workbook.Worksheets,ws=>ws.Name=="時間割");
+        using var overall=new XLWorkbook(result.OverallExcelPath);
+        var weekSheets=overall.Worksheets.Where(ws=>ws.Name.StartsWith("週_",StringComparison.Ordinal)).ToArray();
+        Assert.True(weekSheets.Length>=2,"Expected at least one week sheet per week containing an assignment.");
+        var overviewCells=weekSheets.SelectMany(ws=>ws.CellsUsed()).Select(cell=>cell.GetString()).ToArray();
+        Assert.Contains(overviewCells,text=>text=="架空");
+        Assert.Contains(overviewCells,text=>text=="数");
     }
 
     [Fact]
-    public async Task GenerateAsync_ReportsRegularTeacherShortfallBelowTargetPercentage()
+    public async Task GenerateAsync_ReportsRegularTeacherShortfallAsWarningRow()
     {
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"shortfall.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,21)));
@@ -98,18 +133,18 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         }
 
         var result=await new SqliteOutputPackageService().GenerateAsync(path,_directory);
-        using var workbook=new ClosedXML.Excel.XLWorkbook(result.ExcelPath);
-        var issuesSheet=workbook.Worksheet("未配置・警告");
-        Assert.Contains(issuesSheet.CellsUsed(),cell=>cell.GetString().Contains("通常担当架空 通常担当")&&cell.GetString().Contains("目標2回中0回"));
+        using var issues=new XLWorkbook(result.IssuesExcelPath);
+        var warningSheet=issues.Worksheet("警告一覧");
+        var warningRow=warningSheet.RowsUsed().Skip(1).First();
+        Assert.Equal("通常担当不足",warningRow.Cell(2).GetString());
+        Assert.Contains("架空 通常担当",warningRow.Cell(6).GetString());
+        Assert.Contains("目標2回中0回",warningRow.Cell(7).GetString());
 
         Assert.True(Directory.Exists(result.TeacherPacketDirectory));
         var substituteFile=Path.Combine(result.TeacherPacketDirectory,"架空 代講t.xlsx");
         Assert.True(File.Exists(substituteFile));
-        using var substituteWorkbook=new ClosedXML.Excel.XLWorkbook(substituteFile);
-        var roster=substituteWorkbook.Worksheet("担当一覧");
-        Assert.Contains(roster.CellsUsed(),cell=>cell.GetString()=="講習担当");
-        Assert.Contains(roster.CellsUsed(),cell=>cell.GetString().Contains("架空") && cell.GetString().Contains("数"));
-        Assert.True(substituteWorkbook.Worksheets.Contains("時間割"));
+        using var substituteWorkbook=new XLWorkbook(substituteFile);
+        Assert.Contains(substituteWorkbook.Worksheets,ws=>ws.Name.EndsWith("_講師別",StringComparison.Ordinal));
 
         var substitutePdf=Path.Combine(result.TeacherPacketDirectory,"架空 代講t.pdf");
         Assert.True(File.Exists(substitutePdf));
@@ -144,15 +179,18 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         }
 
         var result=await new SqliteOutputPackageService().GenerateAsync(path,_directory);
-        using var workbook=new ClosedXML.Excel.XLWorkbook(result.ExcelPath);
-        var overview=workbook.Worksheet("全体時間割");
+        using var workbook=new XLWorkbook(result.OverallExcelPath);
+        var overview=workbook.Worksheets.First(ws=>ws.Name.StartsWith("週_",StringComparison.Ordinal));
+        // The project also carries the default A/B/C slots seeded by SqliteProjectRepository.CreateAsync
+        // alongside this test's own "1限"/"2限" slots, so slot rows must be located by label text rather
+        // than by an assumed row offset from one another.
         var slot1Row=overview.CellsUsed().First(cell=>cell.GetString()=="1限 09:00-10:00").Address.RowNumber;
         var slot2Row=overview.CellsUsed().First(cell=>cell.GetString()=="2限 10:00-11:00").Address.RowNumber;
-        var col=overview.CellsUsed().First(cell=>cell.GetString()=="架空 講師").Address.ColumnNumber;
-        Assert.Contains("架空",overview.Cell(slot1Row,col).GetString());
-        Assert.Equal(string.Empty,overview.Cell(slot2Row,col).GetString());
-        Assert.Equal(ClosedXML.Excel.XLColor.LightGray,overview.Cell(slot2Row,col).Style.Fill.BackgroundColor);
-        Assert.NotEqual(ClosedXML.Excel.XLColor.LightGray,overview.Cell(slot1Row,col).Style.Fill.BackgroundColor);
+        var teacherCol=overview.CellsUsed().First(cell=>cell.GetString()=="架空").Address.ColumnNumber;
+        Assert.Equal("中2",overview.Cell(slot1Row,teacherCol).GetString());
+        Assert.Equal(string.Empty,overview.Cell(slot2Row,teacherCol).GetString());
+        Assert.Equal(XLColor.LightGray,overview.Cell(slot2Row,teacherCol).Style.Fill.BackgroundColor);
+        Assert.NotEqual(XLColor.LightGray,overview.Cell(slot1Row,teacherCol).Style.Fill.BackgroundColor);
     }
 
     public void Dispose(){if(Directory.Exists(_directory))Directory.Delete(_directory,true);}

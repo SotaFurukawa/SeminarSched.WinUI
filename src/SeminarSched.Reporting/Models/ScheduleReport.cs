@@ -3,14 +3,33 @@ namespace SeminarSched.Reporting.Models;
 public sealed record ScheduleReportRow(string Date,string TimeSlot,string Student,string StudentGrade,string Subject,string SubjectShortName,string Teacher,bool IsLocked,bool IsRegularTeacher);
 public sealed record AbsentStudent(string Grade,string Name);
 public sealed record TeacherUnavailabilityCell(string Date,string TimeSlot,string Teacher);
+
+/// <summary>
+/// TimeSlot.Codeは表示名(DisplayName)とは別の短いコード（"A"等）。Python版の生徒配布handoutページは
+/// 「{code}タイム」列を使うため、結合済みラベル文字列を後から分割するのではなく、この専用フィールドを使う。
+/// </summary>
+public sealed record SlotDefinition(string Label,string Code,string TimeRangeText);
+
+/// <summary>Python版issue_builder.pyの未配置一覧1行。</summary>
+public sealed record UnassignedRequestRow(string Student,string Subject,int Required,int Placed,int Missing,string MainReason,IReadOnlyList<string> ResolutionCandidates,int Priority,string? RegularTeacher,bool OneToOneRequired,string Note);
+
+/// <summary>Python版issue_builder.pyの警告一覧1行。現時点のC#は通常担当不足のみを検知できるため、そこから生成する。</summary>
+public sealed record WarningRow(string Severity,string IssueType,string? Date,string? Slot,string Student,string Teacher,string Content,string Status);
+
 public sealed record ScheduleReport(
-    string Title,
+    string ProjectTitle,
+    int AcademicYear,
+    string SeasonName,
+    string GeneratedAtText,
     DateOnly StartDate,
     DateOnly EndDate,
     IReadOnlyList<DateOnly> OpenDates,
-    IReadOnlyList<string> SlotLabels,
+    IReadOnlyList<SlotDefinition> SlotDefinitions,
     IReadOnlyList<ScheduleReportRow> Rows,
-    IReadOnlyList<string> Unassigned,
+    IReadOnlyList<UnassignedRequestRow> UnassignedRequests,
     IReadOnlyList<AbsentStudent> AbsentStudents,
-    IReadOnlyList<string> RegularTeacherShortfalls,
-    IReadOnlyList<TeacherUnavailabilityCell> TeacherUnavailabilities);
+    IReadOnlyList<WarningRow> Warnings,
+    IReadOnlyList<TeacherUnavailabilityCell> TeacherUnavailabilities)
+{
+    public IReadOnlyList<string> SlotLabels { get; } = SlotDefinitions.Select(s => s.Label).ToArray();
+}

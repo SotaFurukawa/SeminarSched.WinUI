@@ -29,8 +29,13 @@ public static class WeeklyCalendarLayout
 
     /// <summary>
     /// Python版の表記規則: 表示は姓のみ。同姓の生徒が複数いる場合だけ名の先頭1文字を付けて区別する。
+    /// 生徒・講師のどちらの氏名一覧にも同じ規則を使う（Python版person_names.pyのcompact_person_name_map相当）。
     /// </summary>
-    public static IReadOnlyDictionary<string, string> BuildStudentLabels(IEnumerable<string> fullNames)
+    public static IReadOnlyDictionary<string, string> BuildStudentLabels(IEnumerable<string> fullNames) => BuildCompactNameLookup(fullNames);
+
+    public static IReadOnlyDictionary<string, string> BuildTeacherLabels(IEnumerable<string> fullNames) => BuildCompactNameLookup(fullNames);
+
+    private static IReadOnlyDictionary<string, string> BuildCompactNameLookup(IEnumerable<string> fullNames)
     {
         var names = fullNames.Distinct().ToArray();
         var parsed = names.Select(name =>

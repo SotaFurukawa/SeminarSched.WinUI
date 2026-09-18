@@ -12,9 +12,14 @@ public sealed partial class OutputPage : WorkflowPageBase
     {
         try{IsEnabled=false;Progress.IsActive=true;var result=await App.OutputPackage.GenerateAsync(App.ProjectService.Current!.Path,WorkspacePaths.Output);Status.Severity=InfoBarSeverity.Success;Status.Title="出力しました";Status.Message=$"{result.DirectoryPath}（授業{result.AssignmentCount}件・未配置{result.UnassignedCount}件）";Status.IsOpen=true;App.Logger.Info($"Output generated: assignments={result.AssignmentCount} unassigned={result.UnassignedCount}");
             _outputDirectory=result.DirectoryPath;
-            var files=new List<OutputFileItem>{new(result.ExcelPath,"全体時間割.xlsx"),new(result.PdfPath,"時間割.pdf")};
+            var files=new List<OutputFileItem>{
+                new(result.OverallExcelPath,"季節講習時間割.xlsx"),new(result.OverallPdfPath,"季節講習時間割.pdf"),
+                new(result.StudentHandoutsExcelPath,"生徒配布用生徒別時間割.xlsx"),new(result.StudentHandoutsPdfPath,"生徒配布用生徒別時間割.pdf"),
+                new(result.TeacherHandoutsExcelPath,"講師配布用学年別時間割.xlsx"),new(result.TeacherHandoutsPdfPath,"講師配布用学年別時間割.pdf"),
+                new(result.IssuesExcelPath,"未配置・警告一覧.xlsx"),new(result.IssuesPdfPath,"未配置・警告一覧.pdf"),
+            };
             if(Directory.Exists(result.TeacherPacketDirectory))
-                files.AddRange(Directory.GetFiles(result.TeacherPacketDirectory).OrderBy(x=>x,StringComparer.Ordinal).Select(f=>new OutputFileItem(f,$"講師別/{Path.GetFileName(f)}")));
+                files.AddRange(Directory.GetFiles(result.TeacherPacketDirectory).OrderBy(x=>x,StringComparer.Ordinal).Select(f=>new OutputFileItem(f,$"講師配布用講師別時間割/{Path.GetFileName(f)}")));
             GeneratedFiles.ItemsSource=files;OutputFilesPanel.Visibility=Visibility.Visible;
         }catch(Exception ex)when(ex is IOException or UnauthorizedAccessException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException){Status.Severity=InfoBarSeverity.Error;Status.Title="出力できませんでした";Status.Message=ex.Message;Status.IsOpen=true;App.Logger.Error("Output generation failed",ex);}finally{Progress.IsActive=false;IsEnabled=true;}
     }

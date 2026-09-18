@@ -795,6 +795,32 @@ checkpoint 61の修正直後、ユーザーが実際に③アンケート取込�
 - CP-SATの`SolutionCallback`（解が改善されるたびに呼ばれるコールバック）は未接続。進捗の経過時間・残り時間予測は壁時計ベースの近似（`OptimizationProgress.Elapsed`/`MaximumTime`）で、ソルバー内部の探索進捗そのものではない。
 - 「標準」「高品質」「最高品質」帯は今回のworkers修正後に実データでは未再検証（「高速」「やや高速」および全ステージ強制実行プロファイルでの検証により、同じ仕組みを使う以上おそらく問題ないと判断しているが、実際のユーザー操作での確認は未実施）。
 
+### v0.1.0 checkpoint 65 (Claude) — ⑥出力：帳票をPython版と同じ5種の独立ファイルへ再構成
+
+ユーザーから「⑥について、出力されるファイルの列や配置なども含めてpython版と全く同じものにしてほしい。PDF版はとりあえずxlsxを変換したものでいい」との指示（①〜⑤の一連の作業キューの最後の項目）。
+
+**発見：アーキテクチャそのものがPython版と異なっていた。** Python版の⑥出力は`overall`（全体時間割）・`student_handouts`（生徒配布）・`teacher_handouts`（講師配布・学年順）・`teacher_packets`（講師配布・講師別、講師ごとに独立したfolder出力）・`issues`（未配置・警告一覧）の5種を、それぞれ独立した帳票として生成する（`src/summer_scheduler/reporting/builder.py`の`ReportKind`と`src/summer_scheduler/ui/viewmodels/output_view_model.py`の`_REPORT_OPTIONS`で確認）。一方、既存のC#実装は`時間割.xlsx`1本に全体時間割・配置一覧（Python版に対応が無いsheet）・生徒別・講師別・未配置警告のsheetを束ねていた。列見出しの前に、まずこの「何本のファイルに分けるか」自体を合わせる必要があると判断し、`ExcelScheduleReportRenderer`を5つの公開メソッド（`RenderOverall`/`RenderStudentHandouts`/`RenderTeacherHandouts`/`RenderTeacherPacket`/`RenderIssues`）へ全面的に書き直した。
+
+**実装:**
+- `ScheduleReport`モデルを拡張：`ProjectTitle`・`AcademicYear`・`SeasonName`・`GeneratedAtText`を追加（出力情報sheet・handoutページの帳票タイトル用）。`SlotLabels: IReadOnlyList<string>`を`SlotDefinitions: IReadOnlyList<SlotDefinition>`（`Label`/`Code`/`TimeRangeText`）へ置き換え（後述のバグ修正のため）。`Unassigned: IReadOnlyList<string>`を構造化した`UnassignedRequestRow`（生徒/科目/必要/配置済/不足/主な理由/解決候補/優先度/通常担当/1対1/備考）へ、`RegularTeacherShortfalls`を`WarningRow`（severity/issue type/日付/コマ/生徒/講師/内容/対応状況）へ置き換えた。
+- 新設`HandoutPageLayout`（`Layout/HandoutPageLayout.cs`）：Python版distribution_builder.pyの生徒個人calendarページ（9列A:I、月/曜日/日付見出し＋コマごとの週block、週全体が休校日の週は1行へ結合）を生成する共通レイアウト。生徒配布・講師配布（学年順）・講師配布（講師別）の3レポートが同じhandoutページ描画メソッド（`WriteStudentHandoutPage`）を共有し、`includeTeacher`フラグの有無だけで内容を出し分ける（Python版が3レポートとも同じ`_student_page`を共有しているのと同じ設計）。
+- `未配置一覧`/`警告一覧`をPython版issue_builder.pyと同じ列見出し・列順の2sheet構成へ刷新。未配置行の主な理由・解決候補は、`SqliteScheduleEditorService.GetUnplacedSessionsAsync`と同じ3段階診断（①科目を担当できる講師が未設定／②講師の空き時間・出勤可否の条件を満たすコマが無い／③生徒自身の他の授業と重なる）＋候補コマ列挙クエリを`SqliteOutputPackageService`側にも実装して生成（Python版は候補ごとに独立validatorで再検証するが、ここでは同じ候補生成条件を満たす具体的な日時・講師の組をそのまま提示する簡略版）。
+- 全体時間割は週ごとに`週_yyyyMMdd`sheetへ分割し、先頭に`出力情報`sheet（帳票名/校舎・講習/更新日時）を追加。`WriteOverviewWeekSheet`をコマ3行（学年／科目略称／生徒名を`TextRotation=255`で縦書き）×講師1名2列（同時最大2名まで横並び）の構成へ書き直し、末尾に凡例行を追加。
+- `IOutputPackageService.OutputPackageResult`を5帳票×Excel/PDF＋講師別folderのパスを個別に持つ形へ拡張し、`SqliteOutputPackageService.GenerateAsync`は5メソッドをすべて呼び出して一時folderへ書き出してから`Directory.Move`でatomicに確定する（従来の設計を維持）。`OutputPage`のファイル一覧表示も5帳票分＋講師別folderへ更新。
+
+**発見・修正したバグ（実データでの検証中に発見）:**
+1. 生徒名・学年の並び順が「高→小→中」という五十音の読み順になっていた（既定の文字列比較のため）。Python版`_GRADE_ORDER`（小1..小6 < 中1..中3 < 高1..高3）と同じ学年順にする`GradeOrdering.SortKey`を新設し、生徒配布・講師配布・欠席一覧すべての並び替えをこれに置き換えた。
+2. handoutページのコマ列見出しが「Zタイムタイム」のように「タイム」が二重になっていた。原因は、結合済みラベル文字列（`"Z 15:40-17:00"`）を空白で分割して先頭token=コード扱いしていたが、実データのTimeSlotは`DisplayName`と`Code`が別カラムで、`DisplayName`自体に既に用途表記が含まれるケースがあったため。`TimeSlot.Code`カラムを直接クエリして`ScheduleReport.SlotDefinitions`へ渡す方式に直し、文字列分割をやめた。
+
+**動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全125 tests passed（内訳は checkpoint 64 と同じ）。`SqliteOutputPackageServiceTests`を新しい5帳票構成に合わせて全面的に書き直した。さらに、使い捨てのテストクラス経由でscratchpad上に複製した実際のプロジェクトDB（生徒57名・講師34名・458件配置済み・未配置0件）に対して`GenerateAsync`を実行し、5帳票すべてのsheet名・列見出し・並び順・セル内容を確認した上で使い捨てテストとscratchpad上の複製データを削除した（実データはコミット・ログへ一切書き込んでいない）。アプリは再ビルド・再起動して起動確認済み。⑥出力画面でのボタン操作自体（実際のクリック→ファイル一覧表示）はユーザー側で改めて確認してほしい。
+
+**未対応・意図的な簡略化:**
+- Python版は休校日・範囲外の連続する列をセル結合で1つにまとめるが、本移植版は列ごとに同じ文言（「休校日」「指定範囲外」）を繰り返す簡略版のまま。
+- Python版の「補足の集団授業」sheet（全体時間割）は、本移植版に集団授業の概念自体が無いため対象外。
+- 警告一覧はPython版の汎用issue検知基盤（`project_validation_service`、severityやissue_typeを問わず様々な診断を蓄積する仕組み）が本移植版に無いため、現時点で検知できる「通常担当不足」のみを警告行として出力している。日程競合・定員超過等その他の診断種別は未移植（`FEATURE_PARITY.md`に明記済み）。
+- PDF版はユーザー指示により「とりあえずxlsxを変換したもの」の位置付けのまま据え置いた。列見出しやsheet構成はExcel版に合わせたが、9列handoutページの罫線・縦書き等の細かい書式までは作り込んでいない。PDFのはみ出し等の見た目の崩れは別途対応が必要（ユーザーも認識済み）。
+- 講師配布（講師別）の旧`担当一覧`sheet（通常担当/講習担当の2区分roster）はPython版に対応が無いため削除した。もし利便性の面で残したいという要望があれば、handoutページとは別に追加することを検討する。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`
