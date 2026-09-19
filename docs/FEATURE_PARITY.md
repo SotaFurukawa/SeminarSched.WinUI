@@ -6,8 +6,8 @@
 |---|---|---|---|---|
 | アプリ起動・version/About表示 | UI / release metadata | WinUI shell / assembly metadata | 実装済み | v0.0.0。UI実機確認は未完了 |
 | NavigationView業務導線 | QML workflow shell | ①設定〜⑥出力の6段階flow | 実装中 | ②〜④・⑥は未接続機能を明示する骨格 |
-| Home dashboard | workspace view model / QML | project作成・open・close・backup・restore・複製UI。最近使ったプロジェクト一覧に「表示しない」ボタンを追加し、`RecentProjectService.RemoveAsync`で明示的に非表示化できる | 実装中 | 非表示にした項目を後から再表示する機能はない（Python版もrecentから消すのみ） |
-| 新規project作成 | project service | 年度・講習区分・期間・開講日を持つWinUI schema v1 | 実装中 | SQLite整合性確認後にatomic move |
+| Home dashboard | workspace view model / QML | project作成・open・close・backup・restore・複製UI。最近使ったプロジェクト一覧に「表示しない」ボタンを追加し、`RecentProjectService.RemoveAsync`で明示的に非表示化できる。各行に「フォルダーを開く」ボタン（保存先folderをOSの既定エクスプローラーで開く）と、ファイルの実際の更新日時（`File.GetLastWriteTime`をその場で読み直す。アプリで最後に開いた日時ではなく、バックアップ復元等アプリの「開く」を経ない変更にも追従する）を追加表示 | 実装中 | 非表示にした項目を後から再表示する機能はない（Python版もrecentから消すのみ） |
+| 新規project作成 | project service | 年度・講習区分（春/夏/冬/その他、その他選択時は名称入力boxが出現し`CourseProjectDefinition.CustomSeasonName`としてTitleへ反映）・期間・開講日を持つWinUI schema v1。同名のプロジェクトファイルが既に存在する場合は、従来はエラーで作成を中止していたが、Explorerのファイル複製と同じ流儀で「(2)」「(3)」…を付けた空いている名前を自動的に探して保存し、警告（エラーではない）でその旨を通知するよう変更 | 実装中 | SQLite整合性確認後にatomic move |
 | `.jukuschedule` open | project service / SQLite | WinUI schema v1の検証付きread/open | 実装中 | Python版は直接変更せず、copy-first importを別途設計 |
 | 別名保存・複製 | project service | SQLite backup APIで検証付き複製を作成し、複製先へ切り替え | 実装済み | 元DB不変・上書き拒否を自動テスト |
 | 最近使用・非表示 | workspace view model | 最大10件の履歴・再open・欠損時自動除去・「表示しない」ボタンによる手動非表示 | 実装済み | |

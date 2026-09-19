@@ -60,8 +60,12 @@
                                     <StackPanel Spacing="2">
                                         <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
                                         <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{Binding Path}" TextWrapping="Wrap" />
+                                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" Text="{Binding LastModifiedText}" />
                                     </StackPanel>
-                                    <Button Grid.Column="1" VerticalAlignment="Center" Content="表示しない" Tag="{Binding Path}" Click="HideRecentProject_Click" />
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button Content="フォルダーを開く" Tag="{Binding Path}" Click="OpenRecentProjectFolder_Click" />
+                                        <Button Content="表示しない" Tag="{Binding Path}" Click="HideRecentProject_Click" />
+                                    </StackPanel>
                                 </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>
@@ -82,18 +86,21 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <DatePicker x:Name="AcademicYearPicker" Header="年度" DayVisible="False" MonthVisible="False" YearVisible="True" />
                         <ComboBox x:Name="SeasonBox" Grid.Column="1" Header="講習区分" SelectedIndex="1">
                             <ComboBoxItem Content="春期講習" Tag="1" />
                             <ComboBoxItem Content="夏期講習" Tag="2" />
                             <ComboBoxItem Content="冬期講習" Tag="3" />
+                            <ComboBoxItem Content="その他" Tag="4" />
                         </ComboBox>
                         <TextBox x:Name="GeneratedTitleBox" Grid.Column="2" Header="自動生成される名称" IsReadOnly="True" />
-                        <CalendarDatePicker x:Name="StartDatePicker" Grid.Row="1" Header="開始日" DateChanged="ProjectDefinition_Changed" />
-                        <CalendarDatePicker x:Name="EndDatePicker" Grid.Row="1" Grid.Column="1" Header="終了日" DateChanged="ProjectDefinition_Changed" />
+                        <TextBox x:Name="OtherSeasonNameBox" Grid.Row="1" Grid.Column="1" Header="講習区分の名称（その他を選択した場合）" Visibility="Collapsed" TextChanged="ProjectDefinition_Changed" />
+                        <CalendarDatePicker x:Name="StartDatePicker" Grid.Row="2" Header="開始日" DateChanged="ProjectDefinition_Changed" />
+                        <CalendarDatePicker x:Name="EndDatePicker" Grid.Row="2" Grid.Column="1" Header="終了日" DateChanged="ProjectDefinition_Changed" />
                         <Button
-                            Grid.Row="1"
+                            Grid.Row="2"
                             Grid.Column="2"
                             VerticalAlignment="Bottom"
                             Click="CreateProject_Click"
@@ -107,7 +114,7 @@
                         TextWrapping="Wrap" />
                     <TextBlock
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="一時SQLiteの作成と整合性確認に成功した場合だけ保存します。同名ファイルは上書きしません。"
+                        Text="一時SQLiteの作成と整合性確認に成功した場合だけ保存します。同名ファイルは上書きせず、「(2)」のように名前を変えて保存します。"
                         TextWrapping="Wrap" />
                 </StackPanel>
             </Border>

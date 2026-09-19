@@ -7,13 +7,15 @@ public sealed record CourseProjectDefinition
         CourseSeason season,
         DateOnly startDate,
         DateOnly endDate,
-        bool considerGroupLessons)
+        bool considerGroupLessons,
+        string? customSeasonName)
     {
         AcademicYear = academicYear;
         Season = season;
         StartDate = startDate;
         EndDate = endDate;
         ConsiderGroupLessons = considerGroupLessons;
+        CustomSeasonName = customSeasonName;
     }
 
     public int AcademicYear { get; }
@@ -28,14 +30,18 @@ public sealed record CourseProjectDefinition
     // オンの場合のみ③アンケート取込みに3.1/3.2（集団授業クラスの登録・受講登録）を表示する。
     public bool ConsiderGroupLessons { get; }
 
-    public string Title => $"{AcademicYear}{Season.ToJapaneseName()}";
+    // Season==Otherのときだけ意味を持つ、ホーム画面で入力する講習区分の名称。それ以外はnull。
+    public string? CustomSeasonName { get; }
+
+    public string Title => $"{AcademicYear}{(Season == CourseSeason.Other ? CustomSeasonName : Season.ToJapaneseName())}";
 
     public static CourseProjectDefinition Create(
         int academicYear,
         CourseSeason season,
         DateOnly startDate,
         DateOnly endDate,
-        bool considerGroupLessons = false)
+        bool considerGroupLessons = false,
+        string? customSeasonName = null)
     {
         if (academicYear is < 2000 or > 2200)
         {
@@ -45,6 +51,11 @@ public sealed record CourseProjectDefinition
         if (!Enum.IsDefined(season))
         {
             throw new ArgumentOutOfRangeException(nameof(season));
+        }
+
+        if (season == CourseSeason.Other)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(customSeasonName);
         }
 
         if (endDate < startDate)
@@ -57,6 +68,6 @@ public sealed record CourseProjectDefinition
             throw new ArgumentException("A course project cannot span more than 181 days.", nameof(endDate));
         }
 
-        return new CourseProjectDefinition(academicYear, season, startDate, endDate, considerGroupLessons);
+        return new CourseProjectDefinition(academicYear, season, startDate, endDate, considerGroupLessons, season == CourseSeason.Other ? customSeasonName!.Trim() : null);
     }
 }

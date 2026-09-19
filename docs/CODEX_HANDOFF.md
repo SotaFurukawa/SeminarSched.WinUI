@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.2.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 75（⑤品質スライダー目盛りの理論値inset化、集団授業クラス・受講登録機能の新規追加）。v0.2.0 Draft Release後の追加checkpointのため、次のリリース判断は本書「Next Version Rule」に従うこと。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
+Latest Development Checkpoint: checkpoint 76（新規project作成の同名衝突を警告＋自動リネームへ、最近使ったプロジェクトへフォルダーを開くボタン・最終更新日、講習区分「その他」）。v0.2.0 Draft Release後の追加checkpointのため、次のリリース判断は本書「Next Version Rule」に従うこと。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
 Latest Draft Release: `v0.2.0`（GitHub上にDraftとして作成済み。checkpoint 55〜73の内容をまとめてユーザーより「新しいバージョンとしてリリースしてほしい」との指示を受け作成。詳細は[docs/releases/v0.2.0.md](releases/v0.2.0.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -980,6 +980,18 @@ v0.2.0 Draft Release直後、ユーザーから「アンケート作成につい
 **動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全130 tests passed（既存126件は無修正で通過、新規4件追加）。アプリを`dotnet run`で再起動しログにcrash記録がないことを確認。
 
 **未対応・意図的にスコープ外:** 受講登録した集団授業の時間帯を④時間割編集・⑤時間割自動作成の制約（個別指導との二重予約回避）へは連携していない（今回はデータの登録機能のみが指示範囲のため）。Python版の`GroupLesson`が持つteacher/room/note/subjectといった付随フィールドや、Excelでの一括登録は移植していない。品質スライダーの目盛り位置・集団授業3.1/3.2の実際の見た目は、この環境からは視覚確認できないため実機での確認をお願いしたい。
+
+### v0.2.0 checkpoint 76 (Claude) — 新規project作成の同名衝突を警告＋自動リネームへ、最近使ったプロジェクトへフォルダーを開くボタン・最終更新日、講習区分「その他」
+
+ユーザーから3件。(1)「プロジェクトを新しく作る場合、同名のフォルダが作成されてしまう場合、エラーとして返すのではなく、(2)をつけておき、同名のフォルダがあったから(2)という名前にしているという警告にしてください」。(2)「最近使ったプロジェクトのディレクトリをエクスプローラーで開けるようにするボタン、また、最終更新日の記載を追加してほしい」。(3, ターン途中で追加）「講習区分について、その他を選択した場合にはその名称を入力させるボックスを用意してほしい」。実機ログ（`app-20260919.log`、21:26〜21:27）を確認したところ、まさにこの「同名のプロジェクトが既に存在します。上書きは行いません。」という`IOException`でユーザーの新規作成操作が2回連続で失敗していたことを確認し、今回の指摘の実際の発生状況を裏付けられた。
+
+**新規project作成の同名衝突（本checkpointの主要バグ修正）:** `HomePage.CreateProject_Click`に`ResolveUniqueProjectPath`を新設。保存先folder内に同名の`.jukuschedule`ファイルが既に存在する場合、Explorerのファイル複製と同じ流儀で`名前(2).jukuschedule`→`名前(3).jukuschedule`…と空いている名前を自動的に探し、そこへ保存する（`ProjectService.CreateAsync`/`SqliteProjectRepository.CreateAsync`側の「既に存在する場合は例外」というガード自体はそのまま残し、安全網として機能させる）。リネームが発生した場合は`InfoBarSeverity.Warning`（エラーではない）で「同名のプロジェクトファイルが既に存在したため名前を変更しました」と実際に保存したファイル名を表示する。project本体のTitle列（DB上の表示名）は変更しない、あくまでディスク上のファイル名だけの衝突回避である点に注意。
+
+**最近使ったプロジェクト:** 各行に「フォルダーを開く」ボタンを追加し、保存先folderをOSの既定エクスプローラーで開けるようにした（`QuestionnairePage`の「保存先を開く」等と同じ`Process.Start(UseShellExecute=true)`パターン）。また「最終更新日」を追加表示：`RecentProjectEntry.LastOpenedUtc`（このアプリで最後に「開く」操作をした日時）ではなく、ファイル自体の`File.GetLastWriteTime`をその場で読み直した値を使うようにした（バックアップ復元など、アプリの「開く」操作を経ない変更でも正しい値になるようにするため）。表示用の`RecentProjectRow`（`RecentProjectEntry`＋算出済み文字列）をHomePage内に新設し、`RecentProjectsList.ItemsSource`をこれへ差し替えた。
+
+**講習区分「その他」:** `CourseSeason`に`Other=4`を追加し、ホーム画面の講習区分`ComboBox`へ「その他」を追加。選択時のみ「講習区分の名称」`TextBox`（`OtherSeasonNameBox`）を表示し、`CourseProjectDefinition.Create`の新引数`customSeasonName`（Other選択時は必須、それ以外はnull）として渡す。`CourseProjectDefinition.Title`はOtherの場合`{年度}{CustomSeasonName}`を生成する（それ以外は従来通り`ToJapaneseName()`）。`CourseSeasonExtensions.ToJapaneseName()`のOtherケースは汎用fallbackとして「その他」を返すのみ（実際の名称はTitle列に保存済みの値が正）。⑥出力の`SqliteOutputPackageService`が個別に持つ`seasonName`という補助フィールド（`ToJapaneseName()`から再導出、帳票の一部にのみ使用）は、Other時は汎用の「その他」のまま据え置いた（`projectTitle`は別途DB保存済みの正しい値を使うため実害は小さいと判断）。
+
+**動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全132 tests passed（既存130件は無修正で通過、`CourseProjectDefinitionTests`に2件追加：Otherでの名称反映・名称未入力時のリジェクト）。アプリを`dotnet run`で再起動しログにcrash記録がないことを確認。3点とも実際の見た目・動作はこの環境からは視覚確認できないため、実機でユーザーに確認をお願いしたい。
 
 ### 次回最初に確認するファイル
 

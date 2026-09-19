@@ -144,14 +144,22 @@ public sealed partial class HomePage : Page
                 return;
             }
 
-            var path = Path.Combine(folder.Path, definition.Title + ProjectService.ProjectExtension);
+            var (path, renamed) = ResolveUniqueProjectPath(folder.Path, definition.Title);
             SetBusy(true);
             var summary = await App.ProjectService.CreateAsync(path, definition);
             var sharedRosterResult = await App.SharedRosterStore.CopyIntoProjectAsync(summary.Path);
             await App.RecentProjects.TouchAsync(summary.Path, summary.Title);
             RefreshCurrentProject();
             await RefreshRecentProjectsAsync();
-            ShowStatus(InfoBarSeverity.Success, "プロジェクトを作成しました", sharedRosterResult is null ? summary.Title : $"{summary.Title}（共通名簿から{sharedRosterResult.ImportedRows}行を反映）");
+            var detail = sharedRosterResult is null ? summary.Title : $"{summary.Title}（共通名簿から{sharedRosterResult.ImportedRows}行を反映）";
+            if (renamed)
+            {
+                ShowStatus(InfoBarSeverity.Warning, "同名のプロジェクトファイルが既に存在したため名前を変更しました", $"「{Path.GetFileNameWithoutExtension(path)}」として保存しました。{detail}");
+            }
+            else
+            {
+                ShowStatus(InfoBarSeverity.Success, "プロジェクトを作成しました", detail);
+            }
             App.Logger.Info("Project created");
         }
         catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException or SqliteException or InvalidDataException or InvalidOperationException)
@@ -206,10 +214,11 @@ public sealed partial class HomePage : Page
 
     private async void RecentProject_ItemClick(object sender, ItemClickEventArgs e)
     {
-        if (e.ClickedItem is not RecentProjectEntry entry)
+        if (e.ClickedItem is not RecentProjectRow row)
         {
             return;
         }
+        var entry = row.Entry;
 
         try
         {
@@ -250,12 +259,50 @@ public sealed partial class HomePage : Page
         }
     }
 
+    private void OpenRecentProjectFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string path }) return;
+        var directory = Path.GetDirectoryName(path);
+        if (directory is null) return;
+        try
+        {
+            Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+        }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or IOException)
+        {
+            ShowStatus(InfoBarSeverity.Error, "フォルダーを開けませんでした", exception.Message);
+        }
+    }
+
+    // 「最終更新日」はRecentProjectEntry.LastOpenedUtc（このアプリで最後に開いた日時）ではなく、
+    // ファイル自体の実際の更新日時をその場で読み直して表示する（バックアップ復元等アプリの
+    // 「開く」操作を経ない変更でも正しい値になるようにするため）。
+    private sealed record RecentProjectRow(RecentProjectEntry Entry, string LastModifiedText)
+    {
+        public string Title => Entry.Title;
+        public string Path => Entry.Path;
+    }
+
+    private static string BuildLastModifiedText(string path)
+    {
+        try
+        {
+            return File.Exists(path)
+                ? $"最終更新日: {File.GetLastWriteTime(path):yyyy-MM-dd HH:mm}"
+                : "最終更新日: 不明（ファイルが見つかりません）";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return "最終更新日: 不明";
+        }
+    }
+
     private async Task RefreshRecentProjectsAsync()
     {
         try
         {
             var entries = await App.RecentProjects.GetAsync();
-            RecentProjectsList.ItemsSource = entries;
+            RecentProjectsList.ItemsSource = entries.Select(entry => new RecentProjectRow(entry, BuildLastModifiedText(entry.Path))).ToArray();
             NoRecentProjectsText.Visibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -347,7 +394,37 @@ public sealed partial class HomePage : Page
         try{var picker=new FolderPicker(GetWindowId()){SuggestedFolder=ProjectService.DefaultProjectsDirectory};var folder=await picker.PickSingleFolderAsync();if(folder is null)return;var name=$"{current.Title}_copy_{DateTime.Now:yyyyMMdd_HHmmss}{ProjectService.ProjectExtension}";SetBusy(true);var copy=await App.ProjectService.SaveAsAsync(Path.Combine(folder.Path,name));await App.RecentProjects.TouchAsync(copy.Path,copy.Title);RefreshCurrentProject();await RefreshRecentProjectsAsync();ShowStatus(InfoBarSeverity.Success,"複製へ切り替えました",copy.Path);}catch(Exception ex)when(ex is IOException or UnauthorizedAccessException or InvalidDataException or SqliteException){ShowStatus(InfoBarSeverity.Error,"複製できませんでした",ex.Message);}finally{SetBusy(false);}
     }
 
-    private void ProjectDefinition_Changed(object? sender, object e) => RefreshGeneratedTitle();
+    // 同名のプロジェクトファイルが既に存在する場合、エラーで止めるのではなくExplorerのファイル
+    // 複製時と同じ流儀で「(2)」「(3)」…を付けた空いている名前を探す。project本体のTitle列は
+    // 変更しない（あくまでディスク上のファイル名だけの衝突回避）。
+    private static (string Path, bool Renamed) ResolveUniqueProjectPath(string folderPath, string baseTitle)
+    {
+        var candidate = Path.Combine(folderPath, baseTitle + ProjectService.ProjectExtension);
+        if (!File.Exists(candidate))
+        {
+            return (candidate, false);
+        }
+        for (var suffix = 2; ; suffix++)
+        {
+            var alternative = Path.Combine(folderPath, $"{baseTitle}({suffix}){ProjectService.ProjectExtension}");
+            if (!File.Exists(alternative))
+            {
+                return (alternative, true);
+            }
+        }
+    }
+
+    private void ProjectDefinition_Changed(object? sender, object e)
+    {
+        UpdateOtherSeasonNameVisibility();
+        RefreshGeneratedTitle();
+    }
+
+    private void UpdateOtherSeasonNameVisibility()
+    {
+        var isOther = (SeasonBox.SelectedItem as ComboBoxItem)?.Tag as string == "4";
+        OtherSeasonNameBox.Visibility = isOther ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     private CourseProjectDefinition BuildDefinition()
     {
@@ -367,7 +444,8 @@ public sealed partial class HomePage : Page
             (CourseSeason)seasonValue,
             DateOnly.FromDateTime(start.DateTime),
             DateOnly.FromDateTime(end.DateTime),
-            ConsiderGroupLessonsCheck.IsChecked==true);
+            ConsiderGroupLessonsCheck.IsChecked==true,
+            OtherSeasonNameBox.Text);
     }
 
     private void RefreshGeneratedTitle()
