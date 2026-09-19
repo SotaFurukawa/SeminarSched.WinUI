@@ -22,13 +22,15 @@
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Spacing="12">
                     <TextBlock FontSize="20" FontWeight="SemiBold" Text="最適化品質" />
-                    <StackPanel MaxWidth="760" HorizontalAlignment="Left" Spacing="0">
+                    <StackPanel Width="760" HorizontalAlignment="Left" Spacing="0">
                         <Grid ColumnSpacing="12">
                             <TextBlock Text="高速" />
                             <TextBlock HorizontalAlignment="Right" Text="最高品質" />
                         </Grid>
                         <Slider
                             x:Name="QualitySlider"
+                            Width="760"
+                            HorizontalAlignment="Left"
                             Minimum="1"
                             Maximum="5"
                             StepFrequency="1"

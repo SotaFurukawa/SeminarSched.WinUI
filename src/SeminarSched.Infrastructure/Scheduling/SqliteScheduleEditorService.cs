@@ -19,10 +19,13 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
             """;var result=new List<ScheduleAssignmentItem>();await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))result.Add(new ScheduleAssignmentItem(reader.GetInt64(0),reader.GetInt64(1),reader.GetInt64(2),reader.GetInt64(3),reader.GetInt64(4),reader.GetBoolean(5),reader.GetBoolean(6),reader.GetString(7),reader.GetString(8)));return result;
     }
 
-    public async Task AddManualAsync(string projectPath,long lessonRequestId,long teacherId,long openDateId,long timeSlotId,bool isLocked,CancellationToken cancellationToken=default)
+    public async Task AddManualAsync(string projectPath,long lessonRequestId,long teacherId,long openDateId,long timeSlotId,bool isLocked,bool confirmSoftWarnings=false,string? reason=null,CancellationToken cancellationToken=default)
     {
-        await new SqliteFixedLessonService().AddManualAsync(projectPath,lessonRequestId,teacherId,openDateId,timeSlotId,isLocked,cancellationToken).ConfigureAwait(false);
+        await new SqliteFixedLessonService().AddManualAsync(projectPath,lessonRequestId,teacherId,openDateId,timeSlotId,isLocked,confirmSoftWarnings,reason,cancellationToken).ConfigureAwait(false);
     }
+
+    public async Task<EditPreview> PreviewAddAsync(string projectPath,long lessonRequestId,long teacherId,long openDateId,long timeSlotId,CancellationToken cancellationToken=default)
+        => await new SqliteFixedLessonService().PreviewAddAsync(projectPath,lessonRequestId,teacherId,openDateId,timeSlotId,cancellationToken).ConfigureAwait(false);
 
     public async Task RemoveManualAsync(string projectPath,long assignmentId,CancellationToken cancellationToken=default)
     {

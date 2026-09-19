@@ -153,7 +153,10 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
     {
         if (PreconfirmRequest.SelectedItem is not LessonRequestOption request || PreconfirmTeacher.SelectedItem is not TeacherOption teacher || PreconfirmSlot.SelectedItem is not ScheduleSlotOption slot)
         { ShowEditorError("生徒・科目、担当講師、日付・コマを選択してください。"); return; }
-        await ExecuteEditorAsync(async () => await App.ScheduleEditor.AddManualAsync(App.ProjectService.Current!.Path, request.Id, teacher.Id, slot.OpenDateId, slot.TimeSlotId, true), "事前確定として固定しました");
+        var path = App.ProjectService.Current!.Path;
+        var (proceed, confirmSoftWarnings, reason) = await ResolveAddPreviewAsync(path, request.Id, teacher.Id, slot.OpenDateId, slot.TimeSlotId);
+        if (!proceed) return;
+        await ExecuteEditorAsync(async () => await App.ScheduleEditor.AddManualAsync(path, request.Id, teacher.Id, slot.OpenDateId, slot.TimeSlotId, true, confirmSoftWarnings, reason), "事前確定として固定しました");
     }
 
     private async Task ReloadBoardDatesAsync(string path)
@@ -352,7 +355,9 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
             else if (text.StartsWith("request:", StringComparison.Ordinal))
             {
                 var id = long.Parse(text.AsSpan("request:".Length), CultureInfo.InvariantCulture);
-                await ExecuteEditorAsync(() => App.ScheduleEditor.AddManualAsync(path, id, cell.TeacherId, dateId, cell.TimeSlotId, false), "手動配置を追加しました");
+                var (proceed, confirmSoftWarnings, reason) = await ResolveAddPreviewAsync(path, id, cell.TeacherId, dateId, cell.TimeSlotId);
+                if (!proceed) return;
+                await ExecuteEditorAsync(() => App.ScheduleEditor.AddManualAsync(path, id, cell.TeacherId, dateId, cell.TimeSlotId, false, confirmSoftWarnings, reason), "手動配置を追加しました");
             }
         }
         finally { deferral.Complete(); }
@@ -387,7 +392,10 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
     private async void AddManual_Click(object sender,RoutedEventArgs e)
     {
         if(ManualRequest.SelectedItem is not LessonRequestOption request||ManualTeacher.SelectedItem is not TeacherOption teacher||ManualSlot.SelectedItem is not ScheduleSlotOption slot){ShowEditorError("受講希望・講師・日時を選択してください。");return;}
-        await ExecuteEditorAsync(async()=>await App.ScheduleEditor.AddManualAsync(App.ProjectService.Current!.Path,request.Id,teacher.Id,slot.OpenDateId,slot.TimeSlotId,ManualLocked.IsChecked==true),"手動配置を追加しました");
+        var path=App.ProjectService.Current!.Path;
+        var(proceed,confirmSoftWarnings,reason)=await ResolveAddPreviewAsync(path,request.Id,teacher.Id,slot.OpenDateId,slot.TimeSlotId);
+        if(!proceed)return;
+        await ExecuteEditorAsync(async()=>await App.ScheduleEditor.AddManualAsync(path,request.Id,teacher.Id,slot.OpenDateId,slot.TimeSlotId,ManualLocked.IsChecked==true,confirmSoftWarnings,reason),"手動配置を追加しました");
     }
     private async void RemoveManual_Click(object sender,RoutedEventArgs e)
     {
@@ -440,6 +448,45 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
             Content = panel,
             PrimaryButtonText = "変更する",
             CloseButtonText = "キャンセル",
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return (false, false, null);
+        return (true, true, string.IsNullOrWhiteSpace(reasonBox.Text) ? null : reasonBox.Text);
+    }
+
+    // 手動配置（ドラッグ配置・フォーム配置・事前確定の3経路すべて）の実行前にgreen/yellow/red判定を行う。
+    // ユーザー要望：条件を満たさない場合に即ブロックするのではなく、警告文を出してyes/noで選ばせたい。
+    // redは物理的に成立しない配置（受講希望/コマが無効・必要回数を配置済み・生徒の二重配置）のみで、
+    // 指導可能科目・出勤/出席可否・講師の同時担当上限はyellow（確認の上で配置可）へ倒す。
+    private async Task<(bool Proceed,bool ConfirmSoftWarnings,string? Reason)> ResolveAddPreviewAsync(string path,long requestId,long teacherId,long openDateId,long timeSlotId)
+    {
+        EditPreview preview;
+        try
+        {
+            preview = await App.ScheduleEditor.PreviewAddAsync(path, requestId, teacherId, openDateId, timeSlotId);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            ShowEditorError(ex.Message);
+            return (false, false, null);
+        }
+        if (preview.Decision == EditDecision.Red)
+        {
+            ShowEditorError(preview.Message);
+            return (false, false, null);
+        }
+        if (preview.Decision == EditDecision.Green) return (true, false, null);
+
+        var reasonBox = new TextBox { PlaceholderText = "配置理由（任意・監査ログへ保存）" };
+        var panel = new StackPanel { Spacing = 8 };
+        panel.Children.Add(new TextBlock { Text = "△ " + preview.Message, TextWrapping = TextWrapping.Wrap });
+        panel.Children.Add(reasonBox);
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "条件を満たしていませんが配置しますか？",
+            Content = panel,
+            PrimaryButtonText = "はい（配置する）",
+            CloseButtonText = "いいえ",
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return (false, false, null);
         return (true, true, string.IsNullOrWhiteSpace(reasonBox.Text) ? null : reasonBox.Text);

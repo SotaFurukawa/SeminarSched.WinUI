@@ -915,6 +915,25 @@ checkpoint 65はPython版のソースコード（`reporting/*_builder.py`）を�
 
 **未対応・既知の制約:** タスクバーのオレンジバッジはWindowsのオーバーレイアイコン機能（16x16、単色円）であり、`SetProgressState`の緑色進捗バーとは別物として表示される（進捗バー自体はPausedのような色止め表示ではなく完了と同時に消える設計にした）。
 
+### v0.1.0 checkpoint 72 (Claude) — アプリアイコンをPython版と統一、④手動配置をwarn-and-confirm方式へ、⑤スライダー幅を再修正
+
+ユーザーから3件。「アイコンをpython版と同じにしてもらえますか」「手動配置のときに、条件を満たしていない場合は、置けないようにするのではなく、警告文を出してyes noで選ばせる形式にしたい」「品質のバーは長さが変わっていません（checkpoint71時点でも未解消）」。
+
+**アプリアイコン:** Python版のアイコン一式（`seminarSched/src/summer_scheduler/resources/app_icon.ico`・`app_icon.png`、1024x1024マスター）をWinUI版の`Assets/`へ丸ごと置き換えた。`AppIcon.ico`はPython版のicoファイルをそのままコピー（10サイズ埋め込み済み）。パッケージ用の各PNG（`Square150x150Logo`・`Square44x44Logo`・`StoreLogo`・`Wide310x150Logo`・`SplashScreen`・`LockScreenLogo`等）は、既存ファイルの実寸法をPNG IHDRチャンクから確認した上で、使い捨てのC#コンソールプロジェクト（`System.Drawing.Common`、`<UseWindowsForms>true</UseWindowsForms>`）でPython版マスター画像から高品質リサイズして再生成した（正方形はそのまま拡縮、ワイド系は`Package.appxmanifest`の`BackgroundColor="transparent"`に合わせ透明背景に中央配置）。生成後、使い捨てプロジェクトは削除済み。
+
+**④手動配置のwarn-and-confirm化（本checkpointの主要作業）:** これまで`AddManualAsync`（手動配置・事前確定・ドラッグ配置がいずれも内部で使用）は、講師の資格・出勤可否・担当上限のいずれかを満たさない場合に即座に`InvalidOperationException`で配置を拒否していた。今回、既存の`MoveAsync`が使っているGreen/Yellow/Red判定（`EditPreview`/`SoftWarningConfirmationRequiredException`）と同じ仕組みを追加側にも拡張し、次の分類にした。
+- **Red（従来どおり即拒否・確認なし）:** リクエスト・コマ自体が不正、必要回数を超えて既に配置済み、同じ生徒が同じ日時に重複。いずれも物理的に不可能なケース。
+- **Yellow（警告文＋はい/いいえで確認可）:** 講師がその科目を担当可能に未設定、生徒または講師がその日時に参加できない設定、講師の同時担当人数上限（2人）超過。
+- 新設: `SqliteFixedLessonService.PreviewAddAsync`/`BuildAddPreviewAsync`（`PreviewMoveAsync`と同じ、コミットしないtransactionで判定）。`AddManualAsync`に`confirmSoftWarnings`・`reason`引数を追加（`MoveAsync`と同じ形）。
+- UI側（`ScheduleEditorPage.xaml.cs`）に`ResolveAddPreviewAsync`を新設（`ResolveMovePreviewAsync`と同型）。事前確定ボタン・手動配置ボタン・ドラッグ&ドロップ配置（`Cell_Drop`の`"request:"`分岐）の3箇所すべてで、実際の配置前にこのpreviewを呼び、Yellowなら`ContentDialog`（警告文＋任意の理由入力欄）で「はい（配置する）/いいえ」を確認してから`confirmSoftWarnings:true`で再実行するようにした。
+- 対象は**手動配置（新規追加）のみ**とし、ドラッグ移動（`MoveAsync`）側の既存の確認方式は変更していない（ユーザーの発言「手動配置のときに」を移動と区別して解釈）。
+- 内部的には`EnsureTeacherCanTeachAsync`（旧・即throw版）を削除し、真偽値を返す`IsTeacherQualifiedAsync`/`IsAvailableAsync`/`IsWithinTeacherCapacityAsync`をpreview・実処理の両方から共有する形にリファクタリングした。`MoveAsync`が使う既存のthrow版ラッパー（`EnsureAvailabilityAsync`・`EnsureTeacherCapacityAsync`）はそのまま残し、移動側の挙動は変えていない。
+- 既存テスト`SqliteFixedLessonServiceTests.AddManualAsync_OneToOneLesson_ConsumesBothTeacherSeats`は、2人目の配置が講師上限超過でRedからYellowへ変わったため、期待する例外を`InvalidOperationException`から`SoftWarningConfirmationRequiredException`へ修正し、`confirmSoftWarnings:true`で再実行すると実際に2件目が配置されることを確認するassertionを追加した。他の`AddManualAsync`呼び出しテストはすべて資格あり・出勤可・上限内のGreenケースのままで影響なし。
+
+**⑤品質スライダー再修正:** checkpoint70で`StackPanel`に`MaxWidth="760"`を指定したが、ユーザーから「長さが変わっていない」との報告。`MaxWidth`は`Stretch`する子要素への伝播が不確実なため、`StackPanel`・`Slider`の両方に明示的な`Width="760"`を指定する形へ変更した（より強制力のある指定）。
+
+**動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全126 tests passed（`SqliteFixedLessonServiceTests`の期待例外変更を含む）。アプリを再ビルド・起動確認済み（ログにcrash記録なし）。アイコンの実際の見た目、スライダーの幅、Yellow警告ダイアログの表示・はい/いいえの動作は、いずれもこの環境からは視覚確認できないため、引き続き実機でのユーザー確認をお願いしたい。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

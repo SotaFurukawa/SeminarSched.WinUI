@@ -95,7 +95,8 @@ public sealed class SoftWarningConfirmationRequiredException(EditPreview preview
 public interface IScheduleEditorService
 {
     Task<IReadOnlyList<ScheduleAssignmentItem>> GetAssignmentsAsync(string projectPath, CancellationToken cancellationToken = default);
-    Task AddManualAsync(string projectPath, long lessonRequestId, long teacherId, long openDateId, long timeSlotId, bool isLocked, CancellationToken cancellationToken = default);
+    Task AddManualAsync(string projectPath, long lessonRequestId, long teacherId, long openDateId, long timeSlotId, bool isLocked, bool confirmSoftWarnings = false, string? reason = null, CancellationToken cancellationToken = default);
+    Task<EditPreview> PreviewAddAsync(string projectPath, long lessonRequestId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken = default);
     Task RemoveManualAsync(string projectPath, long assignmentId, CancellationToken cancellationToken = default);
     Task SetLockedAsync(string projectPath, long assignmentId, bool isLocked, CancellationToken cancellationToken = default);
     Task ResetAutomaticAsync(string projectPath, CancellationToken cancellationToken = default);
