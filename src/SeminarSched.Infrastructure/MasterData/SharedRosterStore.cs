@@ -75,6 +75,25 @@ public sealed class SharedRosterStore : ISharedRosterStore
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
+    public async Task<GradeAdvancementSummary> AdvanceStudentGradesAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureDatabaseAsync(cancellationToken).ConfigureAwait(false);
+        var students = await _masterData.GetStudentsAsync(_databasePath, includeInactive: false, cancellationToken).ConfigureAwait(false);
+        var advanced = 0; var graduated = 0;
+        foreach (var student in students)
+        {
+            var (grade, becameGraduate) = GradeAdvancement.Advance(student.Grade);
+            if (grade == student.Grade) continue;
+            var updated = new Student(student.Id, student.ExternalId, student.Name, grade, student.DefaultMaxConsecutiveSlots, student.AllowGap, student.Note, active: becameGraduate ? false : student.Active);
+            await _masterData.SaveStudentAsync(_databasePath, updated, cancellationToken).ConfigureAwait(false);
+            advanced++;
+            if (becameGraduate) graduated++;
+        }
+        // 次に「Excelで編集」を開いたとき、繰り上げ後の最新の内容から再生成させる。
+        if (File.Exists(WorkbookPath)) File.Delete(WorkbookPath);
+        return new GradeAdvancementSummary(advanced, graduated);
+    }
+
     private async Task EnsureDatabaseAsync(CancellationToken cancellationToken)
     {
         if (File.Exists(_databasePath)) return;

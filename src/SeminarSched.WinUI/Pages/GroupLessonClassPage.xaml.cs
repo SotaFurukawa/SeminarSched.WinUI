@@ -181,7 +181,7 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
             var row = new Grid { ColumnSpacing = 2 };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var text = new TextBlock { Text = $"{session.ClassName} {session.TimeRangeLabel}", FontSize = 10, TextWrapping = TextWrapping.Wrap };
+            var text = new TextBlock { Text = $"{session.ClassName} {session.ClassSubject} {session.TimeRangeLabel}", FontSize = 10, TextWrapping = TextWrapping.Wrap };
             var deleteButton = new Button { Content = "×", FontSize = 10, Padding = new Thickness(4, 0, 4, 0), Tag = session.Id };
             deleteButton.Click += DeleteSession_Click;
             Grid.SetColumn(deleteButton, 1);

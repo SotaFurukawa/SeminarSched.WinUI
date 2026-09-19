@@ -11,6 +11,10 @@ namespace SeminarSched.Infrastructure.MasterData;
 /// </summary>
 internal static class SharedRosterWorkbookWriter
 {
+    // 在籍=FALSE（既卒等で使用しない生徒・講師）の行をグレー表示にし、一覧上で「この行は使わない」
+    // ことが一目で分かるようにする。
+    private static readonly XLColor InactiveRowFill = XLColor.FromHtml("#D9D9D9");
+
     public static void Write(
         string path,
         IReadOnlyList<Student> students,
@@ -31,7 +35,9 @@ internal static class SharedRosterWorkbookWriter
         foreach (var value in students)
         {
             var (surname, given) = SplitName(value.Name);
-            SetRow(student, studentRow++, value.Active ? "TRUE" : "FALSE", value.ExternalId, surname, given, value.Name, value.Grade, value.DefaultMaxConsecutiveSlots, value.AllowGap ? "あり" : "なし", value.Note);
+            SetRow(student, studentRow, value.Active ? "TRUE" : "FALSE", value.ExternalId, surname, given, value.Name, value.Grade, value.DefaultMaxConsecutiveSlots, value.AllowGap ? "あり" : "なし", value.Note);
+            if (!value.Active) student.Row(studentRow).Style.Fill.BackgroundColor = InactiveRowFill;
+            studentRow++;
         }
 
         var teacher = workbook.AddWorksheet("講師");
@@ -40,7 +46,9 @@ internal static class SharedRosterWorkbookWriter
         foreach (var value in teachers)
         {
             var (surname, given) = SplitName(value.Name);
-            SetRow(teacher, teacherRow++, value.Active ? "TRUE" : "FALSE", value.ExternalId, surname, given, value.Name, value.AllowGap ? "あり" : "なし", value.Note);
+            SetRow(teacher, teacherRow, value.Active ? "TRUE" : "FALSE", value.ExternalId, surname, given, value.Name, value.AllowGap ? "あり" : "なし", value.Note);
+            if (!value.Active) teacher.Row(teacherRow).Style.Fill.BackgroundColor = InactiveRowFill;
+            teacherRow++;
         }
 
         var subject = workbook.AddWorksheet("科目");

@@ -4,11 +4,11 @@ namespace SeminarSched.Application.GroupLessons;
 
 public sealed record GroupLessonCalendarDate(long OpenDateId, DateOnly Date);
 
-// 3.1のカレンダー1マスに表示する1件（クラス名・時刻帯）。時刻はTimeSlotに縛られない自由入力。
-public sealed record GroupLessonSessionOption(long Id, long ClassId, string ClassName, long OpenDateId, TimeOnly StartTime, TimeOnly EndTime)
+// 3.1のカレンダー1マスに表示する1件（クラス名・科目・時刻帯）。時刻はTimeSlotに縛られない自由入力。
+public sealed record GroupLessonSessionOption(long Id, long ClassId, string ClassName, string ClassSubject, long OpenDateId, TimeOnly StartTime, TimeOnly EndTime)
 {
     public string TimeRangeLabel => $"{StartTime:HH\\:mm}～{EndTime:HH\\:mm}";
-    public override string ToString() => $"{ClassName}　{TimeRangeLabel}";
+    public override string ToString() => $"{ClassName}　{ClassSubject}　{TimeRangeLabel}";
 }
 
 public sealed record GroupLessonEnrollmentCandidate(long StudentId, string ExternalId, string Name, string Grade, bool Enrolled)

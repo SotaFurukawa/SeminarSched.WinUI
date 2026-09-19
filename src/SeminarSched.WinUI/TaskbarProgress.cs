@@ -5,10 +5,8 @@ namespace SeminarSched_WinUI;
 /// <summary>
 /// Windowsタスクバーのアプリアイコンに、⑤時間割自動作成の進行状況を反映する。緑の進捗バーは
 /// <c>ITaskbarList3.SetProgressState/SetProgressValue</c>（標準COM、追加パッケージ不要）。完了通知は
-/// <c>SetProgressState</c>の既定色（緑/赤/黄）だけでは「オレンジ」を表現できないため、代わりに
-/// <c>SetOverlayIcon</c>でオレンジの丸バッジをタスクバーアイコンへ重ね描きする（アイコンは実行時に
-/// AND/XORマスクから直接生成し、追加の画像アセットは不要）。バッジはこのウィンドウがフォアグラウンドへ
-/// 戻った時点（<see cref="MainWindow"/>の<c>Activated</c>）でクリアする。
+/// <c>FlashWindowEx</c>によるタスクバーボタンの点滅のみを使う（オーバーレイアイコンによる常駐バッジは
+/// ユーザー指示により廃止済み。点滅はユーザーがウィンドウをフォアグラウンドへ戻すと自動的に止まる）。
 /// </summary>
 internal static class TaskbarProgress
 {
@@ -20,27 +18,13 @@ internal static class TaskbarProgress
         taskbar.SetProgressValue(hwnd, (ulong)Math.Clamp(percent, 0, 100), 100);
     }
 
-    public static void Clear(IntPtr hwnd)
-    {
-        var taskbar = GetTaskbar();
-        taskbar?.SetProgressState(hwnd, TbpFlag.NoProgress);
-        taskbar?.SetOverlayIcon(hwnd, IntPtr.Zero, "");
-    }
+    public static void Clear(IntPtr hwnd) => GetTaskbar()?.SetProgressState(hwnd, TbpFlag.NoProgress);
 
     public static void NotifyCompleted(IntPtr hwnd)
     {
-        var taskbar = GetTaskbar();
-        if (taskbar is not null)
-        {
-            // 進捗バー自体はここで終了（緑は「実行中」だけの意味にする）。完了はオレンジのバッジで示す。
-            taskbar.SetProgressState(hwnd, TbpFlag.NoProgress);
-            var icon = CreateOrangeBadgeIcon();
-            if (icon != IntPtr.Zero)
-            {
-                taskbar.SetOverlayIcon(hwnd, icon, "時間割の自動作成が完了しました");
-                DestroyIcon(icon);
-            }
-        }
+        // 進捗バー自体はここで終了する（緑は「実行中」だけの意味にする）。完了はタスクバーボタンの
+        // 点滅だけで示し、常駐するオーバーレイバッジは表示しない（ユーザー指示）。
+        GetTaskbar()?.SetProgressState(hwnd, TbpFlag.NoProgress);
         var info = new FlashWInfo
         {
             CbSize = (uint)Marshal.SizeOf<FlashWInfo>(),
@@ -50,45 +34,6 @@ internal static class TaskbarProgress
             Timeout = 0,
         };
         FlashWindowEx(ref info);
-    }
-
-    /// <summary>ウィンドウがフォアグラウンドへ戻ったときに呼び、通知目的だけのオレンジバッジを消す。</summary>
-    public static void ClearCompletionBadge(IntPtr hwnd) => GetTaskbar()?.SetOverlayIcon(hwnd, IntPtr.Zero, "");
-
-    // AND/XORマスクから16x16の円形バッジアイコンを生成する。CreateIconの1bit ANDマスク＋32bit XORマスクは
-    // どのWindowsバージョンでも確実に透過が効く古典的な方式（アルファ付きアイコン専用のCreateIconIndirect等
-    // より依存が少ない）。色はDarkOrange(#FF8C00)。
-    private static IntPtr CreateOrangeBadgeIcon()
-    {
-        const int size = 16;
-        const int andRowBytes = size / 8;
-        var and = new byte[andRowBytes * size];
-        var xor = new byte[size * size * 4];
-        const double center = (size - 1) / 2.0;
-        const double radius = size / 2.0 - 0.5;
-        for (var y = 0; y < size; y++)
-        {
-            for (var x = 0; x < size; x++)
-            {
-                var dx = x - center; var dy = y - center;
-                var inside = dx * dx + dy * dy <= radius * radius;
-                var xorOffset = (y * size + x) * 4;
-                if (inside)
-                {
-                    xor[xorOffset + 0] = 0x00; // B
-                    xor[xorOffset + 1] = 0x8C; // G
-                    xor[xorOffset + 2] = 0xFF; // R  -> #FF8C00 DarkOrange
-                    xor[xorOffset + 3] = 0xFF; // A
-                }
-                else
-                {
-                    var andByteIndex = y * andRowBytes + x / 8;
-                    var bit = 7 - (x % 8);
-                    and[andByteIndex] |= (byte)(1 << bit);
-                }
-            }
-        }
-        return CreateIcon(IntPtr.Zero, size, size, 1, 32, and, xor);
     }
 
     private static ITaskbarList3? _instance;
@@ -167,10 +112,4 @@ internal static class TaskbarProgress
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool FlashWindowEx(ref FlashWInfo pwfi);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern IntPtr CreateIcon(IntPtr hInstance, int nWidth, int nHeight, byte cPlanes, byte cBitsPixel, byte[] lpbAndBits, byte[] lpbXorBits);
-
-    [DllImport("user32.dll")]
-    private static extern bool DestroyIcon(IntPtr icon);
 }

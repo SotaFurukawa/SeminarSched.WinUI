@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using SeminarSched.Application;
 using SeminarSched.Application.Output;
+using SeminarSched.Domain.MasterData;
 using SeminarSched.Domain.Projects;
 using SeminarSched.Reporting.Models;
 using SeminarSched.Reporting.Renderers;
@@ -114,7 +115,7 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
         var openDates=new List<DateOnly>();await using(var q=c.CreateCommand()){q.CommandText="SELECT Date FROM OpenDate WHERE IsOpen=1 ORDER BY Date;";await using var r=await q.ExecuteReaderAsync(token);while(await r.ReadAsync(token))openDates.Add(DateOnly.Parse(r.GetString(0)));}
         var slotDefinitions=new List<SlotDefinition>();await using(var q=c.CreateCommand()){q.CommandText="SELECT Code,DisplayName,StartTime,EndTime FROM TimeSlot WHERE Active=1 ORDER BY SortOrder;";await using var r=await q.ExecuteReaderAsync(token);while(await r.ReadAsync(token)){var code=r.GetString(0);var displayName=r.GetString(1);var start=r.GetString(2);var end=r.GetString(3);slotDefinitions.Add(new($"{displayName} {start}-{end}",code,start,end));}}
         var rows=new List<ScheduleReportRow>();await using(var q=c.CreateCommand()){q.CommandText="""
-            SELECT d.Date,ts.DisplayName||' '||ts.StartTime||'-'||ts.EndTime,s.Name,s.Grade,sub.DisplayName,COALESCE(NULLIF(sub.ShortName,''),sub.DisplayName),t.Name,a.IsLocked,
+            SELECT d.Date,ts.DisplayName||' '||ts.StartTime||'-'||ts.EndTime,s.Name,s.Grade,sub.DisplayName,sub.ShortName,sub.Code,t.Name,a.IsLocked,
                    CASE WHEN a.TeacherId=COALESCE(r.RegularTeacherId,p.RegularTeacherId) THEN 1 ELSE 0 END
             FROM Assignment a
             JOIN LessonRequest r ON r.Id=a.LessonRequestId
@@ -125,7 +126,7 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
             JOIN TimeSlot ts ON ts.Id=a.TimeSlotId
             LEFT JOIN RegularLessonProfile p ON p.ProjectId=r.ProjectId AND p.StudentId=r.StudentId AND p.SubjectId=r.SubjectId
             ORDER BY d.Date,ts.SortOrder,s.ExternalId;
-            """;await using var r=await q.ExecuteReaderAsync(token);while(await r.ReadAsync(token))rows.Add(new(r.GetString(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4),r.GetString(5),r.GetString(6),r.GetBoolean(7),r.GetBoolean(8)));}
+            """;await using var r=await q.ExecuteReaderAsync(token);while(await r.ReadAsync(token))rows.Add(new(r.GetString(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4),SubjectAbbreviation.Resolve(r.GetString(4),r.GetString(5),r.GetString(6)),r.GetString(7),r.GetBoolean(8),r.GetBoolean(9)));}
 
         var unassigned=await LoadUnassignedRequestsAsync(c,token);
         var absent=new List<AbsentStudent>();await using(var q=c.CreateCommand()){q.CommandText="SELECT s.Grade,s.Name FROM Student s WHERE s.Active=1 AND NOT EXISTS(SELECT 1 FROM LessonRequest r WHERE r.StudentId=s.Id) ORDER BY s.ExternalId;";await using var r=await q.ExecuteReaderAsync(token);while(await r.ReadAsync(token))absent.Add(new(r.GetString(0),r.GetString(1)));}
@@ -137,9 +138,16 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
             JOIN TimeSlot ts ON ts.Id=u.TimeSlotId
             JOIN Teacher t ON t.Id=u.TeacherId;
             """;await using var r=await q.ExecuteReaderAsync(token);while(await r.ReadAsync(token))unavailabilities.Add(new(r.GetString(0),r.GetString(1),r.GetString(2)));}
+        var groupLessonAttendances=new List<GroupLessonAttendance>();await using(var q=c.CreateCommand()){q.CommandText="""
+            SELECT s.Name,d.Date,sess.StartTime,sess.EndTime
+            FROM GroupLessonEnrollment e
+            JOIN GroupLessonSession sess ON sess.ClassId=e.ClassId
+            JOIN Student s ON s.Id=e.StudentId
+            JOIN OpenDate d ON d.Id=sess.OpenDateId;
+            """;await using var r=await q.ExecuteReaderAsync(token);while(await r.ReadAsync(token))groupLessonAttendances.Add(new(r.GetString(0),DateOnly.Parse(r.GetString(1)),TimeOnly.ParseExact(r.GetString(2),"HH:mm",System.Globalization.CultureInfo.InvariantCulture),TimeOnly.ParseExact(r.GetString(3),"HH:mm",System.Globalization.CultureInfo.InvariantCulture)));}
 
         var generatedAtText=$"{DateTime.Now:yyyy/MM/dd HH:mm}／アプリ {ApplicationVersion.FromAssembly(typeof(SqliteOutputPackageService).Assembly).DisplayVersion}";
-        return new(projectTitle,academicYear,seasonName,generatedAtText,startDate,endDate,openDates,slotDefinitions,rows,unassigned,absent,warnings,unavailabilities);
+        return new(projectTitle,academicYear,seasonName,generatedAtText,startDate,endDate,openDates,slotDefinitions,rows,unassigned,absent,warnings,unavailabilities,groupLessonAttendances);
     }
 
     /// <summary>
@@ -155,7 +163,7 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
         await using(var q=c.CreateCommand())
         {
             q.CommandText="""
-                SELECT r.Id,st.Name,COALESCE(NULLIF(su.ShortName,''),su.DisplayName),r.RequiredSessions,COUNT(a.Id),
+                SELECT r.Id,st.Name,su.DisplayName,su.ShortName,su.Code,r.RequiredSessions,COUNT(a.Id),
                        COALESCE(NULLIF(r.RegularTeacherPriority,1),p.RegularTeacherPriority,1),te.Name,r.OneToOneRequired,r.Note,r.SubjectId
                 FROM LessonRequest r
                 JOIN Student st ON st.Id=r.StudentId
@@ -168,7 +176,7 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
                 """;
             await using var reader=await q.ExecuteReaderAsync(token);
             while(await reader.ReadAsync(token))
-                baseRows.Add((reader.GetInt64(0),reader.GetString(1),reader.GetString(2),reader.GetInt32(3),reader.GetInt32(4),reader.GetInt32(5),reader.IsDBNull(6)?null:reader.GetString(6),reader.GetBoolean(7),reader.GetString(8),reader.GetInt64(9)));
+                baseRows.Add((reader.GetInt64(0),reader.GetString(1),SubjectAbbreviation.Resolve(reader.GetString(2),reader.GetString(3),reader.GetString(4)),reader.GetInt32(5),reader.GetInt32(6),reader.GetInt32(7),reader.IsDBNull(8)?null:reader.GetString(8),reader.GetBoolean(9),reader.GetString(10),reader.GetInt64(11)));
         }
 
         var qualifiedSubjects=new HashSet<long>();
@@ -246,7 +254,7 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
         var warnings=new List<WarningRow>();
         await using var q=c.CreateCommand();
         q.CommandText="""
-            SELECT s.Name,COALESCE(NULLIF(sub.ShortName,''),sub.DisplayName),te.Name,r.RequiredSessions,
+            SELECT s.Name,sub.DisplayName,sub.ShortName,sub.Code,te.Name,r.RequiredSessions,
                    COALESCE(NULLIF(r.RegularTeacherPriority,1),p.RegularTeacherPriority,1) AS priority,
                    (SELECT COUNT(*) FROM Assignment a WHERE a.LessonRequestId=r.Id AND a.TeacherId=COALESCE(r.RegularTeacherId,p.RegularTeacherId)) AS actual
             FROM LessonRequest r
@@ -261,8 +269,8 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
         await using var reader=await q.ExecuteReaderAsync(token);
         while(await reader.ReadAsync(token))
         {
-            var student=reader.GetString(0);var subject=reader.GetString(1);var teacher=reader.GetString(2);
-            var required=reader.GetInt32(3);var priority=reader.GetInt32(4);var actual=reader.GetInt32(5);
+            var student=reader.GetString(0);var subject=SubjectAbbreviation.Resolve(reader.GetString(1),reader.GetString(2),reader.GetString(3));var teacher=reader.GetString(4);
+            var required=reader.GetInt32(5);var priority=reader.GetInt32(6);var actual=reader.GetInt32(7);
             var target=Math.Max(0,((priority-1)*required+3)/4);
             if(actual<target)warnings.Add(new("警告","通常担当不足",null,null,student,teacher,$"{subject}：通常担当{teacher}　目標{target}回中{actual}回","未対応"));
         }

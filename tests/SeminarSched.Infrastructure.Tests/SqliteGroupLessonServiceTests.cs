@@ -60,7 +60,7 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
 
         await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(17,10),new TimeOnly(18,30));
         var session=Assert.Single(await service.GetAllSessionsAsync(state.Path));
-        Assert.Equal(state.DateId,session.OpenDateId);Assert.Equal(cls.Name,session.ClassName);Assert.Equal("17:10～18:30",session.TimeRangeLabel);
+        Assert.Equal(state.DateId,session.OpenDateId);Assert.Equal(cls.Name,session.ClassName);Assert.Equal(cls.Subject,session.ClassSubject);Assert.Equal("17:10～18:30",session.TimeRangeLabel);
 
         // 同じクラス・日付・時刻帯を再度追加しても無視され、エラーにも重複にもならない。
         await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(17,10),new TimeOnly(18,30));

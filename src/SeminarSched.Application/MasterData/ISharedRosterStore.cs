@@ -23,4 +23,11 @@ public interface ISharedRosterStore
 
     /// <summary>共通正本の現在の内容を、指定したプロジェクトへ反映する。共通正本が空なら何もしない。</summary>
     Task<SharedRosterImportResult?> CopyIntoProjectAsync(string projectPath, CancellationToken cancellationToken = default);
+
+    /// <summary>新しい季節講習を迎える際に、在籍中の生徒全員の学年をまとめて1つ繰り上げる。
+    /// 高3だった生徒は既卒として在籍を停止する（グレー表示・使用しない扱いになる）。</summary>
+    Task<GradeAdvancementSummary> AdvanceStudentGradesAsync(CancellationToken cancellationToken = default);
 }
+
+/// <summary>学年繰り上げ操作の結果件数。</summary>
+public sealed record GradeAdvancementSummary(int AdvancedCount, int GraduatedCount);

@@ -1,9 +1,11 @@
 using ClosedXML.Excel;
 using Microsoft.Data.Sqlite;
 using SeminarSched.Domain.CourseSettings;
+using SeminarSched.Domain.GroupLessons;
 using SeminarSched.Domain.MasterData;
 using SeminarSched.Domain.Projects;
 using SeminarSched.Infrastructure.CourseSettings;
+using SeminarSched.Infrastructure.GroupLessons;
 using SeminarSched.Infrastructure.MasterData;
 using SeminarSched.Infrastructure.Output;
 using SeminarSched.Infrastructure.Projects;
@@ -334,6 +336,71 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         // 編集していない項目（タイトルのフォント名等）は既定値のまま維持される。
         var titleFontRow=secondStyleSheet.CellsUsed().First(cell=>cell.Address.ColumnNumber==1&&cell.GetString()=="タイトル文字のフォント名").Address.RowNumber;
         Assert.Equal("BIZ UDPMincho Medium",secondStyleSheet.Cell(titleFontRow,2).GetString());
+    }
+
+    [Fact]
+    public async Task GenerateAsync_StudentAttendingGroupLesson_ShowsBlackGroupLessonCellOnHandout()
+    {
+        // ユーザー指示: 集団授業を受講する生徒の集団授業がある時間帯は、個別指導ページ上でも
+        // そのマス目を黒塗り・白文字「集団」で表示する（全体時間割は変更不要、個別のページのみ対象）。
+        Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"group-lesson-overlay.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,21)));
+        var m=new SqliteMasterDataRepository();
+        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));
+        var teacher=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 講師"));
+        var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));
+        var course=new SqliteCourseSettingsRepository();
+        var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));
+        await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
+        await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,21),true,"",[slot.Id]));
+        long openDate2Id;
+        await using(var c=new SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            await c.OpenAsync();
+            await using(var q=c.CreateCommand()){q.CommandText=$"INSERT INTO LessonRequest(Id,ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,1,{student.Id},{sub.Id},1);INSERT INTO Assignment(Id,LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source) SELECT 1,1,{teacher.Id},d.Id,{slot.Id},0,'test' FROM OpenDate d WHERE d.Date='2026-07-20';";await q.ExecuteNonQueryAsync();}
+            await using(var q=c.CreateCommand()){q.CommandText="SELECT Id FROM OpenDate WHERE Date='2026-07-21';";openDate2Id=(long)(await q.ExecuteScalarAsync())!;}
+        }
+
+        var groupLessons=new SqliteGroupLessonService();
+        var groupClass=await groupLessons.SaveClassAsync(path,new GroupLessonClass(0,"中2A","中2","理科"));
+        await groupLessons.AddSessionsAsync(path,groupClass.Id,[openDate2Id],new TimeOnly(9,0),new TimeOnly(10,0));
+        await groupLessons.SetEnrollmentAsync(path,groupClass.Id,student.Id,true);
+
+        var result=await new SqliteOutputPackageService().GenerateAsync(path,_directory);
+        using var studentHandouts=new XLWorkbook(result.StudentHandoutsExcelPath);
+        var handoutSheet=studentHandouts.Worksheet("中2_架空 生徒");
+
+        var individualCell=handoutSheet.CellsUsed().Single(cell=>cell.GetString()=="数");
+        Assert.NotEqual(XLColor.Black,individualCell.Style.Fill.BackgroundColor);
+
+        var groupCell=handoutSheet.CellsUsed().Single(cell=>cell.GetString()=="集団");
+        Assert.Equal(XLColor.Black,groupCell.Style.Fill.BackgroundColor);
+        Assert.Equal(XLColor.White,groupCell.Style.Font.FontColor);
+        Assert.NotEqual(individualCell.Address,groupCell.Address);
+
+        // 全体時間割は変更不要（既存仕様のまま。集団授業のセルが紛れ込んでいないことを確認）。
+        using var overall=new XLWorkbook(result.OverallExcelPath);
+        var overallWeek=overall.Worksheets.First(ws=>ws.Name.StartsWith("週_",StringComparison.Ordinal));
+        Assert.DoesNotContain(overallWeek.CellsUsed(),cell=>cell.GetString()=="集団");
+    }
+
+    [Fact]
+    public async Task GenerateAsync_SubjectWithoutExplicitShortName_StillUsesOneCharacterAbbreviation()
+    {
+        // ユーザー指示: 科目の略称（一文字）はPython版と同様、Subject.ShortNameが未入力でも
+        // 表示名からきちんと一文字の略称になっている必要がある（フルネームへフォールバックしない）。
+        Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"subject-abbreviation.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20)));
+        var m=new SqliteMasterDataRepository();var st=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));var te=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 講師"));
+        var sub=await m.SaveSubjectAsync(path,new Subject(0,"ENG","英語","","中学",1)); // ShortName未入力
+        var course=new SqliteCourseSettingsRepository();var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
+        await using(var c=new SqliteConnection($"Data Source={path};Pooling=False")){await c.OpenAsync();await using var q=c.CreateCommand();q.CommandText=$"INSERT INTO LessonRequest(Id,ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,1,{st.Id},{sub.Id},1);INSERT INTO Assignment(Id,LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source) SELECT 1,1,{te.Id},d.Id,{slot.Id},0,'test' FROM OpenDate d LIMIT 1;";await q.ExecuteNonQueryAsync();}
+
+        var result=await new SqliteOutputPackageService().GenerateAsync(path,_directory);
+        using var studentHandouts=new XLWorkbook(result.StudentHandoutsExcelPath);
+        var handoutCells=studentHandouts.Worksheet("中2_架空 生徒").CellsUsed().Select(cell=>cell.GetString()).ToArray();
+        Assert.Contains(handoutCells,text=>text=="英");
+        Assert.DoesNotContain(handoutCells,text=>text=="英語");
     }
 
     public void Dispose(){if(Directory.Exists(_directory))Directory.Delete(_directory,true);}

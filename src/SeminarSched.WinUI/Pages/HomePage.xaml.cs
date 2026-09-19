@@ -118,6 +118,35 @@ public sealed partial class HomePage : Page
         finally { SetBusy(false); }
     }
 
+    // 新しい季節講習を迎える際に、共通名簿（年度をまたぐ正本）の生徒学年をまとめて繰り上げる。
+    // 現在開いているプロジェクトへは自動反映しない（進行中のprojectを意図せず書き換えないため。
+    // 反映したい場合は既存の「作成した基本情報を反映」を別途使う）。
+    private async void AdvanceGrades_Click(object sender, RoutedEventArgs e)
+    {
+        var confirm = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "学年を一括で繰り上げますか？",
+            Content = "共通名簿に登録されている在籍中の生徒全員の学年を1つ繰り上げます。高3の生徒は既卒として在籍を停止します（一覧ではグレー表示・チェックなしになります）。この操作は元に戻せません。",
+            PrimaryButtonText = "繰り上げる",
+            CloseButtonText = "キャンセル",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+
+        try
+        {
+            SetBusy(true);
+            var result = await App.SharedRosterStore.AdvanceStudentGradesAsync();
+            ShowStatus(InfoBarSeverity.Success, "学年を繰り上げました", $"繰り上げ{result.AdvancedCount}名（うち既卒{result.GraduatedCount}名）");
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SqliteException)
+        {
+            ShowStatus(InfoBarSeverity.Error, "学年を繰り上げられませんでした", exception.Message);
+        }
+        finally { SetBusy(false); }
+    }
+
     private static string BuildSharedRosterPreviewSummary(SharedRosterPreview preview)
     {
         var lines = new List<string> { "シート                         件数" };

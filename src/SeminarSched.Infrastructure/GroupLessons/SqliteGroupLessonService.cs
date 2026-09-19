@@ -71,14 +71,14 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT s.Id,s.ClassId,c.Name,s.OpenDateId,s.StartTime,s.EndTime
+            SELECT s.Id,s.ClassId,c.Name,c.Subject,s.OpenDateId,s.StartTime,s.EndTime
             FROM GroupLessonSession s JOIN GroupLessonClass c ON c.Id=s.ClassId
             ORDER BY s.OpenDateId,s.StartTime;
             """;
         var result = new List<GroupLessonSessionOption>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            result.Add(new GroupLessonSessionOption(reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2), reader.GetInt64(3), TimeOnly.ParseExact(reader.GetString(4), "HH:mm", System.Globalization.CultureInfo.InvariantCulture), TimeOnly.ParseExact(reader.GetString(5), "HH:mm", System.Globalization.CultureInfo.InvariantCulture)));
+            result.Add(new GroupLessonSessionOption(reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2), reader.GetString(3), reader.GetInt64(4), TimeOnly.ParseExact(reader.GetString(5), "HH:mm", System.Globalization.CultureInfo.InvariantCulture), TimeOnly.ParseExact(reader.GetString(6), "HH:mm", System.Globalization.CultureInfo.InvariantCulture)));
         return result;
     }
 

@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.3.1 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 80（Inno SetupラッパーによるSetup.exe追加、GitHub Releaseへの`.msix`/`.cer`/Setup.exe添付）。v0.3.1 Draft Release後の追加checkpointのため、次のリリース判断は本書「Next Version Rule」に従うこと。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」は実験的機能であり、実機確認の結果次第で採用・廃止が未確定（本書「9. 現在の既知の未実装・保留事項」参照）。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。
+Latest Development Checkpoint: checkpoint 81（3.1表示に科目追加、共通名簿の学年一括繰り上げ、集団授業の個別ページ黒塗り表示、科目略称fallback修正、タスクバーバッジ廃止）。v0.3.1 Draft Release後の追加checkpointのため、次のリリース判断は本書「Next Version Rule」に従うこと。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」は実験的機能であり、実機確認の結果次第で採用・廃止が未確定（本書「9. 現在の既知の未実装・保留事項」参照）。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81の変更はいずれも実機での視覚確認待ち（ユーザー実機でアプリが起動中だったため、この開発機からの再起動確認は見送った）。
 Latest Draft Release: `v0.3.1`（GitHub上にDraftとして作成済み。checkpoint 78〜79の内容をまとめてユーザーより「そうした不備以外のところが実装できたら新たにドラフトリリースしてほしい」との指示を受け作成。詳細は[docs/releases/v0.3.1.md](releases/v0.3.1.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -1076,6 +1076,24 @@ v0.3.1のDraft Release作成後、ユーザーから「Draft Releaseにインス
 **Draft Releaseへの反映:** v0.3.1のDraft Releaseへ`SeminarSched.WinUI-Setup-0.3.1.exe`を追加アップロード（既存の`.msix`/`.cer`はそのまま残し、上級者向けの代替手段として維持）。
 
 **動作確認:** 上記の通りInstall/Launch/Uninstallの一連の流れを実機で確認済み。C#側のコード変更は無いため`dotnet build`/`dotnet test`への影響は無し。
+
+### v0.3.1 checkpoint 81 (Claude) — 集団授業クラス表示に科目追加、学年一括繰り上げ、集団授業の個別ページ表示、科目略称fallback、タスクバーバッジ廃止
+
+ユーザーから5件の指摘・要望を受けた（3.1の表示、学年繰り上げ、集団授業の個別ページ連携、科目略称、タスクバー通知）。
+
+**3.1カレンダーの表示にクラス自体の科目を追加:** 「クラス+時間」だったカレンダーセル内の表示を「クラス+科目+時間」へ変更。`GroupLessonSessionOption`に`ClassSubject`を追加し、`SqliteGroupLessonService.GetAllSessionsAsync`のJOIN先`GroupLessonClass.Subject`を選択するよう変更、`GroupLessonClassPage.BuildDayCell`の表示文字列を更新した。
+
+**共通名簿に「学年を一括で繰り上げる」機能を追加:** 「基本情報作成時の学年は、春期講習からは1つ上として扱われる（例: 中2→新中3）」という運用に対応。`GradeAdvancement`（新規、`Domain.MasterData`）が小1→...→高3→既卒の順で1段階進める変換を提供し、高3の次は既卒（`GraduateGrade`定数）として扱う。`ISharedRosterStore.AdvanceStudentGradesAsync`が共通名簿（年度をまたぐ正本）の在籍中の生徒全員へこれを適用し、既卒になった生徒は`Active=false`（在籍停止）にする。ホーム画面の共通名簿カードへ「学年を一括で繰り上げる」ボタンを追加（確認ダイアログ付き、元に戻せない旨を明示）。**現在開いているプロジェクトへは自動反映しない**設計とした（進行中のprojectを意図せず書き換えないため。反映したい場合は既存の「作成した基本情報を反映」を別途使う）。また、`SharedRosterWorkbookWriter`の生徒・講師シートで在籍=FALSEの行をグレー(#D9D9D9)塗りつぶしにし、「この行は使わない」ことが一目で分かるようにした（ユーザーから「既卒はチェックマークのないグレー表示にしてほしい、これは以前からの仕様のはず」との指摘に対応。この視覚化自体はこのcheckpointで新規追加したものであり、既卒という学年表記自体はPython版のtest fixtureに存在していた既存概念）。
+
+**集団授業を受講する生徒の個別ページに黒塗り「集団」表示を追加:** 「集団授業を受講する生徒の集団授業がある時間帯は、個別指導ページ上でもそのマス目を黒塗り・白文字『集団』にしてほしい。全体時間割は変更不要」との指示。`ScheduleReport`に`GroupLessonAttendances`（生徒名・日付・開始/終了時刻）を追加し、`SqliteOutputPackageService.LoadAndValidate`で`GroupLessonEnrollment`⋈`GroupLessonSession`⋈`Student`から取得するクエリを追加した。`ExcelScheduleReportRenderer.WriteStudentHandoutPage`（生徒配布・講師配布・講師別packetの3種すべてが共有する1メソッド）で、対象生徒の集団授業日時を日付ごとの辞書にし、各コマのセルを描画する際にコマの時間帯（`SlotDefinition.StartTimeText`/`EndTimeText`）と重なる集団授業が無いか判定、重なる場合はそのセルを個別授業の内容の代わりに黒塗り・白文字「集団」で上書きする（集団授業の開始・終了はコマに縛られない自由入力のため、コマ丸ごとではなく時間帯の重なりで判定する。もし個別授業も同じセルに配置されていた場合は集団授業側を優先表示する＝個別スケジューリングは集団授業との重複を考慮しない設計のため、視覚的に矛盾を目立たせる意図もある）。全体時間割（`WriteOverviewWeekSheet`）は指示通り変更していない。PDF側も対象外（xlsxのみの指示だったため）。
+
+**科目略称（一文字）がShortName未入力時にフルネームへfallbackしていた不具合を修正:** ユーザーから「科目の短縮形はPython版にあるはず」との指摘。Python版`domain/defaults.py`の`default_subject_short_name`（Subject.Codeをキーにした辞書＋「表示名の最終1文字」という3段階fallback）を調査した上で、本アプリ向けに`SubjectAbbreviation`（新規、`Domain.MasterData`）としてfallbackアルゴリズムを移植した。本アプリの`Subject.Code`は自由入力でPython版の命名規約（`JH_MATH`等）と一致する保証が無いため、辞書はCodeではなく**表示名のキーワード部分一致**（「数学」→「数」、「英語」→「英」等、Python版の辞書が対応していた科目を網羅）で判定し、一致しなければ「・」を除いた表示名の最終1文字、それも無ければCodeの先頭1文字、最後に「科」という同じ3段階fallbackにした。従来`COALESCE(NULLIF(ShortName,''),DisplayName)`（ShortName空ならフルネームへfallback）だった`SqliteOutputPackageService`の3箇所と`SqliteScheduleEditorService`の1箇所すべてを、生の`DisplayName`/`ShortName`/`Code`を取得した上で`SubjectAbbreviation.Resolve`を呼ぶ形へ置き換えた。
+
+**タスクバーのオレンジ丸バッジを廃止:** 「出力完了時のオレンジ点滅は良いが、右下のオレンジ丸バッジは不要」との指摘。`TaskbarProgress.NotifyCompleted`から`SetOverlayIcon`によるバッジ表示（`CreateOrangeBadgeIcon`で生成していた常駐アイコン）を削除し、`FlashWindowEx`によるタスクバーボタンの点滅のみを残した（点滅はウィンドウがフォアグラウンドに戻ると自動的に止まる）。バッジ専用だった`ClearCompletionBadge`・`CreateOrangeBadgeIcon`・関連P/Invoke（`CreateIcon`/`DestroyIcon`）と、`MainWindow`の`Activated`購読を削除した。
+
+**新規/更新テスト:** `MasterDataTests`に`GradeAdvancement`（6ケース）・`SubjectAbbreviation`（6ケース+明示ShortName優先の1ケース）を追加。`SharedRosterStoreTests.AdvanceStudentGradesAsync_AdvancesActiveStudentsAndGraduatesHigh3`（3名の生徒で繰り上げ・既卒化・在籍停止済み生徒が対象外になることを検証）を追加。`SqliteOutputPackageServiceTests`に`GenerateAsync_StudentAttendingGroupLesson_ShowsBlackGroupLessonCellOnHandout`（個別授業と集団授業を別日に配置し、集団授業側のセルだけが黒塗り「集団」になり全体時間割には現れないことを検証）と`GenerateAsync_SubjectWithoutExplicitShortName_StillUsesOneCharacterAbbreviation`を追加。`SqliteGroupLessonServiceTests`の既存テストへ`ClassSubject`の検証を追加。`dotnet test`全152 tests passed（既存149件は無修正で通過）。
+
+**未対応・実機確認が必要:** 3.1カレンダー表示・学年繰り上げボタンの実際の見た目、集団授業の黒塗りセルの実際の見た目、タスクバー点滅（バッジ無し）の実際の挙動は、いずれもこの環境からは視覚確認できない。またユーザーの実機で`SeminarSched.WinUI`プロセスが起動中だったため（開発機で本checkpointの動作確認のためのアプリ再起動は行わなかった。ユーザーが作業中の可能性を考慮し、プロセスを強制終了しなかった）、今回の変更を反映するには手動での再起動が必要。
 
 ### 次回最初に確認するファイル
 

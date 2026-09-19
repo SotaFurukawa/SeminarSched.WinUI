@@ -22,6 +22,7 @@
                         <Button Click="EditSharedRoster_Click" Content="Excelで基本情報を編集" Style="{StaticResource AccentButtonStyle}" />
                         <Button Click="NewSharedRosterTemplate_Click" Content="新規で基本情報を作成" />
                         <Button Click="ImportSharedRoster_Click" Content="作成した基本情報を反映" />
+                        <Button Click="AdvanceGrades_Click" Content="学年を一括で繰り上げる" />
                     </StackPanel>
                     <TextBlock x:Name="SharedRosterPathText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                 </StackPanel>

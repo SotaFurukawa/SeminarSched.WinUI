@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using SeminarSched.Application.Scheduling;
+using SeminarSched.Domain.MasterData;
 using SeminarSched.Infrastructure.Projects;
 
 namespace SeminarSched.Infrastructure.Scheduling;
@@ -183,14 +184,14 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
         await using(var command=connection.CreateCommand())
         {
             command.CommandText="""
-                SELECT r.Id,st.Name,st.Grade,COALESCE(NULLIF(su.ShortName,''),su.DisplayName),r.RequiredSessions-COUNT(a.Id) AS remaining
+                SELECT r.Id,st.Name,st.Grade,su.DisplayName,su.ShortName,su.Code,r.RequiredSessions-COUNT(a.Id) AS remaining
                 FROM LessonRequest r JOIN Student st ON st.Id=r.StudentId JOIN Subject su ON su.Id=r.SubjectId
                 LEFT JOIN Assignment a ON a.LessonRequestId=r.Id
                 GROUP BY r.Id HAVING remaining>0 ORDER BY st.ExternalId;
                 """;
             await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                rows.Add((reader.GetInt64(0),reader.GetString(1),reader.GetString(2),reader.GetString(3),reader.GetInt32(4)));
+                rows.Add((reader.GetInt64(0),reader.GetString(1),reader.GetString(2),SubjectAbbreviation.Resolve(reader.GetString(3),reader.GetString(4),reader.GetString(5)),reader.GetInt32(6)));
         }
 
         var slotsByRequest=await GetAvailableSlotCodesForDateAsync(connection,openDateId,cancellationToken).ConfigureAwait(false);

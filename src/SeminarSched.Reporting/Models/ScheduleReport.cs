@@ -22,6 +22,10 @@ public sealed record UnassignedRequestRow(string Student,string Subject,int Requ
 /// <summary>Python版issue_builder.pyの警告一覧1行。現時点のC#は通常担当不足のみを検知できるため、そこから生成する。</summary>
 public sealed record WarningRow(string Severity,string IssueType,string? Date,string? Slot,string Student,string Teacher,string Content,string Status);
 
+/// <summary>生徒が集団授業を受講する日時（開始・終了は自由入力でコマに縛られない）。個別指導の
+/// 生徒配布ページ上で、この時間帯を黒塗り「集団」表示にするために使う。</summary>
+public sealed record GroupLessonAttendance(string Student,DateOnly Date,TimeOnly StartTime,TimeOnly EndTime);
+
 public sealed record ScheduleReport(
     string ProjectTitle,
     int AcademicYear,
@@ -35,7 +39,8 @@ public sealed record ScheduleReport(
     IReadOnlyList<UnassignedRequestRow> UnassignedRequests,
     IReadOnlyList<AbsentStudent> AbsentStudents,
     IReadOnlyList<WarningRow> Warnings,
-    IReadOnlyList<TeacherUnavailabilityCell> TeacherUnavailabilities)
+    IReadOnlyList<TeacherUnavailabilityCell> TeacherUnavailabilities,
+    IReadOnlyList<GroupLessonAttendance> GroupLessonAttendances)
 {
     public IReadOnlyList<string> SlotLabels { get; } = SlotDefinitions.Select(s => s.Label).ToArray();
 }

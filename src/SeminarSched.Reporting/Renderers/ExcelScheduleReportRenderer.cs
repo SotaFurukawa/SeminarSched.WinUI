@@ -182,6 +182,10 @@ public sealed class ExcelScheduleReportRenderer
         var lessonTextByDateSlot = rows.ToDictionary(x => (DateOnly.Parse(x.Date), x.TimeSlot), string (x) => includeTeacher ? $"{x.SubjectShortName}　{teacherLabels[x.Teacher]}" : x.SubjectShortName);
         var weeks = HandoutPageLayout.Build(report.StartDate, report.EndDate, report.OpenDates.ToHashSet(), report.SlotLabels, lessonTextByDateSlot);
         var slotDefinitionsByLabel = report.SlotDefinitions.ToDictionary(s => s.Label);
+        // 集団授業を受講する生徒については、その時間帯を個別指導ページ上でも黒塗り「集団」表示にする
+        // （集団授業の開始・終了はコマに縛られない自由入力のため、コマの時間帯と重なるかで判定する）。
+        var groupLessonsByDate = report.GroupLessonAttendances.Where(x => x.Student == student)
+            .GroupBy(x => x.Date).ToDictionary(g => g.Key, g => g.Select(x => (x.StartTime, x.EndTime)).ToArray());
 
         var row = 7;
         foreach (var week in weeks)
@@ -221,11 +225,22 @@ public sealed class ExcelScheduleReportRenderer
             foreach (var slotRow in week.SlotRows)
             {
                 var slotDefinition = slotDefinitionsByLabel[slotRow.SlotLabel];
+                var slotStart = TimeOnly.ParseExact(slotDefinition.StartTimeText, "HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+                var slotEnd = TimeOnly.ParseExact(slotDefinition.EndTimeText, "HH:mm", System.Globalization.CultureInfo.InvariantCulture);
                 sheet.Cell(row, 1).Value = $"{slotDefinition.Code}タイム"; sheet.Cell(row, 2).Value = slotDefinition.TimeRangeText;
                 for (var i = 0; i < 7; i++)
                 {
                     if (week.Days[i].Kind != HandoutDayKind.Open) continue;
-                    var lessonCell = sheet.Cell(row, 3 + i); lessonCell.Value = slotRow.LessonTextByDay[i] ?? ""; lessonCell.Style.Font.FontSize = settings.HeaderFontSize;
+                    var lessonCell = sheet.Cell(row, 3 + i);
+                    var hasGroupLesson = groupLessonsByDate.TryGetValue(week.Days[i].Date, out var sessions) && sessions.Any(s => s.StartTime < slotEnd && slotStart < s.EndTime);
+                    if (hasGroupLesson)
+                    {
+                        lessonCell.Value = "集団";
+                        lessonCell.Style.Fill.BackgroundColor = XLColor.Black;
+                        lessonCell.Style.Font.FontColor = XLColor.White;
+                    }
+                    else lessonCell.Value = slotRow.LessonTextByDay[i] ?? "";
+                    lessonCell.Style.Font.FontSize = settings.HeaderFontSize;
                 }
                 row++;
             }
