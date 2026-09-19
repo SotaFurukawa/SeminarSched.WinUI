@@ -934,6 +934,23 @@ checkpoint 65はPython版のソースコード（`reporting/*_builder.py`）を�
 
 **動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全126 tests passed（`SqliteFixedLessonServiceTests`の期待例外変更を含む）。アプリを再ビルド・起動確認済み（ログにcrash記録なし）。アイコンの実際の見た目、スライダーの幅、Yellow警告ダイアログの表示・はい/いいえの動作は、いずれもこの環境からは視覚確認できないため、引き続き実機でのユーザー確認をお願いしたい。
 
+### v0.1.0 checkpoint 73 (Claude) — ④「配置一覧」「自動作成の差分」の生徒ID非表示・日付連動・詳細情報追加
+
+checkpoint72完了後、ユーザーから「④時間割編集のcard周りの修正を続けてほしい（生徒ID非表示・カード詳細情報・日付連動一覧・配置可能コマのヒント）」との指示。checkpoint67は未配置一覧カードのみが対象で、同じ画面内の他の場所に同種の問題が残っていたため、まず調査してユーザーに対象箇所を確認してから着手した。
+
+**見つかった残課題:** 「事前確定・配置一覧・手動配置（通常は使いません）」Expander内の配置一覧（`GetAssignmentsAsync`が返す`ScheduleAssignmentItem.Label`）と、「自動作成の差分」カード（`GetLabelSetAsync`が返す`ScheduleLabelSet.RequestLabels`）の両方が、ラベル文字列に生徒の`ExternalId`をそのまま埋め込んでいた（例:「S-001 架空 生徒」）。また配置一覧はプロジェクト全体の配置を日付を問わず一括表示しており、未配置一覧・盤面のように選択中の日付へ絞り込まれていなかった。
+
+**実装:**
+- `SqliteScheduleEditorService.GetAssignmentsAsync`のSQLから`st.ExternalId||' '||`を除去し、代わりにPython版のカード詳細フォーマット（`_card_dict`の`f"{student_name}（{grade}） / {subject_name}"`）に合わせて`st.Name||'（'||st.Grade||'）'`（学年を括弧書き）を追加。さらに`'第'||a.SessionIndex||'回　'`をラベル先頭へ追加し、何回目のコマかも分かるようにした。講師側の`te.ExternalId||' '||te.Name`はこのアプリの既存の慣例（講師IDは常に表示）に合わせそのまま残した。
+- `GetAssignmentsAsync`に`long? openDateId = null`引数を追加（既定nullは従来どおりフィルタなし。既存テストは全て単一引数呼び出しのため無変更で動作）。日付が指定された場合のみ`WHERE a.OpenDateId=$date`を適用。
+- `GetLabelSetAsync`のRequestLabels構築SQLからも同様に`st.ExternalId||' '||`を除去し、`st.Name||'（'||st.Grade||'） / '||su.DisplayName`へ変更（「自動作成の差分」カードの生徒ラベルにも反映される）。
+- `ScheduleEditorPage.xaml.cs`: 配置一覧の初期読み込み（`ReloadEditorAsync`、日付未選択時点）を廃止し、`ReloadBoardAsync`（日付選択・盤面再読込のたびに呼ばれる、未配置一覧と同じタイミング）内で`GetAssignmentsAsync(path, date.Id)`を呼ぶよう変更。これにより配置一覧が常に「日別グリッド編集」で選択中の日付のものだけに絞られる。日付未選択時は`UnplacedList`と同様`Assignments.ItemsSource = null`。
+- 配置一覧セクションの説明文に「下の一覧は上の『日別グリッド編集』で選択中の日付の配置だけを表示します。」を追記。
+
+**動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全126 tests passed（`GetAssignmentsAsync`の新しい`openDateId`引数はすべて省略可能なため既存テストは無修正で通過。`GetLabelSetAsync_ResolvesRequestTeacherDateAndSlotLabels`はExternalIdの有無を検証していなかったため無修正で通過）。アプリを再ビルド・起動確認済み（ログにcrash記録なし）。実際の見た目（ラベルの表示内容・日付切替時の一覧の絞り込み）はユーザー側で確認をお願いしたい。
+
+**未対応・意図的にスコープ外:** 事前確定・手動配置の生徒選択ComboBox（`ManualRequest`/`PreconfirmRequest`、`SqliteFixedLessonService.GetRequestsAsync`）はもともと`ExternalId`を含んでいなかったため対象外。配置可能コマのヒント（`AvailableSlotCodes`相当）は未配置一覧に限定される概念（既に配置済みのカードには「配置可能な別のコマ」という情報は無い）と判断し、配置一覧・差分カードへは追加していない。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

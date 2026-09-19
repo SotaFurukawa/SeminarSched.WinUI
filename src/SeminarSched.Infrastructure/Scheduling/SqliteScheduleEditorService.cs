@@ -8,15 +8,23 @@ namespace SeminarSched.Infrastructure.Scheduling;
 
 public sealed class SqliteScheduleEditorService : IScheduleEditorService
 {
-    public async Task<IReadOnlyList<ScheduleAssignmentItem>> GetAssignmentsAsync(string projectPath, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ScheduleAssignmentItem>> GetAssignmentsAsync(string projectPath, long? openDateId = null, CancellationToken cancellationToken = default)
     {
         await using var connection=await OpenAsync(projectPath,cancellationToken).ConfigureAwait(false);await SqliteProjectSchema.EnsureCurrentAsync(connection,cancellationToken).ConfigureAwait(false);
-        await using var command=connection.CreateCommand();command.CommandText="""
+        await using var command=connection.CreateCommand();command.CommandText=(openDateId is null?"""
             SELECT a.Id,a.LessonRequestId,a.TeacherId,a.OpenDateId,a.TimeSlotId,a.IsLocked,a.IsManual,a.Source,
-                   d.Date||' '||ts.DisplayName||' / '||st.ExternalId||' '||st.Name||' / '||su.DisplayName||' / '||te.ExternalId||' '||te.Name
+                   '第'||a.SessionIndex||'回　'||d.Date||' '||ts.DisplayName||' / '||st.Name||'（'||st.Grade||'） / '||su.DisplayName||' / '||te.ExternalId||' '||te.Name
             FROM Assignment a JOIN LessonRequest r ON r.Id=a.LessonRequestId JOIN Student st ON st.Id=r.StudentId JOIN Subject su ON su.Id=r.SubjectId JOIN Teacher te ON te.Id=a.TeacherId JOIN OpenDate d ON d.Id=a.OpenDateId JOIN TimeSlot ts ON ts.Id=a.TimeSlotId
             ORDER BY d.Date,ts.SortOrder,te.ExternalId,st.ExternalId;
-            """;var result=new List<ScheduleAssignmentItem>();await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))result.Add(new ScheduleAssignmentItem(reader.GetInt64(0),reader.GetInt64(1),reader.GetInt64(2),reader.GetInt64(3),reader.GetInt64(4),reader.GetBoolean(5),reader.GetBoolean(6),reader.GetString(7),reader.GetString(8)));return result;
+            """:"""
+            SELECT a.Id,a.LessonRequestId,a.TeacherId,a.OpenDateId,a.TimeSlotId,a.IsLocked,a.IsManual,a.Source,
+                   '第'||a.SessionIndex||'回　'||d.Date||' '||ts.DisplayName||' / '||st.Name||'（'||st.Grade||'） / '||su.DisplayName||' / '||te.ExternalId||' '||te.Name
+            FROM Assignment a JOIN LessonRequest r ON r.Id=a.LessonRequestId JOIN Student st ON st.Id=r.StudentId JOIN Subject su ON su.Id=r.SubjectId JOIN Teacher te ON te.Id=a.TeacherId JOIN OpenDate d ON d.Id=a.OpenDateId JOIN TimeSlot ts ON ts.Id=a.TimeSlotId
+            WHERE a.OpenDateId=$date
+            ORDER BY d.Date,ts.SortOrder,te.ExternalId,st.ExternalId;
+            """);
+        if(openDateId is not null)command.Parameters.AddWithValue("$date",openDateId.Value);
+        var result=new List<ScheduleAssignmentItem>();await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))result.Add(new ScheduleAssignmentItem(reader.GetInt64(0),reader.GetInt64(1),reader.GetInt64(2),reader.GetInt64(3),reader.GetInt64(4),reader.GetBoolean(5),reader.GetBoolean(6),reader.GetString(7),reader.GetString(8)));return result;
     }
 
     public async Task AddManualAsync(string projectPath,long lessonRequestId,long teacherId,long openDateId,long timeSlotId,bool isLocked,bool confirmSoftWarnings=false,string? reason=null,CancellationToken cancellationToken=default)
@@ -344,7 +352,7 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
         var requests=new Dictionary<long,string>();
         await using(var command=connection.CreateCommand())
         {
-            command.CommandText="SELECT r.Id,st.ExternalId||' '||st.Name||' / '||su.DisplayName FROM LessonRequest r JOIN Student st ON st.Id=r.StudentId JOIN Subject su ON su.Id=r.SubjectId;";
+            command.CommandText="SELECT r.Id,st.Name||'（'||st.Grade||'） / '||su.DisplayName FROM LessonRequest r JOIN Student st ON st.Id=r.StudentId JOIN Subject su ON su.Id=r.SubjectId;";
             await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))requests[reader.GetInt64(0)]=reader.GetString(1);
         }
