@@ -6,14 +6,14 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.3.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 78（TimePicker撤廃、コマ並び替え保存、全画面のnavigation cache化、⑥出力xlsxの書式統一）。v0.3.0 Draft Release後の追加checkpointのため、次のリリース判断は本書「Next Version Rule」に従うこと（ユーザーから今回のcheckpoint完了後の新規Draft Release指示あり）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
-Latest Draft Release: `v0.3.0`（GitHub上にDraftとして作成済み。checkpoint 74〜77の内容をまとめてユーザーより「実装ができたらv0.3.0として一旦ドラフトリリースしてほしい」との指示を受け作成。詳細は[docs/releases/v0.3.0.md](releases/v0.3.0.md)）
+Current Version: `v0.3.1 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
+Latest Development Checkpoint: checkpoint 79（実験的「デザイン設定」テンプレートシート、生徒配布・講師配布xlsxの校舎別カスタマイズ）。v0.3.1 Draft Release後の追加checkpointのため、次のリリース判断は本書「Next Version Rule」に従うこと。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」は実験的機能であり、実機確認の結果次第で採用・廃止が未確定（本書「9. 現在の既知の未実装・保留事項」参照）。
+Latest Draft Release: `v0.3.1`（GitHub上にDraftとして作成済み。checkpoint 78〜79の内容をまとめてユーザーより「そうした不備以外のところが実装できたら新たにドラフトリリースしてほしい」との指示を受け作成。詳細は[docs/releases/v0.3.1.md](releases/v0.3.1.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
 
-- v0.3.0 Draft Release後のbug fix / minor change -> `v0.3.1`
-- v0.3.0 Draft Release後のnew feature -> `v0.4.0`
+- v0.3.1 Draft Release後のbug fix / minor change -> `v0.3.2`
+- v0.3.1 Draft Release後のnew feature -> `v0.4.0`
 - `v1.0.0` -> ユーザーの明示指示がある場合のみ
 
 ### 実装済み
