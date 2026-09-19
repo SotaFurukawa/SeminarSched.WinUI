@@ -100,6 +100,10 @@ internal static class SqliteProjectSchema
         await AddColumnIfMissingAsync(connection, transaction, "Assignment", "OptimizationRunId", "INTEGER REFERENCES OptimizationRun(Id) ON DELETE SET NULL", cancellationToken);
         await AddColumnIfMissingAsync(connection, transaction, "Assignment", "IsManual", "INTEGER NOT NULL DEFAULT 0 CHECK(IsManual IN(0,1))", cancellationToken);
         await AddColumnIfMissingAsync(connection, transaction, "Assignment", "Note", "TEXT NOT NULL DEFAULT ''", cancellationToken);
+
+        // ホーム画面「新しい講習プロジェクト」の「集団授業の日程を考慮する」チェックボックス（既定オフ）。
+        // オンの場合のみ③アンケート取込みに3.1/3.2（集団授業クラスの登録・受講登録）を表示する。
+        await AddColumnIfMissingAsync(connection, transaction, "CourseProject", "ConsiderGroupLessons", "INTEGER NOT NULL DEFAULT 0 CHECK(ConsiderGroupLessons IN(0,1))", cancellationToken);
     }
 
     private static async Task AddColumnIfMissingAsync(
@@ -262,6 +266,27 @@ internal static class SqliteProjectSchema
             StudentPageMode TEXT NOT NULL DEFAULT 'one_per_page',
             CsvWithBom INTEGER NOT NULL DEFAULT 1 CHECK(CsvWithBom IN(0,1)),
             StyleRulesJson TEXT NOT NULL DEFAULT '{}'
+        );
+        CREATE TABLE IF NOT EXISTS GroupLessonClass (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ProjectId INTEGER NOT NULL REFERENCES CourseProject(Id) ON DELETE CASCADE,
+            Name TEXT NOT NULL CHECK(length(trim(Name))>0),
+            Grade TEXT NOT NULL CHECK(length(trim(Grade))>0),
+            AllowOtherGrades INTEGER NOT NULL DEFAULT 0 CHECK(AllowOtherGrades IN(0,1)),
+            Active INTEGER NOT NULL DEFAULT 1 CHECK(Active IN(0,1)),
+            UNIQUE(ProjectId,Name)
+        );
+        CREATE TABLE IF NOT EXISTS GroupLessonSession (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ClassId INTEGER NOT NULL REFERENCES GroupLessonClass(Id) ON DELETE CASCADE,
+            OpenDateId INTEGER NOT NULL REFERENCES OpenDate(Id) ON DELETE CASCADE,
+            TimeSlotId INTEGER NOT NULL REFERENCES TimeSlot(Id) ON DELETE CASCADE,
+            UNIQUE(ClassId,OpenDateId,TimeSlotId)
+        );
+        CREATE TABLE IF NOT EXISTS GroupLessonEnrollment (
+            ClassId INTEGER NOT NULL REFERENCES GroupLessonClass(Id) ON DELETE CASCADE,
+            StudentId INTEGER NOT NULL REFERENCES Student(Id) ON DELETE CASCADE,
+            PRIMARY KEY(ClassId,StudentId)
         );
         CREATE INDEX IF NOT EXISTS IX_AuditLog_Project_Timestamp ON AuditLog(ProjectId,TimestampUtc);
         CREATE INDEX IF NOT EXISTS IX_ValidationIssue_Project_Resolved ON ValidationIssue(ProjectId,Resolved,Severity);

@@ -39,9 +39,11 @@
                             SnapsTo="StepValues"
                             Value="3"
                             ValueChanged="QualitySlider_ValueChanged" />
-                        <!-- Sliderのトラックはthumb半径ぶん左右に内側マージンがあるため、目盛り数字の
-                             行も同じだけ内側へ寄せないと数字がtick位置とずれる（以前の不具合）。 -->
-                        <Grid Margin="12,4,12,0">
+                        <!-- Sliderのtickは、thumb本体の半径ぶんだけ左右へ内側寄せされた位置に描画される
+                             （WinUI既定テーマのSliderHorizontalThumbWidthが実際のinset量）。固定pxを
+                             決め打ちすると理論値とズレるため、コードビハインド側でテーマリソースの値から
+                             実際のinsetを計算してこのGridのMarginへ反映する（Page_LoadedのAlignQualityTickLabels）。 -->
+                        <Grid x:Name="QualityTickLabels" Margin="9,4,9,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />

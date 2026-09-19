@@ -366,7 +366,8 @@ public sealed partial class HomePage : Page
             AcademicYearPicker.Date.Year,
             (CourseSeason)seasonValue,
             DateOnly.FromDateTime(start.DateTime),
-            DateOnly.FromDateTime(end.DateTime));
+            DateOnly.FromDateTime(end.DateTime),
+            ConsiderGroupLessonsCheck.IsChecked==true);
     }
 
     private void RefreshGeneratedTitle()

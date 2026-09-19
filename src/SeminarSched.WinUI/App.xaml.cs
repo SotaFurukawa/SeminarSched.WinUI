@@ -18,6 +18,8 @@ using SeminarSched.Application.Scheduling;
 using SeminarSched.Infrastructure.Scheduling;
 using SeminarSched.Application.Output;
 using SeminarSched.Infrastructure.Output;
+using SeminarSched.Application.GroupLessons;
+using SeminarSched.Infrastructure.GroupLessons;
 using SeminarSched.Infrastructure.Settings;
 using SeminarSched.Application.Logging;
 using SeminarSched.Infrastructure.Logging;
@@ -77,6 +79,8 @@ public partial class App : Application
     public static IScheduleEditorService ScheduleEditor { get; } = new SqliteScheduleEditorService();
 
     public static IOutputPackageService OutputPackage { get; } = new SqliteOutputPackageService();
+
+    public static IGroupLessonService GroupLessons { get; } = new SqliteGroupLessonService();
 
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code

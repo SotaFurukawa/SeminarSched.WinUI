@@ -9,4 +9,5 @@ public sealed record ProjectSummary(
     CourseSeason Season,
     DateOnly StartDate,
     DateOnly EndDate,
-    int WorkflowCompletedStep);
+    int WorkflowCompletedStep,
+    bool ConsiderGroupLessons = false);

@@ -66,9 +66,9 @@
 | 未配置・警告一覧出力 | output service | `未配置・警告一覧.xlsx`として独立出力し、Python版issue_builder.pyと同じ2シート構成（`未配置一覧`＝生徒/科目/必要/配置済/不足/主な理由/解決候補/優先度/通常担当/1対1/備考の11列、`警告一覧`＝severity/issue type/日付/コマ/生徒/講師/内容/対応状況の8列）へ刷新。主な理由・解決候補は`GetUnplacedSessionsAsync`と同じ3段階診断＋候補コマ列挙から生成 | 実装済み | 警告一覧はPython版の汎用issue検知基盤（`project_validation_service`相当）が本移植版に無いため、現時点で検知できる「通常担当不足」のみを警告行として出力。日程競合や定員超過等その他の診断種別は未移植 |
 | atomic export・上書き確認 | output service | integrity再検証・新規一時folder・上書きなしは維持。出力完了後の一覧は上記5帳票のExcel/PDF＋講師別個別fileすべてを表示し、選択したfileや出力folderをOSの既定アプリで開けるUIを追加 | 実装済み | |
 | 設定・logging | settings/logging | `IAppLogger`/`FileAppLogger`を追加。`%LocalAppData%\SeminarSched.WinUI\logs\app-yyyyMMdd.log`へ日次でoperational logを記録（14日保持で自動削除）、未処理例外もWinUIの`UnhandledException`経由で記録。project作成/open/close/backup/restore、時間割自動作成、出力実行のログを追加。件数・成否のみでファイルパスや生徒・講師名は一切記録しない | 実装中 | project/import/scheduling以外の操作（①設定の個別保存など）はまだログ未対象。UIからログ閲覧・エクスポートする画面はない |
-| 集団授業DB/service互換 | group lesson service | 未実装 | 保留 | v1.9.5同様UI停止中 |
+| 集団授業（クラス登録・受講登録） | group lesson service（v1.9.5はUI停止中、DB/serviceのみ残存） | Python版は「1回の開講＝1行」（`group_code`単位、クラス/series概念なし）で、クラスへの受講登録は手動UIが無くExcel一括取込みのみだった。ユーザーから明示指示を受け、Python版とは異なる独自設計で実装：ホーム画面「集団授業の日程を考慮する」チェック（`CourseProject.ConsiderGroupLessons`、作成時のみ設定可）をオンにしたprojectでのみ③アンケート取込みに3.1（集団授業クラスの登録：クラス名・対象学年・複数の開講日程を`GroupLessonClass`/`GroupLessonSession`として登録、同一学年で複数クラス可）・3.2（集団授業の受講登録：クラスを選び対象学年の生徒をチェックボックスで受講登録、クラスの「他学年の受講を許可」がオンなら全学年を表示、`GroupLessonEnrollment`）を追加した | 実装済み | 受講登録した集団授業の時間帯を④⑤の個別指導自動作成・手動配置の制約（二重予約回避）へは未連携（データ登録のみ）。Python版のteacher/room/note/subject等の付随フィールドやExcel一括取込みは移植していない |
 | Windows配布・受入 | packaging/release tests | 方針をMSIXサイドロードに確定（[ADR 0005](docs/adr/0005-windows-distribution.md)）。ローカル自己署名証明書の生成・署名付き`.msix`生成を行う`scripts\New-SigningCertificate.ps1`/`New-MsixPackage.ps1`を追加。署名済み`.msix`の生成と署名者検証は実機で確認済み | 実装中 | `Add-AppxPackage`によるインストールには管理者権限での証明書信頼（`LocalMachine\TrustedPeople`）が必要で、この環境には管理者権限がないため実インストールは未検証。ユーザー側での検証が必要 |
 
 ## Completion rule
 
-各項目は、機能実装、単体テスト、統合テスト、UI確認、Python版との同等性確認が揃って初めて「動作確認済み」とする。Python v1.9.5で意図的に停止中の集団授業UIなどは、無断でscopeへ追加しない。
+各項目は、機能実装、単体テスト、統合テスト、UI確認、Python版との同等性確認が揃って初めて「動作確認済み」とする。Python v1.9.5で意図的に停止中の集団授業UIなどは、無断でscopeへ追加しない（ユーザーからの明示指示がある場合はこの限りではない。集団授業機能はcheckpoint75でユーザー指示により追加したが、Python版のUIをそのまま復活させたのではなく独自設計である点に注意）。

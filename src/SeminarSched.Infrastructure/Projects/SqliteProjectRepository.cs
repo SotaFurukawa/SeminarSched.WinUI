@@ -65,7 +65,7 @@ public sealed class SqliteProjectRepository : IProjectRepository
 
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT cp.Title, cp.AcademicYear, cp.Season, cp.StartDate, cp.EndDate, cp.WorkflowCompletedStep
+            SELECT cp.Title, cp.AcademicYear, cp.Season, cp.StartDate, cp.EndDate, cp.WorkflowCompletedStep, cp.ConsiderGroupLessons
             FROM CourseProject AS cp
             INNER JOIN ApplicationMetadata AS am ON am.Id = 1
             WHERE cp.Id = 1 AND am.Product = $product AND am.SchemaVersion = $schemaVersion;
@@ -87,7 +87,8 @@ public sealed class SqliteProjectRepository : IProjectRepository
             (CourseSeason)reader.GetInt32(2),
             DateOnly.ParseExact(reader.GetString(3), "yyyy-MM-dd", CultureInfo.InvariantCulture),
             DateOnly.ParseExact(reader.GetString(4), "yyyy-MM-dd", CultureInfo.InvariantCulture),
-            reader.GetInt32(5));
+            reader.GetInt32(5),
+            reader.GetBoolean(6));
     }
 
     public async Task<ProjectIntegrityResult> CheckIntegrityAsync(
@@ -413,6 +414,15 @@ public sealed class SqliteProjectRepository : IProjectRepository
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
+        if (definition.ConsiderGroupLessons)
+        {
+            // ConsiderGroupLessons列はEnsureCurrentAsync（EnsureColumnsAsync）が追加するため、
+            // 上のCREATE TABLE内のINSERT時点ではまだ存在せず既定値(0)のまま作られる。ここで
+            // ユーザーがホーム画面で選択した値へ更新する。
+            await using var groupLessonFlag = connection.CreateCommand();
+            groupLessonFlag.CommandText = "UPDATE CourseProject SET ConsiderGroupLessons=1 WHERE Id=1;";
+            await groupLessonFlag.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
         await using var checkpoint = connection.CreateCommand();
         checkpoint.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
         await checkpoint.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -432,6 +442,14 @@ public sealed class SqliteProjectRepository : IProjectRepository
         var version = await SqliteProjectSchema.ReadVersionAsync(inspection, cancellationToken).ConfigureAwait(false);
         if (version == CurrentSchemaVersion)
         {
+            // schema versionは既に最新だが、EnsureColumnsAsync由来の追加列・追加テーブル（version番号を
+            // 上げずに追加してきたもの）が未適用の場合がある。OpenAsync自身は読み取り専用接続でSELECTする
+            // だけなので、ここで書き込み可能接続を使って適用しておく（他のrepositoryメソッドは呼び出しの
+            // たびにEnsureCurrentAsyncを呼んでいるのと同じ扱い）。
+            await inspection.CloseAsync().ConfigureAwait(false);
+            await using var writableForEnsure = CreateConnection(path, SqliteOpenMode.ReadWrite);
+            await writableForEnsure.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await SqliteProjectSchema.EnsureCurrentAsync(writableForEnsure, cancellationToken).ConfigureAwait(false);
             return;
         }
 

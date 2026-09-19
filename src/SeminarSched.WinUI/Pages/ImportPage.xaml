@@ -84,4 +84,44 @@
         </ScrollViewer>
     </StackPanel>
 </Border>
+<Border x:Name="GroupLessonClassCard" Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Visibility="Collapsed">
+    <StackPanel Spacing="12">
+        <TextBlock FontSize="20" FontWeight="SemiBold" Text="3.1 集団授業クラスの登録"/>
+        <TextBlock Text="集団授業のクラスと、それが開講される日程・コマを登録します。同じ学年でも複数のクラスを登録できます。" TextWrapping="Wrap"/>
+        <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="160"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBox x:Name="GroupClassName" Header="クラス名"/>
+            <ComboBox x:Name="GroupClassGrade" Grid.Column="1" Header="対象学年" IsEditable="True"/>
+            <CheckBox x:Name="GroupClassAllowOtherGrades" Grid.Column="2" Content="他学年の受講を許可" VerticalAlignment="Bottom"/>
+            <Button x:Name="SaveGroupClassButton" Grid.Column="3" VerticalAlignment="Bottom" Content="保存" Click="SaveGroupClass_Click" Style="{StaticResource AccentButtonStyle}"/>
+        </Grid>
+        <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="新規入力" Click="NewGroupClass_Click"/><Button Content="選択したクラスを削除" Click="DeleteGroupClass_Click"/></StackPanel>
+        <ListView x:Name="GroupClasses" SelectionChanged="GroupClasses_SelectionChanged" MaxHeight="200"/>
+
+        <TextBlock Margin="0,8,0,0" FontWeight="SemiBold" Text="選択中のクラスの開講日程"/>
+        <TextBlock x:Name="GroupClassSessionsHint" Text="上の一覧からクラスを選択してください。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+        <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <ComboBox x:Name="GroupSessionDate" Header="日付" DisplayMemberPath="Label"/>
+            <ComboBox x:Name="GroupSessionSlot" Grid.Column="1" Header="コマ" DisplayMemberPath="Label"/>
+            <Button Grid.Column="2" VerticalAlignment="Bottom" Content="この日程を追加" Click="AddGroupSession_Click"/>
+        </Grid>
+        <ListView x:Name="GroupSessions" MaxHeight="200"/>
+        <Button Content="選択した日程を削除" Click="DeleteGroupSession_Click" HorizontalAlignment="Left"/>
+    </StackPanel>
+</Border>
+<Border x:Name="GroupLessonEnrollmentCard" Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Visibility="Collapsed">
+    <StackPanel Spacing="12">
+        <TextBlock FontSize="20" FontWeight="SemiBold" Text="3.2 集団授業の受講登録"/>
+        <TextBlock Text="クラスを選び、そのクラスを受講する生徒にチェックを入れます。既定では対象学年の生徒だけを表示します（クラスの「他学年の受講を許可」がオンの場合は全学年を表示）。" TextWrapping="Wrap"/>
+        <ComboBox x:Name="EnrollmentClass" Header="クラス" SelectionChanged="EnrollmentClass_SelectionChanged" MinWidth="280"/>
+        <TextBlock x:Name="EnrollmentClassInfo" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+        <TextBox x:Name="EnrollmentSearch" Header="生徒名検索" TextChanged="EnrollmentSearch_TextChanged"/>
+        <ListView x:Name="EnrollmentStudents" MaxHeight="360">
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <CheckBox IsChecked="{Binding Enrolled}" Checked="EnrollmentCheck_Changed" Unchecked="EnrollmentCheck_Changed" Content="{Binding Display}"/>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </StackPanel>
+</Border>
 </StackPanel></ScrollViewer></local:WorkflowPageBase>

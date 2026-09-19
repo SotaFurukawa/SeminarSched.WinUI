@@ -43,6 +43,7 @@ public sealed partial class OptimizationPage : WorkflowPageBase
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
+        AlignQualityTickLabels();
         OptimizationRunState.Changed += OnRunStateChanged;
         try
         {
@@ -64,6 +65,16 @@ public sealed partial class OptimizationPage : WorkflowPageBase
             SaveErrorInfoBar.IsOpen = true;
             _isLoaded = true;
         }
+    }
+
+    // WinUI既定テーマのSliderは、tickをthumb本体の半径ぶんだけ左右へ内側寄せした位置に描画する
+    // （thumb幅=SliderHorizontalThumbWidthテーマリソース、既定18px→半径9px）。固定pxを決め打ちすると
+    // 実際のテーマ値とズレて目盛り数字が正しい位置に来ないため、テーマリソースから実測して反映する。
+    private void AlignQualityTickLabels()
+    {
+        var thumbWidth = Application.Current.Resources.TryGetValue("SliderHorizontalThumbWidth", out var value) && value is double width ? width : 18d;
+        var inset = thumbWidth / 2;
+        QualityTickLabels.Margin = new Thickness(inset, 4, inset, 0);
     }
 
     private void Page_Unloaded(object sender, RoutedEventArgs e) => OptimizationRunState.Changed -= OnRunStateChanged;

@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.2.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 74（②アンケート作成に画像付き「作成手順」ポップアップを移植）。v0.2.0 Draft Release後の最初の追加checkpointのため、次のリリース判断は本書「Next Version Rule」に従うこと。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
+Latest Development Checkpoint: checkpoint 75（⑤品質スライダー目盛りの理論値inset化、集団授業クラス・受講登録機能の新規追加）。v0.2.0 Draft Release後の追加checkpointのため、次のリリース判断は本書「Next Version Rule」に従うこと。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
 Latest Draft Release: `v0.2.0`（GitHub上にDraftとして作成済み。checkpoint 55〜73の内容をまとめてユーザーより「新しいバージョンとしてリリースしてほしい」との指示を受け作成。詳細は[docs/releases/v0.2.0.md](releases/v0.2.0.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -962,6 +962,24 @@ v0.2.0 Draft Release直後、ユーザーから「アンケート作成につい
 - `QuestionnairePage.xaml`に「作成手順」ボタンを追加（プロジェクト未選択でも操作可能。手順自体はプロジェクト固有のデータに依存しないため）。
 
 **動作確認:** Release/x64 build警告0・エラー0。画像がAppXパッケージへ正しく含まれること（`bin\x64\Release\...\AppX\Assets\GoogleFormsGuide\*.png`）をビルド出力で確認。アプリを`dotnet run`で再起動しログにcrash記録がないことを確認。ダイアログの実際の見た目・画像の表示・「別ウィンドウで表示」の動作は、この環境からは視覚確認できないため、実機でユーザーに確認をお願いしたい。
+
+### v0.2.0 checkpoint 75 (Claude) — ⑤品質スライダー目盛りの理論値inset化、集団授業クラス・受講登録機能の新規追加
+
+ユーザーから2件。(1)「⑤の進捗バーの長さは良いが、やはり目盛りの数字の位置がずれる。きっちり同じ場所になるようにしてほしい」。(2) 集団授業（個別指導と並行して受講する生徒がいる集団クラス）の日程・受講生を登録できる機能を、③アンケート取込みの後段（3.1・3.2）へ新規追加してほしいという詳細な仕様指示。
+
+**⑤品質スライダー目盛り位置:** checkpoint69「余白なし」→checkpoint70「Margin 12px決め打ち」はいずれも実測に基づかない推測だった。WinUI既定テーマの`generic.xaml`（`Microsoft.WindowsAppSDK.WinUI`パッケージ内、`Themes/generic.xaml`）を直接確認したところ、水平Sliderのthumb幅は`SliderHorizontalThumbWidth`（既定18px）で、`TickPlacement`のtickは中央のthumb列に合わせてこの半径ぶん左右へinsetされる（＝理論上の正しいinset量は18÷2＝9px）ことを確認した。今後テーマが変わってもズレないよう、固定pxではなく`Application.Current.Resources["SliderHorizontalThumbWidth"]`を`Page_Loaded`時に実測して`QualityTickLabels`（目盛り数字の`Grid`）の左右`Margin`へ反映する`AlignQualityTickLabels()`を新設した（取得失敗時は18pxを既定値としてfallback）。
+
+**集団授業機能（新規、本checkpointの主要作業）:** 実装前にPython参照repoを調査（Explore subagent）したところ、v1.6.0で「再導入はv2.0.0で」として意図的に停止された`GroupLesson`/`GroupLessonStudent`というDB/serviceが残存していることが判明した。ただしPython版は「1回の開講＝1行」（`group_code`単位でクラス/seriesという概念が無く、同じクラスが複数日開講される場合は日程ごとに別行が必要）で、受講生の登録も手動UIが無くExcel一括取込みでしか行えない設計だった。ユーザーの今回の指示（クラスをまず登録し、その開講日程を複数ひも付け、受講生はクラス単位で1回チェックすれば済むようにしたい、同一学年でも複数クラスを許可、他学年受講の許可オプションを持たせたい）はPython版の設計と異なっていたため、Python版のUIをそのまま復活させるのではなく、指示に沿った独自設計で新規実装した（`docs/FEATURE_PARITY.md`の「Python v1.9.5で意図的に停止中の機能は無断でscopeへ追加しない」という既存の歯止めに抵触しないよう、今回はユーザーの明示指示に基づくものであることを同ドキュメントへ明記した）。
+
+- **ホーム画面:** 「新しい講習プロジェクト」カードへ「集団授業の日程を考慮する」`CheckBox`を追加。オンにして作成したprojectだけが③に3.1/3.2を表示する（作成後の切り替えUIは無し）。`CourseProjectDefinition.Create`・`ProjectSummary`にそれぞれ`considerGroupLessons`引数／`ConsiderGroupLessons`プロパティを追加（いずれも末尾の省略可能引数のため既存呼び出し・テストは無修正で動作）。
+- **schema:** `CourseProject.ConsiderGroupLessons`列と、`GroupLessonClass`（クラス名・対象学年・他学年受講許可・有効フラグ）・`GroupLessonSession`（クラス×`OpenDate`×`TimeSlot`の開講日程、複数可）・`GroupLessonEnrollment`（クラス×生徒の受講登録）の3テーブルを`SqliteProjectSchema`の`EnsureColumnsAsync`/`CompleteSchemaSql`（version番号を上げずに追加していく既存の枠組み）へ追加。**副次的に発見した既存バグを修正:** `SqliteProjectRepository.OpenAsync`は読み取り専用接続で`CourseProject`をSELECTするだけで、schema versionが既に最新（2）の場合は`UpgradeIfNeededAsync`が`EnsureCurrentAsync`を一切呼ばずに早期returnしていた。これまでは v1由来の安定列しか読んでいなかったため問題化しなかったが、今回`ConsiderGroupLessons`という「version番号を上げずに追加された列」を読もうとして初めて顕在化する潜在バグだったため、`UpgradeIfNeededAsync`の「既に最新版」分岐でも書き込み可能接続で`EnsureCurrentAsync`を呼ぶよう修正した。
+- **Application/Infrastructure:** `IGroupLessonService`/`SqliteGroupLessonService`を新設（クラスのCRUD、開講日程の追加・削除・一覧、受講候補生徒の取得＝対象学年で絞込み・`AllowOtherGrades`時は全学年・現在の受講状態付き、受講登録のON/OFF）。クラス名の重複・開講日程の重複はSQLiteのUNIQUE制約違反(`SqliteErrorCode==19`)を捕捉しユーザー向けメッセージへ変換。
+- **③アンケート取込み画面:** `ConsiderGroupLessons`がオンのprojectでのみ表示される2枚の新規カード。「3.1 集団授業クラスの登録」はクラス名・対象学年（既存生徒の学年から候補を出す`IsEditable`な`ComboBox`）・他学年受講許可を入力して保存し、選択中のクラスへ開講日程（日付・コマの`ComboBox`）を複数追加・削除できる。「3.2 集団授業の受講登録」はクラスを選ぶと、対象学年（`AllowOtherGrades`時は全学年）の生徒一覧がチェックボックス付きで表示され、チェックの都度その場で`SetEnrollmentAsync`を呼んで反映する（生徒名検索での絞り込みも可能）。
+- 新規テスト`SqliteGroupLessonServiceTests.cs`（4件）：クラスの保存・更新・クラス名重複拒否、削除時のセッション・受講登録のカスケード削除、開講日程の追加・重複拒否・削除、受講候補の学年絞り込みと`AllowOtherGrades`切替時の全学年表示・受講ON/OFFの反映を検証。
+
+**動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全130 tests passed（既存126件は無修正で通過、新規4件追加）。アプリを`dotnet run`で再起動しログにcrash記録がないことを確認。
+
+**未対応・意図的にスコープ外:** 受講登録した集団授業の時間帯を④時間割編集・⑤時間割自動作成の制約（個別指導との二重予約回避）へは連携していない（今回はデータの登録機能のみが指示範囲のため）。Python版の`GroupLesson`が持つteacher/room/note/subjectといった付随フィールドや、Excelでの一括登録は移植していない。品質スライダーの目盛り位置・集団授業3.1/3.2の実際の見た目は、この環境からは視覚確認できないため実機での確認をお願いしたい。
 
 ### 次回最初に確認するファイル
 

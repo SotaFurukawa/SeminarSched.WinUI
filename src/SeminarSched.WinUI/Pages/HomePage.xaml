@@ -100,6 +100,11 @@
                             Content="保存先を選んで作成"
                             Style="{StaticResource AccentButtonStyle}" />
                     </Grid>
+                    <CheckBox x:Name="ConsiderGroupLessonsCheck" Content="集団授業の日程を考慮する" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="オンにすると③アンケート取込みに集団授業クラスの登録・受講登録（3.1・3.2）が追加されます。個別指導以外に集団授業も受講する生徒がいる場合に選択してください。作成後は変更できません。"
+                        TextWrapping="Wrap" />
                     <TextBlock
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="一時SQLiteの作成と整合性確認に成功した場合だけ保存します。同名ファイルは上書きしません。"
