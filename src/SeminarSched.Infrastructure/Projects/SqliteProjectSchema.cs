@@ -18,12 +18,46 @@ internal static class SqliteProjectSchema
         }
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        // GroupLessonSessionは同日中に「TimeSlot参照」から「自由入力のStartTime/EndTime」へ設計変更した
+        // （集団授業のクラス管理機能自体が同一開発サイクル内の未リリース機能で実データが無いため、
+        // 通常のAddColumnIfMissingAsyncによる追加ではなく一度DROPして作り直す一回限りの対応）。
+        await DropTableIfHasColumnAsync(connection, (SqliteTransaction)transaction, "GroupLessonSession", "TimeSlotId", cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.Transaction = (SqliteTransaction)transaction;
         command.CommandText = CompleteSchemaSql;
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         await EnsureColumnsAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task DropTableIfHasColumnAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string table,
+        string obsoleteColumn,
+        CancellationToken cancellationToken)
+    {
+        await using var info = connection.CreateCommand();
+        info.Transaction = transaction;
+        info.CommandText = $"PRAGMA table_info({table});";
+        var hasObsoleteColumn = false;
+        await using (var reader = await info.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+        {
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (string.Equals(reader.GetString(1), obsoleteColumn, StringComparison.OrdinalIgnoreCase))
+                {
+                    hasObsoleteColumn = true;
+                    break;
+                }
+            }
+        }
+        if (!hasObsoleteColumn) return;
+
+        await using var drop = connection.CreateCommand();
+        drop.Transaction = transaction;
+        drop.CommandText = $"DROP TABLE {table};";
+        await drop.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     internal static async Task<int> ReadVersionAsync(
@@ -280,8 +314,9 @@ internal static class SqliteProjectSchema
             Id INTEGER PRIMARY KEY AUTOINCREMENT,
             ClassId INTEGER NOT NULL REFERENCES GroupLessonClass(Id) ON DELETE CASCADE,
             OpenDateId INTEGER NOT NULL REFERENCES OpenDate(Id) ON DELETE CASCADE,
-            TimeSlotId INTEGER NOT NULL REFERENCES TimeSlot(Id) ON DELETE CASCADE,
-            UNIQUE(ClassId,OpenDateId,TimeSlotId)
+            StartTime TEXT NOT NULL,
+            EndTime TEXT NOT NULL CHECK(EndTime>StartTime),
+            UNIQUE(ClassId,OpenDateId,StartTime,EndTime)
         );
         CREATE TABLE IF NOT EXISTS GroupLessonEnrollment (
             ClassId INTEGER NOT NULL REFERENCES GroupLessonClass(Id) ON DELETE CASCADE,

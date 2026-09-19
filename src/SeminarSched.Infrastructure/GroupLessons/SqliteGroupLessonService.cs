@@ -54,34 +54,51 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyList<GroupLessonSessionOption>> GetSessionsAsync(string projectPath, long classId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<GroupLessonCalendarDate>> GetCalendarDatesAsync(string projectPath, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Id,Date FROM OpenDate ORDER BY Date;";
+        var result = new List<GroupLessonCalendarDate>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            result.Add(new GroupLessonCalendarDate(reader.GetInt64(0), DateOnly.ParseExact(reader.GetString(1), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)));
+        return result;
+    }
+
+    public async Task<IReadOnlyList<GroupLessonSessionOption>> GetAllSessionsAsync(string projectPath, CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT s.Id,s.ClassId,s.OpenDateId,s.TimeSlotId,d.Date,ts.DisplayName
-            FROM GroupLessonSession s JOIN OpenDate d ON d.Id=s.OpenDateId JOIN TimeSlot ts ON ts.Id=s.TimeSlotId
-            WHERE s.ClassId=$class ORDER BY d.Date,ts.SortOrder;
+            SELECT s.Id,s.ClassId,c.Name,s.OpenDateId,s.StartTime,s.EndTime
+            FROM GroupLessonSession s JOIN GroupLessonClass c ON c.Id=s.ClassId
+            ORDER BY s.OpenDateId,s.StartTime;
             """;
-        command.Parameters.AddWithValue("$class", classId);
         var result = new List<GroupLessonSessionOption>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            result.Add(new GroupLessonSessionOption(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3), reader.GetString(4), reader.GetString(5)));
+            result.Add(new GroupLessonSessionOption(reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2), reader.GetInt64(3), TimeOnly.ParseExact(reader.GetString(4), "HH:mm", System.Globalization.CultureInfo.InvariantCulture), TimeOnly.ParseExact(reader.GetString(5), "HH:mm", System.Globalization.CultureInfo.InvariantCulture)));
         return result;
     }
 
-    public async Task AddSessionAsync(string projectPath, long classId, long openDateId, long timeSlotId, CancellationToken cancellationToken = default)
+    public async Task AddSessionsAsync(string projectPath, long classId, IReadOnlyCollection<long> openDateIds, TimeOnly startTime, TimeOnly endTime, CancellationToken cancellationToken = default)
     {
+        if (endTime <= startTime) throw new ArgumentException("終了時刻は開始時刻より後にしてください。");
+        if (openDateIds.Count == 0) return;
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
-        await using var command = connection.CreateCommand();
-        command.CommandText = "INSERT INTO GroupLessonSession(ClassId,OpenDateId,TimeSlotId) VALUES($class,$date,$slot);";
-        command.Parameters.AddWithValue("$class", classId); command.Parameters.AddWithValue("$date", openDateId); command.Parameters.AddWithValue("$slot", timeSlotId);
-        try { await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false); }
-        catch (SqliteException exception) when (exception.SqliteErrorCode == 19)
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        var startText = startTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+        var endText = endTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+        foreach (var openDateId in openDateIds)
         {
-            throw new InvalidOperationException("この日時は既にこのクラスの開講日程として登録されています。");
+            await using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = "INSERT INTO GroupLessonSession(ClassId,OpenDateId,StartTime,EndTime) VALUES($class,$date,$start,$end) ON CONFLICT(ClassId,OpenDateId,StartTime,EndTime) DO NOTHING;";
+            command.Parameters.AddWithValue("$class", classId); command.Parameters.AddWithValue("$date", openDateId); command.Parameters.AddWithValue("$start", startText); command.Parameters.AddWithValue("$end", endText);
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task RemoveSessionAsync(string projectPath, long sessionId, CancellationToken cancellationToken = default)

@@ -98,6 +98,12 @@ public sealed partial class MainWindow : Window
                 case "import":
                     NavFrame.Navigate(typeof(ImportPage));
                     break;
+                case "groupLessonClass":
+                    NavFrame.Navigate(typeof(GroupLessonClassPage));
+                    break;
+                case "groupLessonEnrollment":
+                    NavFrame.Navigate(typeof(GroupLessonEnrollmentPage));
+                    break;
                 case "scheduleEditor":
                     NavFrame.Navigate(typeof(ScheduleEditorPage));
                     break;

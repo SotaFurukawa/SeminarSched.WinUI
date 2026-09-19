@@ -2,9 +2,7 @@ using System.Globalization;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using SeminarSched.Application.GroupLessons;
 using SeminarSched.Application.Importing;
-using SeminarSched.Domain.GroupLessons;
 using SeminarSched.Domain.MasterData;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -18,20 +16,13 @@ public sealed partial class ImportPage : WorkflowPageBase
     private MasterItem<Student>[] _studentItems=[];
     private MasterItem<Subject>[] _subjectItems=[];
     private MasterItem<Teacher?>[] _nullableTeacherItems=[];
-    private GroupLessonClass? _selectedGroupClass;
-    private long? _selectedEnrollmentClassId;
-    private IReadOnlyList<GroupLessonEnrollmentCandidate> _enrollmentCandidates=[];
     public ImportPage() => InitializeComponent();
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         _loaded=true;
         var ready=EnsureProject(ProjectRequired);
         SurveySelectStudentButton.IsEnabled=ready;SurveySelectTeacherButton.IsEnabled=ready;
-        var considerGroupLessons=ready&&App.ProjectService.Current?.ConsiderGroupLessons==true;
-        GroupLessonClassCard.Visibility=considerGroupLessons?Visibility.Visible:Visibility.Collapsed;
-        GroupLessonEnrollmentCard.Visibility=considerGroupLessons?Visibility.Visible:Visibility.Collapsed;
         if(ready){await ReloadMatrixAsync();await ReloadLessonRequestsAsync();}
-        if(considerGroupLessons){await ReloadGroupSessionSlotOptionsAsync();await ReloadGroupClassesAsync();}
     }
 
     private async void SurveySelectStudent_Click(object sender,RoutedEventArgs e)
@@ -299,166 +290,5 @@ public sealed partial class ImportPage : WorkflowPageBase
         }
         catch(Exception exception)when(exception is InvalidOperationException or Microsoft.Data.Sqlite.SqliteException){ShowError(exception.Message);}
         finally{IsEnabled=true;}
-    }
-
-    private sealed record GroupClassRow(GroupLessonClass Value,string Display){public override string ToString()=>Display;}
-
-    private async Task ReloadGroupSessionSlotOptionsAsync()
-    {
-        var path=App.ProjectService.Current?.Path;if(path is null)return;
-        GroupSessionDate.ItemsSource=await App.AvailabilityMatrix.GetOpenDatesAsync(path);
-        var slots=await App.CourseSettings.GetTimeSlotsAsync(path);
-        GroupSessionSlot.ItemsSource=slots.Where(x=>x.Active).OrderBy(x=>x.SortOrder).Select(x=>new AvailabilitySlotOption(x.Id,$"{x.DisplayName} {x.StartTime:HH\\:mm}～{x.EndTime:HH\\:mm}")).ToArray();
-    }
-
-    private async Task ReloadGroupClassesAsync()
-    {
-        var path=App.ProjectService.Current?.Path;if(path is null)return;
-        var previousEnrollmentClassId=(EnrollmentClass.SelectedItem as GroupClassRow)?.Value.Id;
-        var classes=await App.GroupLessons.GetClassesAsync(path);
-        var rows=classes.Select(c=>new GroupClassRow(c,$"{c.Name}　（{c.Grade}）{(c.AllowOtherGrades?"　他学年可":"")}{(c.Active?"":"　[停止]")}")).ToArray();
-        GroupClasses.ItemsSource=rows;
-        EnrollmentClass.ItemsSource=rows;
-        EnrollmentClass.SelectedItem=rows.FirstOrDefault(r=>r.Value.Id==previousEnrollmentClassId);
-        var gradeValues=(await App.MasterData.GetStudentsAsync(path)).Select(s=>s.Grade).Distinct().OrderBy(x=>x,StringComparer.CurrentCultureIgnoreCase).ToArray();
-        GroupClassGrade.ItemsSource=gradeValues;
-    }
-
-    private async void GroupClasses_SelectionChanged(object sender,SelectionChangedEventArgs e)
-    {
-        if(GroupClasses.SelectedItem is not GroupClassRow row)
-        {
-            _selectedGroupClass=null;GroupSessions.ItemsSource=null;GroupClassSessionsHint.Text="上の一覧からクラスを選択してください。";
-            return;
-        }
-        _selectedGroupClass=row.Value;
-        GroupClassName.Text=row.Value.Name;GroupClassGrade.Text=row.Value.Grade;GroupClassAllowOtherGrades.IsChecked=row.Value.AllowOtherGrades;
-        await ReloadGroupSessionsAsync();
-    }
-
-    private async Task ReloadGroupSessionsAsync()
-    {
-        if(_selectedGroupClass is not{}cls){GroupSessions.ItemsSource=null;GroupClassSessionsHint.Text="上の一覧からクラスを選択してください。";return;}
-        var path=App.ProjectService.Current?.Path;if(path is null)return;
-        GroupSessions.ItemsSource=await App.GroupLessons.GetSessionsAsync(path,cls.Id);
-        GroupClassSessionsHint.Text=$"「{cls.Name}」の開講日程です。";
-    }
-
-    private async void SaveGroupClass_Click(object sender,RoutedEventArgs e)
-    {
-        var name=GroupClassName.Text?.Trim()??"";
-        var grade=(GroupClassGrade.Text??"").Trim();
-        if(name.Length==0||grade.Length==0){ShowError("クラス名と対象学年を入力してください。");return;}
-        try
-        {
-            IsEnabled=false;
-            var path=App.ProjectService.Current?.Path??throw new InvalidOperationException("プロジェクトが開かれていません。");
-            var id=_selectedGroupClass?.Id??0;
-            var saved=await App.GroupLessons.SaveClassAsync(path,new GroupLessonClass(id,name,grade,GroupClassAllowOtherGrades.IsChecked==true));
-            _selectedGroupClass=saved;
-            await ReloadGroupClassesAsync();
-            await ReloadGroupSessionsAsync();
-            Show(InfoBarSeverity.Success,"集団授業クラスを保存しました");
-        }
-        catch(Exception exception)when(exception is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
-        {ShowError(exception.Message);}
-        finally{IsEnabled=true;}
-    }
-
-    private void NewGroupClass_Click(object sender,RoutedEventArgs e)
-    {
-        GroupClasses.SelectedItem=null;_selectedGroupClass=null;
-        GroupClassName.Text="";GroupClassGrade.Text="";GroupClassAllowOtherGrades.IsChecked=false;
-        GroupSessions.ItemsSource=null;GroupClassSessionsHint.Text="上の一覧からクラスを選択してください。";
-    }
-
-    private async void DeleteGroupClass_Click(object sender,RoutedEventArgs e)
-    {
-        if(_selectedGroupClass is not{}cls){Show(InfoBarSeverity.Warning,"一覧から削除するクラスを選択してください");return;}
-        try
-        {
-            IsEnabled=false;
-            var path=App.ProjectService.Current?.Path??throw new InvalidOperationException("プロジェクトが開かれていません。");
-            await App.GroupLessons.DeleteClassAsync(path,cls.Id);
-            NewGroupClass_Click(sender,e);
-            await ReloadGroupClassesAsync();
-            Show(InfoBarSeverity.Success,"集団授業クラスを削除しました");
-        }
-        catch(Exception exception)when(exception is InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
-        {ShowError(exception.Message);}
-        finally{IsEnabled=true;}
-    }
-
-    private async void AddGroupSession_Click(object sender,RoutedEventArgs e)
-    {
-        if(_selectedGroupClass is not{}cls){ShowError("先にクラスを選択または保存してください。");return;}
-        if(GroupSessionDate.SelectedItem is not AvailabilityDateOption date||GroupSessionSlot.SelectedItem is not AvailabilitySlotOption slot){ShowError("日付とコマを選択してください。");return;}
-        try
-        {
-            IsEnabled=false;
-            var path=App.ProjectService.Current?.Path??throw new InvalidOperationException("プロジェクトが開かれていません。");
-            await App.GroupLessons.AddSessionAsync(path,cls.Id,date.OpenDateId,slot.TimeSlotId);
-            await ReloadGroupSessionsAsync();
-            Show(InfoBarSeverity.Success,"開講日程を追加しました");
-        }
-        catch(Exception exception)when(exception is InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
-        {ShowError(exception.Message);}
-        finally{IsEnabled=true;}
-    }
-
-    private async void DeleteGroupSession_Click(object sender,RoutedEventArgs e)
-    {
-        if(GroupSessions.SelectedItem is not GroupLessonSessionOption session){Show(InfoBarSeverity.Warning,"一覧から削除する日程を選択してください");return;}
-        try
-        {
-            IsEnabled=false;
-            var path=App.ProjectService.Current?.Path??throw new InvalidOperationException("プロジェクトが開かれていません。");
-            await App.GroupLessons.RemoveSessionAsync(path,session.Id);
-            await ReloadGroupSessionsAsync();
-            Show(InfoBarSeverity.Success,"開講日程を削除しました");
-        }
-        catch(Exception exception)when(exception is InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
-        {ShowError(exception.Message);}
-        finally{IsEnabled=true;}
-    }
-
-    private async void EnrollmentClass_SelectionChanged(object sender,SelectionChangedEventArgs e)
-    {
-        if(EnrollmentClass.SelectedItem is not GroupClassRow row)
-        {
-            _selectedEnrollmentClassId=null;EnrollmentStudents.ItemsSource=null;EnrollmentClassInfo.Text="";
-            return;
-        }
-        _selectedEnrollmentClassId=row.Value.Id;
-        EnrollmentClassInfo.Text=$"対象学年: {row.Value.Grade}{(row.Value.AllowOtherGrades?"（他学年の受講も許可）":"")}";
-        await ReloadEnrollmentCandidatesAsync();
-    }
-
-    private async Task ReloadEnrollmentCandidatesAsync()
-    {
-        if(_selectedEnrollmentClassId is not{}classId){EnrollmentStudents.ItemsSource=null;return;}
-        var path=App.ProjectService.Current?.Path;if(path is null)return;
-        _enrollmentCandidates=await App.GroupLessons.GetEnrollmentCandidatesAsync(path,classId);
-        ApplyEnrollmentFilter();
-    }
-
-    private void ApplyEnrollmentFilter()
-    {
-        var search=EnrollmentSearch.Text?.Trim()??"";
-        EnrollmentStudents.ItemsSource=(search.Length==0?_enrollmentCandidates:_enrollmentCandidates.Where(c=>c.Name.Contains(search,StringComparison.CurrentCultureIgnoreCase))).ToArray();
-    }
-
-    private void EnrollmentSearch_TextChanged(object sender,TextChangedEventArgs e)=>ApplyEnrollmentFilter();
-
-    private async void EnrollmentCheck_Changed(object sender,RoutedEventArgs e)
-    {
-        if(sender is not CheckBox{DataContext:GroupLessonEnrollmentCandidate candidate} checkBox||_selectedEnrollmentClassId is not{}classId)return;
-        try
-        {
-            var path=App.ProjectService.Current?.Path??throw new InvalidOperationException("プロジェクトが開かれていません。");
-            await App.GroupLessons.SetEnrollmentAsync(path,classId,candidate.StudentId,checkBox.IsChecked==true);
-        }
-        catch(Exception exception)when(exception is InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
-        {ShowError(exception.Message);}
     }
 }

@@ -1,0 +1,28 @@
+<local:WorkflowPageBase
+    x:Class="SeminarSched_WinUI.Pages.GroupLessonEnrollmentPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:SeminarSched_WinUI.Pages"
+    Loaded="Page_Loaded">
+    <Grid RowDefinitions="Auto,*">
+        <InfoBar Grid.Row="0" x:Name="ProjectRequired" Margin="24,16,24,0" />
+        <ScrollViewer Grid.Row="1" x:Name="ContentPanel">
+            <StackPanel MaxWidth="720" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="16">
+                <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="3.2 集団授業の受講登録" />
+                <TextBlock Text="クラスを選び、そのクラスを受講する生徒にチェックを入れます。既定では対象学年の生徒だけを表示します（クラスの「他学年の受講を許可」がオンの場合は全学年を表示）。" TextWrapping="Wrap" />
+                <InfoBar x:Name="Status" IsClosable="True" />
+
+                <ComboBox x:Name="EnrollmentClass" Header="クラス" SelectionChanged="EnrollmentClass_SelectionChanged" MinWidth="280" />
+                <TextBlock x:Name="EnrollmentClassInfo" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBox x:Name="EnrollmentSearch" Header="生徒名検索" TextChanged="EnrollmentSearch_TextChanged" />
+                <ListView x:Name="EnrollmentStudents" MaxHeight="480">
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding Enrolled}" Checked="EnrollmentCheck_Changed" Unchecked="EnrollmentCheck_Changed" Content="{Binding Display}" />
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</local:WorkflowPageBase>

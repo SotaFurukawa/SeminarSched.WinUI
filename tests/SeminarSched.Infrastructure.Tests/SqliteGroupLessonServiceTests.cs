@@ -1,8 +1,6 @@
-using SeminarSched.Domain.CourseSettings;
 using SeminarSched.Domain.GroupLessons;
 using SeminarSched.Domain.MasterData;
 using SeminarSched.Domain.Projects;
-using SeminarSched.Infrastructure.CourseSettings;
 using SeminarSched.Infrastructure.GroupLessons;
 using SeminarSched.Infrastructure.MasterData;
 using SeminarSched.Infrastructure.Projects;
@@ -36,28 +34,42 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
     {
         var state=await CreateStateAsync();var service=new SqliteGroupLessonService();
         var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2"));
-        await service.AddSessionAsync(state.Path,cls.Id,state.DateId,state.SlotId);
+        await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(17,10),new TimeOnly(18,30));
         await service.SetEnrollmentAsync(state.Path,cls.Id,state.Student1Id,true);
 
         await service.DeleteClassAsync(state.Path,cls.Id);
 
         Assert.Empty(await service.GetClassesAsync(state.Path));
+        Assert.Empty(await service.GetAllSessionsAsync(state.Path));
     }
 
     [Fact]
-    public async Task SessionLifecycle_AddsListsAndRejectsDuplicateThenRemoves()
+    public async Task GetCalendarDatesAsync_ReturnsAllOpenDatesInProjectRange()
+    {
+        var state=await CreateStateAsync();var service=new SqliteGroupLessonService();
+        var dates=await service.GetCalendarDatesAsync(state.Path);
+        var date=Assert.Single(dates);
+        Assert.Equal(state.DateId,date.OpenDateId);Assert.Equal(new DateOnly(2026,7,20),date.Date);
+    }
+
+    [Fact]
+    public async Task AddSessionsAsync_AddsAcrossMultipleDatesAndIgnoresExactDuplicatesThenRemoves()
     {
         var state=await CreateStateAsync();var service=new SqliteGroupLessonService();
         var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2"));
 
-        await service.AddSessionAsync(state.Path,cls.Id,state.DateId,state.SlotId);
-        var session=Assert.Single(await service.GetSessionsAsync(state.Path,cls.Id));
-        Assert.Equal(state.DateId,session.OpenDateId);Assert.Equal(state.SlotId,session.TimeSlotId);
+        await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(17,10),new TimeOnly(18,30));
+        var session=Assert.Single(await service.GetAllSessionsAsync(state.Path));
+        Assert.Equal(state.DateId,session.OpenDateId);Assert.Equal(cls.Name,session.ClassName);Assert.Equal("17:10～18:30",session.TimeRangeLabel);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(()=>service.AddSessionAsync(state.Path,cls.Id,state.DateId,state.SlotId));
+        // 同じクラス・日付・時刻帯を再度追加しても無視され、エラーにも重複にもならない。
+        await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(17,10),new TimeOnly(18,30));
+        Assert.Single(await service.GetAllSessionsAsync(state.Path));
+
+        await Assert.ThrowsAsync<ArgumentException>(()=>service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(18,0),new TimeOnly(17,0)));
 
         await service.RemoveSessionAsync(state.Path,session.Id);
-        Assert.Empty(await service.GetSessionsAsync(state.Path,cls.Id));
+        Assert.Empty(await service.GetAllSessionsAsync(state.Path));
     }
 
     [Fact]
@@ -91,15 +103,12 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
         var master=new SqliteMasterDataRepository();
         var student1=await master.SaveStudentAsync(path,new Student(0,"S-GROUP1","架空 集団生徒一","中2"));
         var student2=await master.SaveStudentAsync(path,new Student(0,"S-GROUP2","架空 集団生徒二","中1"));
-        var course=new SqliteCourseSettingsRepository();
-        var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));
-        await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
         await using var connection=new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False");
         await connection.OpenAsync();await using var command=connection.CreateCommand();command.CommandText="SELECT Id FROM OpenDate LIMIT 1;";
         var date=Convert.ToInt64(await command.ExecuteScalarAsync());
-        return new State(path,student1.Id,student2.Id,date,slot.Id);
+        return new State(path,student1.Id,student2.Id,date);
     }
 
     public void Dispose(){if(Directory.Exists(_directory))Directory.Delete(_directory,true);}
-    private sealed record State(string Path,long Student1Id,long Student2Id,long DateId,long SlotId);
+    private sealed record State(string Path,long Student1Id,long Student2Id,long DateId);
 }

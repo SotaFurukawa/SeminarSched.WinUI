@@ -195,5 +195,38 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         Assert.NotEqual(unavailableFill,overview.Cell(slot1Row,teacherCol).Style.Fill.BackgroundColor);
     }
 
+    [Fact]
+    public async Task GenerateAsync_TeacherWithUnavailabilityButNoAssignments_DoesNotThrow()
+    {
+        // 実機ログで再現したクラッシュの再現テスト: 出勤不可情報だけ登録され、最終的に一度も配置されなかった
+        // 講師がいると、全体時間割のteacherLabels（report.Rowsのみから構築）にその講師のキーが無く
+        // KeyNotFoundExceptionになっていた（ExcelScheduleReportRenderer.RenderOverall）。
+        Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"unassigned-unavailable.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20)));
+        var m=new SqliteMasterDataRepository();
+        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));
+        var assignedTeacher=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 講師一"));
+        var unassignedTeacher=await m.SaveTeacherAsync(path,new Teacher(0,"T-002","架空 講師二"));
+        var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));
+        var course=new SqliteCourseSettingsRepository();
+        var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));
+        await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
+        await using(var c=new SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            await c.OpenAsync();await using var q=c.CreateCommand();
+            q.CommandText=$"""
+                INSERT INTO LessonRequest(Id,ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,1,{student.Id},{sub.Id},1);
+                INSERT INTO Assignment(LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source)
+                  SELECT 1,{assignedTeacher.Id},d.Id,{slot.Id},0,'test' FROM OpenDate d WHERE d.Date='2026-07-20';
+                INSERT INTO TeacherUnavailability(TeacherId,OpenDateId,TimeSlotId)
+                  SELECT {unassignedTeacher.Id},d.Id,{slot.Id} FROM OpenDate d WHERE d.Date='2026-07-20';
+                """;
+            await q.ExecuteNonQueryAsync();
+        }
+
+        var result=await new SqliteOutputPackageService().GenerateAsync(path,_directory);
+        Assert.True(new FileInfo(result.OverallExcelPath).Length>500);
+    }
+
     public void Dispose(){if(Directory.Exists(_directory))Directory.Delete(_directory,true);}
 }

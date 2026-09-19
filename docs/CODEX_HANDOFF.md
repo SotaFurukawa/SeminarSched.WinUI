@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.2.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 76（新規project作成の同名衝突を警告＋自動リネームへ、最近使ったプロジェクトへフォルダーを開くボタン・最終更新日、講習区分「その他」）。v0.2.0 Draft Release後の追加checkpointのため、次のリリース判断は本書「Next Version Rule」に従うこと。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
+Latest Development Checkpoint: checkpoint 77（集団授業3.1/3.2を独立ページ＋カレンダーUIへ全面書き直し、⑥出力のKeyNotFoundExceptionを修正）。ユーザーより本checkpoint完了後にv0.3.0としてDraft Release作成の指示あり。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
 Latest Draft Release: `v0.2.0`（GitHub上にDraftとして作成済み。checkpoint 55〜73の内容をまとめてユーザーより「新しいバージョンとしてリリースしてほしい」との指示を受け作成。詳細は[docs/releases/v0.2.0.md](releases/v0.2.0.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -992,6 +992,24 @@ v0.2.0 Draft Release直後、ユーザーから「アンケート作成につい
 **講習区分「その他」:** `CourseSeason`に`Other=4`を追加し、ホーム画面の講習区分`ComboBox`へ「その他」を追加。選択時のみ「講習区分の名称」`TextBox`（`OtherSeasonNameBox`）を表示し、`CourseProjectDefinition.Create`の新引数`customSeasonName`（Other選択時は必須、それ以外はnull）として渡す。`CourseProjectDefinition.Title`はOtherの場合`{年度}{CustomSeasonName}`を生成する（それ以外は従来通り`ToJapaneseName()`）。`CourseSeasonExtensions.ToJapaneseName()`のOtherケースは汎用fallbackとして「その他」を返すのみ（実際の名称はTitle列に保存済みの値が正）。⑥出力の`SqliteOutputPackageService`が個別に持つ`seasonName`という補助フィールド（`ToJapaneseName()`から再導出、帳票の一部にのみ使用）は、Other時は汎用の「その他」のまま据え置いた（`projectTitle`は別途DB保存済みの正しい値を使うため実害は小さいと判断）。
 
 **動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全132 tests passed（既存130件は無修正で通過、`CourseProjectDefinitionTests`に2件追加：Otherでの名称反映・名称未入力時のリジェクト）。アプリを`dotnet run`で再起動しログにcrash記録がないことを確認。3点とも実際の見た目・動作はこの環境からは視覚確認できないため、実機でユーザーに確認をお願いしたい。
+
+### v0.2.0 checkpoint 77 (Claude) — 集団授業3.1/3.2を独立ページ＋カレンダーUIへ全面書き直し、⑥出力のKeyNotFoundExceptionを修正
+
+ユーザーから3.1/3.2の画面構成についてかなり具体的な指示。「3.1、3.2は左側の手順の中に含めてください。なので、3.1と3.2は別のページになります。集団クラスの日程はカレンダーで設定していく感じ。カレンダーを表示しておき、カレンダーにチェックボックスをつける。カレンダーの上に、クラス名をプルダウンで選べる部分、開始時刻、終了時刻を入力させ、チェックで指定した日程にそのクラス、時刻（開始時刻～終了時刻の形式で書く）を追加する。別のクラスが書かれた場合は、その下に記載していく。並びとしては、上から順に、クラス自体の追加、クラスと時刻などの入力の部分及び追加ボタンなど、カレンダーです。これが3.1」。checkpoint75では③アンケート取込みページ内の2枚のカードとして実装していたが、これを全面的に作り直した。
+
+**ページ分割:** `GroupLessonClassPage`（3.1）・`GroupLessonEnrollmentPage`（3.2）を新設し、`ImportPage`から集団授業関連のXAML・コードビハインドを完全に削除して移設した。`MainWindow.xaml`の左ナビゲーションへ「3.1 集団授業クラス」「3.2 集団授業の受講登録」を③の直後に追加（他の①〜⑥と同じ常設表示。プロジェクト未選択時・`ConsiderGroupLessons`がオフのprojectでは、他ページの`EnsureProject`と同じ要領で`ProjectRequired`のInfoBarに理由を表示しコンテンツを無効化する`EnsureGroupLessonsEnabled()`を両ページへ追加）。
+
+**3.1のカレンダーUI（本checkpointの主要作業）:** ユーザー指定の並び順（クラス登録→クラス+時刻入力+追加ボタン→カレンダー）で再構築した。
+- クラスの開講日程は、従来の「①設定のコマ（TimeSlot）から選ぶ」方式から、「開始時刻・終了時刻を自由入力する」方式へ変更（Python版`GroupLesson`の`start_time`/`end_time`という自由入力設計に近い形。個別指導の時間割コマとは独立した概念とした）。`GroupLessonSession`テーブルを`TimeSlotId`列から`StartTime`/`EndTime`（TEXT、HH:mm）列へ変更。同日開発サイクル内の未リリース機能で実データが無いため、`SqliteProjectSchema`に「`GroupLessonSession`が旧`TimeSlotId`列を持っていたら一度DROPして作り直す」一回限りの処理を追加した（通常の列追加パターンでは列の削除・型変更ができないため）。
+- カレンダーは①設定「コマ・開校日」タブの月表示カレンダー（`SetupPage.RenderCourseDayCalendar`）と同じ「連続日付を7列へ折り返す」構築方式を踏襲しつつ、日付セルへ実際に`CheckBox`コントロールを配置（①設定側はタップでハイライトのみで文字通りのチェックボックスは無かったため、今回はユーザー指定通り明示的なCheckBoxにした）。セル内には、その日に登録済みの全クラスのセッションを「クラス名 開始～終了」の形で縦に積んで表示し、各行に削除ボタン（×）を付けた。
+- 追加フロー: クラスComboBox・開始/終了`TimePicker`を選び、カレンダーで複数日にチェックを入れてから「選択した日に追加」を押すと、選択した全日付へ同じクラス・時刻のセッションを一括登録する（`IGroupLessonService.AddSessionsAsync`、単一transaction、`INSERT ... ON CONFLICT DO NOTHING`で同一内容の再追加はエラーにせず無視）。
+- `IGroupLessonService`の該当APIを全面変更: `GetSessionsAsync(classId)`/`AddSessionAsync(1件)`を廃止し、`GetCalendarDatesAsync`（project全期間のOpenDate一覧）・`GetAllSessionsAsync`（全クラス分のセッションをOpenDateId付きで返す。カレンダーは特定の1クラスだけでなく登録済み全クラスを表示するため）・`AddSessionsAsync`（複数日付への一括追加）へ置き換えた。
+
+**⑥出力のKeyNotFoundException修正（本checkpoint中に実機ログから発見・対応）:** アプリ再起動時にログ（`app-20260919.log`）を確認したところ、ユーザーが実際に⑥出力を実行した際`KeyNotFoundException`でクラッシュしていた記録を発見した。原因は`ExcelScheduleReportRenderer.RenderOverall`/`PdfScheduleReportRenderer.RenderOverall`が`teacherLabels`（講師名→表示ラベルの辞書）を`report.Rows`（実際に配置がある行）だけから構築していたため、出勤不可情報（`TeacherUnavailability`）は登録されているが最終的に一度も配置されなかった講師がいると、`teacherLabels[u.Teacher]`でキーが見つからず例外になっていた。`report.Rows`と`report.TeacherUnavailabilities`両方の講師名を渡すよう修正（Excel・PDF両方）。再現テスト`GenerateAsync_TeacherWithUnavailabilityButNoAssignments_DoesNotThrow`を追加し、修正前は実際にこのテストが失敗する（PDF側の同一バグも連鎖して検出した）ことを確認した上で両方修正した。この不具合は今回のcheckpointの作業内容とは無関係だが、実機ログに実際のクラッシュ記録があり⑥出力全体をブロックする重大度のため、その場で調査・修正した。
+
+**動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全134 tests passed（`SqliteGroupLessonServiceTests`を新API向けに全面書き直し・5件、`SqliteOutputPackageServiceTests`に1件追加）。アプリを`dotnet run`で再起動しログにcrash記録がないことを確認。3.1/3.2のページ分割・カレンダーの実際の見た目・追加/削除操作、⑥出力が実際に成功するかは、いずれもこの環境からは視覚確認できないため実機でユーザーに確認をお願いしたい。
+
+**未対応・意図的にスコープ外:** 前checkpoint同様、集団授業の受講時間帯を④⑤の個別指導スケジューリングへは連携していない（データの登録・カレンダー表示のみ）。
 
 ### 次回最初に確認するファイル
 

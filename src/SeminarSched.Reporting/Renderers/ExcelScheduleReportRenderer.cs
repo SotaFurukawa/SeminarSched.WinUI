@@ -18,7 +18,9 @@ public sealed class ExcelScheduleReportRenderer
         using var workbook = new XLWorkbook();
         WriteOverviewMetadataSheet(workbook.AddWorksheet("出力情報"), report);
 
-        var teacherLabels = WeeklyCalendarLayout.BuildTeacherLabels(report.Rows.Select(x => x.Teacher));
+        // report.Rowsだけから作ると、配置が1件も無い（が出勤不可情報だけ提出済みの）講師がTeacherUnavailabilities
+        // 側にしか登場せずKeyNotFoundExceptionになるため、両方の集合の講師名を渡す。
+        var teacherLabels = WeeklyCalendarLayout.BuildTeacherLabels(report.Rows.Select(x => x.Teacher).Concat(report.TeacherUnavailabilities.Select(u => u.Teacher)));
         var studentLabels = WeeklyCalendarLayout.BuildStudentLabels(report.Rows.Select(x => x.Student));
         var overviewAssignments = report.Rows.Select(r => new OverviewAssignment(DateOnly.Parse(r.Date), teacherLabels[r.Teacher], r.TimeSlot, r.StudentGrade, r.SubjectShortName, studentLabels[r.Student])).ToArray();
         var overviewUnavailabilities = report.TeacherUnavailabilities.Select(u => new OverviewUnavailability(DateOnly.Parse(u.Date), teacherLabels[u.Teacher], u.TimeSlot)).ToArray();
