@@ -6,14 +6,14 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.2.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 77（集団授業3.1/3.2を独立ページ＋カレンダーUIへ全面書き直し、⑥出力のKeyNotFoundExceptionを修正）。ユーザーより本checkpoint完了後にv0.3.0としてDraft Release作成の指示あり。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
-Latest Draft Release: `v0.2.0`（GitHub上にDraftとして作成済み。checkpoint 55〜73の内容をまとめてユーザーより「新しいバージョンとしてリリースしてほしい」との指示を受け作成。詳細は[docs/releases/v0.2.0.md](releases/v0.2.0.md)）
+Current Version: `v0.3.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
+Latest Development Checkpoint: checkpoint 77（集団授業3.1/3.2を独立ページ＋カレンダーUIへ全面書き直し、⑥出力のKeyNotFoundExceptionを修正）+ v0.3.0 Draft Release作成。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
+Latest Draft Release: `v0.3.0`（GitHub上にDraftとして作成済み。checkpoint 74〜77の内容をまとめてユーザーより「実装ができたらv0.3.0として一旦ドラフトリリースしてほしい」との指示を受け作成。詳細は[docs/releases/v0.3.0.md](releases/v0.3.0.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
 
-- v0.2.0 Draft Release後のbug fix / minor change -> `v0.2.1`
-- v0.2.0 Draft Release後のnew feature -> `v0.3.0`
+- v0.3.0 Draft Release後のbug fix / minor change -> `v0.3.1`
+- v0.3.0 Draft Release後のnew feature -> `v0.4.0`
 - `v1.0.0` -> ユーザーの明示指示がある場合のみ
 
 ### 実装済み
