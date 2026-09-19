@@ -45,6 +45,8 @@ public sealed partial class QuestionnairePage : WorkflowPageBase
         finally { IsEnabled=true; }
     }
 
+    private async void Guide_Click(object sender, RoutedEventArgs e) => await GoogleFormsGuide.ShowAsync(XamlRoot);
+
     private void OpenFolder_Click(object sender, RoutedEventArgs e)
     {
         if (_lastOutputDirectory is null) return;

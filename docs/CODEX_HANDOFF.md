@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.2.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 73（④「配置一覧」「自動作成の差分」の生徒ID非表示・日付連動・詳細情報追加）+ v0.2.0 Draft Release作成。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
+Latest Development Checkpoint: checkpoint 74（②アンケート作成に画像付き「作成手順」ポップアップを移植）。v0.2.0 Draft Release後の最初の追加checkpointのため、次のリリース判断は本書「Next Version Rule」に従うこと。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
 Latest Draft Release: `v0.2.0`（GitHub上にDraftとして作成済み。checkpoint 55〜73の内容をまとめてユーザーより「新しいバージョンとしてリリースしてほしい」との指示を受け作成。詳細は[docs/releases/v0.2.0.md](releases/v0.2.0.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -949,6 +949,19 @@ checkpoint72完了後、ユーザーから「④時間割編集のcard周りの�
 **動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全126 tests passed（`GetAssignmentsAsync`の新しい`openDateId`引数はすべて省略可能なため既存テストは無修正で通過。`GetLabelSetAsync_ResolvesRequestTeacherDateAndSlotLabels`はExternalIdの有無を検証していなかったため無修正で通過）。アプリを再ビルド・起動確認済み（ログにcrash記録なし）。実際の見た目（ラベルの表示内容・日付切替時の一覧の絞り込み）はユーザー側で確認をお願いしたい。
 
 **未対応・意図的にスコープ外:** 事前確定・手動配置の生徒選択ComboBox（`ManualRequest`/`PreconfirmRequest`、`SqliteFixedLessonService.GetRequestsAsync`）はもともと`ExternalId`を含んでいなかったため対象外。配置可能コマのヒント（`AvailableSlotCodes`相当）は未配置一覧に限定される概念（既に配置済みのカードには「配置可能な別のコマ」という情報は無い）と判断し、配置一覧・差分カードへは追加していない。
+
+### v0.2.0 checkpoint 74 (Claude) — ②アンケート作成に画像付き「作成手順」ポップアップを移植
+
+v0.2.0 Draft Release直後、ユーザーから「アンケート作成について、元のpython版では画像付きの説明書があったはずです。それを表示できるようにしてください。また、それをポップアップできるような仕様にしてください。画像はpy版をそのまま流用してもOKです。」との指示。Explore subagentでPython参照repoを調査し、`ui/qml/GoogleFormsGuideDialog.qml`（10手順・画像13枚のスクリーンショット付きガイド、`ui/qml/QuestionnaireCreationPage.qml`の「作成手順」ボタンから開くモーダルDialog）が該当機能だと特定した。画像は`ui/qml/assets/google_forms_guide/`配下の13枚（Windows Explorer・メモ帳・Apps Scriptエディタ・Google認証画面のスクリーンショットのみで個人情報は含まない）で、Apps Script側の生成物（`.gs`3本＋手順書txt）には含まれず、あくまでアプリ内ポップアップ専用のアセットだった。
+
+**実装:**
+- Python版の13枚のPNGをそのまま`Assets/GoogleFormsGuide/`へコピーし、`.csproj`へ`<Content Include="Assets\GoogleFormsGuide\*.png" />`を追加。
+- 新規`GoogleFormsGuide.cs`（`SeminarSched_WinUI`名前空間、`TaskbarProgress.cs`等と同じ場所に配置）に、Python版の10手順（番号・タイトル・説明文・画像1〜2枚・補足の注意書き）をそのままのテキストで移植した静的データと、`ContentDialog`向け・別ウィンドウ向けの両方から呼べる`BuildContent()`ファクトリメソッドを実装。
+- `ShowAsync(XamlRoot)`: `ContentDialog`（既定の548px幅制限を`dialog.Resources["ContentDialogMaxWidth/MinWidth"]`の上書きで1100pxへ拡張するWinUI3の既知の回避策を使用）に手順を表示。Primaryボタン「別ウィンドウで表示」を押すとダイアログを閉じてから独立した`Window`（`AppWindow.Resize`で1180x820、`OverlappedPresenter.PreferredMinimumWidth/Height`で760x560を下限に設定）で同じ内容を開き直す（Python版の「モーダルのまま手順書を見ながら他アプリを操作できない」という不便さへの対策をそのまま踏襲）。
+- 手順4の説明文中のURL（`https://script.google.com/home`）だけを正規表現で検出し`Hyperlink`化、クリックで`Windows.System.Launcher.LaunchUriAsync`により既定ブラウザーを開く（Python版の`Qt.openUrlExternally`相当）。
+- `QuestionnairePage.xaml`に「作成手順」ボタンを追加（プロジェクト未選択でも操作可能。手順自体はプロジェクト固有のデータに依存しないため）。
+
+**動作確認:** Release/x64 build警告0・エラー0。画像がAppXパッケージへ正しく含まれること（`bin\x64\Release\...\AppX\Assets\GoogleFormsGuide\*.png`）をビルド出力で確認。アプリを`dotnet run`で再起動しログにcrash記録がないことを確認。ダイアログの実際の見た目・画像の表示・「別ウィンドウで表示」の動作は、この環境からは視覚確認できないため、実機でユーザーに確認をお願いしたい。
 
 ### 次回最初に確認するファイル
 
