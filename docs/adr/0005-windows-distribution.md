@@ -1,6 +1,6 @@
 # ADR 0005: Windows配布方式
 
-- Status: Accepted for v0.1.0
+- Status: Accepted for v0.1.0。v0.3.1でSetup.exeラッパー方式を追記（Amended 2026-09-20）
 - Date: 2026-09-17
 
 ## Decision
@@ -35,4 +35,12 @@
 
 - 正式なコード署名証明書の購入、Microsoft Store配布は今後ユーザーから明示的な指示があった場合のみ検討する。
 - ARM64/x86向けパッケージ生成、複数platformをまとめた`.msixbundle`化は必要になった時点で追加する。
-- Draft Releaseへの`.msix`/`.cer`添付は、実インストール確認が取れてから行う。
+
+## Amendment（v0.3.1、2026-09-20）: Inno Setupラッパー方式の追加
+
+ユーザーから「Python版で使っていたインストーラ形式にできないか」との要望を受け、Python版の`installer\SummerCourseScheduler.iss`（Inno Setup、日本語ウィザード、管理者権限不要）と同じ体裁のSetup.exeを追加した。ただしPython版はポータブルEXEをそのままコピーするだけだったのに対し、本アプリはMSIXパッケージのため、Setup.exeは内部で「`.cer`をCurrentUser\TrustedPeopleへ登録 → `Add-AppxPackage`でインストール」を`[Code]`セクションから呼び出す薄いラッパーとして実装した（`installer\SeminarSched.WinUI.iss`、`installer\Install-Package.ps1`/`Uninstall-Package.ps1`、`scripts\New-Installer.ps1`）。
+
+- **本アプリの実機（証明書がLocalMachine\TrustedPeopleへも既に登録済みの開発機）で、Setup.exeのインストール→`shell:AppsFolder`経由の起動→登録済みアンインストーラでの削除まで、管理者権限なし（`PrivilegesRequired=lowest`）で一通り成功することを確認した。** デスクトップアイコンのタスクを有効にした場合のショートカット動作も確認済み。
+- **未解決の疑問（上記「検証状況」との矛盾）:** 本ADR冒頭の検証状況には「`CurrentUser\TrustedPeople`だけでは`Add-AppxPackage`の信頼として不足することを実機で確認した」との記載があるが、今回の検証は`LocalMachine\TrustedPeople`にも同じ証明書が既に登録済みの状態で行っており、`CurrentUser\TrustedPeople`単独で十分かどうかを完全には切り分けられていない（`LocalMachine`側の証明書を管理者権限なしで一時的に削除できず、切り分け検証ができなかった）。Microsoft公式のsideloadガイドでは`CurrentUser\TrustedPeople`のみで per-user の`Add-AppxPackage`は成立するはずだが、本ADR記載時点の過去の失敗がDeveloper Mode未有効化など別要因だった可能性も残る。
+- **推奨される次の検証:** 一度もこの証明書を信頼していない別のWindows PC（またはこの証明書をLocalMachineから削除できる管理者環境）でSetup.exeを実行し、`PrivilegesRequired=lowest`のままで実際にインストールが成功するかを確認する。失敗する場合は、`installer\SeminarSched.WinUI.iss`の`PrivilegesRequired`を`admin`に変更し、`Install-Package.ps1`の登録先を`Cert:\LocalMachine\TrustedPeople`（`Import-Certificate -CertStoreLocation Cert:\LocalMachine\TrustedPeople`、要管理者権限）へ切り替える。
+- Draft Releaseへの`.msix`/`.cer`/Setup.exeの添付は、上記の実機インストール確認が取れたため開始した（v0.3.1から）。

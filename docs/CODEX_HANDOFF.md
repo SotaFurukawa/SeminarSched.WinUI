@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.3.1 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 79（実験的「デザイン設定」テンプレートシート、生徒配布・講師配布xlsxの校舎別カスタマイズ）。v0.3.1 Draft Release後の追加checkpointのため、次のリリース判断は本書「Next Version Rule」に従うこと。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」は実験的機能であり、実機確認の結果次第で採用・廃止が未確定（本書「9. 現在の既知の未実装・保留事項」参照）。
+Latest Development Checkpoint: checkpoint 80（Inno SetupラッパーによるSetup.exe追加、GitHub Releaseへの`.msix`/`.cer`/Setup.exe添付）。v0.3.1 Draft Release後の追加checkpointのため、次のリリース判断は本書「Next Version Rule」に従うこと。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」は実験的機能であり、実機確認の結果次第で採用・廃止が未確定（本書「9. 現在の既知の未実装・保留事項」参照）。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。
 Latest Draft Release: `v0.3.1`（GitHub上にDraftとして作成済み。checkpoint 78〜79の内容をまとめてユーザーより「そうした不備以外のところが実装できたら新たにドラフトリリースしてほしい」との指示を受け作成。詳細は[docs/releases/v0.3.1.md](releases/v0.3.1.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -1050,6 +1050,32 @@ checkpoint 78で明示的にスコープ外とした実験的機能（「でき�
 **新規/更新テスト:** `SqliteOutputPackageServiceTests.GenerateAsync_HandoutStyleSheet_RoundTripsCustomizationFromPreviousOutput`を追加。1回目の出力→「デザイン設定」シートの氏名文字サイズと学力テスト行背景色を直接編集・保存→2回目の出力を実行し、(a)実際の生徒配布ページへ編集後の値が反映される、(b)2回目のテンプレートシート自体も編集値を引き継いで表示する、(c)編集していない項目（タイトルフォント名等）は既定値のまま、の3点を検証。`dotnet test`全136 tests passed。
 
 **未確定事項（ユーザーへの報告が必要）:** この機能は「やってみて良ければ採用、微妙なら廃止」という前提で実装した実験的機能である。実機でExcel上の見た目・編集のしやすさ・往復動作を確認した上で、採用するか元の固定書式に戻すか判断してもらう必要がある。
+
+### v0.3.1 checkpoint 80 (Claude) — Inno SetupラッパーによるSetup.exe追加、GitHub Releaseへのインストーラ添付
+
+v0.3.1のDraft Release作成後、ユーザーから「Draft Releaseにインストーラも置きたい、どうすれば表示されるか」との質問を受けた。
+
+**GitHub Releaseへの添付自体の解消:** 元々`scripts\New-MsixPackage.ps1`/`New-SigningCertificate.ps1`は存在していたが、生成物をGitHub Releaseへ`gh release upload`する手順が一度も実行されていなかっただけだった。v0.3.1のDraft Releaseへ`SeminarSched.WinUI-0.3.1-x64.msix`と`SeminarSched.WinUI.cer`を手動アップロードして即座に解消。ユーザーへ「今後もこのPCから手動ビルド」か「CI自動化（署名鍵をGitHub Secretsへ登録する必要あり）」かを確認したところ、**署名鍵をこのPCの外に出さない設計を維持するため手動ビルドを選択**（[[git-github-workflow]]memoryへ記録済み）。
+
+**「Python版と同じインストーラ形式にしたい」という追加要望への対応:** ユーザーの過去のPython版（`seminarSched`repo）は`installer\SummerCourseScheduler.iss`でInno Setupを使い、管理者権限不要（`PrivilegesRequired=lowest`）・日本語ウィザード・任意のデスクトップアイコン・インストール後に起動、という体裁のポータブルEXEインストーラだった。本アプリは（Python版と異なり）MSIXパッケージ配布のため、単純にファイルをコピーするだけでは済まない。そこで、Python版と同じ見た目・体験のSetup.exeを維持しつつ、中身は「MSIXを裏側で自動インストールするラッパー」として実装した。
+
+- `installer\SeminarSched.WinUI.iss`: Python版の`.iss`と同じ構成（`PrivilegesRequired=lowest`、`DefaultDirName={localappdata}\Programs\...`、Japanese.isl、任意のデスクトップアイコンtask、`[Run]`でインストール後起動）。`[Code]`セクションの`CurStepChanged(ssPostInstall)`で同梱の`Install-Package.ps1`を呼び出し、`[UninstallRun]`で`Uninstall-Package.ps1`を呼び出す。
+- `installer\Install-Package.ps1`: 同梱の`.cer`を`Cert:\CurrentUser\TrustedPeople`へ登録し（管理者権限不要）、`Add-AppxPackage`で`.msix`をインストールする。
+- `installer\Uninstall-Package.ps1`: `Get-AppxPackage -Name <IdentityName> | Remove-AppxPackage`でAppXパッケージを削除する（証明書のTrustedPeople登録自体は他のバージョンへ影響しうるため意図的に残す）。
+- Start Menu/デスクトップの各ショートカットは、実ファイルではなくパッケージのため`explorer.exe shell:AppsFolder\<PackageFamilyName>!App`という標準的なmonikerを使う（`Filename: "{win}\explorer.exe"` + `Parameters`）。PackageFamilyName（`F70149DC-...!47fbr72rn8fp2`）はIdentity Name・Publisherが変わらない限り安定するため`.iss`内に定数として持たせた（実機の`Get-AppxPackage`出力で確認済み）。
+- `scripts\Install-InnoSetup.ps1`: Python版の`scripts\install_inno_setup_ci.ps1`と全く同じ方式（Authenticodeの署名検証込みでInno Setupポータブル版をrepo内`build\`へ限定インストール）を移植。`scripts\New-Installer.ps1`: 上記を束ね、無ければ`.msix`/`.cer`を先に作った上でISCC.exeを実行し`dist\SeminarSched.WinUI-Setup-<version>.exe`を作る。
+
+**実機での動作確認（この開発機で実施可能だった。UAC不要な設計にしたためVSCode拡張のシェルからでも最後まで自動実行できた）:**
+- `dotnet run`によるloose-file開発登録を`Remove-AppxPackage`で一旦外した上で、`Add-AppxPackage`で正式な署名済み`.msix`をper-user・管理者権限なしでインストールできることを確認（`SignatureKind: Developer`、インストール先が正式な`C:\Program Files\WindowsApps\...`になることを確認）。
+- コンパイル済みSetup.exeを`/VERYSILENT`で実行し、UACプロンプト無しで正常終了（終了コード0）、AppXパッケージ登録・「アプリと機能」への登録・`shell:AppsFolder`経由の起動が成功することを確認。
+- デスクトップアイコンtaskを有効にした場合のショートカット生成・そのショートカットからの起動も確認。
+- 登録済みアンインストーラを`/VERYSILENT`で実行し、AppXパッケージ・インストールフォルダ・「アプリと機能」の登録がすべて消えるクリーンな削除を確認。
+
+**未解決の疑問（ユーザーへの報告が必要）:** ADR 0005には元々「`CurrentUser\TrustedPeople`だけでは`Add-AppxPackage`の信頼として不足することを実機で確認した」という過去の記載がある。今回の検証機は同じ証明書が`LocalMachine\TrustedPeople`にもcheckpoint39から既に登録済みだったため、`CurrentUser\TrustedPeople`単独で十分かどうかを完全には切り分けられていない（`LocalMachine`側を管理者権限なしで一時的に削除できなかったため）。Microsoft公式のsideloadガイドでは`CurrentUser\TrustedPeople`のみで per-user の`Add-AppxPackage`は成立するはずだが、**この証明書を一度も信頼したことが無い別のPCで実際に試してもらうまでは、`PrivilegesRequired=lowest`のまま動くと断言はできない**。もし別PCで失敗した場合は、`installer\SeminarSched.WinUI.iss`の`PrivilegesRequired`を`admin`に変更し、`Install-Package.ps1`の登録先を`Cert:\LocalMachine\TrustedPeople`（要管理者権限）へ切り替えれば解決するはず（詳細はADR 0005のAmendment参照）。
+
+**Draft Releaseへの反映:** v0.3.1のDraft Releaseへ`SeminarSched.WinUI-Setup-0.3.1.exe`を追加アップロード（既存の`.msix`/`.cer`はそのまま残し、上級者向けの代替手段として維持）。
+
+**動作確認:** 上記の通りInstall/Launch/Uninstallの一連の流れを実機で確認済み。C#側のコード変更は無いため`dotnet build`/`dotnet test`への影響は無し。
 
 ### 次回最初に確認するファイル
 
