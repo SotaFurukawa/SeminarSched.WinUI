@@ -37,9 +37,32 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
 
         using var studentHandouts=new XLWorkbook(result.StudentHandoutsExcelPath);
         Assert.Contains(studentHandouts.Worksheets,ws=>ws.Name=="中2_架空 生徒");
-        var studentCells=studentHandouts.Worksheet("中2_架空 生徒").CellsUsed().Select(cell=>cell.GetString()).ToArray();
+        var handoutSheet=studentHandouts.Worksheet("中2_架空 生徒");
+        var studentCells=handoutSheet.CellsUsed().Select(cell=>cell.GetString()).ToArray();
         Assert.Contains(studentCells,text=>text=="数");
         Assert.DoesNotContain(studentCells,text=>text.Contains("架空",StringComparison.Ordinal)&&text.Contains("数",StringComparison.Ordinal));
+
+        // ユーザー指定の書式（1ページ形式の生徒配布時間割）: 列幅・1行目の反転配色・氏名の文字サイズ・
+        // 学年欄の左右揃え・曜日=9pt・日の背景色・学力テスト行の背景色をピンポイントで検証する。
+        Assert.Equal(Math.Round((54-5)/7.0,2),handoutSheet.Column(1).Width);
+        Assert.Equal(Math.Round((96-5)/7.0,2),handoutSheet.Column(2).Width);
+        Assert.Equal(Math.Round((64-5)/7.0,2),handoutSheet.Column(3).Width);
+        var handoutTitle=handoutSheet.Cell(1,1);
+        Assert.Equal(XLColor.Black,handoutTitle.Style.Fill.BackgroundColor);
+        Assert.Equal(XLColor.White,handoutTitle.Style.Font.FontColor);
+        Assert.Equal("BIZ UDPMincho Medium",handoutTitle.Style.Font.FontName);
+        Assert.Equal(16,handoutTitle.Style.Font.FontSize);
+        Assert.Equal(XLAlignmentHorizontalValues.Right,handoutSheet.Cell(4,2).Style.Alignment.Horizontal);
+        Assert.Equal(XLAlignmentHorizontalValues.Left,handoutSheet.Cell(4,4).Style.Alignment.Horizontal);
+        Assert.Equal(14,handoutSheet.Cell(4,6).Style.Font.FontSize);
+        Assert.Equal("HG丸ゴシックM-PRO",handoutSheet.Cell(7,3).Style.Font.FontName);
+        Assert.Equal(9,handoutSheet.Cell(8,3).Style.Font.FontSize);
+        Assert.Equal(9,handoutSheet.Cell(9,3).Style.Font.FontSize);
+        Assert.Equal(XLColor.FromHtml("#90CAFE"),handoutSheet.Cell(9,3).Style.Fill.BackgroundColor);
+        Assert.Equal(XLColor.FromHtml("#BFBFBF"),handoutSheet.Cell(7,1).Style.Fill.BackgroundColor);
+        var academicTestRow=handoutSheet.CellsUsed().First(cell=>cell.GetString().Contains("学力テスト",StringComparison.Ordinal)).Address.RowNumber;
+        Assert.Equal(XLColor.FromHtml("#95B3D7"),handoutSheet.Cell(academicTestRow,1).Style.Fill.BackgroundColor);
+        Assert.Equal(XLColor.FromHtml("#95B3D7"),handoutSheet.Cell(academicTestRow,9).Style.Fill.BackgroundColor);
 
         using var teacherHandouts=new XLWorkbook(result.TeacherHandoutsExcelPath);
         var teacherCells=teacherHandouts.Worksheet("中2_架空 生徒").CellsUsed().Select(cell=>cell.GetString()).ToArray();
@@ -139,6 +162,8 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         Assert.Equal("通常担当不足",warningRow.Cell(2).GetString());
         Assert.Contains("架空 通常担当",warningRow.Cell(6).GetString());
         Assert.Contains("目標2回中0回",warningRow.Cell(7).GetString());
+        // 科目名は略称(ShortName)のみで表示する（「数学」ではなく「数」）。全xlsxで統一する仕様。
+        Assert.StartsWith("数：通常担当",warningRow.Cell(7).GetString());
 
         Assert.True(Directory.Exists(result.TeacherPacketDirectory));
         var substituteFile=Path.Combine(result.TeacherPacketDirectory,"架空 代講t.xlsx");
@@ -226,6 +251,48 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
 
         var result=await new SqliteOutputPackageService().GenerateAsync(path,_directory);
         Assert.True(new FileInfo(result.OverallExcelPath).Length>500);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_OverviewGrid_SharesOneComaLabelColumnAcrossAllDaysInAWeek()
+    {
+        // ユーザー指示によるPython版からの意図的な差分: 週の中に複数日・複数講師の出勤があっても、
+        // 「コマ」ラベル（時刻テキスト）は週の先頭（A列）に1回だけ置き、日付ごとに繰り返さない。
+        Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"shared-coma-label.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,21)));
+        var m=new SqliteMasterDataRepository();
+        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));
+        var teacher1=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 一郎"));
+        var teacher2=await m.SaveTeacherAsync(path,new Teacher(0,"T-002","架空 二郎"));
+        var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));
+        var course=new SqliteCourseSettingsRepository();
+        var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));
+        await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
+        await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,21),true,"",[slot.Id]));
+        await using(var c=new SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            await c.OpenAsync();await using var q=c.CreateCommand();
+            q.CommandText=$"""
+                INSERT INTO LessonRequest(Id,ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,1,{student.Id},{sub.Id},2);
+                INSERT INTO Assignment(LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source)
+                  SELECT 1,{teacher1.Id},d.Id,{slot.Id},0,'test' FROM OpenDate d WHERE d.Date='2026-07-20';
+                INSERT INTO Assignment(LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source)
+                  SELECT 1,{teacher2.Id},d.Id,{slot.Id},0,'test' FROM OpenDate d WHERE d.Date='2026-07-21';
+                """;
+            await q.ExecuteNonQueryAsync();
+        }
+
+        var result=await new SqliteOutputPackageService().GenerateAsync(path,_directory);
+        using var overall=new XLWorkbook(result.OverallExcelPath);
+        var week=overall.Worksheets.First(ws=>ws.Name.StartsWith("週_",StringComparison.Ordinal));
+        var labelCells=week.CellsUsed().Where(cell=>cell.GetString()=="1\n09:00–10:00").ToArray();
+        var labelCell=Assert.Single(labelCells);
+        Assert.Equal(1,labelCell.Address.ColumnNumber);
+        Assert.Equal(XLAlignmentHorizontalValues.Center,labelCell.Style.Alignment.Horizontal);
+        Assert.Contains(week.CellsUsed(),cell=>cell.GetString()=="架空一");
+        Assert.Contains(week.CellsUsed(),cell=>cell.GetString()=="架空二");
+        Assert.Equal(Math.Round((45-5)/7.0,2),week.Column(1).Width);
+        Assert.Equal(Math.Round((30-5)/7.0,2),week.Column(2).Width);
     }
 
     public void Dispose(){if(Directory.Exists(_directory))Directory.Delete(_directory,true);}

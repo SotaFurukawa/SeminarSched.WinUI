@@ -41,7 +41,7 @@ public sealed partial class GroupLessonEnrollmentPage : WorkflowPageBase
         var path = App.ProjectService.Current?.Path; if (path is null) return;
         var previousClassId = (EnrollmentClass.SelectedItem as GroupClassRow)?.Value.Id;
         var classes = await App.GroupLessons.GetClassesAsync(path);
-        var rows = classes.Select(c => new GroupClassRow(c, $"{c.Name}　（{c.Grade}）{(c.AllowOtherGrades ? "　他学年可" : "")}{(c.Active ? "" : "　[停止]")}")).ToArray();
+        var rows = classes.Select(c => new GroupClassRow(c, $"{c.Name}　{c.Subject}　（{c.Grade}）{(c.AllowOtherGrades ? "　他学年可" : "")}{(c.Active ? "" : "　[停止]")}")).ToArray();
         EnrollmentClass.ItemsSource = rows;
         EnrollmentClass.SelectedItem = rows.FirstOrDefault(r => r.Value.Id == previousClassId) ?? rows.FirstOrDefault();
     }
@@ -54,7 +54,7 @@ public sealed partial class GroupLessonEnrollmentPage : WorkflowPageBase
             return;
         }
         _selectedClassId = row.Value.Id;
-        EnrollmentClassInfo.Text = $"対象学年: {row.Value.Grade}{(row.Value.AllowOtherGrades ? "（他学年の受講も許可）" : "")}";
+        EnrollmentClassInfo.Text = $"科目: {row.Value.Subject}　対象学年: {row.Value.Grade}{(row.Value.AllowOtherGrades ? "（他学年の受講も許可）" : "")}";
         await ReloadCandidatesAsync();
     }
 

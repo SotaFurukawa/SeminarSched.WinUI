@@ -7,7 +7,7 @@ namespace SeminarSched.Domain.GroupLessons;
 // （同じ学年で複数クラスを持てる、受講登録はクラス単位で1回で済む）。
 public sealed record GroupLessonClass
 {
-    public GroupLessonClass(long id, string name, string grade, bool allowOtherGrades = false, bool active = true)
+    public GroupLessonClass(long id, string name, string grade, string subject, bool allowOtherGrades = false, bool active = true)
     {
         if (id < 0) throw new ArgumentOutOfRangeException(nameof(id));
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -15,6 +15,9 @@ public sealed record GroupLessonClass
         Id = id;
         Name = name.Trim();
         Grade = grade.Trim();
+        // UI（3.1画面）では必須入力として扱うが、列追加前に作成された既存クラス（値が空文字列）を
+        // 読み戻せなくなるとGetClassesAsync全体が壊れるため、ドメイン型自体は空文字列を許容する。
+        Subject = subject?.Trim() ?? "";
         AllowOtherGrades = allowOtherGrades;
         Active = active;
     }
@@ -22,6 +25,10 @@ public sealed record GroupLessonClass
     public long Id { get; init; }
     public string Name { get; }
     public string Grade { get; }
+
+    // ①設定のSubjectマスタとは連動しない自由入力（プルダウンではなく手入力にしてほしいという
+    // ユーザー指示のため）。集団授業のクラス名だけでは科目が分からない場合があるための表示用途。
+    public string Subject { get; }
 
     // trueの場合、3.2の受講登録で対象学年による絞り込みを行わず全学年の生徒を選択対象にする
     // （先取り授業などクラスの対象学年以外の生徒も受講する場合向け）。

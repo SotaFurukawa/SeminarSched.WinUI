@@ -11,11 +11,11 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT Id,Name,Grade,AllowOtherGrades,Active FROM GroupLessonClass WHERE ProjectId=1 ORDER BY Grade,Name;";
+        command.CommandText = "SELECT Id,Name,Grade,Subject,AllowOtherGrades,Active FROM GroupLessonClass WHERE ProjectId=1 ORDER BY Grade,Name;";
         var result = new List<GroupLessonClass>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            result.Add(new GroupLessonClass(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetBoolean(3), reader.GetBoolean(4)));
+            result.Add(new GroupLessonClass(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetBoolean(4), reader.GetBoolean(5)));
         return result;
     }
 
@@ -28,13 +28,13 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
         {
             if (value.Id == 0)
             {
-                command.CommandText = "INSERT INTO GroupLessonClass(ProjectId,Name,Grade,AllowOtherGrades,Active) VALUES(1,$name,$grade,$allow,$active); SELECT last_insert_rowid();";
-                command.Parameters.AddWithValue("$name", value.Name); command.Parameters.AddWithValue("$grade", value.Grade); command.Parameters.AddWithValue("$allow", value.AllowOtherGrades); command.Parameters.AddWithValue("$active", value.Active);
+                command.CommandText = "INSERT INTO GroupLessonClass(ProjectId,Name,Grade,Subject,AllowOtherGrades,Active) VALUES(1,$name,$grade,$subject,$allow,$active); SELECT last_insert_rowid();";
+                command.Parameters.AddWithValue("$name", value.Name); command.Parameters.AddWithValue("$grade", value.Grade); command.Parameters.AddWithValue("$subject", value.Subject); command.Parameters.AddWithValue("$allow", value.AllowOtherGrades); command.Parameters.AddWithValue("$active", value.Active);
                 var id = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
                 return value with { Id = id };
             }
-            command.CommandText = "UPDATE GroupLessonClass SET Name=$name,Grade=$grade,AllowOtherGrades=$allow,Active=$active WHERE Id=$id; SELECT changes();";
-            command.Parameters.AddWithValue("$name", value.Name); command.Parameters.AddWithValue("$grade", value.Grade); command.Parameters.AddWithValue("$allow", value.AllowOtherGrades); command.Parameters.AddWithValue("$active", value.Active); command.Parameters.AddWithValue("$id", value.Id);
+            command.CommandText = "UPDATE GroupLessonClass SET Name=$name,Grade=$grade,Subject=$subject,AllowOtherGrades=$allow,Active=$active WHERE Id=$id; SELECT changes();";
+            command.Parameters.AddWithValue("$name", value.Name); command.Parameters.AddWithValue("$grade", value.Grade); command.Parameters.AddWithValue("$subject", value.Subject); command.Parameters.AddWithValue("$allow", value.AllowOtherGrades); command.Parameters.AddWithValue("$active", value.Active); command.Parameters.AddWithValue("$id", value.Id);
             var changed = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
             if (changed != 1) throw new InvalidOperationException("更新対象のクラスが見つかりません。");
             return value;

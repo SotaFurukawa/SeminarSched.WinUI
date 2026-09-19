@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:SeminarSched_WinUI.Pages"
+    NavigationCacheMode="Required"
     Loaded="Page_Loaded">
     <Grid RowDefinitions="Auto,*">
         <InfoBar Grid.Row="0" x:Name="ProjectRequired" Margin="24,16,24,0" />
@@ -18,14 +19,16 @@
                         <Grid ColumnSpacing="8">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="140" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBox x:Name="GroupClassName" Header="クラス名" />
-                            <ComboBox x:Name="GroupClassGrade" Grid.Column="1" Header="対象学年" IsEditable="True" />
-                            <CheckBox x:Name="GroupClassAllowOtherGrades" Grid.Column="2" Content="他学年の受講を許可" VerticalAlignment="Bottom" />
-                            <Button x:Name="SaveGroupClassButton" Grid.Column="3" VerticalAlignment="Bottom" Content="保存" Click="SaveGroupClass_Click" Style="{StaticResource AccentButtonStyle}" />
+                            <TextBox x:Name="GroupClassSubject" Grid.Column="1" Header="科目" />
+                            <ComboBox x:Name="GroupClassGrade" Grid.Column="2" Header="対象学年" IsEditable="True" />
+                            <CheckBox x:Name="GroupClassAllowOtherGrades" Grid.Column="3" Content="他学年の受講を許可" VerticalAlignment="Bottom" />
+                            <Button x:Name="SaveGroupClassButton" Grid.Column="4" VerticalAlignment="Bottom" Content="保存" Click="SaveGroupClass_Click" Style="{StaticResource AccentButtonStyle}" />
                         </Grid>
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button Content="新規入力" Click="NewGroupClass_Click" />
@@ -47,8 +50,22 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <ComboBox x:Name="SessionClassBox" Header="クラス" />
-                            <TimePicker x:Name="SessionStartTime" Grid.Column="1" Header="開始時刻" />
-                            <TimePicker x:Name="SessionEndTime" Grid.Column="2" Header="終了時刻" />
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Text="開始時刻" FontSize="12" />
+                                <StackPanel Orientation="Horizontal" Spacing="2">
+                                    <NumberBox x:Name="SessionStartHour" Minimum="0" Maximum="23" Value="17" SpinButtonPlacementMode="Compact" Width="68" />
+                                    <TextBlock Text=":" VerticalAlignment="Center" FontWeight="SemiBold" />
+                                    <NumberBox x:Name="SessionStartMinute" Minimum="0" Maximum="59" Value="10" SpinButtonPlacementMode="Compact" Width="68" />
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="4">
+                                <TextBlock Text="終了時刻" FontSize="12" />
+                                <StackPanel Orientation="Horizontal" Spacing="2">
+                                    <NumberBox x:Name="SessionEndHour" Minimum="0" Maximum="23" Value="18" SpinButtonPlacementMode="Compact" Width="68" />
+                                    <TextBlock Text=":" VerticalAlignment="Center" FontWeight="SemiBold" />
+                                    <NumberBox x:Name="SessionEndMinute" Minimum="0" Maximum="59" Value="30" SpinButtonPlacementMode="Compact" Width="68" />
+                                </StackPanel>
+                            </StackPanel>
                             <Button Grid.Column="3" VerticalAlignment="Bottom" Content="選択した日に追加" Click="AddSessionsToSelectedDates_Click" Style="{StaticResource AccentButtonStyle}" />
                         </Grid>
                         <StackPanel Orientation="Horizontal" Spacing="16">

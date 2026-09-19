@@ -26,8 +26,6 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
         var ready = EnsureGroupLessonsEnabled();
         ContentPanel.IsEnabled = ready;
         if (!ready) return;
-        SessionStartTime.Time = new TimeSpan(17, 10, 0);
-        SessionEndTime.Time = new TimeSpan(18, 30, 0);
         RenderWeekdayHeader();
         await ReloadClassesAsync();
         await ReloadCalendarDataAsync();
@@ -59,7 +57,7 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
         var path = App.ProjectService.Current?.Path; if (path is null) return;
         var previousSessionClassId = (SessionClassBox.SelectedItem as GroupClassRow)?.Value.Id;
         var classes = await App.GroupLessons.GetClassesAsync(path);
-        var rows = classes.Select(c => new GroupClassRow(c, $"{c.Name}　（{c.Grade}）{(c.AllowOtherGrades ? "　他学年可" : "")}{(c.Active ? "" : "　[停止]")}")).ToArray();
+        var rows = classes.Select(c => new GroupClassRow(c, $"{c.Name}　{c.Subject}　（{c.Grade}）{(c.AllowOtherGrades ? "　他学年可" : "")}{(c.Active ? "" : "　[停止]")}")).ToArray();
         GroupClasses.ItemsSource = rows;
         SessionClassBox.ItemsSource = rows;
         SessionClassBox.SelectedItem = rows.FirstOrDefault(r => r.Value.Id == previousSessionClassId) ?? rows.FirstOrDefault();
@@ -75,20 +73,21 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
             return;
         }
         _selectedGroupClass = row.Value;
-        GroupClassName.Text = row.Value.Name; GroupClassGrade.Text = row.Value.Grade; GroupClassAllowOtherGrades.IsChecked = row.Value.AllowOtherGrades;
+        GroupClassName.Text = row.Value.Name; GroupClassSubject.Text = row.Value.Subject; GroupClassGrade.Text = row.Value.Grade; GroupClassAllowOtherGrades.IsChecked = row.Value.AllowOtherGrades;
     }
 
     private async void SaveGroupClass_Click(object sender, RoutedEventArgs e)
     {
         var name = GroupClassName.Text?.Trim() ?? "";
+        var subject = GroupClassSubject.Text?.Trim() ?? "";
         var grade = (GroupClassGrade.Text ?? "").Trim();
-        if (name.Length == 0 || grade.Length == 0) { ShowError("クラス名と対象学年を入力してください。"); return; }
+        if (name.Length == 0 || subject.Length == 0 || grade.Length == 0) { ShowError("クラス名・科目・対象学年を入力してください。"); return; }
         try
         {
             IsEnabled = false;
             var path = App.ProjectService.Current?.Path ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
             var id = _selectedGroupClass?.Id ?? 0;
-            var saved = await App.GroupLessons.SaveClassAsync(path, new GroupLessonClass(id, name, grade, GroupClassAllowOtherGrades.IsChecked == true));
+            var saved = await App.GroupLessons.SaveClassAsync(path, new GroupLessonClass(id, name, grade, subject, GroupClassAllowOtherGrades.IsChecked == true));
             _selectedGroupClass = saved;
             await ReloadClassesAsync();
             await ReloadCalendarDataAsync();
@@ -103,7 +102,7 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
     private void NewGroupClass_Click(object sender, RoutedEventArgs e)
     {
         GroupClasses.SelectedItem = null; _selectedGroupClass = null;
-        GroupClassName.Text = ""; GroupClassGrade.Text = ""; GroupClassAllowOtherGrades.IsChecked = false;
+        GroupClassName.Text = ""; GroupClassSubject.Text = ""; GroupClassGrade.Text = ""; GroupClassAllowOtherGrades.IsChecked = false;
     }
 
     private async void DeleteGroupClass_Click(object sender, RoutedEventArgs e)
@@ -220,8 +219,8 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
     {
         if (SessionClassBox.SelectedItem is not GroupClassRow row) { ShowError("クラスを選択してください。"); return; }
         if (_selectedDateIds.Count == 0) { ShowError("カレンダーで日付を1件以上選択してください。"); return; }
-        var startTime = TimeOnly.FromTimeSpan(SessionStartTime.Time);
-        var endTime = TimeOnly.FromTimeSpan(SessionEndTime.Time);
+        var startTime = new TimeOnly(checked((int)SessionStartHour.Value), checked((int)SessionStartMinute.Value));
+        var endTime = new TimeOnly(checked((int)SessionEndHour.Value), checked((int)SessionEndMinute.Value));
         try
         {
             IsEnabled = false;

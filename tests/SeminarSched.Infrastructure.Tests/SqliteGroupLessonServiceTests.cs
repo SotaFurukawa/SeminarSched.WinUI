@@ -15,25 +15,25 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
     public async Task SaveClassAsync_CreatesUpdatesAndRejectsDuplicateName()
     {
         var state=await CreateStateAsync();var service=new SqliteGroupLessonService();
-        var created=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2"));
+        var created=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学"));
         Assert.True(created.Id>0);
         var listed=Assert.Single(await service.GetClassesAsync(state.Path));
-        Assert.Equal("中2A",listed.Name);Assert.Equal("中2",listed.Grade);Assert.False(listed.AllowOtherGrades);
+        Assert.Equal("中2A",listed.Name);Assert.Equal("中2",listed.Grade);Assert.Equal("数学",listed.Subject);Assert.False(listed.AllowOtherGrades);
 
-        var renamed=await service.SaveClassAsync(state.Path,new GroupLessonClass(created.Id,"中2B","中2",allowOtherGrades:true));
+        var renamed=await service.SaveClassAsync(state.Path,new GroupLessonClass(created.Id,"中2B","中2","英語",allowOtherGrades:true));
         Assert.Equal(created.Id,renamed.Id);
         var afterRename=Assert.Single(await service.GetClassesAsync(state.Path));
-        Assert.Equal("中2B",afterRename.Name);Assert.True(afterRename.AllowOtherGrades);
+        Assert.Equal("中2B",afterRename.Name);Assert.Equal("英語",afterRename.Subject);Assert.True(afterRename.AllowOtherGrades);
 
-        await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"別クラス","中1"));
-        await Assert.ThrowsAsync<InvalidOperationException>(()=>service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2B","中1")));
+        await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"別クラス","中1","数学"));
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2B","中1","数学")));
     }
 
     [Fact]
     public async Task DeleteClassAsync_CascadesSessionsAndEnrollments()
     {
         var state=await CreateStateAsync();var service=new SqliteGroupLessonService();
-        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2"));
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学"));
         await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(17,10),new TimeOnly(18,30));
         await service.SetEnrollmentAsync(state.Path,cls.Id,state.Student1Id,true);
 
@@ -56,7 +56,7 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
     public async Task AddSessionsAsync_AddsAcrossMultipleDatesAndIgnoresExactDuplicatesThenRemoves()
     {
         var state=await CreateStateAsync();var service=new SqliteGroupLessonService();
-        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2"));
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学"));
 
         await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(17,10),new TimeOnly(18,30));
         var session=Assert.Single(await service.GetAllSessionsAsync(state.Path));
@@ -76,7 +76,7 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
     public async Task GetEnrollmentCandidatesAsync_FiltersByGradeUnlessAllowOtherGradesIsSet()
     {
         var state=await CreateStateAsync();var service=new SqliteGroupLessonService();
-        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2"));
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学"));
 
         var candidates=await service.GetEnrollmentCandidatesAsync(state.Path,cls.Id);
         var candidate=Assert.Single(candidates);
@@ -89,7 +89,7 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
         await service.SetEnrollmentAsync(state.Path,cls.Id,state.Student1Id,false);
         Assert.False(Assert.Single(await service.GetEnrollmentCandidatesAsync(state.Path,cls.Id)).Enrolled);
 
-        var allowOther=await service.SaveClassAsync(state.Path,new GroupLessonClass(cls.Id,cls.Name,cls.Grade,allowOtherGrades:true));
+        var allowOther=await service.SaveClassAsync(state.Path,new GroupLessonClass(cls.Id,cls.Name,cls.Grade,cls.Subject,allowOtherGrades:true));
         var withOtherGrades=await service.GetEnrollmentCandidatesAsync(state.Path,allowOther.Id);
         Assert.Equal(2,withOtherGrades.Count);
         Assert.Contains(withOtherGrades,c=>c.StudentId==state.Student1Id);

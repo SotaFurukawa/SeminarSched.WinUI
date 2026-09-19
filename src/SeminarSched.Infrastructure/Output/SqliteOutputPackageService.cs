@@ -129,7 +129,7 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
         await using(var q=c.CreateCommand())
         {
             q.CommandText="""
-                SELECT r.Id,st.Name,su.DisplayName,r.RequiredSessions,COUNT(a.Id),
+                SELECT r.Id,st.Name,COALESCE(NULLIF(su.ShortName,''),su.DisplayName),r.RequiredSessions,COUNT(a.Id),
                        COALESCE(NULLIF(r.RegularTeacherPriority,1),p.RegularTeacherPriority,1),te.Name,r.OneToOneRequired,r.Note,r.SubjectId
                 FROM LessonRequest r
                 JOIN Student st ON st.Id=r.StudentId
@@ -220,7 +220,7 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
         var warnings=new List<WarningRow>();
         await using var q=c.CreateCommand();
         q.CommandText="""
-            SELECT s.Name,sub.DisplayName,te.Name,r.RequiredSessions,
+            SELECT s.Name,COALESCE(NULLIF(sub.ShortName,''),sub.DisplayName),te.Name,r.RequiredSessions,
                    COALESCE(NULLIF(r.RegularTeacherPriority,1),p.RegularTeacherPriority,1) AS priority,
                    (SELECT COUNT(*) FROM Assignment a WHERE a.LessonRequestId=r.Id AND a.TeacherId=COALESCE(r.RegularTeacherId,p.RegularTeacherId)) AS actual
             FROM LessonRequest r

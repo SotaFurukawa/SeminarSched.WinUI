@@ -136,21 +136,40 @@ public sealed class ExcelScheduleReportRenderer
     /// 有無だけが異なる）。
     /// </summary>
     private static readonly XLColor HandoutWeekdayFill = XLColor.FromHtml("#F2F2F2");
-    private static readonly XLColor HandoutMonthFill = XLColor.FromHtml("#0B3041");
+    private static readonly XLColor HandoutMonthFill = XLColor.FromHtml("#0F243E");
+    private static readonly XLColor HandoutDayFill = XLColor.FromHtml("#90CAFE");
+    private static readonly XLColor HandoutHeaderBlankFill = XLColor.FromHtml("#BFBFBF");
+    private static readonly XLColor HandoutAcademicTestFill = XLColor.FromHtml("#95B3D7");
     private static readonly XLColor HandoutClosedFill = XLColor.FromHtml("#E8E8E8");
     private static readonly XLColor HandoutOutOfRangeFill = XLColor.FromHtml("#0E2841");
+    private const string HandoutBodyFontName = "HG丸ゴシックM-PRO";
+    private const string HandoutTitleFontName = "BIZ UDPMincho Medium";
 
     private static void WriteStudentHandoutPage(IXLWorksheet sheet, ScheduleReport report, string student, string grade, bool includeTeacher, IReadOnlyDictionary<string, string> teacherLabels)
     {
-        sheet.Column(1).Width = 8.3; sheet.Column(2).Width = 11.4; for (var c = 3; c <= 9; c++) sheet.Column(c).Width = 9.2;
+        // ユーザー指定の列幅（ピクセル）。A=54px, B=96px, C~I=64px。
+        sheet.Column(1).Width = PixelsToColumnWidth(54); sheet.Column(2).Width = PixelsToColumnWidth(96);
+        for (var c = 3; c <= 9; c++) sheet.Column(c).Width = PixelsToColumnWidth(64);
+
+        // シート全体の既定値: 全マス中央ぞろえ（水平・垂直）、4行目以降のフォントをHG丸ゴシックM-PROに
+        // 統一する（1行目の「ご案内」だけは後で個別に上書きする）。
+        sheet.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        sheet.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+        sheet.Style.Font.FontName = HandoutBodyFontName;
 
         sheet.Range(1, 1, 1, 9).Merge(); var title = sheet.Cell(1, 1);
         title.Value = $"{report.AcademicYear}　{report.SeasonName}　個別指導　受講日のご案内";
-        title.Style.Font.Bold = true; title.Style.Font.FontSize = 16; title.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        title.Style.Font.Bold = true; title.Style.Font.FontSize = 16; title.Style.Font.FontName = HandoutTitleFontName;
+        title.Style.Font.FontColor = XLColor.White; title.Style.Fill.BackgroundColor = XLColor.Black;
+        title.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
         var (schoolLevel, gradeNumber) = ParseGrade(grade);
-        sheet.Cell(4, 2).Value = schoolLevel; sheet.Cell(4, 3).Value = gradeNumber; sheet.Cell(4, 4).Value = "年生";
-        sheet.Range(4, 6, 4, 7).Merge(); sheet.Cell(4, 6).Value = student; sheet.Cell(4, 8).Value = "様";
+        var schoolLevelCell = sheet.Cell(4, 2); schoolLevelCell.Value = schoolLevel; schoolLevelCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+        sheet.Cell(4, 3).Value = gradeNumber;
+        var gradeSuffixCell = sheet.Cell(4, 4); gradeSuffixCell.Value = "年生"; gradeSuffixCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+        sheet.Range(4, 6, 4, 7).Merge(); var nameCell = sheet.Cell(4, 6); nameCell.Value = student; nameCell.Style.Font.FontSize = 14;
+        sheet.Cell(4, 8).Value = "様";
+        sheet.Range(4, 2, 4, 8).Style.Border.BottomBorder = XLBorderStyleValues.Thin;
 
         var rows = report.Rows.Where(x => x.Student == student).ToArray();
         var lessonTextByDateSlot = rows.ToDictionary(x => (DateOnly.Parse(x.Date), x.TimeSlot), string (x) => includeTeacher ? $"{x.SubjectShortName}　{teacherLabels[x.Teacher]}" : x.SubjectShortName);
@@ -166,23 +185,29 @@ public sealed class ExcelScheduleReportRenderer
                 var closedCell = sheet.Cell(row, 1);
                 closedCell.Value = $"{week.Days[0].Date.Month}/{week.Days[0].Date.Day} ~ {week.Days[6].Date.Month}/{week.Days[6].Date.Day}　休校日";
                 closedCell.Style.Fill.BackgroundColor = HandoutClosedFill;
+                sheet.Range(row, 1, row, 9).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                sheet.Range(row, 1, row, 9).Style.Border.InsideBorder = XLBorderStyleValues.Thin;
                 row++; continue;
             }
             var monthRow = row; var weekdayRow = row + 1; var dayRow = row + 2;
-            sheet.Cell(monthRow, 1).Style.Fill.BackgroundColor = HandoutWeekdayFill; sheet.Cell(monthRow, 2).Style.Fill.BackgroundColor = HandoutWeekdayFill;
+            // 月・曜日・日の見出し3行のうちA~B列は内容が無い空白になるため、指定通りグレー(#BFBFBF)で
+            // 塗りつぶした上で結合する（週ごとに繰り返す。checkpointの指示にある「7~9行目」はこの
+            // 週単位の見出しブロックの一例であり、他の週の同じ位置にも同じ処理を適用する）。
+            sheet.Range(monthRow, 1, dayRow, 2).Merge();
+            sheet.Range(monthRow, 1, dayRow, 2).Style.Fill.BackgroundColor = HandoutHeaderBlankFill;
             var col = 3;
             foreach (var monthGroup in week.Days.GroupBy(d => d.Date.Month))
             {
                 var span = monthGroup.Count();
                 var monthCell = sheet.Cell(monthRow, col);
-                monthCell.Value = $"{monthGroup.Key}月"; monthCell.Style.Font.Bold = true; monthCell.Style.Font.FontColor = XLColor.White; monthCell.Style.Fill.BackgroundColor = HandoutMonthFill;
+                monthCell.Value = $"{monthGroup.Key}月"; monthCell.Style.Font.Bold = true; monthCell.Style.Font.FontColor = XLColor.White; monthCell.Style.Font.FontSize = 11; monthCell.Style.Fill.BackgroundColor = HandoutMonthFill;
                 if (span > 1) sheet.Range(monthRow, col, monthRow, col + span - 1).Merge();
                 col += span;
             }
             for (var i = 0; i < 7; i++)
             {
-                var weekdayCell = sheet.Cell(weekdayRow, 3 + i); weekdayCell.Value = WeeklyCalendarLayout.WeekdayHeaders[i]; weekdayCell.Style.Fill.BackgroundColor = HandoutWeekdayFill;
-                var dayCell = sheet.Cell(dayRow, 3 + i); dayCell.Value = week.Days[i].Date.Day.ToString(); dayCell.Style.Fill.BackgroundColor = HandoutWeekdayFill;
+                var weekdayCell = sheet.Cell(weekdayRow, 3 + i); weekdayCell.Value = WeeklyCalendarLayout.WeekdayHeaders[i]; weekdayCell.Style.Font.FontSize = 9; weekdayCell.Style.Fill.BackgroundColor = HandoutWeekdayFill;
+                var dayCell = sheet.Cell(dayRow, 3 + i); dayCell.Value = week.Days[i].Date.Day.ToString(); dayCell.Style.Font.FontSize = 9; dayCell.Style.Fill.BackgroundColor = HandoutDayFill;
             }
             row = dayRow + 1;
             var slotBlockStartRow = row;
@@ -193,7 +218,7 @@ public sealed class ExcelScheduleReportRenderer
                 for (var i = 0; i < 7; i++)
                 {
                     if (week.Days[i].Kind != HandoutDayKind.Open) continue;
-                    sheet.Cell(row, 3 + i).Value = slotRow.LessonTextByDay[i] ?? "";
+                    var lessonCell = sheet.Cell(row, 3 + i); lessonCell.Value = slotRow.LessonTextByDay[i] ?? ""; lessonCell.Style.Font.FontSize = 9;
                 }
                 row++;
             }
@@ -208,11 +233,19 @@ public sealed class ExcelScheduleReportRenderer
                 cell.Style.Fill.BackgroundColor = day.Kind == HandoutDayKind.OutOfRange ? HandoutOutOfRangeFill : HandoutClosedFill;
                 if (slotBlockRowCount > 1) sheet.Range(slotBlockStartRow, 3 + i, slotBlockStartRow + slotBlockRowCount - 1, 3 + i).Merge();
             }
+            // カレンダー部分は隙間なく格子（全セル罫線）にする。
+            var weekBlock = sheet.Range(monthRow, 1, row - 1, 9);
+            weekBlock.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            weekBlock.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
         }
 
         row++;
         sheet.Range(row, 1, row, 4).Merge(); sheet.Cell(row, 1).Value = $"学力テスト　　{grade}　　日時：";
         sheet.Range(row, 5, row, 9).Merge(); sheet.Cell(row, 5).Value = "受験する・受験しない";
+        var academicTestRange = sheet.Range(row, 1, row, 9);
+        academicTestRange.Style.Fill.BackgroundColor = HandoutAcademicTestFill;
+        academicTestRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+        academicTestRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
     }
 
     private static void WriteAbsenceSheet(IXLWorksheet sheet, ScheduleReport report)
@@ -249,10 +282,11 @@ public sealed class ExcelScheduleReportRenderer
     private const string OverviewFootnoteText = "日曜始まり・土曜終わりの週単位です。出勤予定の講師のみ表示します。";
 
     /// <summary>
-    /// Python版timetable_builder.pyの週単位grid相当。日付panelごとに専用の「コマ」ラベル列を持ち
-    /// （ラベル列＋出勤講師ごとに2列＝同時最大2名までの並び表示）、コマごと3行（学年／科目略称／
-    /// 生徒名縦書き）で表示する。該当日・出勤予定講師が1件も無い週もsheet自体は生成し、
-    /// 「対象となる開校日・出勤予定講師がありません」のplaceholderを表示する。
+    /// Python版timetable_builder.pyは日付panelごとに専用の「コマ」ラベル列を持つ構成だったが、
+    /// ユーザー指示により「コマ・時刻のラベルは週の先頭（A列）だけに1回だけ置く」という簡略化された
+    /// 独自レイアウトへ変更した（Python parityより指示を優先。意図的な差分）。出勤講師は2列（同時
+    /// 最大2名）で日付ごとに横へ並び、コマごと3行（学年／科目略称／生徒名縦書き）で表示する点は従来通り。
+    /// 該当日・出勤予定講師が1件も無い週もsheet自体は生成し、プレースホルダーを表示する。
     /// </summary>
     private static void WriteOverviewWeekSheet(IXLWorksheet sheet, OverviewWeek week, IReadOnlyList<string> slotLabels, IReadOnlyDictionary<string, SlotDefinition> slotDefinitionsByLabel)
     {
@@ -262,30 +296,43 @@ public sealed class ExcelScheduleReportRenderer
         sheet.Cell(2, 1).Value = $"{week.SundayStart:yyyy/M/d}（{WeeklyCalendarLayout.WeekdayHeaders[0]}） ～ {sundayEnd:yyyy/M/d}（{WeeklyCalendarLayout.WeekdayHeaders[6]}）";
         sheet.Cell(2, 1).Style.Fill.BackgroundColor = OverviewSubtitleFill;
 
+        // A列＝週で共有する「コマ」ラベル列。中央ぞろえ（水平・垂直とも）で1回だけ書く。
+        var comaCell = sheet.Cell(comaHeaderRow, 1); comaCell.Value = "コマ"; comaCell.Style.Font.Bold = true; comaCell.Style.Fill.BackgroundColor = OverviewSubtitleFill;
+        comaCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center; comaCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+        for (var s = 0; s < slotLabels.Count; s++)
+        {
+            var rowBase = slotStartRow + s * 3;
+            var labelCell = sheet.Cell(rowBase, 1);
+            labelCell.Value = slotDefinitionsByLabel[slotLabels[s]].OverviewLabelText;
+            labelCell.Style.Font.Bold = true; labelCell.Style.Alignment.WrapText = true;
+            labelCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center; labelCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            labelCell.Style.Fill.BackgroundColor = OverviewSubtitleFill;
+            sheet.Range(rowBase, 1, rowBase + 2, 1).Merge();
+        }
+
         int lastCol; int legendRow;
         if (week.Days.Count == 0)
         {
-            sheet.Cell(dateHeaderRow, 1).Value = "対象となる開校日・出勤予定講師がありません"; sheet.Cell(dateHeaderRow, 1).Style.Fill.BackgroundColor = OverviewSubtitleFill;
-            lastCol = 1; legendRow = dateHeaderRow + 1;
+            sheet.Cell(dateHeaderRow, 2).Value = "対象となる開校日・出勤予定講師がありません"; sheet.Cell(dateHeaderRow, 2).Style.Fill.BackgroundColor = OverviewSubtitleFill;
+            lastCol = 2; legendRow = dateHeaderRow + 1;
         }
         else
         {
-            var col = 1;
+            var col = 2;
             foreach (var day in week.Days)
             {
-                var labelCol = col; col++;
-                var comaCell = sheet.Cell(comaHeaderRow, labelCol); comaCell.Value = "コマ"; comaCell.Style.Font.Bold = true; comaCell.Style.Fill.BackgroundColor = OverviewSubtitleFill;
+                var dayStartCol = col;
 
                 if (day.Teachers.Count == 0)
                 {
-                    var noneCell = sheet.Cell(comaHeaderRow, labelCol + 1); noneCell.Value = "出勤予定なし"; noneCell.Style.Fill.BackgroundColor = OverviewUnavailableFill;
-                    sheet.Range(comaHeaderRow, labelCol + 1, comaHeaderRow, labelCol + 2).Merge();
-                    if (slotLabels.Count > 0) sheet.Range(slotStartRow, labelCol + 1, slotStartRow + slotLabels.Count * 3 - 1, labelCol + 2).Style.Fill.BackgroundColor = OverviewUnavailableFill;
+                    var noneCell = sheet.Cell(comaHeaderRow, dayStartCol); noneCell.Value = "出勤予定なし"; noneCell.Style.Fill.BackgroundColor = OverviewUnavailableFill;
+                    sheet.Range(comaHeaderRow, dayStartCol, comaHeaderRow, dayStartCol + 1).Merge();
+                    if (slotLabels.Count > 0) sheet.Range(slotStartRow, dayStartCol, slotStartRow + slotLabels.Count * 3 - 1, dayStartCol + 1).Style.Fill.BackgroundColor = OverviewUnavailableFill;
                     col += 2;
                 }
                 else
                 {
-                    var teacherCol = labelCol + 1;
+                    var teacherCol = dayStartCol;
                     foreach (var teacher in day.Teachers)
                     {
                         var teacherCell = sheet.Cell(comaHeaderRow, teacherCol); teacherCell.Value = teacher.TeacherName; teacherCell.Style.Font.Bold = true; teacherCell.Style.Font.FontColor = XLColor.White; teacherCell.Style.Fill.BackgroundColor = OverviewHeaderFill;
@@ -323,35 +370,28 @@ public sealed class ExcelScheduleReportRenderer
                     col = teacherCol;
                 }
 
-                if (col - labelCol > 1) sheet.Range(dateHeaderRow, labelCol, dateHeaderRow, col - 1).Merge();
-                var dateCell = sheet.Cell(dateHeaderRow, labelCol);
+                if (col - dayStartCol > 1) sheet.Range(dateHeaderRow, dayStartCol, dateHeaderRow, col - 1).Merge();
+                var dateCell = sheet.Cell(dateHeaderRow, dayStartCol);
                 dateCell.Value = $"{day.Date:yyyy/M/d}（{WeeklyCalendarLayout.WeekdayHeaders[(int)day.Date.DayOfWeek]}）";
                 dateCell.Style.Font.Bold = true; dateCell.Style.Font.FontColor = XLColor.White; dateCell.Style.Fill.BackgroundColor = OverviewHeaderFill; dateCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-
-                for (var s = 0; s < slotLabels.Count; s++)
-                {
-                    var rowBase = slotStartRow + s * 3;
-                    var labelCell = sheet.Cell(rowBase, labelCol);
-                    labelCell.Value = slotDefinitionsByLabel[slotLabels[s]].OverviewLabelText;
-                    labelCell.Style.Font.Bold = true; labelCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center; labelCell.Style.Alignment.WrapText = true;
-                    labelCell.Style.Fill.BackgroundColor = OverviewSubtitleFill;
-                    if (slotLabels.Count > 0) sheet.Range(rowBase, labelCol, rowBase + 2, labelCol).Merge();
-                }
             }
-            lastCol = Math.Max(1, col - 1);
+            lastCol = Math.Max(2, col - 1);
             legendRow = slotStartRow + slotLabels.Count * 3;
         }
 
         var legendCell = sheet.Cell(legendRow, 1); legendCell.Value = OverviewLegendText; legendCell.Style.Fill.BackgroundColor = OverviewFootnoteFill;
         var footnoteCell = sheet.Cell(legendRow + 1, 1); footnoteCell.Value = OverviewFootnoteText; footnoteCell.Style.Fill.BackgroundColor = OverviewFootnoteFill;
-        if (lastCol > 1)
-        {
-            sheet.Range(1, 1, 1, lastCol).Merge(); sheet.Range(2, 1, 2, lastCol).Merge();
-            sheet.Range(legendRow, 1, legendRow, lastCol).Merge(); sheet.Range(legendRow + 1, 1, legendRow + 1, lastCol).Merge();
-            sheet.Columns(1, lastCol).Width = 2.9;
-        }
+        sheet.Range(1, 1, 1, lastCol).Merge(); sheet.Range(2, 1, 2, lastCol).Merge();
+        sheet.Range(legendRow, 1, legendRow, lastCol).Merge(); sheet.Range(legendRow + 1, 1, legendRow + 1, lastCol).Merge();
+        // ユーザー指示: A列（コマ・時刻ラベル）=45px、B列以降（出勤講師の列）は一律30px。
+        sheet.Column(1).Width = PixelsToColumnWidth(45);
+        if (lastCol > 1) sheet.Columns(2, lastCol).Width = PixelsToColumnWidth(30);
         sheet.SheetView.FreezeRows(2);
     }
+
+    // ExcelのColumn.Width単位（既定Calibri 11pt基準のcharacter幅）へ、指定ピクセル数を変換する。
+    // OOXMLの標準変換式: width = (pixels - 5) / MaximumDigitWidth（既定フォントは7px）。
+    private static double PixelsToColumnWidth(double pixels) => Math.Round((pixels - 5) / 7.0, 2);
 
     private static (string Level, string Number) ParseGrade(string grade)
     {

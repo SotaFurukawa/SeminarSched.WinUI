@@ -66,7 +66,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     {
         var nextOrder = SlotOrder.Value + 1;
         await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(_slotEditId, SlotCode.Text, SlotName.Text,
-            TimeOnly.FromTimeSpan(SlotStart.Time), TimeOnly.FromTimeSpan(SlotEnd.Time), checked((int)SlotOrder.Value), SlotActive.IsChecked == true));
+            new TimeOnly(checked((int)SlotStartHour.Value), checked((int)SlotStartMinute.Value)), new TimeOnly(checked((int)SlotEndHour.Value), checked((int)SlotEndMinute.Value)), checked((int)SlotOrder.Value), SlotActive.IsChecked == true));
         ResetSlot(); SlotOrder.Value = nextOrder;
     }, "コマを保存しました");
 
@@ -88,7 +88,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     private void TimeSlots_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_loading || TimeSlots.SelectedItem is not TimeSlotItem selected) return;
-        var value=selected.Value;_slotEditId=value.Id;SlotCode.Text=value.Code;SlotName.Text=value.DisplayName;SlotStart.Time=value.StartTime.ToTimeSpan();SlotEnd.Time=value.EndTime.ToTimeSpan();SlotOrder.Value=value.SortOrder;SlotActive.IsChecked=value.Active;
+        var value=selected.Value;_slotEditId=value.Id;SlotCode.Text=value.Code;SlotName.Text=value.DisplayName;SlotStartHour.Value=value.StartTime.Hour;SlotStartMinute.Value=value.StartTime.Minute;SlotEndHour.Value=value.EndTime.Hour;SlotEndMinute.Value=value.EndTime.Minute;SlotOrder.Value=value.SortOrder;SlotActive.IsChecked=value.Active;
     }
     private void NewStudent_Click(object sender,RoutedEventArgs e)=>ResetStudent();
     private void NewTeacher_Click(object sender,RoutedEventArgs e)=>ResetTeacher();
@@ -135,7 +135,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     private void ResetStudent(){_studentEditId=0;Students.SelectedItem=null;StudentId.Text=StudentName.Text=StudentGrade.Text=StudentNote.Text="";StudentMaximum.Value=2;StudentAllowGap.IsChecked=false;StudentActive.IsChecked=true;}
     private void ResetTeacher(){_teacherEditId=0;Teachers.SelectedItem=null;TeacherId.Text=TeacherName.Text=TeacherNote.Text="";TeacherAllowGap.IsChecked=false;TeacherActive.IsChecked=true;}
     private void ResetSubject(){_subjectEditId=0;Subjects.SelectedItem=null;SubjectCode.Text=SubjectName.Text=SubjectShort.Text=SubjectLevel.Text="";SubjectOrder.Value=1;SubjectActive.IsChecked=true;}
-    private void ResetSlot(){_slotEditId=0;TimeSlots.SelectedItem=null;SlotCode.Text=SlotName.Text="";SlotStart.Time=new TimeSpan(9,0,0);SlotEnd.Time=new TimeSpan(10,0,0);SlotOrder.Value=1;SlotActive.IsChecked=true;}
+    private void ResetSlot(){_slotEditId=0;TimeSlots.SelectedItem=null;SlotCode.Text=SlotName.Text="";SlotStartHour.Value=9;SlotStartMinute.Value=0;SlotEndHour.Value=10;SlotEndMinute.Value=0;SlotOrder.Value=1;SlotActive.IsChecked=true;}
 
     private async void SaveQualification_Click(object sender,RoutedEventArgs e)=>await ExecuteAsync(async path=>
     {
@@ -496,7 +496,10 @@ public sealed partial class SetupPage : WorkflowPageBase
 
     private async void TimeSlots_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)
     {
-        if (args.DropResult != DataPackageOperation.Move) return;
+        // CanReorderItems="True"のListViewは、既定のDragItemsStartingハンドラーが無いと
+        // args.Data.RequestedOperationが設定されずDropResultがMove以外（None等）になることがあり、
+        // 以前はここで早期returnして並び替えが一切保存されない不具合になっていた。ObservableCollection
+        // 自体は並び替え後の順序になっているため、DropResultの値に関わらず常に同期する。
         await ExecuteAsync(async path =>
         {
             for (var i = 0; i < _timeSlotItems.Count; i++)

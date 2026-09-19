@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.3.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 77（集団授業3.1/3.2を独立ページ＋カレンダーUIへ全面書き直し、⑥出力のKeyNotFoundExceptionを修正）+ v0.3.0 Draft Release作成。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
+Latest Development Checkpoint: checkpoint 78（TimePicker撤廃、コマ並び替え保存、全画面のnavigation cache化、⑥出力xlsxの書式統一）。v0.3.0 Draft Release後の追加checkpointのため、次のリリース判断は本書「Next Version Rule」に従うこと（ユーザーから今回のcheckpoint完了後の新規Draft Release指示あり）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
 Latest Draft Release: `v0.3.0`（GitHub上にDraftとして作成済み。checkpoint 74〜77の内容をまとめてユーザーより「実装ができたらv0.3.0として一旦ドラフトリリースしてほしい」との指示を受け作成。詳細は[docs/releases/v0.3.0.md](releases/v0.3.0.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -1010,6 +1010,31 @@ v0.2.0 Draft Release直後、ユーザーから「アンケート作成につい
 **動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全134 tests passed（`SqliteGroupLessonServiceTests`を新API向けに全面書き直し・5件、`SqliteOutputPackageServiceTests`に1件追加）。アプリを`dotnet run`で再起動しログにcrash記録がないことを確認。3.1/3.2のページ分割・カレンダーの実際の見た目・追加/削除操作、⑥出力が実際に成功するかは、いずれもこの環境からは視覚確認できないため実機でユーザーに確認をお願いしたい。
 
 **未対応・意図的にスコープ外:** 前checkpoint同様、集団授業の受講時間帯を④⑤の個別指導スケジューリングへは連携していない（データの登録・カレンダー表示のみ）。
+
+### v0.3.0 checkpoint 78 (Claude) — TimePicker撤廃、コマ並び替え保存、全画面のnavigation cache化、⑥出力xlsxの書式統一
+
+ユーザーから実機スクリーンショット付きの詳細な指摘一式（3.1のクラス時刻入力・①コマ設定の時刻入力・①コマ並び替えが保存されない・画面遷移で状態が消える・最高品質が3分で終わる理由・生成xlsxの書式統一）。「個人情報に関わる重大な問題が発生するとき以外は勝手に進めてよい、5時間程度放置する」との明示的な長時間自律作業の許可を受け、以下すべてに対応した。
+
+**TimePickerの全廃（3.1・①コマ設定）:** ユーザー報告「時刻が分まで表示されない」「チェックマーク以外を押しても反映されるようにしてほしい」「ドラムロールが不思議な場所に出る、被らないよう横か下に出してほしい」はいずれもWinUI既定`TimePicker`のflyout（3列drum-roll、確定ボタン式）に起因すると判断した。この環境から実機のflyout表示を検証する手段が無いため、根本原因を個別に直す代わりに`TimePicker`自体を廃止し、時・分それぞれ独立した`NumberBox`（0-23／0-59、コンパクトなスピンボタン）2個の組へ置き換えた。flyoutが存在しないためポップアップの位置ずれ・被りは構造的に発生せず、値は常時HH:MMの2つの数値として表示され、`NumberBox`は入力のたびに（フォーカスアウト前でも）値が確定するためチェックマーク操作も不要になる。対象は`SetupPage`（①コマ設定の開始・終了）と`GroupLessonClassPage`（3.1の開始時刻・終了時刻）。
+
+**集団授業クラスに科目を追加:** 「クラスは科目も指定する必要があります。ただし、ここは選択肢を用意するのではなく、手入力させてください。」との指示により、`GroupLessonClass`へ`Subject`（自由入力の文字列、①設定のSubjectマスタとは非連動）を追加。3.1のクラス登録フォームへ「科目」`TextBox`を追加し、クラス名・対象学年と並んで必須入力とした（UI側の必須チェックのみ。ドメイン型は列追加前の既存クラス（空文字列）を読み戻せるよう空文字列を許容）。スキーマは`AddColumnIfMissingAsync`で追加。
+
+**①コマ設定の並び替えが保存されない不具合を修正:** `TimeSlots_DragItemsCompleted`が`args.DropResult != DataPackageOperation.Move`で早期returnしており、`CanReorderItems="True"`のListViewでは`DragItemsStarting`未実装時に`DropResult`が`Move`以外になり得るため、並び替え自体は画面上で起きるが保存処理が一度も走らず、画面遷移で元に戻っていた。`DropResult`の判定を撤廷し、`ObservableCollection`の並び順をそのままDBへ同期するようにした（内部の重複チェックにより無駄な書き込みは発生しない）。
+
+**画面遷移での状態保持（全画面共通）:** 「⑥出力後、画面を遷移すると結果一覧が消える」「これは⑥以外にも通じることだが、基本的に画面を遷移してもその状態は保持しておくこと」との指示を受け、全11ページ（Home/About/Settings/Setup/Questionnaire/Import/GroupLessonClass/GroupLessonEnrollment/ScheduleEditor/Optimization/Output）へ`NavigationCacheMode="Required"`を追加した。WinUIの既定動作では`Frame.Navigate`のたびに新しいPageインスタンスが生成され、DBへ保存していない画面内メモリの状態（`OutputPage`の生成済みファイル一覧など）は失われる。`NavigationCacheMode="Required"`はPageインスタンス自体を保持するため、`Page_Loaded`が都度DBから再読込するデータ（ほとんどの画面）は従来通り最新化されつつ、DBに保存されない画面固有の一時状態（⑥出力の結果一覧等）だけが遷移をまたいで保持されるようになる。`OutputPage.Page_Loaded`は元々結果一覧をクリアしていなかったため、このcache化だけで期待通りに動作する。
+
+**最高品質（Highest）が短時間で終わる理由（ユーザーからの質問、コード変更なし）:** 実機ログ（`elapsedSec=173.9 strategy=StandardCpSat`、配置458/未配置0）を確認した上で回答。`CpSatScheduleSolver`はOR-Tools CP-SATへ`max_time_in_seconds`を渡すのみで、CP-SAT自身が最適性を証明した時点（`CpSolverStatus.Optimal`）で即座に打ち切って返る（Highest品質の60分・停滞タイムアウト10分のいずれにも達していない）。`ScheduleOptimizer`は停滞・上限時間・中断以外では全stage・全戦略を順に実行する設計だが、この規模（生徒57名・配置458件）ではCP-SATが各戦略で数十秒〜で最適解へ到達するため、合計でも3分程度で全stageが完了しうる。結論として「配置458件・未配置0件で3分」は、それ以上探しても（現在の重み付け目的関数の範囲では）改善の余地が無いことをソルバー自身が証明した結果である可能性が高い、とユーザーへ報告する。
+
+**⑥出力xlsxの書式統一（本checkpointの最大の作業）:** 「以下生成するxlsxについてです」として、Python版に準拠していた既存仕様から意図的に離れる形での詳細な書式指示を受けた。対象は`ExcelScheduleReportRenderer`（xlsxのみ。PDF版は既存方針通り簡易gridのまま据え置き）。
+- **科目名の略称統一:** 未配置一覧・警告一覧が科目のフルネーム（`Subject.DisplayName`、例:「数学」）を使っていたのを、他の帳票と同じ`COALESCE(NULLIF(ShortName,''),DisplayName)`（例:「数」）へ統一した（`SqliteOutputPackageService`）。全体時間割・生徒配布・講師配布は元々ShortNameを使用済みで対象外。
+- **全体時間割（季節講習時間割）のコマ・時刻ラベル:** 従来は日付panelごとに専用のラベル列を持っていた（Python版の実出力に合わせたcheckpoint66の意図的な仕様）が、ユーザー指示により「週の先頭（A列）に1回だけ」置く簡略化されたレイアウトへ変更した（Python parityより明示指示を優先する意図的な差分）。列幅はA列45px・B列以降30pxで統一。
+- **生徒配布・講師配布（1生徒1ページ、講師別ファイルも含め`WriteStudentHandoutPage`で共有）:** 全マス中央ぞろえ（水平・垂直）をシート既定にした上で、4行目の学年prefix（例:「小学」）だけ右揃え・「年生」だけ左揃えに個別上書き。氏名セルをフォントサイズ14。1行目「ご案内」をBIZ UDPMincho Medium・黒地に白文字（フォントサイズ16は従来通り）。4行目以降の既定フォントをHG丸ゴシックM-PROに統一。4行目（学年〜様）の下に罫線。月・曜日・日の見出し3行のうちA〜B列（内容が無い空白）は週ごとにグレー(#BFBFBF)で塗りつぶした上で結合。曜日・日・コマ内容（教科名／講師名）はフォントサイズ9、月見出しは11。月の塗りつぶしを#0B3041→#0F243E、日の塗りつぶしを新設し#90CAFE（従来は曜日と同じ#F2F2F2だった）。学力テスト行をA〜I列まで#95B3D7で塗りつぶし。カレンダー本体（月〜コマ行）と学力テスト行は隙間なく格子状の罫線を引いた。列幅をA=54px・B=96px・C〜I=64pxへ変更（従来のPython版準拠値8.3/11.4/9.2から変更）。
+- ピクセル→Excel列幅（character単位）の変換は、既定フォント(Calibri 11pt)基準のOOXML標準式`(pixels-5)/7`をそのまま採用した（`PixelsToColumnWidth`ヘルパー）。
+- 新規/更新テスト: `SqliteOutputPackageServiceTests`に`GenerateAsync_OverviewGrid_SharesOneComaLabelColumnAcrossAllDaysInAWeek`（週内の複数日・複数講師でもコマラベルがA列に1回だけ出ることを検証）を追加し、`GenerateAsync_CreatesAllFiveReportKindsAtomically`へ書式（列幅・1行目の反転配色・学年欄の左右揃え・氏名フォントサイズ・曜日/日のフォントサイズと塗り色・学力テスト行の塗り色）の検証を追加、`GenerateAsync_ReportsRegularTeacherShortfallAsWarningRow`へ警告文の科目略称使用を検証するassertionを追加。
+
+**未対応・意図的にスコープ外（本checkpoint時点）:** 「講習欠席一覧と生徒の間に書式テンプレートページを作る」という実験的機能（できたら採用・微妙なら廃止でよいとの前提付き）は、他の確定必須事項を優先したため今回は未着手。必要であれば別途対応する。
+
+**動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全135 tests passed（既存134件は無修正で通過、新規1件・既存2件へassertion追加）。アプリを`dotnet run`で再起動しログにcrash記録がないことを確認。TimePicker撤廃後の実際の見た目・並び替え保存・画面遷移での状態保持・xlsxの実際の見た目は、いずれもこの環境からは視覚確認できないため実機でユーザーに確認をお願いしたい。
 
 ### 次回最初に確認するファイル
 
