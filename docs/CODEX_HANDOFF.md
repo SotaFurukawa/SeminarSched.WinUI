@@ -6,15 +6,14 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.1.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題はv0.2.0以降）
-Latest Development Checkpoint: `037515d`（v0.1.0 checkpoint 54, 保存先・命名の一元管理 + v0.1.0 Draft Release作成）。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
-Latest Draft Release: `v0.1.0`（GitHub上にDraftとして作成済み。ユーザーより「v1.9.5とほぼ同等の内容が実装できたと思ったらdraft releaseしてほしい」との指示を受け、checkpoint 54完了時点で作成）
+Current Version: `v0.2.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
+Latest Development Checkpoint: checkpoint 73（④「配置一覧」「自動作成の差分」の生徒ID非表示・日付連動・詳細情報追加）+ v0.2.0 Draft Release作成。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。
+Latest Draft Release: `v0.2.0`（GitHub上にDraftとして作成済み。checkpoint 55〜73の内容をまとめてユーザーより「新しいバージョンとしてリリースしてほしい」との指示を受け作成。詳細は[docs/releases/v0.2.0.md](releases/v0.2.0.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
 
-- v0.1.0開発中の追加・修正 -> 同一作業単位として`v0.1.0`へ集約
-- v0.1.0 Draft Release後のbug fix / minor change -> `v0.1.1`
-- v0.1.0 Draft Release後のnew feature -> `v0.2.0`
+- v0.2.0 Draft Release後のbug fix / minor change -> `v0.2.1`
+- v0.2.0 Draft Release後のnew feature -> `v0.3.0`
 - `v1.0.0` -> ユーザーの明示指示がある場合のみ
 
 ### 実装済み
