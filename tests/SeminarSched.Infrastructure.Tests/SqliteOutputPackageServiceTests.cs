@@ -295,5 +295,46 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         Assert.Equal(Math.Round((30-5)/7.0,2),week.Column(2).Width);
     }
 
+    [Fact]
+    public async Task GenerateAsync_HandoutStyleSheet_RoundTripsCustomizationFromPreviousOutput()
+    {
+        // 実験的機能: 生徒配布xlsxの「デザイン設定」シートは編集・保存可能なテンプレートであり、
+        // 次回以降の出力（同じ出力先フォルダ）でその値を読み戻して反映する。既定値のまま何も編集
+        // していない場合は既定値が維持されることも合わせて確認する。
+        Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"style-roundtrip.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20)));
+        var m=new SqliteMasterDataRepository();var st=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));var te=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 講師"));var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));var course=new SqliteCourseSettingsRepository();var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
+        await using(var c=new SqliteConnection($"Data Source={path};Pooling=False")){await c.OpenAsync();await using var q=c.CreateCommand();q.CommandText=$"INSERT INTO LessonRequest(Id,ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,1,{st.Id},{sub.Id},1);INSERT INTO Assignment(Id,LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source) SELECT 1,1,{te.Id},d.Id,{slot.Id},0,'test' FROM OpenDate d LIMIT 1;";await q.ExecuteNonQueryAsync();}
+
+        var firstResult=await new SqliteOutputPackageService().GenerateAsync(path,_directory);
+        using(var firstWorkbook=new XLWorkbook(firstResult.StudentHandoutsExcelPath))
+        {
+            Assert.True(firstWorkbook.Worksheets.Contains("デザイン設定"));
+            var styleSheet=firstWorkbook.Worksheet("デザイン設定");
+            var nameSizeRow=styleSheet.CellsUsed().First(cell=>cell.Address.ColumnNumber==1&&cell.GetString()=="氏名の文字サイズ").Address.RowNumber;
+            var academicTestColorRow=styleSheet.CellsUsed().First(cell=>cell.Address.ColumnNumber==1&&cell.GetString()=="学力テスト行の背景色").Address.RowNumber;
+            Assert.Equal("14",styleSheet.Cell(nameSizeRow,2).GetString());
+            Assert.Equal("#95B3D7",styleSheet.Cell(academicTestColorRow,2).GetString());
+            // 編集: 氏名の文字サイズと学力テスト行の背景色を書き換えて保存する（校舎側の操作を模擬）。
+            styleSheet.Cell(academicTestColorRow,2).Value="#FF0000";
+            styleSheet.Cell(nameSizeRow,2).Value="20";
+            firstWorkbook.Save();
+        }
+
+        var secondResult=await new SqliteOutputPackageService().GenerateAsync(path,_directory);
+        using var secondWorkbook=new XLWorkbook(secondResult.StudentHandoutsExcelPath);
+        var handoutSheet=secondWorkbook.Worksheet("中2_架空 生徒");
+        Assert.Equal(20,handoutSheet.Cell(4,6).Style.Font.FontSize);
+        var academicTestRow=handoutSheet.CellsUsed().First(cell=>cell.GetString().Contains("学力テスト",StringComparison.Ordinal)).Address.RowNumber;
+        Assert.Equal(XLColor.FromHtml("#FF0000"),handoutSheet.Cell(academicTestRow,1).Style.Fill.BackgroundColor);
+        // 出力し直したテンプレートシート自体も、直前に編集した値をそのまま引き継いで表示する。
+        var secondStyleSheet=secondWorkbook.Worksheet("デザイン設定");
+        var secondNameSizeRow=secondStyleSheet.CellsUsed().First(cell=>cell.Address.ColumnNumber==1&&cell.GetString()=="氏名の文字サイズ").Address.RowNumber;
+        Assert.Equal("20",secondStyleSheet.Cell(secondNameSizeRow,2).GetString());
+        // 編集していない項目（タイトルのフォント名等）は既定値のまま維持される。
+        var titleFontRow=secondStyleSheet.CellsUsed().First(cell=>cell.Address.ColumnNumber==1&&cell.GetString()=="タイトル文字のフォント名").Address.RowNumber;
+        Assert.Equal("BIZ UDPMincho Medium",secondStyleSheet.Cell(titleFontRow,2).GetString());
+    }
+
     public void Dispose(){if(Directory.Exists(_directory))Directory.Delete(_directory,true);}
 }

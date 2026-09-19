@@ -11,22 +11,23 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
 {
     public async Task<OutputPackageResult> GenerateAsync(string projectPath,string parentDirectory,CancellationToken cancellationToken=default)
     {
-        var report=await LoadAndValidate(projectPath,cancellationToken);var target=Path.Combine(Path.GetFullPath(parentDirectory),$"SeminarSched_Output_{DateTime.Now:yyyyMMdd_HHmmss}");var temporary=target+".tmp-"+Guid.NewGuid().ToString("N");
+        var report=await LoadAndValidate(projectPath,cancellationToken);var target=Path.Combine(Path.GetFullPath(parentDirectory),$"SeminarSched_Output_{DateTime.Now:yyyyMMdd_HHmmssfff}");var temporary=target+".tmp-"+Guid.NewGuid().ToString("N");
         try
         {
             Directory.CreateDirectory(temporary);
             var excel=new ExcelScheduleReportRenderer();var pdf=new PdfScheduleReportRenderer();
+            var styleSettings=TryLoadPreviousHandoutStyleSettings(parentDirectory);
 
             var overallXlsx=Path.Combine(temporary,"季節講習時間割.xlsx");var overallPdf=Path.Combine(temporary,"季節講習時間割.pdf");
             await Task.Run(()=>excel.RenderOverall(report,overallXlsx),cancellationToken);
             await Task.Run(()=>pdf.RenderOverall(report,overallPdf),cancellationToken);
 
             var studentXlsx=Path.Combine(temporary,"生徒配布用生徒別時間割.xlsx");var studentPdf=Path.Combine(temporary,"生徒配布用生徒別時間割.pdf");
-            await Task.Run(()=>excel.RenderStudentHandouts(report,studentXlsx),cancellationToken);
+            await Task.Run(()=>excel.RenderStudentHandouts(report,studentXlsx,styleSettings),cancellationToken);
             await Task.Run(()=>pdf.RenderStudentHandouts(report,studentPdf),cancellationToken);
 
             var teacherXlsx=Path.Combine(temporary,"講師配布用学年別時間割.xlsx");var teacherPdf=Path.Combine(temporary,"講師配布用学年別時間割.pdf");
-            await Task.Run(()=>excel.RenderTeacherHandouts(report,teacherXlsx),cancellationToken);
+            await Task.Run(()=>excel.RenderTeacherHandouts(report,teacherXlsx,styleSettings),cancellationToken);
             await Task.Run(()=>pdf.RenderTeacherHandouts(report,teacherPdf),cancellationToken);
 
             var issuesXlsx=Path.Combine(temporary,"未配置・警告一覧.xlsx");var issuesPdf=Path.Combine(temporary,"未配置・警告一覧.pdf");
@@ -39,7 +40,7 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
             foreach(var teacherName in report.Rows.Select(x=>x.Teacher).Distinct().OrderBy(x=>x,StringComparer.Ordinal))
             {
                 var excelFileName=SanitizeTeacherFileName(teacherName,"xlsx",usedNames);
-                await Task.Run(()=>excel.RenderTeacherPacket(report,teacherName,Path.Combine(teacherPacketDirectory,excelFileName)),cancellationToken);
+                await Task.Run(()=>excel.RenderTeacherPacket(report,teacherName,Path.Combine(teacherPacketDirectory,excelFileName),styleSettings),cancellationToken);
                 var pdfFileName=SanitizeTeacherFileName(teacherName,"pdf",usedNames);
                 await Task.Run(()=>pdf.RenderTeacherPacket(report,teacherName,Path.Combine(teacherPacketDirectory,pdfFileName)),cancellationToken);
             }
@@ -55,6 +56,31 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
                 report.Rows.Count,report.UnassignedRequests.Sum(r=>r.Missing));
         }
         finally{if(Directory.Exists(temporary))Directory.Delete(temporary,true);}
+    }
+
+    /// <summary>
+    /// 実験的機能: 校舎が直前の出力フォルダのxlsx内「デザイン設定」シートを編集していた場合、その値を
+    /// 読み戻して今回の出力に反映する。同じ出力先フォルダに過去の出力が無い・読み取りに失敗した等の
+    /// 場合はnull（＝各レンダラーが既定値を使う）を返す。生成中の一時フォルダ（.tmp-*）は対象外。
+    /// </summary>
+    private static HandoutStyleSettings? TryLoadPreviousHandoutStyleSettings(string parentDirectory)
+    {
+        try
+        {
+            var fullParent=Path.GetFullPath(parentDirectory);
+            if(!Directory.Exists(fullParent))return null;
+            var previous=Directory.GetDirectories(fullParent,"SeminarSched_Output_*")
+                .Where(d=>!Path.GetFileName(d).Contains(".tmp-",StringComparison.Ordinal))
+                .OrderByDescending(d=>Path.GetFileName(d),StringComparer.Ordinal)
+                .FirstOrDefault();
+            if(previous is null)return null;
+            var studentXlsx=Path.Combine(previous,"生徒配布用生徒別時間割.xlsx");
+            return ExcelScheduleReportRenderer.TryReadHandoutStyleSettings(studentXlsx);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static string SanitizeTeacherFileName(string teacherName,string extension,HashSet<string> usedNames)

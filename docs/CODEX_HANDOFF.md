@@ -1036,6 +1036,21 @@ v0.2.0 Draft Release直後、ユーザーから「アンケート作成につい
 
 **動作確認:** Release/x64 build警告0・エラー0。`dotnet test`全135 tests passed（既存134件は無修正で通過、新規1件・既存2件へassertion追加）。アプリを`dotnet run`で再起動しログにcrash記録がないことを確認。TimePicker撤廃後の実際の見た目・並び替え保存・画面遷移での状態保持・xlsxの実際の見た目は、いずれもこの環境からは視覚確認できないため実機でユーザーに確認をお願いしたい。
 
+### v0.3.0 checkpoint 79 (Claude) — 実験的「デザイン設定」テンプレートシート（生徒配布・講師配布xlsxの校舎別カスタマイズ）
+
+checkpoint 78で明示的にスコープ外とした実験的機能（「できたらでいいので、やってみてもらって良い感じだったら採用しますし、微妙だったら廃止にします」との前提付き）に、5時間放置の自律作業許可の範囲内で着手した。
+
+**設計:** `SeminarSched.Reporting.Models.HandoutStyleSettings`（新規record）にcheckpoint78でxlsxへ焼き込んだ書式値（タイトルのフォント名・サイズ・背景色・文字色、本文フォント名、氏名・見出し・月の文字サイズ、月/日/見出し余白/学力テスト行の背景色、計12項目）を切り出し、`HandoutStyleSettings.Default`を従来の固定値と完全一致させた（既存テストは無修正のまま通過することで後方互換を確認済み）。`ExcelScheduleReportRenderer.WriteStudentHandoutPage`・`RenderHandoutWorkbook`・`RenderTeacherPacket`は固定定数の代わりにこの設定を受け取るようシグネチャを変更（省略時は`Default`）。
+
+**テンプレートシート:** 生徒配布用生徒別時間割・講師配布用学年別時間割・講師配布用講師別時間割（teacher packet、講師ごとの個別ファイル）の3種類全てで、「講習欠席一覧」シートの直後・各生徒シートの直前に「デザイン設定」という新規シートを追加した（欠席者がいないprojectでは先頭シートになる＝結果的に「講習欠席一覧と生徒の間」という指示通りの位置になる）。シートはA列=項目名・B列=値（編集可能）・C列=補足の3列構成で、色項目のB列セルは実際の色でプレビュー塗りつぶしする。
+
+**読み戻し（往復動作）:** `SqliteOutputPackageService.GenerateAsync`は⑥出力の実行のたびに、出力先の親フォルダ内にある直前の`SeminarSched_Output_*`フォルダ（タイムスタンプの降順で最新のもの、生成中の`.tmp-*`は除外）の生徒配布用生徒別時間割.xlsxを探し、その「デザイン設定」シートを`ExcelScheduleReportRenderer.TryReadHandoutStyleSettings`で読み戻して今回の出力（学年別・講師別packetも含む全て）へ適用する。校舎側の運用イメージ: ①一度出力する→②生成されたxlsxの「デザイン設定」シートをExcelで直接編集して保存する→③次回以降の⑥出力で自動的にその内容が反映される、というサイクルになる。読み取りは全面try/catchで保護し、シートが無い・値が壊れている（不正な#RRGGBBやフォントサイズ範囲外など）場合は項目単位で既定値へフォールバックし、出力自体が失敗することは無い。PDF側は対象外（ユーザー指示が「以下生成するxlsxについてです」とxlsxに限定していたため）。
+**副次的な堅牢化:** 上記の「直前の出力フォルダを探す」処理を実装する過程で、出力フォルダ名が秒単位のタイムスタンプ（`SeminarSched_Output_yyyyMMdd_HHmmss`）のみで一意化されており、同一秒内に2回⑥出力を実行すると`Directory.Move`が衝突して例外になる潜在バグに気付いたため、ミリ秒まで含む形式（`yyyyMMdd_HHmmssfff`）へ変更した（既存の`SeminarSched_Output_*`glob・文字列降順ソートとも後方互換）。
+
+**新規/更新テスト:** `SqliteOutputPackageServiceTests.GenerateAsync_HandoutStyleSheet_RoundTripsCustomizationFromPreviousOutput`を追加。1回目の出力→「デザイン設定」シートの氏名文字サイズと学力テスト行背景色を直接編集・保存→2回目の出力を実行し、(a)実際の生徒配布ページへ編集後の値が反映される、(b)2回目のテンプレートシート自体も編集値を引き継いで表示する、(c)編集していない項目（タイトルフォント名等）は既定値のまま、の3点を検証。`dotnet test`全136 tests passed。
+
+**未確定事項（ユーザーへの報告が必要）:** この機能は「やってみて良ければ採用、微妙なら廃止」という前提で実装した実験的機能である。実機でExcel上の見た目・編集のしやすさ・往復動作を確認した上で、採用するか元の固定書式に戻すか判断してもらう必要がある。
+
 ### 次回最初に確認するファイル
 
 - `AGENTS.md`

@@ -36,9 +36,11 @@ public sealed class ExcelScheduleReportRenderer
         workbook.SaveAs(path);
     }
 
-    public void RenderStudentHandouts(ScheduleReport report, string path) => RenderHandoutWorkbook(report, path, includeTeacher: false, ParticipatingStudents(report));
+    public void RenderStudentHandouts(ScheduleReport report, string path, HandoutStyleSettings? styleSettings = null) =>
+        RenderHandoutWorkbook(report, path, includeTeacher: false, ParticipatingStudents(report), styleSettings ?? HandoutStyleSettings.Default);
 
-    public void RenderTeacherHandouts(ScheduleReport report, string path) => RenderHandoutWorkbook(report, path, includeTeacher: true, ParticipatingStudents(report));
+    public void RenderTeacherHandouts(ScheduleReport report, string path, HandoutStyleSettings? styleSettings = null) =>
+        RenderHandoutWorkbook(report, path, includeTeacher: true, ParticipatingStudents(report), styleSettings ?? HandoutStyleSettings.Default);
 
     /// <summary>
     /// Python版6節「講師配布時間割（講師別）」相当。講師ごとに独立したファイルとして、参加する全生徒の
@@ -47,12 +49,14 @@ public sealed class ExcelScheduleReportRenderer
     /// （`build_teacher_packet_document`の`ordered_students`と同じロジック。他の全講師のファイルも
     /// 中身の生徒集合は同じで、並び順だけがそれぞれの講師視点で変わる）。
     /// </summary>
-    public void RenderTeacherPacket(ScheduleReport report, string teacherName, string path)
+    public void RenderTeacherPacket(ScheduleReport report, string teacherName, string path, HandoutStyleSettings? styleSettings = null)
     {
+        var settings = styleSettings ?? HandoutStyleSettings.Default;
         var teacherLabels = WeeklyCalendarLayout.BuildTeacherLabels(report.Rows.Select(x => x.Teacher));
         using var workbook = new XLWorkbook();
         var usedNames = new HashSet<string>(StringComparer.Ordinal);
         if (report.AbsentStudents.Count > 0) WriteAbsenceSheet(workbook.AddWorksheet(UniqueSheetName(usedNames, "講習欠席一覧")), report);
+        WriteHandoutStyleTemplateSheet(workbook.AddWorksheet(UniqueSheetName(usedNames, HandoutStyleSheetName)), settings);
 
         var allStudents = ParticipatingStudents(report);
         var regularIds = report.Rows.Where(r => r.Teacher == teacherName && r.IsRegularTeacher).Select(r => r.Student).ToHashSet();
@@ -65,7 +69,7 @@ public sealed class ExcelScheduleReportRenderer
         foreach (var s in ordered)
         {
             var sheet = workbook.AddWorksheet(UniqueSheetName(usedNames, $"{s.Grade}_{s.Student}_講師別"));
-            WriteStudentHandoutPage(sheet, report, s.Student, s.Grade, includeTeacher: true, teacherLabels);
+            WriteStudentHandoutPage(sheet, report, s.Student, s.Grade, includeTeacher: true, teacherLabels, settings);
         }
         if (ordered.Length == 0 && report.AbsentStudents.Count == 0) workbook.AddWorksheet("出力対象がありません");
         workbook.SaveAs(path);
@@ -112,16 +116,17 @@ public sealed class ExcelScheduleReportRenderer
         workbook.SaveAs(path);
     }
 
-    private static void RenderHandoutWorkbook(ScheduleReport report, string path, bool includeTeacher, IReadOnlyList<(string Student, string Grade)> students)
+    private static void RenderHandoutWorkbook(ScheduleReport report, string path, bool includeTeacher, IReadOnlyList<(string Student, string Grade)> students, HandoutStyleSettings settings)
     {
         using var workbook = new XLWorkbook();
         var teacherLabels = WeeklyCalendarLayout.BuildTeacherLabels(report.Rows.Select(x => x.Teacher));
         var usedNames = new HashSet<string>(StringComparer.Ordinal);
         if (report.AbsentStudents.Count > 0) WriteAbsenceSheet(workbook.AddWorksheet(UniqueSheetName(usedNames, "講習欠席一覧")), report);
+        WriteHandoutStyleTemplateSheet(workbook.AddWorksheet(UniqueSheetName(usedNames, HandoutStyleSheetName)), settings);
         foreach (var (student, grade) in students)
         {
             var sheet = workbook.AddWorksheet(UniqueSheetName(usedNames, $"{grade}_{student}"));
-            WriteStudentHandoutPage(sheet, report, student, grade, includeTeacher, teacherLabels);
+            WriteStudentHandoutPage(sheet, report, student, grade, includeTeacher, teacherLabels, settings);
         }
         workbook.SaveAs(path);
     }
@@ -136,38 +141,40 @@ public sealed class ExcelScheduleReportRenderer
     /// 有無だけが異なる）。
     /// </summary>
     private static readonly XLColor HandoutWeekdayFill = XLColor.FromHtml("#F2F2F2");
-    private static readonly XLColor HandoutMonthFill = XLColor.FromHtml("#0F243E");
-    private static readonly XLColor HandoutDayFill = XLColor.FromHtml("#90CAFE");
-    private static readonly XLColor HandoutHeaderBlankFill = XLColor.FromHtml("#BFBFBF");
-    private static readonly XLColor HandoutAcademicTestFill = XLColor.FromHtml("#95B3D7");
     private static readonly XLColor HandoutClosedFill = XLColor.FromHtml("#E8E8E8");
     private static readonly XLColor HandoutOutOfRangeFill = XLColor.FromHtml("#0E2841");
-    private const string HandoutBodyFontName = "HG丸ゴシックM-PRO";
-    private const string HandoutTitleFontName = "BIZ UDPMincho Medium";
+    private const string HandoutStyleSheetName = "デザイン設定";
 
-    private static void WriteStudentHandoutPage(IXLWorksheet sheet, ScheduleReport report, string student, string grade, bool includeTeacher, IReadOnlyDictionary<string, string> teacherLabels)
+    private static void WriteStudentHandoutPage(IXLWorksheet sheet, ScheduleReport report, string student, string grade, bool includeTeacher, IReadOnlyDictionary<string, string> teacherLabels, HandoutStyleSettings settings)
     {
+        var titleFill = ParseColorOrDefault(settings.TitleFillHex, XLColor.Black);
+        var titleFontColor = ParseColorOrDefault(settings.TitleFontColorHex, XLColor.White);
+        var monthFill = ParseColorOrDefault(settings.MonthFillHex, XLColor.FromHtml("#0F243E"));
+        var dayFill = ParseColorOrDefault(settings.DayFillHex, XLColor.FromHtml("#90CAFE"));
+        var headerBlankFill = ParseColorOrDefault(settings.HeaderBlankFillHex, XLColor.FromHtml("#BFBFBF"));
+        var academicTestFill = ParseColorOrDefault(settings.AcademicTestFillHex, XLColor.FromHtml("#95B3D7"));
+
         // ユーザー指定の列幅（ピクセル）。A=54px, B=96px, C~I=64px。
         sheet.Column(1).Width = PixelsToColumnWidth(54); sheet.Column(2).Width = PixelsToColumnWidth(96);
         for (var c = 3; c <= 9; c++) sheet.Column(c).Width = PixelsToColumnWidth(64);
 
-        // シート全体の既定値: 全マス中央ぞろえ（水平・垂直）、4行目以降のフォントをHG丸ゴシックM-PROに
-        // 統一する（1行目の「ご案内」だけは後で個別に上書きする）。
+        // シート全体の既定値: 全マス中央ぞろえ（水平・垂直）、4行目以降のフォントを設定値に統一する
+        // （1行目の「ご案内」だけは後で個別に上書きする）。
         sheet.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         sheet.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-        sheet.Style.Font.FontName = HandoutBodyFontName;
+        sheet.Style.Font.FontName = settings.BodyFontName;
 
         sheet.Range(1, 1, 1, 9).Merge(); var title = sheet.Cell(1, 1);
         title.Value = $"{report.AcademicYear}　{report.SeasonName}　個別指導　受講日のご案内";
-        title.Style.Font.Bold = true; title.Style.Font.FontSize = 16; title.Style.Font.FontName = HandoutTitleFontName;
-        title.Style.Font.FontColor = XLColor.White; title.Style.Fill.BackgroundColor = XLColor.Black;
+        title.Style.Font.Bold = true; title.Style.Font.FontSize = settings.TitleFontSize; title.Style.Font.FontName = settings.TitleFontName;
+        title.Style.Font.FontColor = titleFontColor; title.Style.Fill.BackgroundColor = titleFill;
         title.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
         var (schoolLevel, gradeNumber) = ParseGrade(grade);
         var schoolLevelCell = sheet.Cell(4, 2); schoolLevelCell.Value = schoolLevel; schoolLevelCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
         sheet.Cell(4, 3).Value = gradeNumber;
         var gradeSuffixCell = sheet.Cell(4, 4); gradeSuffixCell.Value = "年生"; gradeSuffixCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
-        sheet.Range(4, 6, 4, 7).Merge(); var nameCell = sheet.Cell(4, 6); nameCell.Value = student; nameCell.Style.Font.FontSize = 14;
+        sheet.Range(4, 6, 4, 7).Merge(); var nameCell = sheet.Cell(4, 6); nameCell.Value = student; nameCell.Style.Font.FontSize = settings.NameFontSize;
         sheet.Cell(4, 8).Value = "様";
         sheet.Range(4, 2, 4, 8).Style.Border.BottomBorder = XLBorderStyleValues.Thin;
 
@@ -194,20 +201,20 @@ public sealed class ExcelScheduleReportRenderer
             // 塗りつぶした上で結合する（週ごとに繰り返す。checkpointの指示にある「7~9行目」はこの
             // 週単位の見出しブロックの一例であり、他の週の同じ位置にも同じ処理を適用する）。
             sheet.Range(monthRow, 1, dayRow, 2).Merge();
-            sheet.Range(monthRow, 1, dayRow, 2).Style.Fill.BackgroundColor = HandoutHeaderBlankFill;
+            sheet.Range(monthRow, 1, dayRow, 2).Style.Fill.BackgroundColor = headerBlankFill;
             var col = 3;
             foreach (var monthGroup in week.Days.GroupBy(d => d.Date.Month))
             {
                 var span = monthGroup.Count();
                 var monthCell = sheet.Cell(monthRow, col);
-                monthCell.Value = $"{monthGroup.Key}月"; monthCell.Style.Font.Bold = true; monthCell.Style.Font.FontColor = XLColor.White; monthCell.Style.Font.FontSize = 11; monthCell.Style.Fill.BackgroundColor = HandoutMonthFill;
+                monthCell.Value = $"{monthGroup.Key}月"; monthCell.Style.Font.Bold = true; monthCell.Style.Font.FontColor = XLColor.White; monthCell.Style.Font.FontSize = settings.MonthFontSize; monthCell.Style.Fill.BackgroundColor = monthFill;
                 if (span > 1) sheet.Range(monthRow, col, monthRow, col + span - 1).Merge();
                 col += span;
             }
             for (var i = 0; i < 7; i++)
             {
-                var weekdayCell = sheet.Cell(weekdayRow, 3 + i); weekdayCell.Value = WeeklyCalendarLayout.WeekdayHeaders[i]; weekdayCell.Style.Font.FontSize = 9; weekdayCell.Style.Fill.BackgroundColor = HandoutWeekdayFill;
-                var dayCell = sheet.Cell(dayRow, 3 + i); dayCell.Value = week.Days[i].Date.Day.ToString(); dayCell.Style.Font.FontSize = 9; dayCell.Style.Fill.BackgroundColor = HandoutDayFill;
+                var weekdayCell = sheet.Cell(weekdayRow, 3 + i); weekdayCell.Value = WeeklyCalendarLayout.WeekdayHeaders[i]; weekdayCell.Style.Font.FontSize = settings.HeaderFontSize; weekdayCell.Style.Fill.BackgroundColor = HandoutWeekdayFill;
+                var dayCell = sheet.Cell(dayRow, 3 + i); dayCell.Value = week.Days[i].Date.Day.ToString(); dayCell.Style.Font.FontSize = settings.HeaderFontSize; dayCell.Style.Fill.BackgroundColor = dayFill;
             }
             row = dayRow + 1;
             var slotBlockStartRow = row;
@@ -218,7 +225,7 @@ public sealed class ExcelScheduleReportRenderer
                 for (var i = 0; i < 7; i++)
                 {
                     if (week.Days[i].Kind != HandoutDayKind.Open) continue;
-                    var lessonCell = sheet.Cell(row, 3 + i); lessonCell.Value = slotRow.LessonTextByDay[i] ?? ""; lessonCell.Style.Font.FontSize = 9;
+                    var lessonCell = sheet.Cell(row, 3 + i); lessonCell.Value = slotRow.LessonTextByDay[i] ?? ""; lessonCell.Style.Font.FontSize = settings.HeaderFontSize;
                 }
                 row++;
             }
@@ -243,7 +250,7 @@ public sealed class ExcelScheduleReportRenderer
         sheet.Range(row, 1, row, 4).Merge(); sheet.Cell(row, 1).Value = $"学力テスト　　{grade}　　日時：";
         sheet.Range(row, 5, row, 9).Merge(); sheet.Cell(row, 5).Value = "受験する・受験しない";
         var academicTestRange = sheet.Range(row, 1, row, 9);
-        academicTestRange.Style.Fill.BackgroundColor = HandoutAcademicTestFill;
+        academicTestRange.Style.Fill.BackgroundColor = academicTestFill;
         academicTestRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
         academicTestRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
     }
@@ -263,6 +270,105 @@ public sealed class ExcelScheduleReportRenderer
             sheet.Range(row, 4, row, 9).Merge(); sheet.Cell(row, 4).Value = student.Name;
             row++;
         }
+    }
+
+    /// <summary>
+    /// 実験的機能: 生徒配布・講師配布xlsxの見た目をテキストで確認・編集できる「デザイン設定」シートを
+    /// 書き出す。ここに列挙したラベル文字列は<see cref="TryReadHandoutStyleSettings"/>が読み戻す際の
+    /// キーと完全一致させる必要があるため、<see cref="StyleFields"/>を単一の定義元として両者が共有する。
+    /// 校舎側がこのシートのB列を編集して保存すると、次回以降の出力（同じ出力先フォルダの直前の
+    /// 生徒配布用生徒別時間割.xlsx）から読み込まれ反映される。値が壊れている・シート自体が無い等の
+    /// 場合は既定値にフォールバックし、出力自体は止めない。
+    /// </summary>
+    private static readonly (string Label, Func<HandoutStyleSettings, string> Get, Func<HandoutStyleSettings, string, HandoutStyleSettings> With, string Hint, bool IsColor)[] StyleFields =
+    [
+        ("タイトル文字のフォント名", s => s.TitleFontName, (s, v) => string.IsNullOrWhiteSpace(v) ? s : s with { TitleFontName = v.Trim() }, "例: BIZ UDPMincho Medium", false),
+        ("タイトル文字のサイズ", s => FormatNumber(s.TitleFontSize), (s, v) => s with { TitleFontSize = ParseSizeOrDefault(v, s.TitleFontSize) }, "pt", false),
+        ("タイトル背景色", s => s.TitleFillHex, (s, v) => IsValidHexColor(v) ? s with { TitleFillHex = v.Trim() } : s, "#RRGGBB形式", true),
+        ("タイトル文字色", s => s.TitleFontColorHex, (s, v) => IsValidHexColor(v) ? s with { TitleFontColorHex = v.Trim() } : s, "#RRGGBB形式", true),
+        ("本文フォント名", s => s.BodyFontName, (s, v) => string.IsNullOrWhiteSpace(v) ? s : s with { BodyFontName = v.Trim() }, "例: HG丸ゴシックM-PRO", false),
+        ("氏名の文字サイズ", s => FormatNumber(s.NameFontSize), (s, v) => s with { NameFontSize = ParseSizeOrDefault(v, s.NameFontSize) }, "pt", false),
+        ("曜日・日付・教科名等の文字サイズ", s => FormatNumber(s.HeaderFontSize), (s, v) => s with { HeaderFontSize = ParseSizeOrDefault(v, s.HeaderFontSize) }, "pt", false),
+        ("月表示の文字サイズ", s => FormatNumber(s.MonthFontSize), (s, v) => s with { MonthFontSize = ParseSizeOrDefault(v, s.MonthFontSize) }, "pt", false),
+        ("月の背景色", s => s.MonthFillHex, (s, v) => IsValidHexColor(v) ? s with { MonthFillHex = v.Trim() } : s, "#RRGGBB形式", true),
+        ("日の背景色", s => s.DayFillHex, (s, v) => IsValidHexColor(v) ? s with { DayFillHex = v.Trim() } : s, "#RRGGBB形式", true),
+        ("見出し余白の背景色", s => s.HeaderBlankFillHex, (s, v) => IsValidHexColor(v) ? s with { HeaderBlankFillHex = v.Trim() } : s, "#RRGGBB形式", true),
+        ("学力テスト行の背景色", s => s.AcademicTestFillHex, (s, v) => IsValidHexColor(v) ? s with { AcademicTestFillHex = v.Trim() } : s, "#RRGGBB形式", true),
+    ];
+
+    private static void WriteHandoutStyleTemplateSheet(IXLWorksheet sheet, HandoutStyleSettings settings)
+    {
+        sheet.Column(1).Width = 32; sheet.Column(2).Width = 28; sheet.Column(3).Width = 40;
+        sheet.Range(1, 1, 1, 3).Merge();
+        sheet.Cell(1, 1).Value = "デザイン設定（実験的機能）";
+        sheet.Cell(1, 1).Style.Font.Bold = true; sheet.Cell(1, 1).Style.Font.FontSize = 14;
+        sheet.Range(2, 1, 2, 3).Merge();
+        sheet.Cell(2, 1).Value = "B列の値を書き換えて保存すると、この出力フォルダより後に生成する生徒配布・講師配布xlsxへ反映されます（色は#RRGGBB形式で入力してください）。";
+        sheet.Cell(2, 1).Style.Alignment.WrapText = true;
+        sheet.Row(2).Height = 30;
+
+        var row = 4;
+        sheet.Cell(row, 1).Value = "項目"; sheet.Cell(row, 2).Value = "値"; sheet.Cell(row, 3).Value = "備考";
+        sheet.Row(row).Style.Font.Bold = true; row++;
+        foreach (var field in StyleFields)
+        {
+            sheet.Cell(row, 1).Value = field.Label;
+            var valueCell = sheet.Cell(row, 2); valueCell.Value = field.Get(settings);
+            if (field.IsColor) valueCell.Style.Fill.BackgroundColor = ParseColorOrDefault(field.Get(settings), XLColor.White);
+            sheet.Cell(row, 3).Value = field.Hint;
+            row++;
+        }
+        sheet.Columns(1, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+        sheet.Columns(1, 3).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+    }
+
+    /// <summary>
+    /// 直前の出力フォルダ内のxlsxから「デザイン設定」シートを読み戻す。シートが無い・壊れている等の
+    /// 場合はnullを返し、呼び出し側は既定値（<see cref="HandoutStyleSettings.Default"/>）を使う。
+    /// </summary>
+    public static HandoutStyleSettings? TryReadHandoutStyleSettings(string xlsxPath)
+    {
+        try
+        {
+            if (!File.Exists(xlsxPath)) return null;
+            using var workbook = new XLWorkbook(xlsxPath);
+            var sheet = workbook.Worksheets.FirstOrDefault(w => w.Name == HandoutStyleSheetName);
+            if (sheet is null) return null;
+
+            var byLabel = new Dictionary<string, string>(StringComparer.Ordinal);
+            var lastRow = sheet.LastRowUsed()?.RowNumber() ?? 0;
+            for (var r = 1; r <= lastRow; r++)
+            {
+                var label = sheet.Cell(r, 1).GetString().Trim();
+                if (label.Length == 0) continue;
+                byLabel[label] = sheet.Cell(r, 2).GetString();
+            }
+
+            var settings = HandoutStyleSettings.Default;
+            foreach (var field in StyleFields)
+                if (byLabel.TryGetValue(field.Label, out var value))
+                    settings = field.With(settings, value);
+            return settings;
+        }
+        catch
+        {
+            // 校舎側の編集内容が壊れていても出力自体は止めない。既定値へフォールバックする。
+            return null;
+        }
+    }
+
+    private static string FormatNumber(double value) => value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private static double ParseSizeOrDefault(string text, double fallback) =>
+        double.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value) && value is > 0 and <= 200 ? value : fallback;
+
+    private static bool IsValidHexColor(string text) =>
+        !string.IsNullOrWhiteSpace(text) && System.Text.RegularExpressions.Regex.IsMatch(text.Trim(), "^#[0-9A-Fa-f]{6}$");
+
+    private static XLColor ParseColorOrDefault(string hex, XLColor fallback)
+    {
+        try { return IsValidHexColor(hex) ? XLColor.FromHtml(hex.Trim()) : fallback; }
+        catch { return fallback; }
     }
 
     private static void WriteOverviewMetadataSheet(IXLWorksheet sheet, ScheduleReport report)
