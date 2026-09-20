@@ -14,6 +14,7 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
     private readonly HashSet<long> _extraTeacherIds = [];
     private ScheduleBoard? _currentBoard;
     private long? _selectedDateId;
+    private long? _loadedDataVersion;
     private readonly TranslateTransform _columnHeaderTransform = new();
     private readonly TranslateTransform _rowHeaderTransform = new();
     private readonly TranslateTransform _cornerTransform = new();
@@ -44,6 +45,7 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         try
         {
             IsEnabled = false;
+            if (!await EnsureFreshDataAsync(path)) return;
             var current = await App.ScheduleEditor.CaptureSnapshotAsync(path);
             var previous = ScheduleUndoState.UndoStack.Pop();
             ScheduleUndoState.RedoStack.Push(current);
@@ -63,6 +65,7 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         try
         {
             IsEnabled = false;
+            if (!await EnsureFreshDataAsync(path)) return;
             var current = await App.ScheduleEditor.CaptureSnapshotAsync(path);
             var next = ScheduleUndoState.RedoStack.Pop();
             ScheduleUndoState.UndoStack.Push(current);
@@ -81,6 +84,7 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
     private async Task ReloadEditorAsync()
     {
         var path=App.ProjectService.Current?.Path;if(path is null)return;
+        _loadedDataVersion=await App.ScheduleEditor.GetDataVersionAsync(path);
         PreconfirmRequest.ItemsSource=await App.FixedLessons.GetRequestsAsync(path);PreconfirmTeacher.ItemsSource=await App.FixedLessons.GetTeachersAsync(path);PreconfirmSlot.ItemsSource=await App.FixedLessons.GetSlotsAsync(path);
         ManualRequest.ItemsSource=await App.FixedLessons.GetRequestsAsync(path);ManualTeacher.ItemsSource=await App.FixedLessons.GetTeachersAsync(path);ManualSlot.ItemsSource=await App.FixedLessons.GetSlotsAsync(path);
         HistoryList.ItemsSource=await App.ScheduleEditor.GetAuditHistoryAsync(path);
@@ -493,12 +497,33 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         return (true, true, string.IsNullOrWhiteSpace(reasonBox.Text) ? null : reasonBox.Text);
     }
 
+    // 読み込み後に他経路（別途Excelで基本情報を編集して反映、別インスタンスでの編集等）でこの
+    // プロジェクトのSQLiteファイルが変更されていないかを、編集操作の直前に確認する。PRAGMA data_version
+    // は自分自身が最後に読み込んだ時点の値と比較するだけの軽量チェックで、Python版の
+    // ScheduleEditService（コンテンツのfingerprintを保持し、書き込み前に不一致ならScheduleEditConflictError
+    // を投げる）と同じ役割を果たす。不一致の場合は書き込みを行わず、最新の内容を読み込み直して知らせる。
+    private async Task<bool> EnsureFreshDataAsync(string path)
+    {
+        if (_loadedDataVersion is not { } known) return true;
+        var current = await App.ScheduleEditor.GetDataVersionAsync(path);
+        if (current == known) return true;
+        ScheduleUndoState.Clear();
+        await ReloadEditorAsync();
+        UpdateUndoRedoButtons();
+        EditorStatus.Severity = InfoBarSeverity.Warning;
+        EditorStatus.Title = "プロジェクトのデータが外部で変更されました";
+        EditorStatus.Message = "読み込み後に他の操作（Excelでの基本情報の反映など）でデータが変更されたため、最新の内容に読み込み直しました。内容を確認し、必要であれば操作をやり直してください。";
+        EditorStatus.IsOpen = true;
+        return false;
+    }
+
     private async Task ExecuteEditorAsync(Func<Task> action,string success,bool clearsHistory=false)
     {
         var path=App.ProjectService.Current?.Path;var snapshotPushed=false;
         try
         {
             IsEnabled=false;
+            if(path is not null && !await EnsureFreshDataAsync(path))return;
             if(path is not null && !clearsHistory){ScheduleUndoState.Push(await App.ScheduleEditor.CaptureSnapshotAsync(path));snapshotPushed=true;}
             await action();
             if(clearsHistory)ScheduleUndoState.Clear();

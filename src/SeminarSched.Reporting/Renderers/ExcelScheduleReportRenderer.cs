@@ -324,7 +324,7 @@ public sealed class ExcelScheduleReportRenderer
     }
 
     /// <summary>
-    /// 実験的機能: 生徒配布・講師配布xlsxの見た目をテキストで確認・編集できる「デザイン設定」シートを
+    /// 生徒配布・講師配布xlsxの見た目をテキストで確認・編集できる「デザイン設定」シートを
     /// 書き出す。ここに列挙したラベル文字列は<see cref="TryReadHandoutStyleSettings"/>が読み戻す際の
     /// キーと完全一致させる必要があるため、<see cref="StyleFields"/>を単一の定義元として両者が共有する。
     /// 校舎側がこのシートのB列を編集して保存すると、次回以降の出力（同じ出力先フォルダの直前の
@@ -351,7 +351,7 @@ public sealed class ExcelScheduleReportRenderer
     {
         sheet.Column(1).Width = 32; sheet.Column(2).Width = 28; sheet.Column(3).Width = 40;
         sheet.Range(1, 1, 1, 3).Merge();
-        sheet.Cell(1, 1).Value = "デザイン設定（実験的機能）";
+        sheet.Cell(1, 1).Value = "デザイン設定";
         sheet.Cell(1, 1).Style.Font.Bold = true; sheet.Cell(1, 1).Style.Font.FontSize = 14;
         sheet.Range(2, 1, 2, 3).Merge();
         sheet.Cell(2, 1).Value = "B列の値を書き換えて保存すると、この出力フォルダより後に生成する生徒配布・講師配布xlsxへ反映されます（色は#RRGGBB形式で入力してください）。";

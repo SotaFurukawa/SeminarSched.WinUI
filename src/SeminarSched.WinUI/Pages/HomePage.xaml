@@ -16,8 +16,8 @@
 
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Spacing="14">
-                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="共通名簿" />
-                    <TextBlock Text="年度をまたいで使う生徒・講師の共通名簿です。プロジェクトを開いていなくても編集でき、新規プロジェクト作成時に自動で反映されます。" TextWrapping="Wrap" />
+                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="生徒講師基本情報・通常授業担当情報" />
+                    <TextBlock Text="生徒と講師の基本的な情報と、通常授業の担当をまとめたものです。プロジェクトごとの管理ではなく、一括した情報で、新規プロジェクト作成時に自動で反映されます。" TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Click="EditSharedRoster_Click" Content="Excelで基本情報を編集" Style="{StaticResource AccentButtonStyle}" />
                         <Button Click="NewSharedRosterTemplate_Click" Content="新規で基本情報を作成" />
@@ -43,7 +43,7 @@
                     </StackPanel>
                     <TextBlock
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="復元は選択したバックアップで現在のプロジェクトを置き換えます。置換前後に整合性を検証します。"
+                        Text="バックアップから復元する場合は、現在のプロジェクトが書き換えられますので、ご注意ください。"
                         TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
@@ -65,6 +65,7 @@
                                         <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" Text="{Binding LastModifiedText}" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button Content="プロジェクトを開く" Tag="{Binding Path}" Click="OpenRecentProjectButton_Click" />
                                         <Button Content="フォルダーを開く" Tag="{Binding Path}" Click="OpenRecentProjectFolder_Click" />
                                         <Button Content="表示しない" Tag="{Binding Path}" Click="HideRecentProject_Click" />
                                     </StackPanel>
@@ -97,27 +98,29 @@
                             <ComboBoxItem Content="冬期講習" Tag="3" />
                             <ComboBoxItem Content="その他" Tag="4" />
                         </ComboBox>
-                        <TextBox x:Name="GeneratedTitleBox" Grid.Column="2" Header="自動生成される名称" IsReadOnly="True" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                            <TextBox x:Name="GeneratedTitleBox" Width="160" IsReadOnly="True" />
+                            <TextBlock Text="として保存" VerticalAlignment="Center" />
+                        </StackPanel>
                         <TextBox x:Name="OtherSeasonNameBox" Grid.Row="1" Grid.Column="1" Header="講習区分の名称（その他を選択した場合）" Visibility="Collapsed" TextChanged="ProjectDefinition_Changed" />
                         <CalendarDatePicker x:Name="StartDatePicker" Grid.Row="2" Header="開始日" DateChanged="ProjectDefinition_Changed" />
                         <CalendarDatePicker x:Name="EndDatePicker" Grid.Row="2" Grid.Column="1" Header="終了日" DateChanged="ProjectDefinition_Changed" />
-                        <Button
-                            Grid.Row="2"
-                            Grid.Column="2"
-                            VerticalAlignment="Bottom"
-                            Click="CreateProject_Click"
-                            Content="保存先を選んで作成"
-                            Style="{StaticResource AccentButtonStyle}" />
                     </Grid>
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="一時SQLiteの作成と整合性確認に成功した場合だけ保存します。整合性が確認できない場合には保存できない場合があります。また、同名のファイルが存在する場合は、末尾に番号をつけて保存します。"
+                        TextWrapping="Wrap" />
+                    <TextBlock FontWeight="SemiBold" Text="オプション機能" />
                     <CheckBox x:Name="ConsiderGroupLessonsCheck" Content="集団授業の日程を考慮する" />
                     <TextBlock
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="オンにすると③アンケート取込みに集団授業クラスの登録・受講登録（3.1・3.2）が追加されます。個別指導以外に集団授業も受講する生徒がいる場合に選択してください。作成後は変更できません。"
+                        Text="オンにすると③アンケート取込みに「集団授業クラスの登録」・「受講登録」の項目が追加されます。個別指導以外に集団授業も受講する生徒がいる場合に、選択してください。このオプションを選択すると、後から変更できません。"
                         TextWrapping="Wrap" />
-                    <TextBlock
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="一時SQLiteの作成と整合性確認に成功した場合だけ保存します。同名ファイルは上書きせず、「(2)」のように名前を変えて保存します。"
-                        TextWrapping="Wrap" />
+                    <Button
+                        HorizontalAlignment="Right"
+                        Click="CreateProject_Click"
+                        Content="保存先を選んで作成"
+                        Style="{StaticResource AccentButtonStyle}" />
                 </StackPanel>
             </Border>
         </StackPanel>

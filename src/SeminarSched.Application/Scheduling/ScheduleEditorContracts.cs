@@ -94,6 +94,14 @@ public sealed class SoftWarningConfirmationRequiredException(EditPreview preview
 
 public interface IScheduleEditorService
 {
+    // プロジェクトファイル（WALモードのため本体＋"-wal"サイドカーの新しい方）の最終更新時刻を
+    // ticksで返す軽量フィンガープリント（Python版ScheduleEditServiceのcontent fingerprintに相当）。
+    // 呼び出し側（WinUIの編集画面）が読み込み時にこの値を保持しておき、編集操作の直前に再取得して
+    // 不一致なら「他経路でプロジェクトが変更された」と判断し、書き込みを中止して再読み込みする。
+    // 実装当初はSQLiteのPRAGMA data_versionを使う案を検証したが、この環境（WALモード+
+    // Microsoft.Data.Sqliteの毎回新規接続）では外部接続からの変更を検出できないことが
+    // テストで実証されたため、HomePageの最終更新時刻表示と同じファイルタイムスタンプ方式に変更した。
+    Task<long> GetDataVersionAsync(string projectPath, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ScheduleAssignmentItem>> GetAssignmentsAsync(string projectPath, long? openDateId = null, CancellationToken cancellationToken = default);
     Task AddManualAsync(string projectPath, long lessonRequestId, long teacherId, long openDateId, long timeSlotId, bool isLocked, bool confirmSoftWarnings = false, string? reason = null, CancellationToken cancellationToken = default);
     Task<EditPreview> PreviewAddAsync(string projectPath, long lessonRequestId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken = default);

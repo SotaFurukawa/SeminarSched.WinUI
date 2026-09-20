@@ -13,7 +13,7 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "SeminarSched.Tests", Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public async Task GenerateAsync_WritesThreeAppsScriptsAtomicallyWithSurveyCompatibleHeaders()
+    public async Task GenerateAsync_WritesTwoAppsScriptsAtomicallyWithSurveyCompatibleHeaders()
     {
         var path = Path.Combine(_directory, "project.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
@@ -27,8 +27,8 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
 
         var studentScript = await File.ReadAllTextAsync(Path.Combine(output, "create_student_questionnaire.gs"));
         var teacherScript = await File.ReadAllTextAsync(Path.Combine(output, "create_teacher_questionnaire.gs"));
-        var teacherSubjectScript = await File.ReadAllTextAsync(Path.Combine(output, "create_teacher_subject_questionnaire.gs"));
         Assert.True(File.Exists(Path.Combine(output, "Googleフォーム作成手順.txt")));
+        Assert.False(File.Exists(Path.Combine(output, "create_teacher_subject_questionnaire.gs")));
 
         Assert.Contains("function createStudentQuestionnaire()", studentScript);
         Assert.Contains("受講教科（${schoolLabel}${index}教科目）", studentScript);
@@ -41,10 +41,8 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
         Assert.Contains("function createTeacherQuestionnaire()", teacherScript);
         Assert.Contains("出勤不可日時（チェックしたコマは出勤不可）", teacherScript);
         Assert.DoesNotContain("\"subjectsBySchoolLevel\"", teacherScript);
-
-        Assert.Contains("function createTeacherSubjectQuestionnaire()", teacherSubjectScript);
-        Assert.Contains("小学校・算数", teacherSubjectScript);
-        Assert.DoesNotContain("\"openDates\"", teacherSubjectScript);
+        Assert.DoesNotContain("teacher_subject", teacherScript);
+        Assert.DoesNotContain("addTeacherSubjectQuestions_", teacherScript);
 
         Assert.Empty(Directory.GetDirectories(_directory, "*.tmp-*"));
     }

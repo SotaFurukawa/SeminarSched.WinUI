@@ -2,7 +2,7 @@ namespace SeminarSched.Reporting.Models;
 
 /// <summary>
 /// 生徒配布・講師配布時間割xlsxの見た目（フォント・色・文字サイズ）を校舎ごとにカスタマイズ可能にする
-/// 実験的機能。<see cref="Default"/>がユーザー指定のデフォルト値であり、生成されたxlsx内の「デザイン設定」
+/// 機能。<see cref="Default"/>がユーザー指定のデフォルト値であり、生成されたxlsx内の「デザイン設定」
 /// シートを校舎側で編集して保存すると、次回以降の出力でその値が読み込まれ反映される。
 /// </summary>
 public sealed record HandoutStyleSettings(

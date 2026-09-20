@@ -31,9 +31,9 @@ internal static class GoogleFormsGuide
             [new("01_save_kit.png", "アプリの作成キット保存画面", 220)],
             "開校日と有効コマが未設定の場合は保存できません。先に①設定で授業日とコマを確定してください。"),
         new(2, "保存先を開く",
-            "保存が完了すると「保存先を開く」ボタンが表示されます。押すと、作成された3つの.gsと手順書が入ったフォルダーを開けます。",
+            "保存が完了すると「保存先を開く」ボタンが表示されます。押すと、作成された2つの.gsと手順書が入ったフォルダーを開けます。",
             [new("02_open_saved_folder.png", "保存先フォルダーの中身", 220)],
-            "生徒用は create_student_questionnaire.gs、講師勤務日時用は create_teacher_questionnaire.gs、講師指導可能科目用は create_teacher_subject_questionnaire.gs です。"),
+            "生徒用は create_student_questionnaire.gs、講師勤務日時用は create_teacher_questionnaire.gs です。"),
         new(3, "create_student_questionnaire.gsをメモ帳で開く",
             "create_student_questionnaire.gsを右クリックし、「プログラムから開く」から「メモ帳」を選びます。メモ帳に表示された内容を先頭から最後まで選択してコピーします。",
             [new("03_open_with_menu.png", "右クリックメニューのプログラムから開く", 340), new("03_choose_notepad.png", "メモ帳を選択する画面", 340)],
@@ -41,7 +41,7 @@ internal static class GoogleFormsGuide
         new(4, "Apps Scriptで新しいプロジェクトを作る",
             "https://script.google.com/home を開き、「新しいプロジェクト」を押します。Code.gsに最初から入っている function myFunction() のコードをすべて削除します。",
             [new("04_apps_script_home.png", "Apps Scriptのホーム画面", 330), new("04_blank_code_gs.png", "新規プロジェクトのCode.gs", 330)],
-            "生徒用・講師勤務日時用・講師指導可能科目用は、それぞれ別のApps Scriptプロジェクトで作成します。"),
+            "生徒用・講師勤務日時用は、それぞれ別のApps Scriptプロジェクトで作成します。"),
         new(5, "メモ帳の内容をコピー＆ペースト",
             "空にしたCode.gsへ、メモ帳からコピーした.gsの全内容を貼り付けます。日付・コマ・フォーム名などは、アプリで設定した内容がコード内へ反映されています。",
             [new("05_paste_script.png", "Code.gsへ貼り付けた状態", 360)],
@@ -49,7 +49,7 @@ internal static class GoogleFormsGuide
         new(6, "保存して作成関数を実行",
             "Ctrl＋Sまたはフロッピーディスクのボタンで保存します。関数が createStudentQuestionnaire になっていることを確認し、「実行」を押します。",
             [new("06_select_function.png", "実行する関数の選択画面", 360)],
-            "講師勤務日時用は createTeacherQuestionnaire、講師指導可能科目用は createTeacherSubjectQuestionnaire を選びます。Google Apps Scriptの「デプロイ」は不要です。"),
+            "講師勤務日時用は createTeacherQuestionnaire を選びます。Google Apps Scriptの「デプロイ」は不要です。"),
         new(7, "権限を確認",
             "初回実行時に「承認が必要です」と表示されたら、「権限を確認」を押して使用するGoogleアカウントを選択します。",
             [new("07_confirm_permissions.png", "権限の確認ダイアログ", 260)],
@@ -74,14 +74,14 @@ internal static class GoogleFormsGuide
         {
             XamlRoot = xamlRoot,
             Title = "Googleフォーム作成手順",
-            Content = new ScrollViewer { Content = BuildContent(), Width = 1040, Height = 620 },
+            Content = new Border { Width = 1120, Height = 660, Child = BuildWizard() },
             PrimaryButtonText = "別ウィンドウで表示",
             CloseButtonText = "閉じる",
         };
         // 既定のContentDialogは幅548px相当に固定されており、画像を含む本文には狭すぎるため、
         // このダイアログのResourcesだけを上書きして拡張する（WinUI3の既知の回避策）。
-        dialog.Resources["ContentDialogMaxWidth"] = 1100d;
-        dialog.Resources["ContentDialogMinWidth"] = 1100d;
+        dialog.Resources["ContentDialogMaxWidth"] = 1180d;
+        dialog.Resources["ContentDialogMinWidth"] = 1180d;
         var result = await dialog.ShowAsync();
         if (result == ContentDialogResult.Primary) OpenWindow();
     }
@@ -93,63 +93,161 @@ internal static class GoogleFormsGuide
         var window = new Window
         {
             Title = "Googleフォーム作成手順",
-            Content = new ScrollViewer { Content = BuildContent(), Padding = new Thickness(16) },
+            Content = new Border { Padding = new Thickness(16), Child = BuildWizard() },
         };
         window.AppWindow.SetIcon("Assets/AppIcon.ico");
         window.AppWindow.Resize(new SizeInt32(1180, 820));
         if (window.AppWindow.Presenter is OverlappedPresenter presenter)
         {
-            presenter.PreferredMinimumWidth = 760;
-            presenter.PreferredMinimumHeight = 560;
+            presenter.PreferredMinimumWidth = 900;
+            presenter.PreferredMinimumHeight = 620;
         }
         window.Activate();
     }
 
-    private static FrameworkElement BuildContent()
+    private sealed record RailItem(Button Button, Border Badge, TextBlock BadgeText, TextBlock TitleText);
+
+    // Python版は10枚のカードを縦一列に並べただけの単純なスクロールだった。ここでは左に手順一覧の
+    // レール、右に選択中の手順の詳細（説明・スクリーンショット・補足）を表示するウィザード形式にし、
+    // 上部の進捗バーと下部の「前へ／次へ」で現在地が一目でわかるようにしている。
+    private static FrameworkElement BuildWizard()
     {
-        var root = new StackPanel { Spacing = 16 };
-        root.Children.Add(new InfoBar
+        var currentIndex = 0;
+        var railItems = new List<RailItem>();
+        var detailHost = new Border();
+        var progressBar = new ProgressBar { Minimum = 1, Maximum = Steps.Count, Value = 1, Width = 220, VerticalAlignment = VerticalAlignment.Center };
+        var progressText = new TextBlock { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"] };
+        var stepTitleText = new TextBlock { FontSize = 20, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+        var prevButton = new Button { Content = "← 前の手順" };
+        var nextButton = new Button { Content = "次の手順 →", Style = (Style)Application.Current.Resources["AccentButtonStyle"] };
+
+        void Refresh()
         {
-            IsOpen = true,
-            IsClosable = false,
-            Severity = InfoBarSeverity.Informational,
-            Message = "上から1～10の順に進めてください。説明と実際の画面を同じ場所にまとめています。Google側の表示は更新により多少異なる場合があります。",
-        });
-        foreach (var step in Steps) root.Children.Add(BuildStepCard(step));
-        root.Children.Add(new InfoBar
+            var step = Steps[currentIndex];
+            stepTitleText.Text = $"手順 {step.Number}：{step.Title}";
+            progressBar.Value = step.Number;
+            progressText.Text = $"{step.Number} / {Steps.Count}";
+            detailHost.Child = BuildStepDetail(step);
+            prevButton.IsEnabled = currentIndex > 0;
+            nextButton.IsEnabled = currentIndex < Steps.Count - 1;
+            for (var i = 0; i < railItems.Count; i++) StyleRailItem(railItems[i], i == currentIndex);
+        }
+
+        var rail = new StackPanel { Spacing = 2 };
+        for (var i = 0; i < Steps.Count; i++)
         {
-            IsOpen = true,
-            IsClosable = false,
-            Severity = InfoBarSeverity.Warning,
-            Message = "回答原本には氏名・学年・希望日時などの個人情報が含まれます。一般公開せず、担当者だけがアクセスできる場所で管理してください。",
+            var index = i;
+            var item = BuildRailItem(Steps[i]);
+            item.Button.Click += (_, _) => { currentIndex = index; Refresh(); };
+            railItems.Add(item);
+            rail.Children.Add(item.Button);
+        }
+        prevButton.Click += (_, _) => { if (currentIndex > 0) { currentIndex--; Refresh(); } };
+        nextButton.Click += (_, _) => { if (currentIndex < Steps.Count - 1) { currentIndex++; Refresh(); } };
+
+        var railScroll = new ScrollViewer { Content = rail, Width = 230, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        var detailScroll = new ScrollViewer { Content = detailHost, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(4, 0, 16, 0) };
+
+        var body = new Grid { ColumnSpacing = 20 };
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(railScroll, 0);
+        Grid.SetColumn(detailScroll, 1);
+        body.Children.Add(railScroll);
+        body.Children.Add(detailScroll);
+
+        var header = new StackPanel { Spacing = 8 };
+        header.Children.Add(new TextBlock
+        {
+            Text = "左の一覧から手順を選ぶか、下の「次の手順」で順番に進めてください。Google側の画面は更新により多少異なる場合があります。",
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
         });
+        var progressRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+        progressRow.Children.Add(progressBar);
+        progressRow.Children.Add(progressText);
+        header.Children.Add(progressRow);
+        header.Children.Add(stepTitleText);
+
+        var footer = new Grid { ColumnSpacing = 16 };
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var privacyNote = new TextBlock
+        {
+            Text = "回答原本には氏名・学年・希望日時などの個人情報が含まれます。一般公開せず、担当者だけがアクセスできる場所で管理してください。",
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"],
+        };
+        Grid.SetColumn(privacyNote, 0);
+        var navButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        navButtons.Children.Add(prevButton);
+        navButtons.Children.Add(nextButton);
+        Grid.SetColumn(navButtons, 1);
+        footer.Children.Add(privacyNote);
+        footer.Children.Add(navButtons);
+
+        var root = new Grid { RowSpacing = 16 };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(header, 0);
+        Grid.SetRow(body, 1);
+        Grid.SetRow(footer, 2);
+        root.Children.Add(header);
+        root.Children.Add(body);
+        root.Children.Add(footer);
+
+        Refresh();
         return root;
     }
 
-    private static FrameworkElement BuildStepCard(GuideStep step)
+    private static RailItem BuildRailItem(GuideStep step)
     {
-        var content = new StackPanel { Spacing = 8 };
+        var badgeText = new TextBlock { Text = step.Number.ToString(), FontSize = 12, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var badge = new Border { Width = 26, Height = 26, CornerRadius = new CornerRadius(13), BorderThickness = new Thickness(1), Child = badgeText };
+        var title = new TextBlock { Text = step.Title, FontSize = 13, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+        var content = new Grid { ColumnSpacing = 10 };
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(badge, 0);
+        Grid.SetColumn(title, 1);
+        content.Children.Add(badge);
+        content.Children.Add(title);
 
-        var header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
-        header.Children.Add(new Border
+        var button = new Button
         {
-            Width = 28,
-            Height = 28,
-            CornerRadius = new CornerRadius(14),
-            Background = (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"],
-            Child = new TextBlock
-            {
-                Text = step.Number.ToString(),
-                Foreground = new SolidColorBrush(Colors.White),
-                FontWeight = FontWeights.SemiBold,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-            },
-        });
-        header.Children.Add(new TextBlock { Text = step.Title, FontSize = 16, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center });
-        content.Children.Add(header);
+            Content = content,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(10, 8, 10, 8),
+            BorderThickness = new Thickness(0),
+            CornerRadius = new CornerRadius(6),
+        };
+        AutomationProperties.SetName(button, $"手順{step.Number}：{step.Title}");
+        return new RailItem(button, badge, badgeText, title);
+    }
 
-        var description = new TextBlock { TextWrapping = TextWrapping.Wrap };
+    private static void StyleRailItem(RailItem item, bool selected)
+    {
+        var accent = (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"];
+        var subtle = (Brush)Application.Current.Resources["SubtleFillColorSecondaryBrush"];
+        var cardStroke = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"];
+        var textPrimary = (Brush)Application.Current.Resources["TextFillColorPrimaryBrush"];
+        item.Button.Background = selected ? subtle : new SolidColorBrush(Colors.Transparent);
+        item.Badge.Background = selected ? accent : new SolidColorBrush(Colors.Transparent);
+        item.Badge.BorderBrush = selected ? accent : cardStroke;
+        item.BadgeText.Foreground = selected ? new SolidColorBrush(Colors.White) : textPrimary;
+        item.TitleText.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
+    }
+
+    private static FrameworkElement BuildStepDetail(GuideStep step)
+    {
+        var content = new StackPanel { Spacing = 14 };
+
+        var description = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 14 };
         AppendDescription(description, step.Description);
         content.Children.Add(description);
 
@@ -190,15 +288,7 @@ internal static class GoogleFormsGuide
             Child = new TextBlock { Text = $"補足：{step.Note}", TextWrapping = TextWrapping.Wrap, FontSize = 12 },
         });
 
-        return new Border
-        {
-            Padding = new Thickness(16),
-            CornerRadius = new CornerRadius(8),
-            Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
-            BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
-            BorderThickness = new Thickness(1),
-            Child = content,
-        };
+        return content;
     }
 
     // 手順4の説明文に含まれるURL（https://script.google.com/home）だけをHyperlinkにする。

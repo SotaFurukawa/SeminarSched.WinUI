@@ -38,8 +38,6 @@ public sealed partial class SetupPage : WorkflowPageBase
     {
         var current = App.ProjectService.Current;
         if (!EnsureProject(ProjectRequired) || current is null) { Tabs.IsEnabled = false; return; }
-        ProjectTitle.Text = current.Title;
-        ProjectPeriod.Text = $"{current.StartDate:yyyy年M月d日} ～ {current.EndDate:yyyy年M月d日}";
         CourseDayPeriodLabel.Text = $"{current.StartDate:yyyy年M月d日} ～ {current.EndDate:yyyy年M月d日}（変更はすぐに保存されます）";
         await ReloadAsync();
         await LoadOutputSettingsAsync(current.Path);
@@ -93,6 +91,34 @@ public sealed partial class SetupPage : WorkflowPageBase
             new TimeOnly(checked((int)SlotStartHour.Value), checked((int)SlotStartMinute.Value)), new TimeOnly(checked((int)SlotEndHour.Value), checked((int)SlotEndMinute.Value)), checked((int)SlotOrder.Value), SlotActive.IsChecked == true));
         ResetSlot(); SlotOrder.Value = nextOrder;
     }, "コマを保存しました");
+
+    // 「有効」チェックボックスだけは、保存ボタンを押さずにチェックの変更だけでそのまま即座に保存する
+    // （既存の項目を選択している場合のみ。新規入力フォームの初期値やResetXxx()での既定値設定でも
+    // Checked/Uncheckedは発火するが、その時点では_studentEditId等が0のため何もしない）。
+    private async void StudentActive_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading || _studentEditId == 0) return;
+        await ExecuteAsync(async path => await App.MasterData.SaveStudentAsync(path, new Student(_studentEditId, StudentId.Text, StudentName.Text, StudentGrade.Text, checked((int)StudentMaximum.Value), StudentAllowGap.IsChecked == true, StudentNote.Text, StudentActive.IsChecked == true)), "有効状態を更新しました");
+    }
+
+    private async void TeacherActive_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading || _teacherEditId == 0) return;
+        await ExecuteAsync(async path => await App.MasterData.SaveTeacherAsync(path, new Teacher(_teacherEditId, TeacherId.Text, TeacherName.Text, TeacherAllowGap.IsChecked == true, TeacherNote.Text, TeacherActive.IsChecked == true)), "有効状態を更新しました");
+    }
+
+    private async void SubjectActive_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading || _subjectEditId == 0) return;
+        await ExecuteAsync(async path => await App.MasterData.SaveSubjectAsync(path, new Subject(_subjectEditId, SubjectCode.Text, SubjectName.Text, SubjectShort.Text, SubjectLevel.Text, checked((int)SubjectOrder.Value), SubjectActive.IsChecked == true)), "有効状態を更新しました");
+    }
+
+    private async void SlotActive_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading || _slotEditId == 0) return;
+        await ExecuteAsync(async path => await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(_slotEditId, SlotCode.Text, SlotName.Text,
+            new TimeOnly(checked((int)SlotStartHour.Value), checked((int)SlotStartMinute.Value)), new TimeOnly(checked((int)SlotEndHour.Value), checked((int)SlotEndMinute.Value)), checked((int)SlotOrder.Value), SlotActive.IsChecked == true)), "有効状態を更新しました");
+    }
 
     private void Students_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -257,112 +283,6 @@ public sealed partial class SetupPage : WorkflowPageBase
         await App.MasterData.SaveRegularLessonAsync(path,new RegularLessonProfile(0,student.Value.Id,subject.Value.Id,teacher?.Id,checked((int)RegularPriority.Value),RegularOneToOne.IsChecked==true,RegularNote.Text));
     },"通常授業の担当設定を保存しました");
 
-
-    private async void ExportMasterWorkbook_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var picker = new FileSavePicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary, SuggestedFileName = "共通基本情報" };
-            picker.FileTypeChoices.Add("Excelブック", [".xlsx"]);
-            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow!));
-            var file = await picker.PickSaveFileAsync(); if (file is null) return;
-            IsEnabled = false; await App.MasterDataWorkbook.ExportAsync(App.ProjectService.Current!.Path, file.Path);
-            Show(InfoBarSeverity.Success, "共通基本情報を出力しました", file.Path);
-        }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or SqliteException)
-        {
-            Show(InfoBarSeverity.Error, "Excelを出力できませんでした", exception.Message);
-        }
-        finally { IsEnabled = true; }
-    }
-
-    private async void ImportMasterWorkbook_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
-            picker.FileTypeFilter.Add(".xlsx"); InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow!));
-            var file = await picker.PickSingleFileAsync(); if (file is null) return;
-            IsEnabled = false; var preview = await App.MasterDataWorkbook.PreviewAsync(App.ProjectService.Current!.Path, file.Path);
-            var summary = BuildPreviewSummary(preview);
-            var dialog = new ContentDialog
-            {
-                XamlRoot = XamlRoot,
-                Title = preview.HasErrors ? "取込エラーがあります" : "共通基本情報を反映しますか？",
-                Content = new ScrollViewer { MaxHeight = 520, Content = new TextBlock { Text = summary, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true } },
-                CloseButtonText = preview.HasErrors ? "閉じる" : "キャンセル",
-                PrimaryButtonText = preview.HasErrors ? null : "反映する",
-                DefaultButton = preview.HasErrors ? ContentDialogButton.Close : ContentDialogButton.Primary,
-            };
-            IsEnabled = true;
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-            IsEnabled = false; var result = await App.MasterDataWorkbook.ApplyAsync(App.ProjectService.Current!.Path, preview); await ReloadAsync();
-            Show(InfoBarSeverity.Success, "共通基本情報を反映しました", $"{result.ImportedRows}行（警告{result.WarningCount}件）");
-        }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException or SqliteException)
-        {
-            Show(InfoBarSeverity.Error, "Excelを取り込めませんでした", exception.Message);
-        }
-        finally { IsEnabled = true; }
-    }
-
-    private async void ImportSharedRoster_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
-            picker.FileTypeFilter.Add(".xlsx"); InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow!));
-            var file = await picker.PickSingleFileAsync(); if (file is null) return;
-            IsEnabled = false; var preview = await App.SharedRosterImport.PreviewAsync(App.ProjectService.Current!.Path, file.Path);
-            var summary = BuildSharedRosterPreviewSummary(preview);
-            var dialog = new ContentDialog
-            {
-                XamlRoot = XamlRoot,
-                Title = preview.HasErrors ? "取込エラーがあります" : "共通名簿Excelを反映しますか？",
-                Content = new ScrollViewer { MaxHeight = 520, Content = new TextBlock { Text = summary, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true } },
-                CloseButtonText = preview.HasErrors ? "閉じる" : "キャンセル",
-                PrimaryButtonText = preview.HasErrors ? null : "反映する",
-                DefaultButton = preview.HasErrors ? ContentDialogButton.Close : ContentDialogButton.Primary,
-            };
-            IsEnabled = true;
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-            IsEnabled = false; var result = await App.SharedRosterImport.ApplyAsync(App.ProjectService.Current!.Path, preview); await ReloadAsync();
-            Show(InfoBarSeverity.Success, "共通名簿Excelを反映しました", $"{result.ImportedRows}行（警告{result.WarningCount}件）");
-        }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException or SqliteException)
-        {
-            Show(InfoBarSeverity.Error, "Excelを取り込めませんでした", exception.Message);
-        }
-        finally { IsEnabled = true; }
-    }
-
-    private static string BuildSharedRosterPreviewSummary(SharedRosterPreview preview)
-    {
-        var lines = new List<string> { "シート                         件数" };
-        foreach (var (name, count) in new (string, int)[] { ("生徒", preview.StudentCount), ("講師", preview.TeacherCount), ("科目", preview.SubjectCount), ("講師対応科目", preview.QualificationCount), ("通常授業", preview.RegularLessonCount) })
-            lines.Add($"{name,-14} {count,4}");
-        if (preview.Issues.Count != 0)
-        {
-            lines.Add(""); lines.Add($"検証結果（エラー{preview.Issues.Count(issue => issue.Severity == SharedRosterIssueSeverity.Error)}件・警告{preview.Issues.Count(issue => issue.Severity == SharedRosterIssueSeverity.Warning)}件）");
-            lines.AddRange(preview.Issues.Take(100).Select(issue => $"{issue.SheetName} {(issue.RowNumber is null ? "" : $"{issue.RowNumber}行 ")}{issue.ColumnName}: {issue.Message}"));
-            if (preview.Issues.Count > 100) lines.Add($"ほか{preview.Issues.Count - 100}件");
-        }
-        return string.Join(Environment.NewLine, lines);
-    }
-
-    private static string BuildPreviewSummary(MasterWorkbookPreview preview)
-    {
-        var lines = new List<string> { "シート                         新規  更新" };
-        foreach (var name in new[] { "生徒", "講師", "科目", "講師対応科目", "受講希望" }) lines.Add($"{name,-14} {preview.NewCounts.GetValueOrDefault(name),4} {preview.UpdateCounts.GetValueOrDefault(name),5}");
-        if (preview.Issues.Count != 0)
-        {
-            lines.Add(""); lines.Add($"検証結果（エラー{preview.Issues.Count(issue => issue.Severity == MasterWorkbookIssueSeverity.Error)}件・警告{preview.WarningCount}件）");
-            lines.AddRange(preview.Issues.Take(100).Select(issue => $"{issue.SheetName} {(issue.RowNumber is null ? "" : $"{issue.RowNumber}行 ")}{issue.ColumnName}: {issue.Message}"));
-            if (preview.Issues.Count > 100) lines.Add($"ほか{preview.Issues.Count - 100}件");
-        }
-        return string.Join(Environment.NewLine, lines);
-    }
-
     private static readonly string[] WeekdayHeaders = ["日", "月", "火", "水", "木", "金", "土"];
 
     private void RenderCalendarWeekdayHeader()
@@ -466,24 +386,25 @@ public sealed partial class SetupPage : WorkflowPageBase
         }, "選択日のコマを全コマに設定しました");
     }
 
-    private async void CalendarOpenAll_Click(object sender, RoutedEventArgs e)
+    // ユーザー指示により「期間内をすべて開校」「指定曜日を休校」という直接操作ボタンは廃止し、代わりに
+    // 「対象を選択→選択日を開校/休校」という2段階の操作へ統一した（既存の一括操作と同じ流儀に揃える）。
+    private void CalendarSelectClosedDays_Click(object sender, RoutedEventArgs e)
     {
-        var allSlotIds = _timeSlotItems.Where(x => x.Value.Active).Select(x => x.Value.Id).ToArray();
-        await ExecuteAsync(async path =>
-        {
-            foreach (var day in _courseDays)
-                await App.CourseSettings.SaveCourseDayAsync(path, new CourseDay(day.Date, true, day.Note, day.EnabledTimeSlotIds.Count == 0 ? allSlotIds : day.EnabledTimeSlotIds));
-        }, "期間内をすべて開校にしました");
+        _selectedDates.Clear(); foreach (var day in _courseDays.Where(d => !d.IsOpen)) _selectedDates.Add(day.Date);
+        RenderCourseDayCalendar(); RenderCalendarSlotToggles(); UpdateCalendarSelectionCount();
     }
 
-    private async void CalendarCloseWeekday_Click(object sender, RoutedEventArgs e)
+    private void CalendarSelectOpenDays_Click(object sender, RoutedEventArgs e)
+    {
+        _selectedDates.Clear(); foreach (var day in _courseDays.Where(d => d.IsOpen)) _selectedDates.Add(day.Date);
+        RenderCourseDayCalendar(); RenderCalendarSlotToggles(); UpdateCalendarSelectionCount();
+    }
+
+    private void CalendarSelectWeekday_Click(object sender, RoutedEventArgs e)
     {
         var weekday = (DayOfWeek)CalendarWeekday.SelectedIndex;
-        await ExecuteAsync(async path =>
-        {
-            foreach (var day in _courseDays.Where(d => d.Date.DayOfWeek == weekday))
-                await App.CourseSettings.SaveCourseDayAsync(path, new CourseDay(day.Date, false, day.Note, day.EnabledTimeSlotIds));
-        }, "指定曜日を休校にしました");
+        _selectedDates.Clear(); foreach (var day in _courseDays.Where(d => d.Date.DayOfWeek == weekday)) _selectedDates.Add(day.Date);
+        RenderCourseDayCalendar(); RenderCalendarSlotToggles(); UpdateCalendarSelectionCount();
     }
 
     private void CalendarSelectAll_Click(object sender, RoutedEventArgs e)
@@ -518,12 +439,14 @@ public sealed partial class SetupPage : WorkflowPageBase
 
     private void UpdateCalendarSelectionCount() => CalendarSelectionCount.Text = $"{_selectedDates.Count}件選択中";
 
+    // CanReorderItems="True"のListViewは、DragItemsStartingでRequestedOperationを明示しないと
+    // 並び替え自体が不安定になる（DropResultがMove以外になり、ドラッグが視覚的には成功して見えても
+    // 実際にはコマの表示順が変更されない場合があった）。これがWinUI標準のドラッグ並び替えパターン。
+    private void TimeSlots_DragItemsStarting(object sender, DragItemsStartingEventArgs args) => args.Data.RequestedOperation = DataPackageOperation.Move;
+
     private async void TimeSlots_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)
     {
-        // CanReorderItems="True"のListViewは、既定のDragItemsStartingハンドラーが無いと
-        // args.Data.RequestedOperationが設定されずDropResultがMove以外（None等）になることがあり、
-        // 以前はここで早期returnして並び替えが一切保存されない不具合になっていた。ObservableCollection
-        // 自体は並び替え後の順序になっているため、DropResultの値に関わらず常に同期する。
+        // ObservableCollection自体は並び替え後の順序になっているため、DropResultの値に関わらず常に同期する。
         await ExecuteAsync(async path =>
         {
             for (var i = 0; i < _timeSlotItems.Count; i++)

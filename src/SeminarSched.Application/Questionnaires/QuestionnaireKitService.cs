@@ -12,8 +12,11 @@ namespace SeminarSched.Application.Questionnaires;
 /// Python版questionnaire_script_service.pyの移植。生成したGoogleフォームの回答は
 /// <see cref="Importing.ICourseSurveyImportService"/>がそのまま取り込める列構成になる
 /// （姓・名の分割、学年、在籍区分、教科ごとの学校区分・受講教科・受講回数、日付ごとの
-/// 受講/出勤不可日時列）。3つのApps Scriptは共通の本体テンプレートを種類ごとの設定値
-/// （kind・関数名・プロパティキー）だけ差し替えて生成する。
+/// 受講/出勤不可日時列）。生徒用・講師用の2つのApps Scriptは共通の本体テンプレートを種類ごとの
+/// 設定値（kind・関数名・プロパティキー）だけ差し替えて生成する。
+/// ユーザー指示（v0.3.2）により、講師指導可能科目用のGoogleフォーム作成キットは廃止した
+/// （講師指導可能科目は③アンケート取込みでは使用しないため。共通名簿Excelの「講師対応科目」で
+/// 校舎側が直接管理する）。
 /// </summary>
 public sealed class QuestionnaireKitService
 {
@@ -57,12 +60,6 @@ public sealed class QuestionnaireKitService
             ["highSchool"] = highSchool.Select(x => StudentSubjectLabel(x.DisplayName)).ToArray(),
         };
         var studentSubjectChoices = studentSubjectsBySchoolLevel.Values.SelectMany(x => x).Distinct().ToArray();
-        var teacherSubjectsBySchoolLevel = new Dictionary<string, string[]>
-        {
-            ["elementary"] = elementary.Select(x => x.DisplayName).ToArray(),
-            ["juniorHigh"] = juniorHigh.Select(x => x.DisplayName).ToArray(),
-            ["highSchool"] = highSchool.Select(x => x.DisplayName).ToArray(),
-        };
 
         var target = AvailableDirectory(Path.Combine(Path.GetFullPath(parentDirectory), $"Googleフォーム_{SafeFileName(projectTitle)}_{DateTime.Now:yyyyMMdd_HHmmss}"));
         var temporary = target + ".tmp-" + Guid.NewGuid().ToString("N");
@@ -98,24 +95,12 @@ public sealed class QuestionnaireKitService
                 openDates,
                 timeSlots,
             };
-            var teacherSubjectConfig = new
-            {
-                kind = "teacher_subject",
-                title = $"{projectTitle} 講師 指導可能科目アンケート",
-                deadline = teacherDeadline,
-                contact,
-                description = "現在、講師本人が単独で授業を進められる指導可能科目を確認するフォームです。小学校・中学校・高校から、該当する科目をすべて選択してください。\n\n回答は講師マスターの更新、担当可能科目の確認、時間割作成にだけ使用します。回答先スプレッドシートの閲覧者は担当者に限定してください。",
-                subjectsBySchoolLevel = teacherSubjectsBySchoolLevel,
-            };
 
             await File.WriteAllTextAsync(Path.Combine(temporary, "create_student_questionnaire.gs"),
                 RenderScript(studentConfig, jsonOptions, "SUMMER_SCHEDULER_STUDENT_FORM_ID", "SUMMER_SCHEDULER_STUDENT_RESPONSE_SHEET_ID", "createStudentQuestionnaire", "showCreatedQuestionnaireUrls", "createReplacementStudentQuestionnaire", "生徒・保護者用"),
                 new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
             await File.WriteAllTextAsync(Path.Combine(temporary, "create_teacher_questionnaire.gs"),
                 RenderScript(teacherConfig, jsonOptions, "SUMMER_SCHEDULER_TEACHER_FORM_ID", "SUMMER_SCHEDULER_TEACHER_RESPONSE_SHEET_ID", "createTeacherQuestionnaire", "showCreatedTeacherQuestionnaireUrls", "createReplacementTeacherQuestionnaire", "講師用"),
-                new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
-            await File.WriteAllTextAsync(Path.Combine(temporary, "create_teacher_subject_questionnaire.gs"),
-                RenderScript(teacherSubjectConfig, jsonOptions, "SUMMER_SCHEDULER_TEACHER_SUBJECT_FORM_ID", "SUMMER_SCHEDULER_TEACHER_SUBJECT_RESPONSE_SHEET_ID", "createTeacherSubjectQuestionnaire", "showCreatedTeacherSubjectQuestionnaireUrls", "createReplacementTeacherSubjectQuestionnaire", "講師指導可能科目用"),
                 new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
             await File.WriteAllTextAsync(Path.Combine(temporary, "Googleフォーム作成手順.txt"), BuildInstructions(projectTitle, days.Length, slots.Length), new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
             Directory.Move(temporary, target);
@@ -181,7 +166,7 @@ public sealed class QuestionnaireKitService
         {{projectTitle}} Googleフォーム作成手順
 
         このフォルダーには、①で設定した開校日{{openDateCount}}日・有効コマ{{timeSlotCount}}件を
-        反映した生徒用／講師勤務日時用／講師指導可能科目用Google Apps Scriptが入っています。
+        反映した生徒用／講師勤務日時用のGoogle Apps Scriptが入っています。
 
         【生徒用：上から順に進めます】
         1. アプリの「作成キットを保存」から作成キットを保存します。
@@ -200,12 +185,9 @@ public sealed class QuestionnaireKitService
         10. 実行ログの回答URLからアンケートを開きます。フォーム編集URLと回答原本URLは
             担当者だけで管理し、回答URLだけを生徒へ案内します。
 
-        【講師用・講師指導可能科目用】
-        上記と同じ1～10の手順を、別々のApps Scriptプロジェクトで繰り返します。
+        【講師用】
+        上記と同じ1～10の手順を、別のApps Scriptプロジェクトで繰り返します。
         - 講師勤務日時用：create_teacher_questionnaire.gs／createTeacherQuestionnaire
-        - 講師指導可能科目用：create_teacher_subject_questionnaire.gs／
-          createTeacherSubjectQuestionnaire
-        講師指導可能科目用は、完成後に科目一覧と説明文を確認します。
         講師のメールアドレスは収集しません。
 
         Google Apps Scriptの「デプロイ」は不要です。配布前に、タイトル、締切、質問、開校日、
@@ -213,15 +195,15 @@ public sealed class QuestionnaireKitService
 
         生徒・講師勤務日時の回答後はGoogleスプレッドシートの「Form Responses 1」シートを
         xlsxまたはCSVでダウンロードし、アプリの③「アンケート取込み」で生徒回答／講師回答を
-        選んで検証・反映します。指導可能科目の回答は回答原本で確認し、共通名簿Excel
-        （生徒・講師_基本情報.xlsx）の「講師対応科目」へ、校舎側で内容を確認して反映してください。
+        選んで検証・反映します。講師の指導可能科目は、共通名簿Excel
+        （生徒・講師_基本情報.xlsx）の「講師対応科目」で校舎側が直接管理してください。
 
         このスクリプトはフォーム作成時だけGoogleへアクセスします。アプリ本体はGoogleへ接続せず、
         回答や個人情報を外部へ送信しません。
         """;
 
-    // Python版questionnaire_script_service.pyのApps Scriptテンプレートの移植。生徒・講師・
-    // 講師指導可能科目の3種類は本体が共通で、__プレースホルダー__部分だけ種類ごとに差し替える。
+    // Python版questionnaire_script_service.pyのApps Scriptテンプレートの移植。生徒・講師の
+    // 2種類は本体が共通で、__プレースホルダー__部分だけ種類ごとに差し替える。
     // 生成されるフォーム回答（正規化後のスプレッドシート列）はICourseSurveyImportServiceが
     // そのまま取り込める列名になっている。
     private const string ScriptTemplate = """
@@ -278,9 +260,7 @@ public sealed class QuestionnaireKitService
             .setHelpText(
               QUESTIONNAIRE_CONFIG.kind === "student"
                 ? "回答を講習の受付、時間割作成、内容確認、必要な連絡に使用します。"
-                : QUESTIONNAIRE_CONFIG.kind === "teacher_subject"
-                  ? "回答を講師マスターの更新、担当可能科目の確認、時間割作成に使用します。"
-                  : "回答を勤務希望の確認、時間割作成、内容確認、必要な連絡に使用します。",
+                : "回答を勤務希望の確認、時間割作成、内容確認、必要な連絡に使用します。",
             )
             .setChoiceValues(["上記の利用目的を確認し、回答します"])
             .setRequired(true);
@@ -297,10 +277,8 @@ public sealed class QuestionnaireKitService
 
           if (QUESTIONNAIRE_CONFIG.kind === "student") {
             addStudentQuestions_(form);
-          } else if (QUESTIONNAIRE_CONFIG.kind === "teacher") {
-            addTeacherQuestions_(form);
           } else {
-            addTeacherSubjectQuestions_(form);
+            addTeacherQuestions_(form);
           }
 
           const spreadsheet = SpreadsheetApp.create(`${QUESTIONNAIRE_CONFIG.title} 回答原本`);
@@ -422,58 +400,6 @@ public sealed class QuestionnaireKitService
             .addParagraphTextItem()
             .setTitle("勤務に関する特記事項")
             .setHelpText("連続勤務、到着・退出時刻など、日程について必要な事項をご記入ください。")
-            .setRequired(false);
-        }
-
-        function addTeacherSubjectQuestions_(form) {
-          form
-            .addSectionHeaderItem()
-            .setTitle("現在の指導可能科目")
-            .setHelpText(
-              "教材を使い、講師本人が単独で授業を進められる科目をすべて選択してください。" +
-                "未経験、補助が必要、または現在は担当できない科目は選択しないでください。",
-            );
-          addTeacherSubjectCheckbox_(
-            form,
-            "指導可能科目（小学校）",
-            QUESTIONNAIRE_CONFIG.subjectsBySchoolLevel.elementary,
-          );
-          addTeacherSubjectCheckbox_(
-            form,
-            "指導可能科目（中学校）",
-            QUESTIONNAIRE_CONFIG.subjectsBySchoolLevel.juniorHigh,
-          );
-          addTeacherSubjectCheckbox_(
-            form,
-            "指導可能科目（高校）",
-            QUESTIONNAIRE_CONFIG.subjectsBySchoolLevel.highSchool,
-          );
-          form
-            .addMultipleChoiceItem()
-            .setTitle("指導可能科目の確認（必須）")
-            .setHelpText(
-              "選択した科目だけを現在の指導可能科目として回答することを確認してください。" +
-                "1科目もない場合は、2つ目を選択してください。",
-            )
-            .setChoiceValues([
-              "上記で選択した科目を現在指導できます",
-              "現在指導可能な科目はありません",
-            ])
-            .setRequired(true);
-          form
-            .addParagraphTextItem()
-            .setTitle("指導可能科目に関する補足")
-            .setHelpText(
-              "例: 高校数学は数学I・Aのみ、受験指導は要相談、研修後に追加可能、など。",
-            )
-            .setRequired(false);
-        }
-
-        function addTeacherSubjectCheckbox_(form, title, subjects) {
-          form
-            .addCheckboxItem()
-            .setTitle(title)
-            .setChoiceValues(subjects)
             .setRequired(false);
         }
 
@@ -774,32 +700,27 @@ public sealed class QuestionnaireKitService
         }
 
         function validateQuestionnaireConfig_() {
-          if (QUESTIONNAIRE_CONFIG.kind !== "teacher_subject") {
-            const dates = QUESTIONNAIRE_CONFIG.openDates;
-            if (dates.length === 0) throw new Error("開校日を1日以上設定してください。");
-            if (new Set(dates).size !== dates.length) throw new Error("開校日が重複しています。");
-            dates.forEach((value) => {
-              if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-                throw new Error(`開校日はYYYY-MM-DD形式にしてください: ${value}`);
-              }
-            });
-            if (QUESTIONNAIRE_CONFIG.timeSlots.length === 0) {
-              throw new Error("時間帯を1件以上設定してください。");
+          const dates = QUESTIONNAIRE_CONFIG.openDates;
+          if (dates.length === 0) throw new Error("開校日を1日以上設定してください。");
+          if (new Set(dates).size !== dates.length) throw new Error("開校日が重複しています。");
+          dates.forEach((value) => {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+              throw new Error(`開校日はYYYY-MM-DD形式にしてください: ${value}`);
             }
+          });
+          if (QUESTIONNAIRE_CONFIG.timeSlots.length === 0) {
+            throw new Error("時間帯を1件以上設定してください。");
           }
-          if (
-            QUESTIONNAIRE_CONFIG.kind === "student" ||
-            QUESTIONNAIRE_CONFIG.kind === "teacher_subject"
-          ) {
+          if (QUESTIONNAIRE_CONFIG.kind === "student") {
             const subjectGroups = Object.values(QUESTIONNAIRE_CONFIG.subjectsBySchoolLevel);
             const invalidGroup = subjectGroups.some(
               (subjects) => subjects.length === 0 || new Set(subjects).size !== subjects.length,
             );
             const studentSubjects = QUESTIONNAIRE_CONFIG.studentSubjectChoices || [];
-            const invalidStudentSubjects = QUESTIONNAIRE_CONFIG.kind === "student" &&
-              (studentSubjects.length === 0 ||
-               new Set(studentSubjects).size !== studentSubjects.length ||
-               QUESTIONNAIRE_CONFIG.schoolLevels.join("・") !== "小学校・中学校・高校");
+            const invalidStudentSubjects =
+              studentSubjects.length === 0 ||
+              new Set(studentSubjects).size !== studentSubjects.length ||
+              QUESTIONNAIRE_CONFIG.schoolLevels.join("・") !== "小学校・中学校・高校";
             if (invalidGroup || invalidStudentSubjects) {
               throw new Error("科目選択肢が未設定または重複しています。");
             }

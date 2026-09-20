@@ -243,16 +243,22 @@ public sealed partial class HomePage : Page
 
     private async void RecentProject_ItemClick(object sender, ItemClickEventArgs e)
     {
-        if (e.ClickedItem is not RecentProjectRow row)
-        {
-            return;
-        }
-        var entry = row.Entry;
+        if (e.ClickedItem is not RecentProjectRow row) return;
+        await OpenRecentProjectAsync(row.Entry.Path);
+    }
 
+    private async void OpenRecentProjectButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string path }) return;
+        await OpenRecentProjectAsync(path);
+    }
+
+    private async Task OpenRecentProjectAsync(string path)
+    {
         try
         {
             SetBusy(true);
-            var summary = await App.ProjectService.OpenAsync(entry.Path);
+            var summary = await App.ProjectService.OpenAsync(path);
             await App.RecentProjects.TouchAsync(summary.Path, summary.Title);
             RefreshCurrentProject();
             await RefreshRecentProjectsAsync();
@@ -260,7 +266,7 @@ public sealed partial class HomePage : Page
         }
         catch (FileNotFoundException)
         {
-            await App.RecentProjects.RemoveAsync(entry.Path);
+            await App.RecentProjects.RemoveAsync(path);
             await RefreshRecentProjectsAsync();
             ShowStatus(InfoBarSeverity.Warning, "プロジェクトが見つかりません", "履歴から削除しました。");
         }

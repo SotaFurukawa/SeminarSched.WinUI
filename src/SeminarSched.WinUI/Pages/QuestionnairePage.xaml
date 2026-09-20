@@ -3,7 +3,7 @@
         <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="② アンケート作成"/>
         <InfoBar x:Name="ProjectRequired"/>
         <InfoBar x:Name="Status" IsClosable="True"/>
-        <TextBlock Text="設定した開校日・コマ・科目から、生徒用・講師用・講師指導可能科目用のGoogleフォーム作成キット（3本のApps Script）を生成します。生成されるフォーム回答は③アンケート取込みでそのまま取り込めます。" TextWrapping="Wrap"/>
+        <TextBlock Text="設定した開校日・コマ・科目から、生徒用・講師用のGoogleフォーム作成キットを作成します。フォーム回答(Google spreadsheet)を「3.アンケート取込」でそのまま取り込むことができます。" TextWrapping="Wrap"/>
         <TextBox x:Name="StudentTitleBox" Header="生徒用フォーム名"/>
         <CalendarDatePicker x:Name="StudentDeadlinePicker" Header="生徒用 回答締切"/>
         <TextBox x:Name="TeacherTitleBox" Header="講師用フォーム名（勤務可能日時）"/>

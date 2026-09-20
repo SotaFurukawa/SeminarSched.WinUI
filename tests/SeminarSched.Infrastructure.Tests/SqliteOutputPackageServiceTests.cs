@@ -310,7 +310,7 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
     [Fact]
     public async Task GenerateAsync_HandoutStyleSheet_RoundTripsCustomizationFromPreviousOutput()
     {
-        // 実験的機能: 生徒配布xlsxの「デザイン設定」シートは編集・保存可能なテンプレートであり、
+        // 生徒配布xlsxの「デザイン設定」シートは編集・保存可能なテンプレートであり、
         // 次回以降の出力（同じ出力先フォルダ）でその値を読み戻して反映する。既定値のまま何も編集
         // していない場合は既定値が維持されることも合わせて確認する。
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"style-roundtrip.jukuschedule");

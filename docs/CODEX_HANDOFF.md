@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.3.2 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 82（出力設定画面・プロジェクト別出力フォルダ/ファイル名規則・講師配布用講師別時間割(一括)・PDF全面刷新）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」は実験的機能であり、実機確認の結果次第で採用・廃止が未確定（本書「9. 現在の既知の未実装・保留事項」参照）。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。
+Latest Development Checkpoint: checkpoint 83（④編集中の外部変更検出・Googleフォームキット整理・ホーム/設定の文言/操作性改善・「デザイン設定」正式採用）。まだDraft Release化されておらず、version番号はv0.3.2のまま据え置いている（Next Version Ruleに従えば本checkpointはnew feature相当でv0.4.0が既定だが、ユーザーからのversion番号指示待ち）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83の④外部変更検出・ホーム/設定/アンケート作成のUI変更・Googleフォーム作成手順ウィザードは、いずれもこの環境からは視覚確認できないため実機での確認待ち。
 Latest Draft Release: `v0.3.2`（GitHub上にDraftとして作成済み。checkpoint80〜82の内容をまとめてユーザーより明示的に「0.3.2としてドラフトリリースしてほしい」との指示を受け作成（checkpoint82は本来「Next Version Rule」に従えばnew feature相当でv0.4.0だが、ユーザーがバージョン番号を明示指定したためそれに従った）。詳細は[docs/releases/v0.3.2.md](releases/v0.3.2.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -1120,6 +1120,29 @@ v0.3.1のDraft Release作成後、ユーザーから「Draft Releaseにインス
 **動作確認:** Release/x64 build警告0・エラー0。実際にscratchpad上の使い捨てharnessプロジェクトで`SqliteOutputPackageService.GenerateAsync`を実行し、生成された生徒配布・全体時間割・講師別一括のPDFを、このツール自体でPDFを画像として読み込み目視確認した（このセッションで初めて、生成物を実際に画像として確認する手段が使えることを確認した）。集団授業の黒塗り「集団」表示、月/曜日/日の配色、コマラベルの週先頭配置、講師別一括ファイルの「{講師名}t用」ラベルが、いずれも意図通りに表示されることを確認済み。ただし①設定の新規tab「出力設定」自体のUI操作感（ComboBox/NumberBoxの実際の見た目）は、この環境からは視覚確認できないため実機でユーザーに確認をお願いしたい。
 
 **未対応・意図的にスコープ外:** 表示項目ON/OFF・ロゴ画像・1ページの日数/講師列数（全体時間割の現在の「週単位で全講師を動的に横並び」というレイアウトの前提を崩すため）・生徒別改ページ方式（複数生徒を1シートにまとめる新しい描画モードが必要）は、ユーザーとの事前確認で示された設計上の衝突を理由に今回は実装していない。必要であれば、既存の週単位固定レイアウトをどう変えるか改めて相談したうえで着手する。
+
+### v0.3.2 checkpoint 83 (Claude) — 外部変更検出、Googleフォームキット整理、ホーム/設定の文言・操作性改善、「デザイン設定」の正式採用
+
+v0.3.2 Draft Release後、ユーザーから「先の比較調査で挙げたまま判断待ちだった4項目」の説明を求められ回答した上で、①アンケート旧形式のテンプレート出力・④匿名サンプルプロジェクト作成は不要、②スケジュール編集中の外部変更検出は実装、「デザイン設定」テンプレートシート（checkpoint79、実験的機能として実装）は実機評価の結果「良かった、正式採用する」との指示を受けた。同じメッセージでv0.3.1当時から溜まっていたホーム/設定/アンケート作成画面の文言・操作性の改善指示も大量にまとめて依頼され、本checkpointで一括対応した。
+
+**②スケジュール編集中の外部変更検出（最も技術的に大きい変更）:** ユーザーが挙げた具体的な事故シナリオ：「一人で使っていても、④時間割編集でExcelを開いた状態のまま編集を続け、途中でホームの『作成した基本情報を反映』でExcelの基本情報を反映すると、その変更が時間割編集中の画面には反映されないまま編集を続けてしまう」。Python版`schedule_edit_service.py`の`ScheduleEditService`は編集対象データのcontent fingerprint（sha256）をメモリ上に保持し、書き込み前に再計算した値と不一致なら`ScheduleEditConflictError`を投げて再読込みを促す設計だったため、これと同じ役割を軽量に移植した。
+- `IScheduleEditorService.GetDataVersionAsync(projectPath)`（新規）を追加。当初はSQLiteの`PRAGMA data_version`を使う実装を試みたが、実際にテスト（別接続からの直接INSERTの前後で値が変わるか）を書いて検証したところ、この環境（`journal_mode=WAL`＋`Microsoft.Data.Sqlite`で呼び出しのたびに新規接続を開く既存の設計）では外部接続からの変更をこの方法では検出できないことが実証された（テストが実際に失敗し、原因調査の末に判明）。そのため、プロジェクトファイル本体と`-wal`サイドカーファイルのうち新しい方の最終更新時刻（ticks）を返す、ファイルタイムスタンプ方式へ変更した。これはHomePageの「最近使ったプロジェクト」の最終更新時刻表示（`File.GetLastWriteTime`）と同じ手法で、この codebase で既に実績のあるアプローチ。
+- `ScheduleEditorPage`に`_loadedDataVersion`を追加し、`ReloadEditorAsync()`（④画面のあらゆる再読込み経路がここを通る）の先頭で毎回取得・保持する。全ての書き込み操作が通る唯一の経路である`ExecuteEditorAsync`と、`Undo_Click`/`Redo_Click`の先頭に`EnsureFreshDataAsync`ガードを追加し、保持している値と現在値が不一致なら書き込みを中止し、Undo/Redo履歴をクリアした上で最新の内容へ自動的に読み込み直し、InfoBarで警告を表示する（Python版と異なり、ユーザーに再読込みボタンを押させるのではなく自動で読み込み直す設計とした。手動配置の候補選択・グリッド描画等はどのみち`ReloadEditorAsync`で作り直されるため、単に書き込みを弾いて放置するより体験がよいと判断）。
+- 新規テスト`SqliteScheduleEditorServiceTests.GetDataVersionAsync_ChangesOnlyAfterAnExternalConnectionCommitsAWrite`（別接続からの直接INSERTの前後で値が変化することを検証）。
+
+**Googleフォーム作成キットの整理（ユーザー指示による意図的なPython版からの逸脱）:** 「講師指導可能科目はアンケート取込みの項目では使用しないため、このアンケートは取らなくてもよいのではないか」との判断により、`QuestionnaireKitService`が生成していた3本目のApps Script（`create_teacher_subject_questionnaire.gs`、講師指導可能科目用）を完全に削除した。共有の`ScriptTemplate`から`kind==="teacher_subject"`分岐・`addTeacherSubjectQuestions_`/`addTeacherSubjectCheckbox_`関数・`validateQuestionnaireConfig_`のteacher_subject分岐を除去し、`BuildInstructions`の手順書テキストも生徒用・講師用の2本のみに書き換えた。以降、講師の指導可能科目は共通名簿Excelの「講師対応科目」で校舎側が直接管理する運用に一本化する。②アンケート作成画面の説明文もユーザー指定の文言（「設定した開校日・コマ・科目から、生徒用・講師用のGoogleフォーム作成キットを作成します。フォーム回答(Google spreadsheet)を「3.アンケート取込」でそのまま取り込むことができます。」）へ変更した。
+
+**Googleフォーム作成手順ポップアップのUI刷新:** 「作成手順について、python版とUIがかなり近い。C#, WinUI, claudeの技術を利用していい感じのUIに仕上げてほしい」との指示を受け、`GoogleFormsGuide`を全面刷新した。従来は10枚のカードを縦一列に並べただけの単純スクロール（Python版`GoogleFormsGuideDialog.qml`とほぼ同じ構成）だったが、左に手順一覧レール（番号バッジ＋タイトル、選択中はアクセント色でハイライト）、右に選択中の手順の詳細（説明文・スクリーンショット・補足）を表示するウィザード形式へ変更した。上部に進捗バー（`ProgressBar`）と「手順X/10」表示、下部に「前の手順／次の手順」ナビゲーションボタンを配置し、レールの任意の手順をクリックして直接ジャンプもできる。手順の文章・画像アセット自体はPython版の内容をそのまま踏襲しつつ、上記のキット整理に伴い講師指導可能科目用への言及（3本目の.gs・関数名）は削除した。
+
+**「デザイン設定」テンプレートシートの正式採用:** checkpoint79で「良ければ採用、微妙なら廃止」という前提付きで実装した実験的機能について、ユーザーから実機評価の結果「良かった。正式に採用する」との判断を受けた。`HandoutStyleSettings`・`ExcelScheduleReportRenderer`・`SqliteOutputPackageService`のXMLコメントおよび生成されるxlsxのシート見出し（「デザイン設定（実験的機能）」→「デザイン設定」）から「実験的機能」の表記を削除した。機能自体（校舎がxlsx内のシートを編集して保存すると次回出力で読み戻される往復編集）は変更していない。
+
+**ホーム画面の文言・操作性改善（ユーザー指定の文言へ逐語で変更）:** 「共通名簿」カードのタイトル・説明文を「生徒講師基本情報・通常授業担当情報」＋新しい説明文へ変更。バックアップ復元の警告文を簡潔な表現へ変更。「最近使ったプロジェクト」の各行に、枠内クリックでの開く操作は残したまま「プロジェクトを開く」ボタンを追加（`OpenRecentProjectButton_Click`が`OpenRecentProjectAsync`という共通処理を`RecentProject_ItemClick`と共有する形にリファクタ）。「新しい講習プロジェクト」カード内で、自動生成される名称ラベルを廃止し`GeneratedTitleBox`の横に「として保存」と表示、「保存先を選んで作成」ボタンをカード右下へ移動、「オプション機能」という見出しを新設して集団授業チェックボックスの上に配置（将来他のオプションが増える前提の見出し）、一時SQLite作成に関する説明文をオプション機能の上へ移動した上で内容を拡充。
+
+**設定画面の整理・操作性改善:** 「プロジェクトの項目は不要、ホームのみで十分」との指示により「プロジェクト」タブを完全に削除した。**ユーザーへの開示事項:** このタブには`ExportMasterWorkbook_Click`/`ImportMasterWorkbook_Click`（受講希望データをプロジェクトのExcelへ一括書き出し・取り込みする機能）が含まれており、これは他のどの画面にも同等の代替が無い機能だったため、タブ自体は指示通り削除したが、この一括編集機能は今回削除に伴い利用できなくなった。必要であれば別の形（例えば③アンケート取込みや①設定「担当設定」への統合）で復活させることを検討する。同タブの`ImportSharedRoster_Click`（プロジェクト個別の共通名簿反映）はホームの「作成した基本情報を反映」と重複していたため削除した影響は無い。有効/無効チェックボックス（生徒・講師・科目・コマ）は保存ボタンを押さずともチェック変更のみで即座に保存されるよう変更。開校日・休校日カレンダーのボタンを「休校日を全て選択」「開校日を全て選択」「○曜日を選択」（プルダウンで曜日を指定）へ差し替え、「期間内をすべて開校」「指定曜日を休校」は削除、「選択日を休校」ボタンの色を「選択日を開校」と統一した。**コマ設定のドラッグ並び替えが保存されない不具合の再修正:** ユーザーから「もしかすると既に直っているかもしれないが」と留保付きで再確認依頼があったため調査した結果、checkpoint78では症状（`DropResult != Move`によるガードで並び替えが弾かれる）への対処としてそのガードを削除しただけで、`ListView.CanReorderItems`が正しく動作するために必要な`DragItemsStarting`ハンドラ（`args.Data.RequestedOperation = DataPackageOperation.Move`を設定する）自体が実装されていなかったことが判明。これを追加して根本原因に対処した（このセッションからは実際のドラッグ操作を対話的に検証する手段が無いため、静的解析に基づく根本原因の修正である旨をユーザーへ改めて開示する）。
+
+**新規/更新テスト:** `QuestionnaireKitServiceTests`（3本→2本生成への変更に合わせてリネーム・アサーション更新）、`SqliteScheduleEditorServiceTests.GetDataVersionAsync_ChangesOnlyAfterAnExternalConnectionCommitsAWrite`（新規）。`dotnet test`全164 tests passed。
+
+**動作確認:** Debug/x86ビルド警告0・エラー0（Release/x64は次回の正式リリース作業時に実施予定）。ホーム/設定/アンケート作成画面の実際の見た目・操作感、Googleフォーム作成手順ウィザードの実際の見た目、外部変更検出のInfoBar表示は、いずれもこの環境からは視覚確認できないため実機でユーザーに確認をお願いしたい。
 
 ### 次回最初に確認するファイル
 

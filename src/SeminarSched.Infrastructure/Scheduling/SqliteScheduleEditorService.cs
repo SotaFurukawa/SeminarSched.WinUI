@@ -9,6 +9,15 @@ namespace SeminarSched.Infrastructure.Scheduling;
 
 public sealed class SqliteScheduleEditorService : IScheduleEditorService
 {
+    public Task<long> GetDataVersionAsync(string projectPath, CancellationToken cancellationToken = default)
+    {
+        var fullPath = Path.GetFullPath(projectPath);
+        var mainTicks = File.Exists(fullPath) ? File.GetLastWriteTimeUtc(fullPath).Ticks : 0L;
+        var walPath = fullPath + "-wal";
+        var walTicks = File.Exists(walPath) ? File.GetLastWriteTimeUtc(walPath).Ticks : 0L;
+        return Task.FromResult(Math.Max(mainTicks, walTicks));
+    }
+
     public async Task<IReadOnlyList<ScheduleAssignmentItem>> GetAssignmentsAsync(string projectPath, long? openDateId = null, CancellationToken cancellationToken = default)
     {
         await using var connection=await OpenAsync(projectPath,cancellationToken).ConfigureAwait(false);await SqliteProjectSchema.EnsureCurrentAsync(connection,cancellationToken).ConfigureAwait(false);

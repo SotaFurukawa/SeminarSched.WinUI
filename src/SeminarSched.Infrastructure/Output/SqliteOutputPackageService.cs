@@ -76,7 +76,7 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
     }
 
     /// <summary>
-    /// 実験的機能: 校舎が直前の出力フォルダのxlsx内「デザイン設定」シートを編集していた場合、その値を
+    /// 校舎が直前の出力フォルダのxlsx内「デザイン設定」シートを編集していた場合、その値を
     /// 読み戻して今回の出力に反映する。同じプロジェクトフォルダに過去の出力が無い・読み取りに失敗した等の
     /// 場合はnull（＝各レンダラーが既定値を使う）を返す。生成中の一時フォルダ（.tmp-*）は対象外。
     /// ファイル名はOutputSettings.FileNamePatternで変わりうるため、「生徒配布用生徒別時間割」を

@@ -304,6 +304,22 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
         await using var connection=new SqliteConnection($"Data Source={state.Path};Pooling=False");await connection.OpenAsync();await using var command=connection.CreateCommand();command.CommandText="SELECT COUNT(*) FROM AuditLog WHERE Action='schedule_snapshot_restored';";Assert.Equal(2L,Convert.ToInt64(await command.ExecuteScalarAsync()));
     }
 
+    // 外部変更検出（②）の土台となるGetDataVersionAsyncの動作確認。編集画面の外側からファイルへ
+    // 直接書き込む状況（Excelでの基本情報反映等）を、別接続からの直接INSERTで再現する。
+    [Fact]
+    public async Task GetDataVersionAsync_ChangesOnlyAfterAnExternalConnectionCommitsAWrite()
+    {
+        var state=await CreateStateAsync();var editor=new SqliteScheduleEditorService();
+        var initial=await editor.GetDataVersionAsync(state.Path);
+        Assert.Equal(initial,await editor.GetDataVersionAsync(state.Path));
+
+        await Task.Delay(20);
+        await InsertRawAssignmentAsync(state.Path,state.RequestId,state.TeacherId,state.DateId,state.SlotId,false,true);
+
+        var afterExternalWrite=await editor.GetDataVersionAsync(state.Path);
+        Assert.NotEqual(initial,afterExternalWrite);
+    }
+
     private static async Task InsertRawAssignmentAsync(string path,long requestId,long teacherId,long openDateId,long timeSlotId,bool isLocked,bool isManual)
     {
         await using var connection=new SqliteConnection($"Data Source={path};Pooling=False");await connection.OpenAsync();
