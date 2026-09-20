@@ -9,7 +9,10 @@ public sealed record Subject
         ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
         ArgumentException.ThrowIfNullOrWhiteSpace(schoolLevel);
         if (sortOrder < 1) throw new ArgumentOutOfRangeException(nameof(sortOrder));
-        if ((shortName ?? "").Trim().Length > 10) throw new ArgumentException("科目略称は10文字以内です。", nameof(shortName));
+        // Python版domain/validation.pyのvalidate_subjectと同じ制約: 略称は未入力か、ちょうど1文字。
+        // 時間割の科目表記が常に一文字に収まることを保証するための不変条件（SubjectAbbreviation参照）。
+        if ((shortName ?? "").Trim() is { Length: > 0 } trimmedShortName && trimmedShortName.Length != 1)
+            throw new ArgumentException("科目略称は1文字で入力してください。", nameof(shortName));
         Id = id; Code = code.Trim(); DisplayName = displayName.Trim(); ShortName = shortName?.Trim() ?? "";
         SchoolLevel = schoolLevel.Trim(); SortOrder = sortOrder; Active = active;
     }

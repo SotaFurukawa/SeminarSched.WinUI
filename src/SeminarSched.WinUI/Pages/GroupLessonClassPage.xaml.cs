@@ -19,7 +19,12 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
     private IReadOnlyList<GroupLessonSessionOption> _allSessions = [];
     private readonly HashSet<long> _selectedDateIds = [];
 
-    public GroupLessonClassPage() => InitializeComponent();
+    public GroupLessonClassPage()
+    {
+        InitializeComponent();
+        SessionStartTime.ItemsSource = TimeOfDayOptions.Values; SessionStartTime.Text = "17:10";
+        SessionEndTime.ItemsSource = TimeOfDayOptions.Values; SessionEndTime.Text = "18:30";
+    }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
@@ -219,8 +224,8 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
     {
         if (SessionClassBox.SelectedItem is not GroupClassRow row) { ShowError("クラスを選択してください。"); return; }
         if (_selectedDateIds.Count == 0) { ShowError("カレンダーで日付を1件以上選択してください。"); return; }
-        var startTime = new TimeOnly(checked((int)SessionStartHour.Value), checked((int)SessionStartMinute.Value));
-        var endTime = new TimeOnly(checked((int)SessionEndHour.Value), checked((int)SessionEndMinute.Value));
+        var startTime = TimeOfDayOptions.Parse(SessionStartTime.Text);
+        var endTime = TimeOfDayOptions.Parse(SessionEndTime.Text);
         try
         {
             IsEnabled = false;
@@ -232,7 +237,7 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
             RenderCalendar();
             Show(InfoBarSeverity.Success, $"{count}日へ「{row.Value.Name} {startTime:HH\\:mm}～{endTime:HH\\:mm}」を追加しました");
         }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException or FormatException)
         { ShowError(exception.Message); }
         finally { IsEnabled = true; }
     }

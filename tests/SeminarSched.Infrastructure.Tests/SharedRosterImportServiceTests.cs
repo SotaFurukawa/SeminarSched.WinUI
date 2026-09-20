@@ -33,6 +33,34 @@ public sealed class SharedRosterImportServiceTests : IDisposable
         Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM Teacher WHERE ExternalId='T-0001' AND Active=1"));
         Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM TeacherQualification q JOIN Teacher t ON t.Id=q.TeacherId JOIN Subject s ON s.Id=q.SubjectId WHERE t.ExternalId='T-0001' AND s.Code='JH_MATH' AND q.CanTeach=1"));
         Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM RegularLessonProfile r JOIN Teacher t ON t.Id=r.RegularTeacherId WHERE r.RegularTeacherPriority=3 AND t.ExternalId='T-0001'"));
+        // 「科目」シートに略称列が無いため、新規科目の略称は表示名から自動推定される（バグ修正の回帰防止:
+        // 以前はDefaultShortNameが表示名をそのまま（10文字まで切り詰めて）入れてしまい、時間割出力の
+        // 科目表記が一文字にならない不具合の原因になっていた）。
+        Assert.Equal("数", await ScalarStringAsync(connection, "SELECT ShortName FROM Subject WHERE Code='JH_MATH'"));
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ReImportingSameSubject_PreservesManuallyCorrectedShortName()
+    {
+        var project = await CreateProjectAsync();
+        var workbookPath = Path.Combine(_directory, "生徒・講師_基本情報.xlsx");
+        BuildSharedRosterWorkbook(workbookPath);
+        var service = new SharedRosterImportService();
+        await service.ApplyAsync(project, await service.PreviewAsync(project, workbookPath));
+
+        await using (var connection = new SqliteConnection($"Data Source={project};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE Subject SET ShortName='算' WHERE Code='JH_MATH';";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await service.ApplyAsync(project, await service.PreviewAsync(project, workbookPath));
+
+        await using var verify = new SqliteConnection($"Data Source={project};Pooling=False");
+        await verify.OpenAsync();
+        Assert.Equal("算", await ScalarStringAsync(verify, "SELECT ShortName FROM Subject WHERE Code='JH_MATH'"));
     }
 
     [Fact]
@@ -103,6 +131,13 @@ public sealed class SharedRosterImportServiceTests : IDisposable
         await using var command = connection.CreateCommand();
         command.CommandText = sql;
         return Convert.ToInt64(await command.ExecuteScalarAsync());
+    }
+
+    private static async Task<string> ScalarStringAsync(SqliteConnection connection, string sql)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        return Convert.ToString(await command.ExecuteScalarAsync()) ?? "";
     }
 
     public void Dispose() { if (Directory.Exists(_directory)) Directory.Delete(_directory, true); }

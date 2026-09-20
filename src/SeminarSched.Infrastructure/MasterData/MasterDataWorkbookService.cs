@@ -4,6 +4,7 @@ using System.Text.Json;
 using ClosedXML.Excel;
 using Microsoft.Data.Sqlite;
 using SeminarSched.Application.MasterData;
+using SeminarSched.Domain.MasterData;
 using SeminarSched.Infrastructure.Projects;
 
 namespace SeminarSched.Infrastructure.MasterData;
@@ -177,7 +178,8 @@ public sealed class MasterDataWorkbookService : IMasterDataWorkbookService
     private static SubjectRow ParseSubject(RowReader row)
     {
         var displayName = row.Text("表示名", true)!;
-        return new SubjectRow(row.RowNumber, row.Text("科目コード", true)!, displayName, row.Text("略称", false) ?? DefaultShortName(displayName), row.Text("学校段階", true)!, row.Integer("並び順", true, null, 1)!.Value, row.Boolean("有効", false, true)!.Value);
+        var code = row.Text("科目コード", true)!;
+        return new SubjectRow(row.RowNumber, code, displayName, SubjectAbbreviation.Resolve(displayName, row.Text("略称", false), code), row.Text("学校段階", true)!, row.Integer("並び順", true, null, 1)!.Value, row.Boolean("有効", false, true)!.Value);
     }
 
     private static QualificationRow ParseQualification(RowReader row) => new(
@@ -455,7 +457,6 @@ public sealed class MasterDataWorkbookService : IMasterDataWorkbookService
 
     private static XLCellValue ToCellValue(object? value)=>value switch{null=>Blank.Value,bool boolean=>boolean?"はい":"いいえ",long number=>number,int number=>number,double number=>number,string text=>text,_=>Convert.ToString(value,CultureInfo.InvariantCulture)??string.Empty};
     private static string CanonicalHeader(string header)=>header.Trim().Replace("（必須）",string.Empty,StringComparison.Ordinal);
-    private static string DefaultShortName(string displayName)=>displayName.Length<=10?displayName:displayName[..10];
     private static string FormatIssue(MasterWorkbookIssue issue)=>$"{issue.SheetName}{(issue.RowNumber is null?"":$" {issue.RowNumber}行")}{(issue.ColumnName is null?"":$" [{issue.ColumnName}]")}: {issue.Message}";
     private static MasterWorkbookIssue Error(string sheet,int? row,string? column,string message)=>new(MasterWorkbookIssueSeverity.Error,sheet,row,column,message);
     private static MasterWorkbookIssue Warning(string sheet,int? row,string? column,string message)=>new(MasterWorkbookIssueSeverity.Warning,sheet,row,column,message);

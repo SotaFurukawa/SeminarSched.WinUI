@@ -54,10 +54,10 @@
                 <NavigationViewItem Content="③ アンケート取込み" Tag="import">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE8B5;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="3.1 集団授業クラス" Tag="groupLessonClass">
+                <NavigationViewItem Content="3.1 集団授業クラス" Tag="groupLessonClass" Visibility="Collapsed">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE787;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="3.2 集団授業の受講登録" Tag="groupLessonEnrollment">
+                <NavigationViewItem Content="3.2 集団授業の受講登録" Tag="groupLessonEnrollment" Visibility="Collapsed">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE716;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="④ 時間割編集" Tag="scheduleEditor">

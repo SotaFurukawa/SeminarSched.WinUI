@@ -50,22 +50,8 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <ComboBox x:Name="SessionClassBox" Header="クラス" />
-                            <StackPanel Grid.Column="1" Spacing="4">
-                                <TextBlock Text="開始時刻" FontSize="12" />
-                                <StackPanel Orientation="Horizontal" Spacing="2">
-                                    <NumberBox x:Name="SessionStartHour" Minimum="0" Maximum="23" Value="17" SpinButtonPlacementMode="Compact" Width="68" />
-                                    <TextBlock Text=":" VerticalAlignment="Center" FontWeight="SemiBold" />
-                                    <NumberBox x:Name="SessionStartMinute" Minimum="0" Maximum="59" Value="10" SpinButtonPlacementMode="Compact" Width="68" />
-                                </StackPanel>
-                            </StackPanel>
-                            <StackPanel Grid.Column="2" Spacing="4">
-                                <TextBlock Text="終了時刻" FontSize="12" />
-                                <StackPanel Orientation="Horizontal" Spacing="2">
-                                    <NumberBox x:Name="SessionEndHour" Minimum="0" Maximum="23" Value="18" SpinButtonPlacementMode="Compact" Width="68" />
-                                    <TextBlock Text=":" VerticalAlignment="Center" FontWeight="SemiBold" />
-                                    <NumberBox x:Name="SessionEndMinute" Minimum="0" Maximum="59" Value="30" SpinButtonPlacementMode="Compact" Width="68" />
-                                </StackPanel>
-                            </StackPanel>
+                            <ComboBox x:Name="SessionStartTime" Grid.Column="1" Header="開始時刻" IsEditable="True" PlaceholderText="17:10" />
+                            <ComboBox x:Name="SessionEndTime" Grid.Column="2" Header="終了時刻" IsEditable="True" PlaceholderText="18:30" />
                             <Button Grid.Column="3" VerticalAlignment="Bottom" Content="選択した日に追加" Click="AddSessionsToSelectedDates_Click" Style="{StaticResource AccentButtonStyle}" />
                         </Grid>
                         <StackPanel Orientation="Horizontal" Spacing="16">

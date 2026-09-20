@@ -68,7 +68,7 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
     {
         var state=await CreateStateAsync();var editor=new SqliteScheduleEditorService();var master=new SqliteMasterDataRepository();
 
-        var subjectNoTeacher=await master.SaveSubjectAsync(state.Path,new Subject(0,"JH_NOTEACH","無資格科目","無資格","中学校",2));
+        var subjectNoTeacher=await master.SaveSubjectAsync(state.Path,new Subject(0,"JH_NOTEACH","無資格科目","無","中学校",2));
         long noTeacherRequestId;
         await using(var connection=new SqliteConnection($"Data Source={state.Path};Pooling=False"))
         {
@@ -162,7 +162,7 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
         await Assert.ThrowsAsync<InvalidOperationException>(()=>editor.MoveAsync(state.Path,locked.Id,state.Teacher1Id,state.DateId,state.Slot1Id));
 
         var master=new SqliteMasterDataRepository();
-        var subject2=await master.SaveSubjectAsync(state.Path,new Subject(0,"JH_BOARD2","盤科目二","盤二","中学校",2));
+        var subject2=await master.SaveSubjectAsync(state.Path,new Subject(0,"JH_BOARD2","盤科目二","盤","中学校",2));
         await master.SaveQualificationAsync(state.Path,new TeacherQualification(state.Teacher2Id,subject2.Id,true));
         long secondRequest;await using(var connection=new SqliteConnection($"Data Source={state.Path};Pooling=False")){await connection.OpenAsync();await using var command=connection.CreateCommand();command.CommandText="INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions) SELECT 1,StudentId,$subject,1 FROM LessonRequest WHERE Id=$request;SELECT last_insert_rowid();";command.Parameters.AddWithValue("$subject",subject2.Id);command.Parameters.AddWithValue("$request",state.RequestId);secondRequest=Convert.ToInt64(await command.ExecuteScalarAsync());}
         await editor.AddManualAsync(state.Path,secondRequest,state.Teacher2Id,state.DateId,state.Slot2Id,false);

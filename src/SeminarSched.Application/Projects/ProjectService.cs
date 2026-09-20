@@ -31,6 +31,10 @@ public sealed class ProjectService
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
     }
 
+    // WinUI側（MainWindowのnavigationメニュー）が、集団授業タブの表示可否のように現在のプロジェクトへ
+    // 依存するUI状態を、プロジェクトの開閉・作成・切替のたびに再計算できるようにするための通知。
+    public event EventHandler? Changed;
+
     public ProjectSummary? Current { get; private set; }
 
     public async Task<ProjectSummary> CreateAsync(
@@ -46,6 +50,7 @@ public sealed class ProjectService
         }
 
         Current = await _repository.CreateAsync(normalized, definition, cancellationToken).ConfigureAwait(false);
+        Changed?.Invoke(this, EventArgs.Empty);
         return Current;
     }
 
@@ -61,10 +66,11 @@ public sealed class ProjectService
 
         Current = await _repository.OpenAsync(normalized, cancellationToken).ConfigureAwait(false);
         await _repository.CreateAutomaticBackupAsync(normalized, DefaultBackupDirectory, AutomaticBackupGenerations, cancellationToken).ConfigureAwait(false);
+        Changed?.Invoke(this, EventArgs.Empty);
         return Current;
     }
 
-    public void Close() => Current = null;
+    public void Close() { Current = null; Changed?.Invoke(this, EventArgs.Empty); }
 
     public async Task<string> CreateBackupAsync(
         string backupPath,
@@ -89,6 +95,7 @@ public sealed class ProjectService
         var source = NormalizeProjectPath(backupPath);
         await _repository.RestoreBackupAsync(source, current.Path, cancellationToken).ConfigureAwait(false);
         Current = await _repository.OpenAsync(current.Path, cancellationToken).ConfigureAwait(false);
+        Changed?.Invoke(this, EventArgs.Empty);
         return Current;
     }
 
@@ -105,6 +112,7 @@ public sealed class ProjectService
 
         await _repository.CreateBackupAsync(current.Path, target, cancellationToken).ConfigureAwait(false);
         Current = await _repository.OpenAsync(target, cancellationToken).ConfigureAwait(false);
+        Changed?.Invoke(this, EventArgs.Empty);
         return Current;
     }
 

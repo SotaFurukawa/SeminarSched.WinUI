@@ -19,9 +19,9 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
         await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
         var course = new SqliteCourseSettingsRepository();
         var master = new SqliteMasterDataRepository();
-        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH", "小学校・算数", "算数", "小学校", 1));
-        await master.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "中学校・数学", "数学", "中学校", 2));
-        await master.SaveSubjectAsync(path, new Subject(0, "HS_MATH", "高校・数学IA", "数学IA", "高校", 3));
+        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH", "小学校・算数", "算", "小学校", 1));
+        await master.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "中学校・数学", "数", "中学校", 2));
+        await master.SaveSubjectAsync(path, new Subject(0, "HS_MATH", "高校・数学IA", "数", "高校", 3));
 
         var output = await new QuestionnaireKitService(course, master).GenerateAsync(path, _directory, "2026夏期講習", "2026夏期講習 個別指導受講申込", "2026夏期講習 非常勤勤務アンケート", "2026-07-06", "2026-07-10", "校舎へお問い合わせください");
 
@@ -54,7 +54,7 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
         await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
         var course = new SqliteCourseSettingsRepository();
         var master = new SqliteMasterDataRepository();
-        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH", "小学校・算数", "算数", "小学校", 1));
+        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH", "小学校・算数", "算", "小学校", 1));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             new QuestionnaireKitService(course, master).GenerateAsync(path, _directory, "2026夏期講習", "生徒用", "講師用", "2026-07-06", "2026-07-06", "問い合わせ先"));

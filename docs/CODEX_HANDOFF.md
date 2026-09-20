@@ -1152,6 +1152,27 @@ v0.3.2 Draft Release後、ユーザーから「先の比較調査で挙げたま
 - `docs/adr/0001-platform-and-architecture.md`
 - `docs/releases/v0.0.0.md`
 
+### v0.4.0 checkpoint 84 (Claude) — 時刻選択UIの刷新、3.1/3.2タブの表示制御、科目略称バグの根本修正
+
+v0.4.0 Draft Release後、実機スクリーンショット付きの指摘一式（コマ設定の時刻入力欄を専用UIにしたい・5分刻みにしてほしい・3.1/3.2は集団授業を使わないプロジェクトでは非表示にしてほしい・時間割出力の科目名が一文字になっていない・コマの並び替えがまだ反映されない）を受けて対応した。
+
+**時刻選択UIの刷新（①コマ設定・3.1集団授業クラス）:** checkpoint78でWinUI標準`TimePicker`のflyout（位置ずれ・確定ボタン必須）を理由に時・分別々の`NumberBox`2個組へ置き換えていたが、今度は「分まで見えづらい」との指摘を受けた。ユーザーが挙げたInfragistics製time-pickerの参考実装（クリックでダイアログ/ドロップダウンが開き、OK/Cancelで確定）を調査した上で、標準`TimePicker`のflyoutを再度使うのではなく、5分刻み（00:00〜23:55、288件）の時刻文字列一覧を持つ`IsEditable="True"`な`ComboBox`へ置き換えた（新規`TimeOfDayOptions`ヘルパー）。選択すれば即座に反映され（確定ボタン不要）、ComboBoxの開閉位置はこのアプリの他のComboBox（校種選択等）と同じ挙動のため位置ずれのリスクが無く、closed状態でも常にHH:mmの全体が見える。5分刻みに無い既存データ（レガシー値）もIsEditableにより表示・編集できる。対象は`SetupPage`（コマ設定の開始・終了）と`GroupLessonClassPage`（3.1の開始・終了時刻）。
+
+**3.1/3.2タブの表示制御:** 「集団授業を有効にしたプロジェクトを開いている・作成したときにだけ表示してほしい」との指示を受け、`ProjectService`に`Changed`イベント（Create/Open/Close/RestoreBackup/SaveAsのたびに発火）を新設し、`MainWindow`がこれを購読して`NavigationView`の「3.1 集団授業クラス」「3.2 集団授業の受講登録」項目の`Visibility`を`Current?.ConsiderGroupLessons`に応じて切り替えるようにした（既定はXAML側もCollapsed）。両ページ自体には既に`EnsureGroupLessonsEnabled`という同等のガードが実装済みだったため、ページ側の変更は不要だった。
+
+**科目略称が一文字にならない不具合の根本原因と修正（本checkpoint最大の作業）:** ユーザー報告「数学なら数、理科なら理、算数なら算のはずが一文字になっていない」を、実際のコードを読んで原因究明した。
+- `SubjectAbbreviation.Resolve`（checkpoint81で実装した表示名キーワード一致による1文字略称推定）自体は正しく動作するが、**`ShortName`が空でない場合は無条件にその値をそのまま返す**設計だった。
+- 原因は`SharedRosterImportService.UpsertSubjectsAsync`（共通名簿Excelの「科目」シート取込み。このシートには略称列が無い）が、新規科目の`ShortName`を`DefaultShortName(displayName)`という「表示名を10文字まで切り詰めるだけ」の関数で埋めていたこと。「数学」「算数」「理科」はいずれも2文字で10文字以内のため、表示名がそのまま`ShortName`として保存され、以降`SubjectAbbreviation.Resolve`の「非空なら尊重する」分岐が常に発火し、キーワード推定に一切到達しなかった。Python版参照実装（`domain/validation.py`の`validate_subject`が`short_name`は空か厳密に1文字であることを保存時に強制、`shared_roster_service.py`は新規作成時のみ`default_subject_short_name`で自動算出し既存行の更新では触れない）と比較し、この差分がバグの根本原因と特定した。
+- 修正: `SharedRosterImportService`の新規科目の`ShortName`を`SubjectAbbreviation.Resolve(displayName, null, code)`で正しく1文字推定するよう変更し、かつUPSERTの`ON CONFLICT DO UPDATE`から`ShortName`を除外（既存科目の略称は再取込みで上書きしない。Python版と同じ挙動）。同じ「表示名をそのまま切り詰める」バグを持つ`MasterDataWorkbookService`（checkpoint83で削除した「共通基本情報Excel」機能。UI上は既に到達不能だが一貫性のため修正）にも同様の修正を適用。
+- `Subject`ドメインの検証を、Python版`validate_subject`と同じ「略称は空欄かちょうど1文字」（従来は「10文字以内」）へ厳格化し、①設定「科目」タブの略称欄に`MaxLength="1"`とヒント文言を追加した。これにより今後は同種のバグが（手動入力経路も含めて）構造的に発生し得ない。
+- **既存プロジェクトの後始末:** 既に上記バグで壊れた略称データ（略称が空でも1文字でもない科目）を持つプロジェクトファイルのために、`SqliteProjectSchema.EnsureCurrentAsync`（ほぼ全てのリポジトリ呼び出しの先頭で実行される）に自己修復処理を追加した。該当する科目を見つけ次第`SubjectAbbreviation.Resolve`で正しい1文字へ再計算する。ユーザーが既に開いている壊れたプロジェクトも、次にどの画面からでもアクセスした時点で自動的に直る。
+
+**①コマ設定の並び替えをドラッグから▲▼ボタンへ変更:** checkpoint83で`DragItemsStarting`ハンドラを追加する根本原因修正を行ったが、ユーザー実機のスクリーンショット2枚（ドラッグ後に見た目上は並び替わるが、その状態が保存・反映されない）で依然として症状が再現することが分かった。この環境からは実際のドラッグ操作を対話的に検証する手段が無く、原因を①設定ページ全体を包む外側`ScrollViewer`とListView内蔵のドラッグ機構の競合と推定したが、これ以上のドラッグ方式での修正は確実性を検証できないと判断し、方式自体を変更した。`ListView.CanReorderItems`/`AllowDrop`/`DragItemsStarting`/`DragItemsCompleted`を全廃し、各行に▲▼ボタンを追加、隣接する行と`SortOrder`を直接入れ替えて即座に保存する方式（`MoveSlotUp_Click`/`MoveSlotDown_Click`/`MoveSlotAsync`）にした。ドラッグ操作特有の環境依存要因が一切無くなるため、確実に動作する。
+
+**新規/更新テスト:** `MasterDataTests.Subject_RequiresPositiveSortOrderAndShortAbbreviation`に2文字略称が拒否されることの検証を追加。`SharedRosterImportServiceTests`に新規科目の略称自動推定（`ApplyAsync`後に`ShortName='数'`であることを検証）と、再取込み時に手動修正した略称が保持されることを検証する新規テストを追加。`SqliteMasterDataRepositoryTests.GetSubjectsAsync_SelfHealsShortNamesLeftInvalidByThePastImportBug`（新規、自己修復migrationの検証）を追加。過去のバグにより2文字以上の略称を使っていた既存テストfixture（`QuestionnaireKitServiceTests`・`CourseSurveyImportServiceTests`・`SqliteScheduleEditorServiceTests`の計6箇所）を、新しい1文字制約に合わせて修正。`dotnet test`全166 tests passed。
+
+**動作確認:** Debug/x86ビルド警告0・エラー0。時刻選択ComboBox・3.1/3.2の表示切替・▲▼ボタンでの並び替え・科目略称の実際の見た目は、いずれもこの環境からは視覚確認できないため実機でユーザーに確認をお願いしたい。特に科目略称のバックフィルは、ユーザーの既存プロジェクトで実際に正しい1文字へ直っているかの確認を重視したい。
+
 ## 1. この文書の目的
 
 この文書は、別のCodexチャットがSeminarSchedの文脈を失わず、既存Python版を参照しながら

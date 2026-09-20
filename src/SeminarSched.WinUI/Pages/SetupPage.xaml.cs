@@ -6,7 +6,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using Windows.ApplicationModel.DataTransfer;
 using SeminarSched.Domain.MasterData;
 using SeminarSched.Domain.CourseSettings;
 using SeminarSched.Domain.Output;
@@ -32,7 +31,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     private CourseDay[] _courseDays = [];
     private readonly HashSet<DateOnly> _selectedDates = new();
 
-    public SetupPage() { InitializeComponent(); TimeSlots.ItemsSource = _timeSlotItems; RenderCalendarWeekdayHeader(); }
+    public SetupPage() { InitializeComponent(); TimeSlots.ItemsSource = _timeSlotItems; SlotStartTime.ItemsSource = TimeOfDayOptions.Values; SlotEndTime.ItemsSource = TimeOfDayOptions.Values; RenderCalendarWeekdayHeader(); }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
@@ -88,7 +87,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     {
         var nextOrder = SlotOrder.Value + 1;
         await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(_slotEditId, SlotCode.Text, SlotName.Text,
-            new TimeOnly(checked((int)SlotStartHour.Value), checked((int)SlotStartMinute.Value)), new TimeOnly(checked((int)SlotEndHour.Value), checked((int)SlotEndMinute.Value)), checked((int)SlotOrder.Value), SlotActive.IsChecked == true));
+            TimeOfDayOptions.Parse(SlotStartTime.Text), TimeOfDayOptions.Parse(SlotEndTime.Text), checked((int)SlotOrder.Value), SlotActive.IsChecked == true));
         ResetSlot(); SlotOrder.Value = nextOrder;
     }, "コマを保存しました");
 
@@ -117,7 +116,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     {
         if (_loading || _slotEditId == 0) return;
         await ExecuteAsync(async path => await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(_slotEditId, SlotCode.Text, SlotName.Text,
-            new TimeOnly(checked((int)SlotStartHour.Value), checked((int)SlotStartMinute.Value)), new TimeOnly(checked((int)SlotEndHour.Value), checked((int)SlotEndMinute.Value)), checked((int)SlotOrder.Value), SlotActive.IsChecked == true)), "有効状態を更新しました");
+            TimeOfDayOptions.Parse(SlotStartTime.Text), TimeOfDayOptions.Parse(SlotEndTime.Text), checked((int)SlotOrder.Value), SlotActive.IsChecked == true)), "有効状態を更新しました");
     }
 
     private void Students_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -138,7 +137,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     private void TimeSlots_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_loading || TimeSlots.SelectedItem is not TimeSlotItem selected) return;
-        var value=selected.Value;_slotEditId=value.Id;SlotCode.Text=value.Code;SlotName.Text=value.DisplayName;SlotStartHour.Value=value.StartTime.Hour;SlotStartMinute.Value=value.StartTime.Minute;SlotEndHour.Value=value.EndTime.Hour;SlotEndMinute.Value=value.EndTime.Minute;SlotOrder.Value=value.SortOrder;SlotActive.IsChecked=value.Active;
+        var value=selected.Value;_slotEditId=value.Id;SlotCode.Text=value.Code;SlotName.Text=value.DisplayName;SlotStartTime.Text=TimeOfDayOptions.Format(value.StartTime);SlotEndTime.Text=TimeOfDayOptions.Format(value.EndTime);SlotOrder.Value=value.SortOrder;SlotActive.IsChecked=value.Active;
     }
     private void NewStudent_Click(object sender,RoutedEventArgs e)=>ResetStudent();
     private void NewTeacher_Click(object sender,RoutedEventArgs e)=>ResetTeacher();
@@ -185,7 +184,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     private void ResetStudent(){_studentEditId=0;Students.SelectedItem=null;StudentId.Text=StudentName.Text=StudentGrade.Text=StudentNote.Text="";StudentMaximum.Value=2;StudentAllowGap.IsChecked=false;StudentActive.IsChecked=true;}
     private void ResetTeacher(){_teacherEditId=0;Teachers.SelectedItem=null;TeacherId.Text=TeacherName.Text=TeacherNote.Text="";TeacherAllowGap.IsChecked=false;TeacherActive.IsChecked=true;}
     private void ResetSubject(){_subjectEditId=0;Subjects.SelectedItem=null;SubjectCode.Text=SubjectName.Text=SubjectShort.Text=SubjectLevel.Text="";SubjectOrder.Value=1;SubjectActive.IsChecked=true;}
-    private void ResetSlot(){_slotEditId=0;TimeSlots.SelectedItem=null;SlotCode.Text=SlotName.Text="";SlotStartHour.Value=9;SlotStartMinute.Value=0;SlotEndHour.Value=10;SlotEndMinute.Value=0;SlotOrder.Value=1;SlotActive.IsChecked=true;}
+    private void ResetSlot(){_slotEditId=0;TimeSlots.SelectedItem=null;SlotCode.Text=SlotName.Text="";SlotStartTime.Text="09:00";SlotEndTime.Text="10:00";SlotOrder.Value=1;SlotActive.IsChecked=true;}
 
     private async void SaveQualification_Click(object sender,RoutedEventArgs e)=>await ExecuteAsync(async path=>
     {
@@ -439,22 +438,25 @@ public sealed partial class SetupPage : WorkflowPageBase
 
     private void UpdateCalendarSelectionCount() => CalendarSelectionCount.Text = $"{_selectedDates.Count}件選択中";
 
-    // CanReorderItems="True"のListViewは、DragItemsStartingでRequestedOperationを明示しないと
-    // 並び替え自体が不安定になる（DropResultがMove以外になり、ドラッグが視覚的には成功して見えても
-    // 実際にはコマの表示順が変更されない場合があった）。これがWinUI標準のドラッグ並び替えパターン。
-    private void TimeSlots_DragItemsStarting(object sender, DragItemsStartingEventArgs args) => args.Data.RequestedOperation = DataPackageOperation.Move;
+    // 一覧内ドラッグによる並び替え（ListView.CanReorderItems）は、①設定ページ全体を包む外側の
+    // ScrollViewerとドラッグの手のひら操作が競合し、見た目上は動いても保存が反映されない不具合が
+    // ユーザー実機で複数回再現したため撤廃した。代わりに、隣接する行とSortOrderを直接入れ替える
+    // ▲▼ボタンへ置き換え、環境に依存せず確実に並び替え・即時保存できるようにした。
+    private async void MoveSlotUp_Click(object sender, RoutedEventArgs e) => await MoveSlotAsync(sender, -1);
+    private async void MoveSlotDown_Click(object sender, RoutedEventArgs e) => await MoveSlotAsync(sender, 1);
 
-    private async void TimeSlots_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)
+    private async Task MoveSlotAsync(object sender, int direction)
     {
-        // ObservableCollection自体は並び替え後の順序になっているため、DropResultの値に関わらず常に同期する。
+        if (sender is not FrameworkElement { Tag: long slotId }) return;
+        var index = _timeSlotItems.ToList().FindIndex(x => x.Value.Id == slotId);
+        var targetIndex = index + direction;
+        if (index < 0 || targetIndex < 0 || targetIndex >= _timeSlotItems.Count) return;
+        var current = _timeSlotItems[index].Value;
+        var target = _timeSlotItems[targetIndex].Value;
         await ExecuteAsync(async path =>
         {
-            for (var i = 0; i < _timeSlotItems.Count; i++)
-            {
-                var slot = _timeSlotItems[i].Value;
-                if (slot.SortOrder != i + 1)
-                    await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(slot.Id, slot.Code, slot.DisplayName, slot.StartTime, slot.EndTime, i + 1, slot.Active));
-            }
+            await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(current.Id, current.Code, current.DisplayName, current.StartTime, current.EndTime, target.SortOrder, current.Active));
+            await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(target.Id, target.Code, target.DisplayName, target.StartTime, target.EndTime, current.SortOrder, target.Active));
         }, "コマの表示順を更新しました");
     }
 
@@ -467,7 +469,7 @@ public sealed partial class SetupPage : WorkflowPageBase
             await action(path); await ReloadAsync();
             Show(InfoBarSeverity.Success, success, "");
         }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or SqliteException or OverflowException)
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or SqliteException or OverflowException or FormatException)
         {
             Show(InfoBarSeverity.Error, "保存できませんでした", exception is SqliteException { SqliteErrorCode: 19 } ? "IDまたはコードが重複しています。" : exception.Message);
         }

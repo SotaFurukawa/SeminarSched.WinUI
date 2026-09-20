@@ -24,7 +24,7 @@
                 </ListView>
             </StackPanel></TabViewItem>
             <TabViewItem Header="講師"><StackPanel Padding="16" Spacing="10"><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="TeacherId" Header="講師ID"/><TextBox x:Name="TeacherName" Grid.Column="1" Header="氏名"/><Button Grid.Column="2" VerticalAlignment="Bottom" Content="保存" Click="AddTeacher_Click"/></Grid><TextBox x:Name="TeacherNote" Header="備考"/><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="TeacherAllowGap" Content="空きコマを許可"/><CheckBox x:Name="TeacherActive" Content="有効" IsChecked="True" Checked="TeacherActive_Changed" Unchecked="TeacherActive_Changed"/><Button Content="新規入力" Click="NewTeacher_Click"/><Button Content="IDを自動採番" Click="AutoNumberTeacherId_Click"/></StackPanel><TextBox x:Name="TeacherSearch" PlaceholderText="ID・氏名で検索" TextChanged="TeacherSearch_TextChanged"/><ListView x:Name="Teachers" SelectionChanged="Teachers_SelectionChanged"/></StackPanel></TabViewItem>
-            <TabViewItem Header="科目"><StackPanel Padding="16" Spacing="10"><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="180"/><ColumnDefinition Width="80"/><ColumnDefinition Width="120"/><ColumnDefinition Width="90"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="SubjectCode" Header="コード"/><TextBox x:Name="SubjectName" Grid.Column="1" Header="科目名"/><TextBox x:Name="SubjectShort" Grid.Column="2" Header="略称"/><ComboBox x:Name="SubjectLevel" Grid.Column="3" Header="校種" IsEditable="True" PlaceholderText="校種を選択または入力"><ComboBoxItem Content="小学校"/><ComboBoxItem Content="中学校"/><ComboBoxItem Content="高等学校"/></ComboBox><NumberBox x:Name="SubjectOrder" Grid.Column="4" Header="順序" Minimum="1" Value="1"/><Button Grid.Column="5" VerticalAlignment="Bottom" Content="保存" Click="AddSubject_Click"/></Grid><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="SubjectActive" Content="有効" IsChecked="True" Checked="SubjectActive_Changed" Unchecked="SubjectActive_Changed"/><Button Content="新規入力" Click="NewSubject_Click"/></StackPanel><TextBox x:Name="SubjectSearch" PlaceholderText="コード・科目名・校種で検索" TextChanged="SubjectSearch_TextChanged"/><ListView x:Name="Subjects" SelectionChanged="Subjects_SelectionChanged"/></StackPanel></TabViewItem>
+            <TabViewItem Header="科目"><StackPanel Padding="16" Spacing="10"><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="180"/><ColumnDefinition Width="80"/><ColumnDefinition Width="120"/><ColumnDefinition Width="90"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="SubjectCode" Header="コード"/><TextBox x:Name="SubjectName" Grid.Column="1" Header="科目名"/><TextBox x:Name="SubjectShort" Grid.Column="2" Header="略称" PlaceholderText="1文字（空欄で自動推定）" MaxLength="1"/><ComboBox x:Name="SubjectLevel" Grid.Column="3" Header="校種" IsEditable="True" PlaceholderText="校種を選択または入力"><ComboBoxItem Content="小学校"/><ComboBoxItem Content="中学校"/><ComboBoxItem Content="高等学校"/></ComboBox><NumberBox x:Name="SubjectOrder" Grid.Column="4" Header="順序" Minimum="1" Value="1"/><Button Grid.Column="5" VerticalAlignment="Bottom" Content="保存" Click="AddSubject_Click"/></Grid><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="SubjectActive" Content="有効" IsChecked="True" Checked="SubjectActive_Changed" Unchecked="SubjectActive_Changed"/><Button Content="新規入力" Click="NewSubject_Click"/></StackPanel><TextBox x:Name="SubjectSearch" PlaceholderText="コード・科目名・校種で検索" TextChanged="SubjectSearch_TextChanged"/><ListView x:Name="Subjects" SelectionChanged="Subjects_SelectionChanged"/></StackPanel></TabViewItem>
             <TabViewItem Header="担当設定"><StackPanel Padding="16" Spacing="12"><TextBlock FontSize="18" FontWeight="SemiBold" Text="講師対応科目"/><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="240"/><ColumnDefinition Width="240"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><ComboBox x:Name="QualificationTeacher" Header="講師"/><ComboBox x:Name="QualificationSubject" Grid.Column="1" Header="科目"/><Button Grid.Column="2" VerticalAlignment="Bottom" Content="保存" Click="SaveQualification_Click"/></Grid><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="QualificationCanTeach" Content="指導可能" IsChecked="True"/><TextBox x:Name="QualificationNote" Width="420" Header="備考"/></StackPanel>
                 <TextBlock Text="表の○をクリックすると指導可能／不可を切り替えられます（備考は上のフォームで個別に設定してください）。" TextWrapping="Wrap"/>
                 <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="480">
@@ -43,29 +43,15 @@
                 <TextBlock FontSize="18" FontWeight="SemiBold" Text="コマ設定"/>
                 <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="130"/><ColumnDefinition Width="170"/><ColumnDefinition Width="170"/><ColumnDefinition Width="80"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <TextBox x:Name="SlotCode" Header="コード"/><TextBox x:Name="SlotName" Grid.Column="1" Header="表示名"/>
-                    <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="開始" FontSize="12"/>
-                        <StackPanel Orientation="Horizontal" Spacing="2">
-                            <NumberBox x:Name="SlotStartHour" Minimum="0" Maximum="23" Value="9" SpinButtonPlacementMode="Compact" Width="68"/>
-                            <TextBlock Text=":" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                            <NumberBox x:Name="SlotStartMinute" Minimum="0" Maximum="59" Value="0" SpinButtonPlacementMode="Compact" Width="68"/>
-                        </StackPanel>
-                    </StackPanel>
-                    <StackPanel Grid.Column="3" Spacing="4">
-                        <TextBlock Text="終了" FontSize="12"/>
-                        <StackPanel Orientation="Horizontal" Spacing="2">
-                            <NumberBox x:Name="SlotEndHour" Minimum="0" Maximum="23" Value="10" SpinButtonPlacementMode="Compact" Width="68"/>
-                            <TextBlock Text=":" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                            <NumberBox x:Name="SlotEndMinute" Minimum="0" Maximum="59" Value="0" SpinButtonPlacementMode="Compact" Width="68"/>
-                        </StackPanel>
-                    </StackPanel>
+                    <ComboBox x:Name="SlotStartTime" Grid.Column="2" Header="開始" IsEditable="True" PlaceholderText="09:00"/>
+                    <ComboBox x:Name="SlotEndTime" Grid.Column="3" Header="終了" IsEditable="True" PlaceholderText="10:00"/>
                     <NumberBox x:Name="SlotOrder" Grid.Column="4" Header="順序" Minimum="1" Value="1"/><Button Grid.Column="5" VerticalAlignment="Bottom" Content="保存" Click="AddSlot_Click"/>
                 </Grid><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="SlotActive" Content="有効" IsChecked="True" Checked="SlotActive_Changed" Unchecked="SlotActive_Changed"/><Button Content="新規入力" Click="NewSlot_Click"/></StackPanel>
-                <TextBlock Text="一覧をドラッグすると表示順を並べ替えられます。右端の×で削除できます（時間割配置等で使用中のコマは削除できません）。" TextWrapping="Wrap"/>
+                <TextBlock Text="▲▼で表示順を並べ替えられます（動かすとすぐに保存されます）。右端の×で削除できます（時間割配置等で使用中のコマは削除できません）。" TextWrapping="Wrap"/>
                 <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="140"/><ColumnDefinition Width="90"/><ColumnDefinition Width="90"/><ColumnDefinition Width="60"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <TextBlock FontWeight="SemiBold" Text="コード"/><TextBlock Grid.Column="1" FontWeight="SemiBold" Text="表示名"/><TextBlock Grid.Column="2" FontWeight="SemiBold" Text="開始"/><TextBlock Grid.Column="3" FontWeight="SemiBold" Text="終了"/><TextBlock Grid.Column="4" FontWeight="SemiBold" Text="状態"/>
                 </Grid>
-                <ListView x:Name="TimeSlots" SelectionChanged="TimeSlots_SelectionChanged" CanReorderItems="True" AllowDrop="True" DragItemsStarting="TimeSlots_DragItemsStarting" DragItemsCompleted="TimeSlots_DragItemsCompleted">
+                <ListView x:Name="TimeSlots" SelectionChanged="TimeSlots_SelectionChanged">
                     <ListView.ItemTemplate>
                         <DataTemplate>
                             <Grid ColumnSpacing="8" Padding="4">
@@ -75,7 +61,11 @@
                                 <TextBlock Grid.Column="2" Text="{Binding StartText}"/>
                                 <TextBlock Grid.Column="3" Text="{Binding EndText}"/>
                                 <TextBlock Grid.Column="4" Text="{Binding StatusText}"/>
-                                <Button Grid.Column="5" Content="×" Padding="10,2" Tag="{Binding Value.Id}" Click="DeleteSlot_Click"/>
+                                <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="4">
+                                    <Button Content="▲" Padding="8,2" Tag="{Binding Value.Id}" Click="MoveSlotUp_Click"/>
+                                    <Button Content="▼" Padding="8,2" Tag="{Binding Value.Id}" Click="MoveSlotDown_Click"/>
+                                    <Button Content="×" Padding="10,2" Tag="{Binding Value.Id}" Click="DeleteSlot_Click"/>
+                                </StackPanel>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>

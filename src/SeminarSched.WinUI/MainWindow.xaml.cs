@@ -26,6 +26,23 @@ public sealed partial class MainWindow : Window
         OptimizationRunState.Changed += OnOptimizationRunStateChanged;
         Closed += (_, _) => OptimizationRunState.Changed -= OnOptimizationRunStateChanged;
         RefreshOptimizationStatus();
+
+        // 3.1/3.2は、開いている（または作成時に）「集団授業の日程を考慮する」を有効にしたプロジェクトの
+        // ときだけ表示する。プロジェクト未選択・当該オプション無効のプロジェクトでは常時非表示にする。
+        App.ProjectService.Changed += OnProjectServiceChanged;
+        Closed += (_, _) => App.ProjectService.Changed -= OnProjectServiceChanged;
+        UpdateGroupLessonNavVisibility();
+    }
+
+    private void OnProjectServiceChanged(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(UpdateGroupLessonNavVisibility);
+
+    private void UpdateGroupLessonNavVisibility()
+    {
+        var visibility = App.ProjectService.Current?.ConsiderGroupLessons == true ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var item in NavView.MenuItems.OfType<NavigationViewItem>())
+        {
+            if (item.Tag is "groupLessonClass" or "groupLessonEnrollment") item.Visibility = visibility;
+        }
     }
 
     private void OnOptimizationRunStateChanged() => DispatcherQueue.TryEnqueue(RefreshOptimizationStatus);

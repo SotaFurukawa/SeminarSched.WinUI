@@ -18,6 +18,12 @@ public sealed class MasterDataTests
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new Subject(0, "MATH", "数学", "数", "中学", 0));
         Assert.Throws<ArgumentException>(() => new Subject(0, "MATH", "数学", "12345678901", "中学", 1));
+        // 略称は空欄か、ちょうど1文字でなければならない（Python版validate_subjectと同じ制約）。
+        // 過去にSharedRosterImportService等が「表示名をそのまま」略称へ入れてしまうバグがあり、
+        // それにより時間割出力の科目表記が一文字にならない不具合が発生していたための回帰防止。
+        Assert.Throws<ArgumentException>(() => new Subject(0, "MATH", "数学", "数学", "中学", 1));
+        _ = new Subject(0, "MATH", "数学", "", "中学", 1);
+        _ = new Subject(0, "MATH", "数学", "数", "中学", 1);
     }
 
     [Fact]

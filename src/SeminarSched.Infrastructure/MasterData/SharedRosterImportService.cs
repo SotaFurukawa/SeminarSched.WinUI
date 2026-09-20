@@ -4,6 +4,7 @@ using System.Text.Json;
 using ClosedXML.Excel;
 using Microsoft.Data.Sqlite;
 using SeminarSched.Application.MasterData;
+using SeminarSched.Domain.MasterData;
 using SeminarSched.Infrastructure.Projects;
 
 namespace SeminarSched.Infrastructure.MasterData;
@@ -223,13 +224,17 @@ public sealed class SharedRosterImportService : ISharedRosterImportService
         return result;
     }
 
+    // 共通名簿Excelの「科目」シートには略称列が無いため、新規科目の略称は表示名から自動推定する
+    // （SubjectAbbreviation.Resolve、Python版default_subject_short_name相当）。既存科目を再取込みで
+    // 更新する際はShortNameを上書きしない（①設定「科目」タブで手動修正した略称を再取込みで
+    // 消さないため。Python版shared_roster_service.pyも既存行のshort_nameは更新時に触れない）。
     private static async Task<Dictionary<string, long>> UpsertSubjectsAsync(SqliteConnection connection, SqliteTransaction transaction, IEnumerable<SubjectRow> rows, CancellationToken cancellationToken)
     {
         var result = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in rows)
             result[row.Code] = await UpsertIdAsync(connection, transaction,
-                "INSERT INTO Subject(Code,DisplayName,ShortName,SchoolLevel,SortOrder,Active) VALUES($key,$name,$short,$level,$sort,$active) ON CONFLICT(Code) DO UPDATE SET DisplayName=excluded.DisplayName,ShortName=excluded.ShortName,SchoolLevel=excluded.SchoolLevel,SortOrder=excluded.SortOrder,Active=excluded.Active RETURNING Id;",
-                command => { Bind(command, "$key", row.Code); Bind(command, "$name", row.DisplayName); Bind(command, "$short", DefaultShortName(row.DisplayName)); Bind(command, "$level", row.SchoolLevel); Bind(command, "$sort", row.SortOrder); Bind(command, "$active", row.Active); },
+                "INSERT INTO Subject(Code,DisplayName,ShortName,SchoolLevel,SortOrder,Active) VALUES($key,$name,$short,$level,$sort,$active) ON CONFLICT(Code) DO UPDATE SET DisplayName=excluded.DisplayName,SchoolLevel=excluded.SchoolLevel,SortOrder=excluded.SortOrder,Active=excluded.Active RETURNING Id;",
+                command => { Bind(command, "$key", row.Code); Bind(command, "$name", row.DisplayName); Bind(command, "$short", SubjectAbbreviation.Resolve(row.DisplayName, null, row.Code)); Bind(command, "$level", row.SchoolLevel); Bind(command, "$sort", row.SortOrder); Bind(command, "$active", row.Active); },
                 cancellationToken).ConfigureAwait(false);
         return result;
     }
@@ -296,8 +301,6 @@ public sealed class SharedRosterImportService : ISharedRosterImportService
             await audit.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
     }
-
-    private static string DefaultShortName(string displayName) => displayName.Length <= 10 ? displayName : displayName[..10];
 
     // ヘッダーには"（必須）"・"（自動・入力不要）"等さまざまな注記が付くため、最初の全角"（"より前だけを
     // canonical名として扱う（複数の注記パターンに対応するため、"（必須）"限定の除去ではなく汎用化した）。

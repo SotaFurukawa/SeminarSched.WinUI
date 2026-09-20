@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using SeminarSched.Domain.MasterData;
 
 namespace SeminarSched.Infrastructure.Projects;
 
@@ -27,7 +28,41 @@ internal static class SqliteProjectSchema
         command.CommandText = CompleteSchemaSql;
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         await EnsureColumnsAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
+        await BackfillInvalidSubjectShortNamesAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    // 過去のバグ（共通名簿Excel取込みが略称列を「表示名をそのまま（10文字まで）切り詰めた値」で
+    // 上書きしていた）により、略称が空でも1文字でもない科目が既存プロジェクトに残っている場合がある。
+    // 自己修復として、該当する科目だけをSubjectAbbreviation.Resolveで正しい1文字へ再計算する
+    // （新規保存・再取込みは既に修正済みで、このメソッドは既存データの後始末専用）。
+    private static async Task BackfillInvalidSubjectShortNamesAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        var invalid = new List<(long Id, string DisplayName, string Code)>();
+        await using (var select = connection.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText = "SELECT Id,DisplayName,Code FROM Subject WHERE length(trim(ShortName)) NOT IN (0,1);";
+            await using var reader = await select.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                invalid.Add((reader.GetInt64(0), reader.GetString(1), reader.GetString(2)));
+        }
+        if (invalid.Count == 0) return;
+
+        await using var update = connection.CreateCommand();
+        update.Transaction = transaction;
+        update.CommandText = "UPDATE Subject SET ShortName=$short WHERE Id=$id;";
+        var idParameter = update.Parameters.Add("$id", SqliteType.Integer);
+        var shortParameter = update.Parameters.Add("$short", SqliteType.Text);
+        foreach (var (id, displayName, code) in invalid)
+        {
+            idParameter.Value = id;
+            shortParameter.Value = SubjectAbbreviation.Resolve(displayName, null, code);
+            await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private static async Task DropTableIfHasColumnAsync(

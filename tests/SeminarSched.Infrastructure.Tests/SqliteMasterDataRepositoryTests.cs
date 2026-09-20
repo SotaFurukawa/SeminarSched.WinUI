@@ -75,6 +75,32 @@ public sealed class SqliteMasterDataRepositoryTests : IDisposable
             repository.SaveStudentAsync(path, new Student(0, "S-001", "架空 二郎", "中2")));
     }
 
+    // 過去のバグ（共通名簿Excel取込みが略称列を表示名そのままで上書きしていた）で作られた既存の
+    // 壊れた略称データを、SqliteProjectSchema.EnsureCurrentAsync（各リポジトリ呼び出しのたびに実行
+    // される）が自己修復することを確認する。新規保存はドメイン層のバリデーションで防げるが、
+    // 既にファイルへ書き込まれてしまった過去のデータはこの自己修復でしか直せないため。
+    [Fact]
+    public async Task GetSubjectsAsync_SelfHealsShortNamesLeftInvalidByThePastImportBug()
+    {
+        var path = Path.Combine(_directory, "backfill.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(
+            2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 22)));
+        var repository = new SqliteMasterDataRepository();
+        var subject = await repository.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "中学校・数学", "数", "中学校", 1));
+
+        await using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE Subject SET ShortName='中学校・数学' WHERE Id=$id;";
+            command.Parameters.AddWithValue("$id", subject.Id);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var healed = Assert.Single(await repository.GetSubjectsAsync(path));
+        Assert.Equal("数", healed.ShortName);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_directory)) Directory.Delete(_directory, true);
