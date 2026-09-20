@@ -6,16 +6,16 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.3.2 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 83（④編集中の外部変更検出・Googleフォームキット整理・ホーム/設定の文言/操作性改善・「デザイン設定」正式採用）。まだDraft Release化されておらず、version番号はv0.3.2のまま据え置いている（Next Version Ruleに従えば本checkpointはnew feature相当でv0.4.0が既定だが、ユーザーからのversion番号指示待ち）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83の④外部変更検出・ホーム/設定/アンケート作成のUI変更・Googleフォーム作成手順ウィザードは、いずれもこの環境からは視覚確認できないため実機での確認待ち。
-Latest Draft Release: `v0.3.2`（GitHub上にDraftとして作成済み。checkpoint80〜82の内容をまとめてユーザーより明示的に「0.3.2としてドラフトリリースしてほしい」との指示を受け作成（checkpoint82は本来「Next Version Rule」に従えばnew feature相当でv0.4.0だが、ユーザーがバージョン番号を明示指定したためそれに従った）。詳細は[docs/releases/v0.3.2.md](releases/v0.3.2.md)）
+Current Version: `v0.4.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
+Latest Development Checkpoint: checkpoint 83（④編集中の外部変更検出・Googleフォームキット整理・ホーム/設定の文言/操作性改善・「デザイン設定」正式採用）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83の④外部変更検出・ホーム/設定/アンケート作成のUI変更・Googleフォーム作成手順ウィザードは、いずれもこの環境からは視覚確認できないため実機での確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。
+Latest Draft Release: `v0.4.0`（GitHub上にDraftとして作成済み。checkpoint83の内容をまとめてユーザーより「できたらドラフトリリースで」との指示を受け作成。checkpoint83はNext Version Ruleに従いnew feature相当でv0.4.0とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.4.0.md](releases/v0.4.0.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
 
-- v0.3.2 Draft Release後のbug fix / minor change -> `v0.3.3`
-- v0.3.2 Draft Release後のnew feature -> `v0.4.0`
+- v0.4.0 Draft Release後のbug fix / minor change -> `v0.4.1`
+- v0.4.0 Draft Release後のnew feature -> `v0.5.0`
 - `v1.0.0` -> ユーザーの明示指示がある場合のみ
-- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2がその例）。
+- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2がその例）。checkpoint83のv0.4.0はユーザーが番号を指定しなかったため、この既定ルールをそのまま適用した例。
 
 ### 実装済み
 
@@ -1138,7 +1138,7 @@ v0.3.2 Draft Release後、ユーザーから「先の比較調査で挙げたま
 
 **ホーム画面の文言・操作性改善（ユーザー指定の文言へ逐語で変更）:** 「共通名簿」カードのタイトル・説明文を「生徒講師基本情報・通常授業担当情報」＋新しい説明文へ変更。バックアップ復元の警告文を簡潔な表現へ変更。「最近使ったプロジェクト」の各行に、枠内クリックでの開く操作は残したまま「プロジェクトを開く」ボタンを追加（`OpenRecentProjectButton_Click`が`OpenRecentProjectAsync`という共通処理を`RecentProject_ItemClick`と共有する形にリファクタ）。「新しい講習プロジェクト」カード内で、自動生成される名称ラベルを廃止し`GeneratedTitleBox`の横に「として保存」と表示、「保存先を選んで作成」ボタンをカード右下へ移動、「オプション機能」という見出しを新設して集団授業チェックボックスの上に配置（将来他のオプションが増える前提の見出し）、一時SQLite作成に関する説明文をオプション機能の上へ移動した上で内容を拡充。
 
-**設定画面の整理・操作性改善:** 「プロジェクトの項目は不要、ホームのみで十分」との指示により「プロジェクト」タブを完全に削除した。**ユーザーへの開示事項:** このタブには`ExportMasterWorkbook_Click`/`ImportMasterWorkbook_Click`（受講希望データをプロジェクトのExcelへ一括書き出し・取り込みする機能）が含まれており、これは他のどの画面にも同等の代替が無い機能だったため、タブ自体は指示通り削除したが、この一括編集機能は今回削除に伴い利用できなくなった。必要であれば別の形（例えば③アンケート取込みや①設定「担当設定」への統合）で復活させることを検討する。同タブの`ImportSharedRoster_Click`（プロジェクト個別の共通名簿反映）はホームの「作成した基本情報を反映」と重複していたため削除した影響は無い。有効/無効チェックボックス（生徒・講師・科目・コマ）は保存ボタンを押さずともチェック変更のみで即座に保存されるよう変更。開校日・休校日カレンダーのボタンを「休校日を全て選択」「開校日を全て選択」「○曜日を選択」（プルダウンで曜日を指定）へ差し替え、「期間内をすべて開校」「指定曜日を休校」は削除、「選択日を休校」ボタンの色を「選択日を開校」と統一した。**コマ設定のドラッグ並び替えが保存されない不具合の再修正:** ユーザーから「もしかすると既に直っているかもしれないが」と留保付きで再確認依頼があったため調査した結果、checkpoint78では症状（`DropResult != Move`によるガードで並び替えが弾かれる）への対処としてそのガードを削除しただけで、`ListView.CanReorderItems`が正しく動作するために必要な`DragItemsStarting`ハンドラ（`args.Data.RequestedOperation = DataPackageOperation.Move`を設定する）自体が実装されていなかったことが判明。これを追加して根本原因に対処した（このセッションからは実際のドラッグ操作を対話的に検証する手段が無いため、静的解析に基づく根本原因の修正である旨をユーザーへ改めて開示する）。
+**設定画面の整理・操作性改善:** 「プロジェクトの項目は不要、ホームのみで十分」との指示により「プロジェクト」タブを完全に削除した。**ユーザーへの開示事項:** このタブには`ExportMasterWorkbook_Click`/`ImportMasterWorkbook_Click`（受講希望データをプロジェクトのExcelへ一括書き出し・取り込みする機能）が含まれており、これは他のどの画面にも同等の代替が無い機能だったため、タブ自体は指示通り削除したが、この一括編集機能は今回削除に伴い利用できなくなった。ユーザーへ開示のうえ「共通名簿Excel（生徒・講師_基本情報.xlsx、通常授業を含む）」と「削除した共通基本情報Excel（受講希望を含む、プロジェクト単位）」の違いを具体的に説明したところ、「アンケート取込で十分なので削除してください」との最終確認を得たため、復活させない方針で確定した。同タブの`ImportSharedRoster_Click`（プロジェクト個別の共通名簿反映）はホームの「作成した基本情報を反映」と重複していたため削除した影響は無い。有効/無効チェックボックス（生徒・講師・科目・コマ）は保存ボタンを押さずともチェック変更のみで即座に保存されるよう変更。開校日・休校日カレンダーのボタンを「休校日を全て選択」「開校日を全て選択」「○曜日を選択」（プルダウンで曜日を指定）へ差し替え、「期間内をすべて開校」「指定曜日を休校」は削除、「選択日を休校」ボタンの色を「選択日を開校」と統一した。**コマ設定のドラッグ並び替えが保存されない不具合の再修正:** ユーザーから「もしかすると既に直っているかもしれないが」と留保付きで再確認依頼があったため調査した結果、checkpoint78では症状（`DropResult != Move`によるガードで並び替えが弾かれる）への対処としてそのガードを削除しただけで、`ListView.CanReorderItems`が正しく動作するために必要な`DragItemsStarting`ハンドラ（`args.Data.RequestedOperation = DataPackageOperation.Move`を設定する）自体が実装されていなかったことが判明。これを追加して根本原因に対処した（このセッションからは実際のドラッグ操作を対話的に検証する手段が無いため、静的解析に基づく根本原因の修正である旨をユーザーへ改めて開示する）。
 
 **新規/更新テスト:** `QuestionnaireKitServiceTests`（3本→2本生成への変更に合わせてリネーム・アサーション更新）、`SqliteScheduleEditorServiceTests.GetDataVersionAsync_ChangesOnlyAfterAnExternalConnectionCommitsAWrite`（新規）。`dotnet test`全164 tests passed。
 
