@@ -13,7 +13,7 @@ public sealed class CourseProjectDefinitionTests
             new DateOnly(2026, 7, 20),
             new DateOnly(2026, 8, 31));
 
-        Assert.Equal("2026夏期講習", project.Title);
+        Assert.Equal("2026年度夏期講習", project.Title);
     }
 
     [Fact]
@@ -36,7 +36,7 @@ public sealed class CourseProjectDefinitionTests
             new DateOnly(2026, 5, 31),
             customSeasonName: "GW特別講習");
 
-        Assert.Equal("2026GW特別講習", project.Title);
+        Assert.Equal("2026年度GW特別講習", project.Title);
         Assert.Equal("GW特別講習", project.CustomSeasonName);
     }
 

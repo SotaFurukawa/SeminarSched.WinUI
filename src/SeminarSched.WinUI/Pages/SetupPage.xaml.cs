@@ -9,6 +9,7 @@ using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
 using SeminarSched.Domain.MasterData;
 using SeminarSched.Domain.CourseSettings;
+using SeminarSched.Domain.Output;
 using SeminarSched.Application.MasterData;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -41,7 +42,30 @@ public sealed partial class SetupPage : WorkflowPageBase
         ProjectPeriod.Text = $"{current.StartDate:yyyy年M月d日} ～ {current.EndDate:yyyy年M月d日}";
         CourseDayPeriodLabel.Text = $"{current.StartDate:yyyy年M月d日} ～ {current.EndDate:yyyy年M月d日}（変更はすぐに保存されます）";
         await ReloadAsync();
+        await LoadOutputSettingsAsync(current.Path);
     }
+
+    private async Task LoadOutputSettingsAsync(string path)
+    {
+        var settings = await App.OutputSettings.GetAsync(path);
+        OutputPaperSize.SelectedItem = OutputPaperSize.Items.Cast<ComboBoxItem>().First(i => (string)i.Content == settings.PaperSize);
+        OutputOrientation.SelectedItem = OutputOrientation.Items.Cast<ComboBoxItem>().First(i => (string)i.Tag == settings.Orientation);
+        OutputMarginMm.Value = settings.MarginMm;
+        OutputFileNamePattern.Text = settings.FileNamePattern;
+        OutputClosedColor.Text = settings.ClosedFillHex;
+        OutputUnavailableColor.Text = settings.UnavailableFillHex;
+        OutputGroupColor.Text = settings.GroupFillHex;
+    }
+
+    private async void SaveOutputSettings_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
+    {
+        if (OutputPaperSize.SelectedItem is not ComboBoxItem paperSizeItem || OutputOrientation.SelectedItem is not ComboBoxItem orientationItem)
+            throw new ArgumentException("用紙サイズと向きを選択してください。");
+        var settings = new OutputSettings(
+            (string)paperSizeItem.Content, (string)orientationItem.Tag, OutputMarginMm.Value, OutputFileNamePattern.Text,
+            OutputClosedColor.Text, OutputUnavailableColor.Text, OutputGroupColor.Text);
+        await App.OutputSettings.SaveAsync(path, settings);
+    }, "出力設定を保存しました");
 
     private async void AddStudent_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
     {

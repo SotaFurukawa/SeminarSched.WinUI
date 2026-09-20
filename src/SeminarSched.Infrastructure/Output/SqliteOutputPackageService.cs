@@ -12,48 +12,64 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
 {
     public async Task<OutputPackageResult> GenerateAsync(string projectPath,string parentDirectory,CancellationToken cancellationToken=default)
     {
-        var report=await LoadAndValidate(projectPath,cancellationToken);var target=Path.Combine(Path.GetFullPath(parentDirectory),$"SeminarSched_Output_{DateTime.Now:yyyyMMdd_HHmmssfff}");var temporary=target+".tmp-"+Guid.NewGuid().ToString("N");
+        var report=await LoadAndValidate(projectPath,cancellationToken);
+        var outputSettings=await new SqliteOutputSettingsRepository().GetAsync(projectPath,cancellationToken);
+        // ユーザー指示: 出力は校舎ごとではなくプロジェクトごとにフォルダを分ける（同じ既定出力先フォルダを
+        // 複数projectで使い回しても、実行ごとのタイムスタンプfolderだけが並んで混ざらないようにする）。
+        var projectFolder=Path.Combine(Path.GetFullPath(parentDirectory),SeminarSched.Domain.Output.OutputSettings.SanitizeForFileName(report.ProjectTitle));
+        var today=DateOnly.FromDateTime(DateTime.Now);
+        var target=Path.Combine(projectFolder,$"SeminarSched_Output_{DateTime.Now:yyyyMMdd_HHmmssfff}");var temporary=target+".tmp-"+Guid.NewGuid().ToString("N");
         try
         {
             Directory.CreateDirectory(temporary);
             var excel=new ExcelScheduleReportRenderer();var pdf=new PdfScheduleReportRenderer();
-            var styleSettings=TryLoadPreviousHandoutStyleSettings(parentDirectory);
+            var styleSettings=TryLoadPreviousHandoutStyleSettings(projectFolder);
 
-            var overallXlsx=Path.Combine(temporary,"季節講習時間割.xlsx");var overallPdf=Path.Combine(temporary,"季節講習時間割.pdf");
+            string FileName(string reportName)=>outputSettings.BuildFileName(report.ProjectTitle,reportName,today);
+
+            var overallXlsx=Path.Combine(temporary,FileName("全体時間割")+".xlsx");var overallPdf=Path.Combine(temporary,FileName("全体時間割")+".pdf");
             await Task.Run(()=>excel.RenderOverall(report,overallXlsx),cancellationToken);
-            await Task.Run(()=>pdf.RenderOverall(report,overallPdf),cancellationToken);
+            await Task.Run(()=>pdf.RenderOverall(report,overallPdf,outputSettings),cancellationToken);
 
-            var studentXlsx=Path.Combine(temporary,"生徒配布用生徒別時間割.xlsx");var studentPdf=Path.Combine(temporary,"生徒配布用生徒別時間割.pdf");
+            var studentXlsx=Path.Combine(temporary,FileName("生徒配布用生徒別時間割")+".xlsx");var studentPdf=Path.Combine(temporary,FileName("生徒配布用生徒別時間割")+".pdf");
             await Task.Run(()=>excel.RenderStudentHandouts(report,studentXlsx,styleSettings),cancellationToken);
-            await Task.Run(()=>pdf.RenderStudentHandouts(report,studentPdf),cancellationToken);
+            await Task.Run(()=>pdf.RenderStudentHandouts(report,studentPdf,outputSettings),cancellationToken);
 
-            var teacherXlsx=Path.Combine(temporary,"講師配布用学年別時間割.xlsx");var teacherPdf=Path.Combine(temporary,"講師配布用学年別時間割.pdf");
+            var teacherXlsx=Path.Combine(temporary,FileName("講師配布用学年別時間割")+".xlsx");var teacherPdf=Path.Combine(temporary,FileName("講師配布用学年別時間割")+".pdf");
             await Task.Run(()=>excel.RenderTeacherHandouts(report,teacherXlsx,styleSettings),cancellationToken);
-            await Task.Run(()=>pdf.RenderTeacherHandouts(report,teacherPdf),cancellationToken);
+            await Task.Run(()=>pdf.RenderTeacherHandouts(report,teacherPdf,outputSettings),cancellationToken);
 
-            var issuesXlsx=Path.Combine(temporary,"未配置・警告一覧.xlsx");var issuesPdf=Path.Combine(temporary,"未配置・警告一覧.pdf");
+            var issuesXlsx=Path.Combine(temporary,FileName("未配置・警告一覧")+".xlsx");var issuesPdf=Path.Combine(temporary,FileName("未配置・警告一覧")+".pdf");
             await Task.Run(()=>excel.RenderIssues(report,issuesXlsx),cancellationToken);
-            await Task.Run(()=>pdf.RenderIssues(report,issuesPdf),cancellationToken);
+            await Task.Run(()=>pdf.RenderIssues(report,issuesPdf,outputSettings),cancellationToken);
+
+            var teacherNames=report.Rows.Select(x=>x.Teacher).Distinct().OrderBy(x=>x,StringComparer.Ordinal).ToArray();
 
             var teacherPacketDirectory=Path.Combine(temporary,"講師配布用講師別時間割");
             Directory.CreateDirectory(teacherPacketDirectory);
             var usedNames=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach(var teacherName in report.Rows.Select(x=>x.Teacher).Distinct().OrderBy(x=>x,StringComparer.Ordinal))
+            foreach(var teacherName in teacherNames)
             {
                 var excelFileName=SanitizeTeacherFileName(teacherName,"xlsx",usedNames);
                 await Task.Run(()=>excel.RenderTeacherPacket(report,teacherName,Path.Combine(teacherPacketDirectory,excelFileName),styleSettings),cancellationToken);
                 var pdfFileName=SanitizeTeacherFileName(teacherName,"pdf",usedNames);
-                await Task.Run(()=>pdf.RenderTeacherPacket(report,teacherName,Path.Combine(teacherPacketDirectory,pdfFileName)),cancellationToken);
+                await Task.Run(()=>pdf.RenderTeacherPacket(report,teacherName,Path.Combine(teacherPacketDirectory,pdfFileName),outputSettings),cancellationToken);
             }
 
+            var combinedTeacherXlsx=Path.Combine(temporary,FileName("講師配布用講師別時間割(一括)")+".xlsx");var combinedTeacherPdf=Path.Combine(temporary,FileName("講師配布用講師別時間割(一括)")+".pdf");
+            await Task.Run(()=>excel.RenderTeacherPacketsCombined(report,teacherNames,combinedTeacherXlsx,styleSettings),cancellationToken);
+            await Task.Run(()=>pdf.RenderTeacherPacketsCombined(report,teacherNames,combinedTeacherPdf,outputSettings),cancellationToken);
+
+            Directory.CreateDirectory(projectFolder);
             Directory.Move(temporary,target);
             return new(
                 target,
-                Path.Combine(target,"季節講習時間割.xlsx"),Path.Combine(target,"季節講習時間割.pdf"),
-                Path.Combine(target,"生徒配布用生徒別時間割.xlsx"),Path.Combine(target,"生徒配布用生徒別時間割.pdf"),
-                Path.Combine(target,"講師配布用学年別時間割.xlsx"),Path.Combine(target,"講師配布用学年別時間割.pdf"),
-                Path.Combine(target,"未配置・警告一覧.xlsx"),Path.Combine(target,"未配置・警告一覧.pdf"),
+                Path.Combine(target,Path.GetFileName(overallXlsx)),Path.Combine(target,Path.GetFileName(overallPdf)),
+                Path.Combine(target,Path.GetFileName(studentXlsx)),Path.Combine(target,Path.GetFileName(studentPdf)),
+                Path.Combine(target,Path.GetFileName(teacherXlsx)),Path.Combine(target,Path.GetFileName(teacherPdf)),
+                Path.Combine(target,Path.GetFileName(issuesXlsx)),Path.Combine(target,Path.GetFileName(issuesPdf)),
                 Path.Combine(target,"講師配布用講師別時間割"),
+                Path.Combine(target,Path.GetFileName(combinedTeacherXlsx)),Path.Combine(target,Path.GetFileName(combinedTeacherPdf)),
                 report.Rows.Count,report.UnassignedRequests.Sum(r=>r.Missing));
         }
         finally{if(Directory.Exists(temporary))Directory.Delete(temporary,true);}
@@ -61,22 +77,23 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
 
     /// <summary>
     /// 実験的機能: 校舎が直前の出力フォルダのxlsx内「デザイン設定」シートを編集していた場合、その値を
-    /// 読み戻して今回の出力に反映する。同じ出力先フォルダに過去の出力が無い・読み取りに失敗した等の
+    /// 読み戻して今回の出力に反映する。同じプロジェクトフォルダに過去の出力が無い・読み取りに失敗した等の
     /// 場合はnull（＝各レンダラーが既定値を使う）を返す。生成中の一時フォルダ（.tmp-*）は対象外。
+    /// ファイル名はOutputSettings.FileNamePatternで変わりうるため、「生徒配布用生徒別時間割」を
+    /// 含むxlsxをfolder内から探す（固定ファイル名には依存しない）。
     /// </summary>
-    private static HandoutStyleSettings? TryLoadPreviousHandoutStyleSettings(string parentDirectory)
+    private static HandoutStyleSettings? TryLoadPreviousHandoutStyleSettings(string projectFolder)
     {
         try
         {
-            var fullParent=Path.GetFullPath(parentDirectory);
-            if(!Directory.Exists(fullParent))return null;
-            var previous=Directory.GetDirectories(fullParent,"SeminarSched_Output_*")
+            if(!Directory.Exists(projectFolder))return null;
+            var previous=Directory.GetDirectories(projectFolder,"SeminarSched_Output_*")
                 .Where(d=>!Path.GetFileName(d).Contains(".tmp-",StringComparison.Ordinal))
                 .OrderByDescending(d=>Path.GetFileName(d),StringComparer.Ordinal)
                 .FirstOrDefault();
             if(previous is null)return null;
-            var studentXlsx=Path.Combine(previous,"生徒配布用生徒別時間割.xlsx");
-            return ExcelScheduleReportRenderer.TryReadHandoutStyleSettings(studentXlsx);
+            var studentXlsx=Directory.GetFiles(previous,"*.xlsx").FirstOrDefault(f=>Path.GetFileName(f).Contains("生徒配布用生徒別時間割",StringComparison.Ordinal));
+            return studentXlsx is null?null:ExcelScheduleReportRenderer.TryReadHandoutStyleSettings(studentXlsx);
         }
         catch
         {

@@ -33,7 +33,7 @@ public sealed record CourseProjectDefinition
     // Season==Otherのときだけ意味を持つ、ホーム画面で入力する講習区分の名称。それ以外はnull。
     public string? CustomSeasonName { get; }
 
-    public string Title => $"{AcademicYear}{(Season == CourseSeason.Other ? CustomSeasonName : Season.ToJapaneseName())}";
+    public string Title => $"{AcademicYear}年度{(Season == CourseSeason.Other ? CustomSeasonName : Season.ToJapaneseName())}";
 
     public static CourseProjectDefinition Create(
         int academicYear,

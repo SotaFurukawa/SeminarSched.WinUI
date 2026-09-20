@@ -106,6 +106,28 @@
                     <Grid x:Name="CourseDayCalendar" ColumnSpacing="2" RowSpacing="2"/>
                 </ScrollViewer>
             </StackPanel></TabViewItem>
+            <TabViewItem Header="出力設定">
+                <StackPanel Padding="16" Spacing="12">
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="⑥出力の書式設定"/>
+                    <TextBlock Text="PDFの用紙サイズ・向き・余白、出力ファイル名の規則（{project}=プロジェクト名、{report}=帳票名、{date}=出力日）、主な塗り色を設定します。" TextWrapping="Wrap"/>
+                    <Grid ColumnSpacing="8" RowSpacing="8">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="160"/><ColumnDefinition Width="140"/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                        <ComboBox x:Name="OutputPaperSize" Header="用紙サイズ" Grid.Row="0" Grid.Column="0"><ComboBoxItem Content="A4"/><ComboBoxItem Content="A3"/></ComboBox>
+                        <ComboBox x:Name="OutputOrientation" Header="向き" Grid.Row="0" Grid.Column="1"><ComboBoxItem Content="横（landscape）" Tag="landscape"/><ComboBoxItem Content="縦（portrait）" Tag="portrait"/></ComboBox>
+                        <NumberBox x:Name="OutputMarginMm" Header="余白（mm）" Grid.Row="0" Grid.Column="2" Minimum="0" Maximum="30" SpinButtonPlacementMode="Compact"/>
+                    </Grid>
+                    <TextBox x:Name="OutputFileNamePattern" Header="ファイル名規則" PlaceholderText="{}{project}-{report}"/>
+                    <TextBlock FontSize="16" FontWeight="SemiBold" Margin="0,8,0,0" Text="塗り色（#RRGGBB形式）"/>
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="200"/><ColumnDefinition Width="200"/></Grid.ColumnDefinitions>
+                        <TextBox x:Name="OutputClosedColor" Header="休校日" Grid.Column="0"/>
+                        <TextBox x:Name="OutputUnavailableColor" Header="勤務不可コマ" Grid.Column="1"/>
+                        <TextBox x:Name="OutputGroupColor" Header="集団授業" Grid.Column="2"/>
+                    </Grid>
+                    <Button Content="保存" Click="SaveOutputSettings_Click" HorizontalAlignment="Left"/>
+                </StackPanel>
+            </TabViewItem>
         </TabView>
     </StackPanel></ScrollViewer>
 </local:WorkflowPageBase>

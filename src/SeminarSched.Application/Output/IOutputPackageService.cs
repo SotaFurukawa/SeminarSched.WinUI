@@ -11,6 +11,7 @@ public sealed record OutputPackageResult(
     string TeacherHandoutsExcelPath,string TeacherHandoutsPdfPath,
     string IssuesExcelPath,string IssuesPdfPath,
     string TeacherPacketDirectory,
+    string CombinedTeacherPacketExcelPath,string CombinedTeacherPacketPdfPath,
     int AssignmentCount,int UnassignedCount);
 
 public interface IOutputPackageService

@@ -6,15 +6,16 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.3.1 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 81（3.1表示に科目追加、共通名簿の学年一括繰り上げ、集団授業の個別ページ黒塗り表示、科目略称fallback修正、タスクバーバッジ廃止）。v0.3.1 Draft Release後の追加checkpointのため、次のリリース判断は本書「Next Version Rule」に従うこと。checkpoint 39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint 51のproject open crash修正、checkpoint 54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint 48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」は実験的機能であり、実機確認の結果次第で採用・廃止が未確定（本書「9. 現在の既知の未実装・保留事項」参照）。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81の変更はいずれも実機での視覚確認待ち（ユーザー実機でアプリが起動中だったため、この開発機からの再起動確認は見送った）。
-Latest Draft Release: `v0.3.1`（GitHub上にDraftとして作成済み。checkpoint 78〜79の内容をまとめてユーザーより「そうした不備以外のところが実装できたら新たにドラフトリリースしてほしい」との指示を受け作成。詳細は[docs/releases/v0.3.1.md](releases/v0.3.1.md)）
+Current Version: `v0.3.2 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
+Latest Development Checkpoint: checkpoint 82（出力設定画面・プロジェクト別出力フォルダ/ファイル名規則・講師配布用講師別時間割(一括)・PDF全面刷新）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」は実験的機能であり、実機確認の結果次第で採用・廃止が未確定（本書「9. 現在の既知の未実装・保留事項」参照）。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。
+Latest Draft Release: `v0.3.2`（GitHub上にDraftとして作成済み。checkpoint80〜82の内容をまとめてユーザーより明示的に「0.3.2としてドラフトリリースしてほしい」との指示を受け作成（checkpoint82は本来「Next Version Rule」に従えばnew feature相当でv0.4.0だが、ユーザーがバージョン番号を明示指定したためそれに従った）。詳細は[docs/releases/v0.3.2.md](releases/v0.3.2.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
 
-- v0.3.1 Draft Release後のbug fix / minor change -> `v0.3.2`
-- v0.3.1 Draft Release後のnew feature -> `v0.4.0`
+- v0.3.2 Draft Release後のbug fix / minor change -> `v0.3.3`
+- v0.3.2 Draft Release後のnew feature -> `v0.4.0`
 - `v1.0.0` -> ユーザーの明示指示がある場合のみ
+- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2がその例）。
 
 ### 実装済み
 
@@ -1094,6 +1095,31 @@ v0.3.1のDraft Release作成後、ユーザーから「Draft Releaseにインス
 **新規/更新テスト:** `MasterDataTests`に`GradeAdvancement`（6ケース）・`SubjectAbbreviation`（6ケース+明示ShortName優先の1ケース）を追加。`SharedRosterStoreTests.AdvanceStudentGradesAsync_AdvancesActiveStudentsAndGraduatesHigh3`（3名の生徒で繰り上げ・既卒化・在籍停止済み生徒が対象外になることを検証）を追加。`SqliteOutputPackageServiceTests`に`GenerateAsync_StudentAttendingGroupLesson_ShowsBlackGroupLessonCellOnHandout`（個別授業と集団授業を別日に配置し、集団授業側のセルだけが黒塗り「集団」になり全体時間割には現れないことを検証）と`GenerateAsync_SubjectWithoutExplicitShortName_StillUsesOneCharacterAbbreviation`を追加。`SqliteGroupLessonServiceTests`の既存テストへ`ClassSubject`の検証を追加。`dotnet test`全152 tests passed（既存149件は無修正で通過）。
 
 **未対応・実機確認が必要:** 3.1カレンダー表示・学年繰り上げボタンの実際の見た目、集団授業の黒塗りセルの実際の見た目、タスクバー点滅（バッジ無し）の実際の挙動は、いずれもこの環境からは視覚確認できない。またユーザーの実機で`SeminarSched.WinUI`プロセスが起動中だったため（開発機で本checkpointの動作確認のためのアプリ再起動は行わなかった。ユーザーが作業中の可能性を考慮し、プロセスを強制終了しなかった）、今回の変更を反映するには手動での再起動が必要。
+
+### v0.3.2 checkpoint 82 (Claude) — 出力設定画面（用紙・ファイル名規則・色）、プロジェクト別出力フォルダ、講師別一括ファイル、PDF全面刷新
+
+ユーザーからのPython版比較調査（③出力設定画面の欠如）を受けて実装した項目。実装範囲について事前にAskUserQuestionで確認したところ、「色分け凡例のカスタマイズ・ファイル名パターン/既定出力先・用紙サイズ/向き/フォントサイズ/余白(PDF)・表示項目ON/OFF/ロゴ/1ページの日数・講師列数/生徒別改ページ方式」の全項目が選択されたが、後続の自由記述で「PDFの用紙内ぴったり収まる印刷」「プロジェクトごとのフォルダ分け」「ファイル名統一（季節講習時間割→全体時間割に改称）」「講師配布用講師別時間割(一括)ファイルの新設と奇数人時の空白ページ挿入」という、より具体的で優先度の高い要求が示されたため、これらを中心に実装し、表示項目ON/OFF・ロゴ画像・1ページの日数/講師列数・生徒別改ページ方式（既存の週単位固定レイアウトと設計上衝突する項目）は今回のスコープから外した。
+
+**`OutputSettings`（新規、`Domain.Output`）:** Python版`reporting/settings.py`の`OutputSettings`のうち、既存レイアウトと衝突しない範囲（用紙サイズA3/A4・向き・余白mm・ファイル名規則・休校日/勤務不可コマ/集団授業の3色）だけを対象にした軽量版。もともとschema定義だけは存在し一切利用されていなかった`OutputSetting`テーブル（Phase W1/W2時点の先行スキャフォールディングと思われる）を初めて実際に読み書きする（`SqliteOutputSettingsRepository`、`IOutputSettingsRepository`）。①設定に新規tab「出力設定」を追加し、値をプロジェクトごとに保存できるようにした。
+
+**プロジェクトごとの出力フォルダ・ファイル名規則:** 従来`⑥出力`は指定した1つの既定フォルダへ、実行のたびの`SeminarSched_Output_<timestamp>`フォルダをそのまま並べていたため、複数projectで同じ既定フォルダを使うと出力が混在していた。`<既定フォルダ>\<プロジェクトタイトル>\SeminarSched_Output_<timestamp>\`という構成へ変更し、project単位でフォルダが分かれるようにした。ファイル名も`OutputSettings.FileNamePattern`（既定`{project}-{report}`、トークンは`{project}`/`{report}`/`{date}`）で統一し、「全体時間割.xlsx」ではなく「2026年度夏期講習-全体時間割.xlsx」のような名前になる。あわせて`CourseProjectDefinition.Title`のフォーマットを`{年度}{季節}`から`{年度}年度{季節}`へ変更した（「2026夏期講習」→「2026年度夏期講習」）。
+
+**「季節講習時間割」→「全体時間割」への改称:** ユーザー指示により、帳票名・出力ファイル名の両方を変更した。
+
+**講師配布用講師別時間割(一括)（新規帳票、Excel/PDF）:** 従来の「講師ごとに独立したファイル」（`講師配布用講師別時間割`folder）とは別に、全講師分を1つのファイルへまとめた版を追加した（`ExcelScheduleReportRenderer.RenderTeacherPacketsCombined`/`PdfScheduleReportRenderer.RenderTeacherPacketsCombined`）。各生徒シート/ページの左上（Excelはセル(2,1)、PDFはページ冒頭）に「{講師名}t用」と表示し、どの講師の束かを明示する。ユーザー指示「2シートずつまとめて印刷する想定のため、担当生徒数が奇数だと次の講師の開始位置がずれる」に対応し、講師の担当生徒数が奇数の場合はその講師の直後に空白シート/ページを1枚挿入して次の講師が必ず奇数番目から始まるようにした。生徒の絞り込みロジック自体（担当・非担当で人数を絞る等）は変更していない（ユーザーからも「これは追加しなくていい」との明示指示あり）。
+
+**PDF版の全面刷新（本checkpoint最大の作業）:** ユーザー指示「PDFもxlsxと全く同じ形式にしてほしい。フォントやマス目のカラーはxlsxと統一。フォントサイズや行と列の幅などは、曜日の幅が等しく全ての文字が見えていれば自由に設定してよい。ただしできるだけ文字は大きく」を受け、従来「とりあえずxlsxを変換したもの」というstopgap位置づけだった`PdfScheduleReportRenderer`を、`ExcelScheduleReportRenderer`と同じ構造・配色で作り直した。
+- タイトル用フォント「BIZ UDPMincho Medium」は、実機のWindowsフォントを調査したところ`BIZ-UDMinchoM.ttc`というTrueType Collection形式で提供されており、PDFsharp 6.2.4がこれを直接読み込めない（生バイト列を渡すと`OpenTypeFontFace.CetOrCreateFrom`で`NullReferenceException`。実際に最小構成のテストプロジェクトで検証し確認した）ため、PDFでは本文と同じ「HG丸ゴシックM-PRO」（こちらは単体.ttfで提供されており問題なく読み込める）を太字・大きめサイズで代用した。
+- 生徒配布・講師配布・講師別packet（単独・一括とも）のカレンダーページを、Excel版と同じ`HandoutPageLayout`を使う設計へ全面的に作り直した（従来は別の簡易layout `WeeklyCalendarLayout.Build`で日付ごとの行を並べるだけだった）。タイトル黒地白文字・4行目相当の学年/氏名行・月/曜日/日見出しの配色（紺#0F243E・水色#90CAFE等）・学力テスト行・checkpoint81の集団授業黒塗り「集団」表示まで、Excel版と同じ内容を再現した。
+- 全体時間割のPDFも、Excel版と同じ「コマ時刻ラベルを週の先頭列へ1回だけ配置」する構成へ作り直した。
+- 用紙サイズ・向き・余白は`OutputSettings`から反映する。7曜日列の幅は、使用可能幅（用紙サイズ・向き・余白から計算）をExcel版のA:I列と同じ比率（54:96:64×7）で配分し、常に均等な幅になるようにした。
+- **重大なバグとその修正（実機で発見・実機で検証）:** 実装時、レイアウト計算のために`Section.PageSetup.PageWidth`をSection生成直後に読み取っていたところ、常に0が返り、結果として全ての列幅が実質0になり生成される全PDFが破損していた（テキストが極端に狭い1列へ潰れて重なる状態。テストは"%PDF"ヘッダーの有無とサイズ下限しか見ていなかったため気付けず、実際にPDFを生成してこのツール自体でPDFを画像として読み込み目視確認して初めて発覚した）。原因はMigraDocの仕様で、`PageSetup.PageWidth`/`PageHeight`はSectionへ`PageFormat`を設定した直後には未解決（0のまま）で、実際に`PdfDocumentRenderer.RenderDocument()`でレンダリングされる過程で初めて解決される、という点にあった。対策として、レンダリング前に自前でA3/A4×縦横の既知の寸法（mm単位）から使用可能幅を計算する`GetUsableWidth`ヘルパーに置き換えた。この不具合とその原因究明・修正過程は`PdfScheduleReportRendererLayoutTests`の新テスト（A3/A4×縦横の4パターンでファイルサイズの下限を検証）として再発防止した。
+
+**新規/更新テスト:** `OutputSettingsTests`（Domain、既定値・バリデーション・ファイル名生成の8ケース）、`SqliteOutputSettingsRepositoryTests`（既定値の読み取り・保存の往復・上書きの3ケース）を追加。`PdfScheduleReportRendererLayoutTests`を全面的に書き換え（旧テストは今回廃止した固定3.5cm/列レイアウトを検証する内容だったため陳腐化していた）、A3/A4×縦横の4パターンで実際に`GenerateAsync`を実行しPDFファイルサイズが破損時には現実的にありえない下限を超えることを検証する内容にした。`CourseProjectDefinitionTests`・`SqliteProjectRepositoryTests`のTitle形式アサーションを新形式（「年度」を含む）へ更新。`SqliteOutputPackageServiceTests.GenerateAsync_CreatesAllFiveReportKindsAtomically`へプロジェクト別フォルダ・ファイル名パターン・講師別一括ファイルの検証を追加。`dotnet test`全163 tests passed。
+
+**動作確認:** Release/x64 build警告0・エラー0。実際にscratchpad上の使い捨てharnessプロジェクトで`SqliteOutputPackageService.GenerateAsync`を実行し、生成された生徒配布・全体時間割・講師別一括のPDFを、このツール自体でPDFを画像として読み込み目視確認した（このセッションで初めて、生成物を実際に画像として確認する手段が使えることを確認した）。集団授業の黒塗り「集団」表示、月/曜日/日の配色、コマラベルの週先頭配置、講師別一括ファイルの「{講師名}t用」ラベルが、いずれも意図通りに表示されることを確認済み。ただし①設定の新規tab「出力設定」自体のUI操作感（ComboBox/NumberBoxの実際の見た目）は、この環境からは視覚確認できないため実機でユーザーに確認をお願いしたい。
+
+**未対応・意図的にスコープ外:** 表示項目ON/OFF・ロゴ画像・1ページの日数/講師列数（全体時間割の現在の「週単位で全講師を動的に横並び」というレイアウトの前提を崩すため）・生徒別改ページ方式（複数生徒を1シートにまとめる新しい描画モードが必要）は、ユーザーとの事前確認で示された設計上の衝突を理由に今回は実装していない。必要であれば、既存の週単位固定レイアウトをどう変えるか改めて相談したうえで着手する。
 
 ### 次回最初に確認するファイル
 

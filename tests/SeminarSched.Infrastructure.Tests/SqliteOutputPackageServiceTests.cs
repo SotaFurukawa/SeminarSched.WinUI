@@ -30,11 +30,21 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         {
             var bytes=await File.ReadAllBytesAsync(pdf);Assert.Equal("%PDF",System.Text.Encoding.ASCII.GetString(bytes,0,4));
         }
-        Assert.Empty(Directory.GetDirectories(_directory,"*.tmp-*"));
+        Assert.Empty(Directory.GetDirectories(_directory,"*.tmp-*",SearchOption.AllDirectories));
+
+        // ユーザー指示: 出力はプロジェクトごとにフォルダを分ける。ファイル名は既定パターン
+        // {project}-{report}（例: 2026年度夏期講習-全体時間割.xlsx）になる。
+        var projectFolder=Path.Combine(_directory,"2026年度夏期講習");
+        Assert.Equal(projectFolder,Path.GetDirectoryName(result.DirectoryPath));
+        Assert.Equal("2026年度夏期講習-全体時間割.xlsx",Path.GetFileName(result.OverallExcelPath));
+        Assert.Equal("2026年度夏期講習-全体時間割.pdf",Path.GetFileName(result.OverallPdfPath));
+        Assert.Equal("2026年度夏期講習-講師配布用講師別時間割(一括).xlsx",Path.GetFileName(result.CombinedTeacherPacketExcelPath));
+        Assert.True(new FileInfo(result.CombinedTeacherPacketExcelPath).Length>500);
+        Assert.True(new FileInfo(result.CombinedTeacherPacketPdfPath).Length>0);
 
         using var overall=new XLWorkbook(result.OverallExcelPath);
         Assert.True(overall.Worksheets.Contains("出力情報"));
-        Assert.Equal("季節講習時間割",overall.Worksheet("出力情報").Cell(1,2).GetString());
+        Assert.Equal("全体時間割",overall.Worksheet("出力情報").Cell(1,2).GetString());
         Assert.Contains(overall.Worksheets,ws=>ws.Name.StartsWith("週_",StringComparison.Ordinal));
 
         using var studentHandouts=new XLWorkbook(result.StudentHandoutsExcelPath);

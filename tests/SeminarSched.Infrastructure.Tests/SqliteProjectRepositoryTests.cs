@@ -24,7 +24,7 @@ public sealed class SqliteProjectRepositoryTests : IDisposable
 
         var summary = await repository.CreateAsync(path, definition);
 
-        Assert.Equal("2026夏期講習", summary.Title);
+        Assert.Equal("2026年度夏期講習", summary.Title);
         Assert.True(File.Exists(path));
         Assert.Empty(Directory.GetFiles(_directory, "*.tmp", SearchOption.AllDirectories));
         Assert.True((await repository.CheckIntegrityAsync(path)).IsValid);
@@ -67,7 +67,7 @@ public sealed class SqliteProjectRepositoryTests : IDisposable
 
         Assert.True(File.Exists(backup));
         Assert.True((await repository.CheckIntegrityAsync(backup)).IsValid);
-        Assert.Equal("2026夏期講習", (await repository.OpenAsync(backup)).Title);
+        Assert.Equal("2026年度夏期講習", (await repository.OpenAsync(backup)).Title);
     }
 
     [Fact]
@@ -83,9 +83,9 @@ public sealed class SqliteProjectRepositoryTests : IDisposable
 
         await repository.RestoreBackupAsync(backup, target);
 
-        Assert.Equal("2026冬期講習", (await repository.OpenAsync(target)).Title);
+        Assert.Equal("2026年度冬期講習", (await repository.OpenAsync(target)).Title);
         var safetyBackup = Assert.Single(Directory.GetFiles(_directory, "active_before_restore_*.jukuschedule"));
-        Assert.Equal("2026夏期講習", (await repository.OpenAsync(safetyBackup)).Title);
+        Assert.Equal("2026年度夏期講習", (await repository.OpenAsync(safetyBackup)).Title);
         Assert.Empty(Directory.GetFiles(_directory, "*.rollback", SearchOption.AllDirectories));
         Assert.Empty(Directory.GetFiles(_directory, "*.tmp", SearchOption.AllDirectories));
     }
@@ -107,7 +107,7 @@ public sealed class SqliteProjectRepositoryTests : IDisposable
 
         var summary = await repository.OpenAsync(path);
 
-        Assert.Equal("2026夏期講習", summary.Title);
+        Assert.Equal("2026年度夏期講習", summary.Title);
         var backup = Assert.Single(Directory.GetFiles(_directory, "legacy_before_migration_v1_*.jukuschedule"));
         Assert.True((await repository.CheckIntegrityAsync(backup)).IsValid);
         await using var verify = new SqliteConnection($"Data Source={path};Mode=ReadOnly;Pooling=False");

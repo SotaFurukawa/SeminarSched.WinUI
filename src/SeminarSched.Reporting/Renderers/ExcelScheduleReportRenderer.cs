@@ -58,21 +58,57 @@ public sealed class ExcelScheduleReportRenderer
         if (report.AbsentStudents.Count > 0) WriteAbsenceSheet(workbook.AddWorksheet(UniqueSheetName(usedNames, "講習欠席一覧")), report);
         WriteHandoutStyleTemplateSheet(workbook.AddWorksheet(UniqueSheetName(usedNames, HandoutStyleSheetName)), settings);
 
-        var allStudents = ParticipatingStudents(report);
-        var regularIds = report.Rows.Where(r => r.Teacher == teacherName && r.IsRegularTeacher).Select(r => r.Student).ToHashSet();
-        var seasonalIds = report.Rows.Where(r => r.Teacher == teacherName).Select(r => r.Student).ToHashSet();
-        var ordered = allStudents.Where(s => regularIds.Contains(s.Student))
-            .Concat(allStudents.Where(s => seasonalIds.Contains(s.Student) && !regularIds.Contains(s.Student)))
-            .Concat(allStudents.Where(s => !regularIds.Contains(s.Student) && !seasonalIds.Contains(s.Student)))
-            .ToArray();
-
+        var ordered = OrderStudentsForTeacher(report, teacherName);
         foreach (var s in ordered)
         {
             var sheet = workbook.AddWorksheet(UniqueSheetName(usedNames, $"{s.Grade}_{s.Student}_講師別"));
             WriteStudentHandoutPage(sheet, report, s.Student, s.Grade, includeTeacher: true, teacherLabels, settings);
         }
-        if (ordered.Length == 0 && report.AbsentStudents.Count == 0) workbook.AddWorksheet("出力対象がありません");
+        if (ordered.Count == 0 && report.AbsentStudents.Count == 0) workbook.AddWorksheet("出力対象がありません");
         workbook.SaveAs(path);
+    }
+
+    /// <summary>
+    /// ユーザー指示による追加機能。従来の「講師配布用講師別時間割」（講師ごとに独立したファイル）とは
+    /// 別に、全講師分を1ファイルへまとめた「(一括)」版を作る。印刷時に2シートずつまとめる運用を
+    /// 想定しているため、担当生徒数が奇数の講師の後ろには空白シートを1枚挟み、次の講師が必ず
+    /// 奇数番目のシートから始まるようにする（そうしないと講師の境界がページの中間へずれてしまう）。
+    /// 各生徒シートの左上（A2、通常空欄の行）に「{講師名}t用」と書き、どの講師の束かを明示する。
+    /// </summary>
+    public void RenderTeacherPacketsCombined(ScheduleReport report, IReadOnlyList<string> teacherNames, string path, HandoutStyleSettings? styleSettings = null)
+    {
+        var settings = styleSettings ?? HandoutStyleSettings.Default;
+        var teacherLabels = WeeklyCalendarLayout.BuildTeacherLabels(report.Rows.Select(x => x.Teacher));
+        using var workbook = new XLWorkbook();
+        var usedNames = new HashSet<string>(StringComparer.Ordinal);
+        if (report.AbsentStudents.Count > 0) WriteAbsenceSheet(workbook.AddWorksheet(UniqueSheetName(usedNames, "講習欠席一覧")), report);
+        WriteHandoutStyleTemplateSheet(workbook.AddWorksheet(UniqueSheetName(usedNames, HandoutStyleSheetName)), settings);
+
+        var blankIndex = 1;
+        foreach (var teacherName in teacherNames.OrderBy(x => x, StringComparer.Ordinal))
+        {
+            var ordered = OrderStudentsForTeacher(report, teacherName);
+            foreach (var s in ordered)
+            {
+                var sheet = workbook.AddWorksheet(UniqueSheetName(usedNames, $"{s.Grade}_{s.Student}_{teacherName}"));
+                WriteStudentHandoutPage(sheet, report, s.Student, s.Grade, includeTeacher: true, teacherLabels, settings);
+                var label = sheet.Cell(2, 1); label.Value = $"{teacherName}t用"; label.Style.Font.Bold = true; label.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+            }
+            if (ordered.Count % 2 != 0) workbook.AddWorksheet(UniqueSheetName(usedNames, $"空白_{blankIndex++}"));
+        }
+        if (workbook.Worksheets.Count == 0) workbook.AddWorksheet("出力対象がありません");
+        workbook.SaveAs(path);
+    }
+
+    private static IReadOnlyList<(string Student, string Grade)> OrderStudentsForTeacher(ScheduleReport report, string teacherName)
+    {
+        var allStudents = ParticipatingStudents(report);
+        var regularIds = report.Rows.Where(r => r.Teacher == teacherName && r.IsRegularTeacher).Select(r => r.Student).ToHashSet();
+        var seasonalIds = report.Rows.Where(r => r.Teacher == teacherName).Select(r => r.Student).ToHashSet();
+        return allStudents.Where(s => regularIds.Contains(s.Student))
+            .Concat(allStudents.Where(s => seasonalIds.Contains(s.Student) && !regularIds.Contains(s.Student)))
+            .Concat(allStudents.Where(s => !regularIds.Contains(s.Student) && !seasonalIds.Contains(s.Student)))
+            .ToArray();
     }
 
     public void RenderIssues(ScheduleReport report, string path)
@@ -389,7 +425,7 @@ public sealed class ExcelScheduleReportRenderer
     private static void WriteOverviewMetadataSheet(IXLWorksheet sheet, ScheduleReport report)
     {
         sheet.Column(1).Width = 24; sheet.Column(2).Width = 54; sheet.Column(1).Style.Font.Bold = true;
-        sheet.Cell(1, 1).Value = "帳票名"; sheet.Cell(1, 2).Value = "季節講習時間割";
+        sheet.Cell(1, 1).Value = "帳票名"; sheet.Cell(1, 2).Value = "全体時間割";
         sheet.Cell(2, 1).Value = "校舎・講習"; sheet.Cell(2, 2).Value = report.ProjectTitle;
         sheet.Cell(3, 1).Value = "更新日時"; sheet.Cell(3, 2).Value = report.GeneratedAtText;
     }
@@ -412,7 +448,7 @@ public sealed class ExcelScheduleReportRenderer
     private static void WriteOverviewWeekSheet(IXLWorksheet sheet, OverviewWeek week, IReadOnlyList<string> slotLabels, IReadOnlyDictionary<string, SlotDefinition> slotDefinitionsByLabel)
     {
         const int dateHeaderRow = 3, comaHeaderRow = 4, slotStartRow = 5;
-        sheet.Cell(1, 1).Value = "季節講習時間割"; sheet.Cell(1, 1).Style.Fill.BackgroundColor = OverviewTitleFill;
+        sheet.Cell(1, 1).Value = "全体時間割"; sheet.Cell(1, 1).Style.Fill.BackgroundColor = OverviewTitleFill;
         var sundayEnd = week.SundayStart.AddDays(6);
         sheet.Cell(2, 1).Value = $"{week.SundayStart:yyyy/M/d}（{WeeklyCalendarLayout.WeekdayHeaders[0]}） ～ {sundayEnd:yyyy/M/d}（{WeeklyCalendarLayout.WeekdayHeaders[6]}）";
         sheet.Cell(2, 1).Style.Fill.BackgroundColor = OverviewSubtitleFill;
