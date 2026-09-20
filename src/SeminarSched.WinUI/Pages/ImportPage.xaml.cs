@@ -128,6 +128,15 @@ public sealed partial class ImportPage : WorkflowPageBase
 
     private void NewLessonRequest_Click(object sender,RoutedEventArgs e)=>ResetLessonRequest();
 
+    // ユーザー指示: 第1希望講師は普通、通常担当講師と同じになるため、通常担当講師を選ぶと
+    // 第1希望講師が未設定（指定なし）のままであれば自動的に同じ講師を初期値として補う。
+    // 第1希望講師をすでに選んでいる場合（既存データの編集時含む）は上書きしない。
+    private void RequestRegularTeacher_SelectionChanged(object sender,SelectionChangedEventArgs e)
+    {
+        if(RequestPreferred1.SelectedItem is MasterItem<Teacher?> current && current.Value is not null)return;
+        RequestPreferred1.SelectedItem=RequestRegularTeacher.SelectedItem;
+    }
+
     private void LessonRequests_SelectionChanged(object sender,SelectionChangedEventArgs e)
     {
         if(LessonRequests.SelectedItem is not LessonRequestRow selected)return;

@@ -31,19 +31,39 @@ internal static class OptimizationRunState
     private static DispatcherTimer? _timer;
 
     // progress?.Report()はストラテジーの開始・終了時にしか呼ばれず、1ストラテジーが数十秒〜数分
-    // 続くことがあるため、報告の間だけ経過/残り時間を毎秒補間して滑らかに見せる。
+    // 続くことがあるため、報告の間だけ経過時間を毎秒補間して滑らかに見せる（経過時間の表示自体は
+    // 引き続き実時間ベース）。一方、パーセンテージは経過時間とMaximumDuration（品質レベルの
+    // 名目上の上限、最高品質なら3600秒）の比ではなく、OptimizationProgress.ProgressWeight
+    // （計画済みの全戦略のうち、実際に完了・進行中の割合）を基準にする。CP-SATは対象規模によっては
+    // 名目上の持ち時間をほとんど使わずに最適解を証明して終わることが多く、経過時間ベースだと
+    // 数%のまま止まって見えたあと、終了した瞬間に100%へ飛ぶ（実際にユーザー報告のあった症状）。
+    // 進捗ベースなら、戦略の完了に応じて滑らかかつ正確に100%へ近づく。
     public static (double Percent, TimeSpan Elapsed, TimeSpan Remaining) Estimate()
     {
         if (LatestProgress is null) return (0, TimeSpan.Zero, MaximumDuration);
         // 停滞検知や「中断して現在の結果を採用」で持ち時間を使い切る前に終了することがあり、その場合
-        // 経過/持ち時間の比率は100%未満のまま止まって見える。実行が終わっている（成功・失敗問わず）
+        // 進捗の比率は100%未満のまま止まって見える。実行が終わっている（成功・失敗問わず）
         // 時点で、ユーザーから見れば「もう終わった」ので100%・残り0として表示する。
         if (!IsRunning) return (100, _lastReportedElapsed, TimeSpan.Zero);
         var elapsed = _lastReportedElapsed + (DateTime.UtcNow - _lastReportedAtUtc);
-        var percent = MaximumDuration.TotalSeconds <= 0 ? 0 : Math.Clamp(elapsed.TotalSeconds / MaximumDuration.TotalSeconds * 100.0, 0, 100);
         var remaining = MaximumDuration - elapsed;
         if (remaining < TimeSpan.Zero) remaining = TimeSpan.Zero;
-        return (percent, elapsed, remaining);
+
+        var progress = LatestProgress;
+        double percent;
+        if (progress.IsStrategyStarting)
+        {
+            var strategyElapsed = DateTime.UtcNow - _lastReportedAtUtc;
+            var fraction = progress.StrategyBudget.TotalSeconds <= 0
+                ? 0
+                : Math.Clamp(strategyElapsed.TotalSeconds / progress.StrategyBudget.TotalSeconds, 0, 1);
+            percent = (progress.ProgressWeight + fraction * progress.StrategyWeight) * 100.0;
+        }
+        else
+        {
+            percent = progress.ProgressWeight * 100.0;
+        }
+        return (Math.Clamp(percent, 0, 100), elapsed, remaining);
     }
 
     public static async Task StartAsync(string projectPath, OptimizationProfile profile)

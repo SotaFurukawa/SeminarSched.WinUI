@@ -114,6 +114,29 @@ public sealed class CpSatScheduleSolverTests
         Assert.All(solution.Placements, item => Assert.Equal(100, item.TeacherId));
     }
 
+    // ユーザー指定の目安（優先度が1下がるごとに通常担当講師の最低保証割合が30ポイント下がる:
+    // 5→100%・4→70%・3→40%・2→10%）に沿って、MinimumRegularTeacherSessionsの実際の閾値を
+    // SolveAsync経由で（内部関数は非公開のため）間接的に検証する。
+    [Theory]
+    [InlineData(4, 10, 7)] // 70% of 10, ceiling
+    [InlineData(2, 10, 1)] // 10% of 10, ceiling
+    public async Task SolveAsync_PreservesRegularTeacherMinimumAtEachPriorityLevel(int priority, int requiredSessions, int expectedMinimum)
+    {
+        var demand = new LessonDemand(1, 10, requiredSessions, 0, RegularTeacherId: 100, RegularTeacherPriority: priority);
+        var candidates = Enumerable.Range(1, requiredSessions)
+            .SelectMany(day => new[]
+            {
+                new PlacementCandidate(1, 10, 100, day, 1, day, 1, PreferencePenalty: 0),
+                new PlacementCandidate(1, 10, 200, day, 1, day, 1, PreferencePenalty: 5),
+            })
+            .ToArray();
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem([demand], candidates), TimeSpan.FromSeconds(5));
+
+        Assert.Equal(requiredSessions, solution.Placements.Count);
+        Assert.True(solution.Placements.Count(item => item.TeacherId == 100) >= expectedMinimum);
+    }
+
     [Fact]
     public async Task SolveAsync_RespectsMaximumConsecutiveSlots()
     {

@@ -10,5 +10,10 @@ public enum OptimizationStrategyKind
     MultiStage,
     HintImprovement,
     NeighborhoodRepair,
+    NeighborhoodRepairB,
+    NeighborhoodRepairC,
+    NeighborhoodRepairD,
+    NeighborhoodRepairE,
     FinalPolishing,
+    FinalPolishingB,
 }

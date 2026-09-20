@@ -6,16 +6,16 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.4.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 83（④編集中の外部変更検出・Googleフォームキット整理・ホーム/設定の文言/操作性改善・「デザイン設定」正式採用）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83の④外部変更検出・ホーム/設定/アンケート作成のUI変更・Googleフォーム作成手順ウィザードは、いずれもこの環境からは視覚確認できないため実機での確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。
-Latest Draft Release: `v0.4.0`（GitHub上にDraftとして作成済み。checkpoint83の内容をまとめてユーザーより「できたらドラフトリリースで」との指示を受け作成。checkpoint83はNext Version Ruleに従いnew feature相当でv0.4.0とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.4.0.md](releases/v0.4.0.md)）
+Current Version: `v0.5.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
+Latest Development Checkpoint: checkpoint 85（⑤時間割自動作成: 担当講師優先度5の候補制限・進捗パーセンテージの計算方式変更・高品質帯の多重近傍探索）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84の時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、checkpoint85の担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
+Latest Draft Release: `v0.5.0`（GitHub上にDraftとして作成済み。checkpoint84・85の内容をまとめてユーザーより「完成したらバージョンアップしてドラフトリリース」との指示を受け作成。checkpoint84・85はいずれもNext Version Ruleに従えばnew feature相当でv0.5.0とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.5.0.md](releases/v0.5.0.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
 
-- v0.4.0 Draft Release後のbug fix / minor change -> `v0.4.1`
-- v0.4.0 Draft Release後のnew feature -> `v0.5.0`
+- v0.5.0 Draft Release後のbug fix / minor change -> `v0.5.1`
+- v0.5.0 Draft Release後のnew feature -> `v0.6.0`
 - `v1.0.0` -> ユーザーの明示指示がある場合のみ
-- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2がその例）。checkpoint83のv0.4.0はユーザーが番号を指定しなかったため、この既定ルールをそのまま適用した例。
+- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2がその例）。checkpoint83のv0.4.0・checkpoint84〜85のv0.5.0は、いずれもユーザーが番号を指定しなかったため、この既定ルールをそのまま適用した例。
 
 ### 実装済み
 
@@ -1144,14 +1144,6 @@ v0.3.2 Draft Release後、ユーザーから「先の比較調査で挙げたま
 
 **動作確認:** Debug/x86ビルド警告0・エラー0（Release/x64は次回の正式リリース作業時に実施予定）。ホーム/設定/アンケート作成画面の実際の見た目・操作感、Googleフォーム作成手順ウィザードの実際の見た目、外部変更検出のInfoBar表示は、いずれもこの環境からは視覚確認できないため実機でユーザーに確認をお願いしたい。
 
-### 次回最初に確認するファイル
-
-- `AGENTS.md`
-- `Directory.Build.props`
-- `docs/FEATURE_PARITY.md`
-- `docs/adr/0001-platform-and-architecture.md`
-- `docs/releases/v0.0.0.md`
-
 ### v0.4.0 checkpoint 84 (Claude) — 時刻選択UIの刷新、3.1/3.2タブの表示制御、科目略称バグの根本修正
 
 v0.4.0 Draft Release後、実機スクリーンショット付きの指摘一式（コマ設定の時刻入力欄を専用UIにしたい・5分刻みにしてほしい・3.1/3.2は集団授業を使わないプロジェクトでは非表示にしてほしい・時間割出力の科目名が一文字になっていない・コマの並び替えがまだ反映されない）を受けて対応した。
@@ -1174,6 +1166,40 @@ v0.4.0 Draft Release後、実機スクリーンショット付きの指摘一式
 **動作確認:** Debug/x86ビルド警告0・エラー0。時刻選択ComboBox・3.1/3.2の表示切替・▲▼ボタンでの並び替え・科目略称の実際の見た目は、いずれもこの環境からは視覚確認できないため実機でユーザーに確認をお願いしたい。特に科目略称のバックフィルは、ユーザーの既存プロジェクトで実際に正しい1文字へ直っているかの確認を重視したい。
 
 **追記（実機スクリーンショットによる指摘）:** ③アンケート取込みの「受講希望」欄で、生徒・科目・通常担当講師のComboBoxと隣接する項目の間に不自然な余白ができるとの指摘を受けた。原因は`ImportPage`の最上位`StackPanel`にだけ他の画面（HomePage・SetupPage等）と違い`MaxWidth`指定が無く、ウィンドウ幅に応じて際限なく広がるため、`受講希望`グリッドの`*`列（生徒・科目・通常担当講師）が不釣り合いに間延びしていたこと。他画面と同じ`MaxWidth="960" HorizontalAlignment="Left"`を追加して解消した。
+
+### v0.4.0 checkpoint 85 (Claude) — 担当講師優先度5の候補制限、進捗パーセンテージの計算方式変更、高品質帯の多重近傍探索
+
+ユーザーから⑤時間割自動作成（探索アルゴリズム）に関する3件の指示を受けて対応した。
+
+**①担当講師優先度5は通常担当講師（＋第1〜3希望）に限定:** 「優先度5の場合は通常担当講師に限る。他の講師が入る選択肢を残さないでほしい。ただし通常担当講師の出勤可能コマ数が必要回数に満たない場合は、それに限らない」との指示。従来、優先度5は`AddRegularTeacherMinimums`（CpSatScheduleSolver）でソフトな最低保証（目的関数の減点だけで強制ではない）としてしか扱っておらず、必ずしも通常担当講師以外の候補を排除しなかった（実際、生徒の受講日を分散させる「日程分散」加点（1日あたり10,000点）が講師優先度の加点（100点単位）を上回る場面では、通常担当講師以外を意図的に選んでしまう構成があり得ることを新規テストで再現した）。
+- `SqliteScheduleRunService.BuildProblemAsync`に`RestrictPriorityFiveCandidatesToPreferredTeachers`を追加。担当講師優先度=5の受講希望について、通常担当講師の候補コマ数（＝出勤可能コマ数）が必要残り回数以上あれば、その受講希望の候補を「通常担当講師・第1希望・第2希望・第3希望」だけへハードに絞り込む（それ以外の講師の候補自体を除去する）。出勤可能コマ数が不足する場合は絞り込みを行わず、従来通り他の講師も候補に残す（不可能な制約でInfeasibleにしないため）。
+- 「第1希望講師は普通、通常担当講師と同じになる」との指示により、③アンケート取込み「受講希望」フォームで通常担当講師を選択すると、第1希望講師が未設定の場合に限り自動的に同じ講師を初期値として補うようにした（`ImportPage.RequestRegularTeacher_SelectionChanged`）。第1希望講師を既に選んでいる場合は上書きしない。
+- 「優先度が1下がるごとに通常担当（第1希望）講師が入る割合の最低保証値が30ポイントずつ下がる」という目安（5→100%・4→70%・3→40%・2→10%・1→保証なし）に合わせ、`CpSatScheduleSolver.MinimumRegularTeacherSessions`の計算式を`((priority-1)*required+3)/4`（25%刻み）から`ceil(required * max(0,100-(5-priority)*30) / 100)`（30%刻み）へ変更した。
+- 新規テスト: `SqliteScheduleRunServiceTests`に、①出勤可能コマ数が足りる場合は他講師が一切使われないこと、②足りない場合は他講師も使われて未配置を防ぐこと、の2件（意図的に「他講師を使うと日程分散で加点される」状況を作り、制限が実際に効いていることを検証）。`CpSatScheduleSolverTests`に優先度4・2それぞれの最低保証件数を検証するTheoryテストを追加。
+
+**③進捗パーセンテージを経過時間基準から計画済み作業量基準へ変更:** 「最高品質（名目60分）でも2〜3分で終わることが多く、2〜3%から急に100%へジャンプする。時間基準ではなく進捗基準で表示してほしい」との指摘。原因は`OptimizationRunState.Estimate()`が`経過時間 ÷ MaximumDuration（品質レベルの名目上限、最高品質なら3600秒）`でパーセンテージを計算していたため、CP-SATが証明済み最適解に達して名目時間よりずっと早く終わる（このアプリの実データ規模ではよくある）と、経過時間ベースの分子がほとんど増えないまま実行が終わり、終了した瞬間だけ100%表示へ切り替わる仕組みになっていたこと。
+- `OptimizationProgress`（Optimization層）に`ProgressWeight`・`StrategyWeight`・`StrategyBudget`・`IsStrategyStarting`を追加。各ステージの`BudgetShare`を戦略数で均等割りしたものを「そのステージの1戦略が持つ重み」とみなし、`ScheduleOptimizer.RunAsync`が戦略の実行前後にこの重みを積み上げて報告するようにした（全戦略の重みの合計は必ず1.0になる）。
+- `OptimizationRunState.Estimate()`を、経過時間ではなく`ProgressWeight`（＋実行中の戦略1つ分は、その戦略の持ち時間に対する経過時間の割合で滑らかに補間）からパーセンテージを計算するよう書き換えた。経過時間・残り時間の表示自体は従来通り実時間ベースのまま維持した。
+- **副次的な修正:** `ScheduleOptimizer.RunAsync`の`previousBest`計算が、同じステージ内で複数の戦略を実行する場合に、1つ目の戦略が改善を出しても2つ目以降がそれをhintとして受け取れない（`advancing`はステージ完了時にしか更新されないため）という既存の制限に気づき、`stageCandidates`も見るよう修正した。この修正は次の②の複数回近傍修復を活かす土台にもなる。
+- 新規テスト: `ScheduleOptimizerTests`に、2ステージ構成でProgressWeightが期待通りの順序（0→0.3→0.3→0.6→0.6→1.0）で報告されることを検証するテストと、同一ステージ内の2戦略目が1戦略目の改善結果をhintとして受け取ることを検証するテストを追加。
+
+**②高品質・最高品質帯で「時間をかけるほど良くなる」余地を増やす:** 「最高品質でも大差ない。30分かけてもいいので、もっと良い解が出る高品質オプションが欲しい」との相談。CP-SATは証明済み最適解に達すると持ち時間を残したまま終了する設計上の性質があり、単に同じ探索を長く待たせても改善しない（数学的に「これ以上良くならない」ことが証明された時点で終わるため）。そのため「同じ探索を長く待つ」のではなく「異なる乱数近傍を持つ独立した部分修復（Large Neighborhood Search）の試行数を増やす」方向で対応した。
+- `NeighborhoodRepairStrategy`を`NeighborhoodRepairStrategyBase`へ共通化し、異なる乱数シード（21・22・23・24・25）を持つ`NeighborhoodRepairB/C/D/E`を追加（新規`OptimizationStrategyKind`）。同様に`FinalPolishingB`（シード6）も追加。
+- `OptimizationProfileCatalog`の「高品質」の近傍修復ステージを1戦略→3戦略（NeighborhoodRepair・B・C）、「最高品質」を1戦略→5戦略（+D・E）へ拡張し、最高品質の最終仕上げステージも1戦略→2戦略（FinalPolishing・B）へ拡張した。各ステージの`BudgetShare`（総時間に対する割合）自体は変更していないため、同じ名目時間の中でより多くの独立した近傍を試すことになる（誠実な期待値として、対象データ規模によっては依然としてすぐ収束することもあり、必ず「より良い解」が出るとは限らない旨は別途ユーザーへ報告する）。
+- `SqliteScheduleRunService.CreateStrategies()`・`OptimizationPage`の戦略表示名辞書（`StrategyLabels`）へ新戦略を登録。
+- 新規テスト: `CpSatStrategyIntegrationTests`に新戦略5種＋FinalPolishingBを実際に組み込んだプロファイルでの end-to-end 実行テストを追加。既存の`OptimizationProfileCatalogTests`（戦略数の単調非減少・BudgetShare合計1.0の検証）はいずれも無修正のまま通過。
+
+**新規/更新テスト（合計）:** 上記の新規テストにより`dotnet test`全173 tests passed（既存170件は無修正で通過）。
+
+**動作確認:** Debug/x86・Release/x64ともにビルド警告0・エラー0。実際に⑤時間割自動作成を実行した際の進捗表示の見た目・体感、優先度5の実際の配置結果、高品質帯での所要時間や結果の変化は、いずれもこの環境からは確認できない（CP-SATの実行自体は確認できたがUIの視覚的な滑らかさや実データでの改善幅は未検証）ため、実機でユーザーに確認をお願いしたい。
+
+### 次回最初に確認するファイル
+
+- `AGENTS.md`
+- `Directory.Build.props`
+- `docs/FEATURE_PARITY.md`
+- `docs/adr/0001-platform-and-architecture.md`
+- `docs/releases/v0.0.0.md`
 
 ## 1. この文書の目的
 

@@ -121,18 +121,50 @@ public sealed class HintImprovementStrategy : CpSatStrategyBase
 /// frozen requests already satisfied every hard constraint in the hint), and lets the solver spend
 /// its whole time budget on a small slice of the problem instead of the whole thing.
 /// </summary>
-public sealed class NeighborhoodRepairStrategy : CpSatStrategyBase
+/// <remarks>
+/// <paramref name="seed"/> picks both the random neighborhood (which ~25% of requests are freed) and
+/// the CP-SAT random_seed, so each of the sibling NeighborhoodRepairB/C/D/E strategies below explores
+/// a genuinely different neighborhood - repeating the same seed would just re-solve the identical
+/// sub-problem. High/Highest list several of these in one NeighborhoodRepair stage (see
+/// OptimizationProfileCatalog) specifically so a longer nominal time budget buys more independent
+/// random-restart attempts, not just a longer wait on the same one.
+/// </remarks>
+public abstract class NeighborhoodRepairStrategyBase(int seed) : CpSatStrategyBase
 {
-    public override OptimizationStrategyKind Kind => OptimizationStrategyKind.NeighborhoodRepair;
     protected override CpSatSolveOptions BuildOptions(StrategyContext<ScheduleProblem, ScheduleSolution> context)
     {
-        if (context.Hint is null) return ColdStart(context, seed: 21);
+        if (context.Hint is null) return ColdStart(context, seed);
         var demandIds = context.Input.Demands.Select(demand => demand.RequestId).ToArray();
         var freeCount = Math.Max(1, demandIds.Length / 4);
-        var random = new Random(21);
+        var random = new Random(seed);
         var freeRequestIds = demandIds.OrderBy(_ => random.Next()).Take(freeCount).ToHashSet();
-        return WarmStart(context, seed: 21, freeRequestIds: freeRequestIds);
+        return WarmStart(context, seed, freeRequestIds: freeRequestIds);
     }
+}
+
+public sealed class NeighborhoodRepairStrategy() : NeighborhoodRepairStrategyBase(seed: 21)
+{
+    public override OptimizationStrategyKind Kind => OptimizationStrategyKind.NeighborhoodRepair;
+}
+
+public sealed class NeighborhoodRepairBStrategy() : NeighborhoodRepairStrategyBase(seed: 22)
+{
+    public override OptimizationStrategyKind Kind => OptimizationStrategyKind.NeighborhoodRepairB;
+}
+
+public sealed class NeighborhoodRepairCStrategy() : NeighborhoodRepairStrategyBase(seed: 23)
+{
+    public override OptimizationStrategyKind Kind => OptimizationStrategyKind.NeighborhoodRepairC;
+}
+
+public sealed class NeighborhoodRepairDStrategy() : NeighborhoodRepairStrategyBase(seed: 24)
+{
+    public override OptimizationStrategyKind Kind => OptimizationStrategyKind.NeighborhoodRepairD;
+}
+
+public sealed class NeighborhoodRepairEStrategy() : NeighborhoodRepairStrategyBase(seed: 25)
+{
+    public override OptimizationStrategyKind Kind => OptimizationStrategyKind.NeighborhoodRepairE;
 }
 
 /// <summary>Last-stage attempt: hint warm start, no freezing, one more full pass at the whole problem.</summary>
@@ -141,4 +173,12 @@ public sealed class FinalPolishingStrategy : CpSatStrategyBase
     public override OptimizationStrategyKind Kind => OptimizationStrategyKind.FinalPolishing;
     protected override CpSatSolveOptions BuildOptions(StrategyContext<ScheduleProblem, ScheduleSolution> context) =>
         WarmStart(context, seed: 5);
+}
+
+/// <summary>Second final-pass attempt with a different seed, for Highest only (see OptimizationProfileCatalog).</summary>
+public sealed class FinalPolishingBStrategy : CpSatStrategyBase
+{
+    public override OptimizationStrategyKind Kind => OptimizationStrategyKind.FinalPolishingB;
+    protected override CpSatSolveOptions BuildOptions(StrategyContext<ScheduleProblem, ScheduleSolution> context) =>
+        WarmStart(context, seed: 6);
 }

@@ -30,7 +30,12 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         [OptimizationStrategyKind.MultiStage] = "並列強化探索",
         [OptimizationStrategyKind.HintImprovement] = "改善探索",
         [OptimizationStrategyKind.NeighborhoodRepair] = "部分修復探索",
+        [OptimizationStrategyKind.NeighborhoodRepairB] = "部分修復探索B",
+        [OptimizationStrategyKind.NeighborhoodRepairC] = "部分修復探索C",
+        [OptimizationStrategyKind.NeighborhoodRepairD] = "部分修復探索D",
+        [OptimizationStrategyKind.NeighborhoodRepairE] = "部分修復探索E",
         [OptimizationStrategyKind.FinalPolishing] = "最終仕上げ探索",
+        [OptimizationStrategyKind.FinalPolishingB] = "最終仕上げ探索B",
     };
 
     public OptimizationPage()

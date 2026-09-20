@@ -49,7 +49,9 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
     [
         new StandardCpSatStrategy(), new SeededCpSatAStrategy(), new SeededCpSatBStrategy(), new SeededCpSatCStrategy(),
         new AlternateDecisionStrategy(), new MultiStageStrategy(), new HintImprovementStrategy(),
-        new NeighborhoodRepairStrategy(), new FinalPolishingStrategy(),
+        new NeighborhoodRepairStrategy(), new NeighborhoodRepairBStrategy(), new NeighborhoodRepairCStrategy(),
+        new NeighborhoodRepairDStrategy(), new NeighborhoodRepairEStrategy(),
+        new FinalPolishingStrategy(), new FinalPolishingBStrategy(),
     ];
 
     private static async Task<ScheduleProblem> BuildProblemAsync(SqliteConnection connection, CancellationToken cancellationToken)
@@ -179,7 +181,43 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 fixedPlacements.Add(new FixedPlacement(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3), reader.GetInt64(4), reader.GetInt32(5), reader.GetInt32(6), reader.GetBoolean(7)));
         }
-        return new ScheduleProblem(demands, candidates, slots, fixedPlacements);
+        var restrictedCandidates = RestrictPriorityFiveCandidatesToPreferredTeachers(candidates, demands, metadata);
+        return new ScheduleProblem(demands, restrictedCandidates, slots, fixedPlacements);
+    }
+
+    // ユーザー指示: 担当講師優先度5は通常担当講師に限る（他の講師が候補として残らないようにする）。
+    // ただし通常担当講師の出勤可能コマ数（＝この受講希望に対する候補コマ数）が必要回数に満たない
+    // 場合は、全回数を通常担当講師だけで満たすこと自体が不可能なため、この絞り込みを適用しない
+    // （元の全候補のまま残す）。第2希望・第3希望が設定されている場合はそれらも候補として残す
+    // （通常担当＝第1希望が優先されるべきという前提は、PreferencePenaltyの得点差で維持される）。
+    private static List<PlacementCandidate> RestrictPriorityFiveCandidatesToPreferredTeachers(
+        List<PlacementCandidate> candidates,
+        List<LessonDemand> demands,
+        IReadOnlyDictionary<long, RequestMetadata> metadata)
+    {
+        var demandsById = demands.ToDictionary(demand => demand.RequestId);
+        var restricted = new List<PlacementCandidate>(candidates.Count);
+        foreach (var group in candidates.GroupBy(candidate => candidate.RequestId))
+        {
+            var demand = demandsById[group.Key];
+            if (demand.RegularTeacherPriority == 5 && demand.RegularTeacherId is long regularTeacherId)
+            {
+                var remainingNeeded = Math.Max(0, demand.RequiredSessions - demand.AlreadyFixedSessions);
+                var regularTeacherCandidateCount = group.Count(candidate => candidate.TeacherId == regularTeacherId);
+                if (regularTeacherCandidateCount >= remainingNeeded)
+                {
+                    var meta = metadata[group.Key];
+                    var allowedTeacherIds = new HashSet<long> { regularTeacherId };
+                    if (meta.PreferredTeacher1Id is long preferred1) allowedTeacherIds.Add(preferred1);
+                    if (meta.PreferredTeacher2Id is long preferred2) allowedTeacherIds.Add(preferred2);
+                    if (meta.PreferredTeacher3Id is long preferred3) allowedTeacherIds.Add(preferred3);
+                    restricted.AddRange(group.Where(candidate => allowedTeacherIds.Contains(candidate.TeacherId)));
+                    continue;
+                }
+            }
+            restricted.AddRange(group);
+        }
+        return restricted;
     }
 
     private static int PreferencePenalty(RequestMetadata request, long teacherId)

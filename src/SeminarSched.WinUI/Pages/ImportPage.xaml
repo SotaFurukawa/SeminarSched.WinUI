@@ -14,7 +14,7 @@
         <TextBlock FontSize="18" FontWeight="SemiBold" Text="受講希望"/>
         <TextBlock Text="生徒ごとの受講希望（必要授業回数・希望講師）を個別に登録・編集します。通常はアンケート取込みで自動反映されますが、ここで個別に追加・修正できます。一覧から選ぶと編集できます。" TextWrapping="Wrap"/>
         <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/><ColumnDefinition Width="120"/></Grid.ColumnDefinitions>
-            <ComboBox x:Name="RequestStudent" Header="生徒"/><ComboBox x:Name="RequestSubject" Grid.Column="1" Header="科目"/><NumberBox x:Name="RequestRequiredSessions" Grid.Column="2" Header="必要授業回数" Minimum="1" Value="1"/><ComboBox x:Name="RequestRegularTeacher" Grid.Column="3" Header="通常担当講師（任意）"/><NumberBox x:Name="RequestRegularPriority" Grid.Column="4" Header="優先度 1～5" Minimum="1" Maximum="5" Value="3"/>
+            <ComboBox x:Name="RequestStudent" Header="生徒"/><ComboBox x:Name="RequestSubject" Grid.Column="1" Header="科目"/><NumberBox x:Name="RequestRequiredSessions" Grid.Column="2" Header="必要授業回数" Minimum="1" Value="1"/><ComboBox x:Name="RequestRegularTeacher" Grid.Column="3" Header="通常担当講師（任意）" SelectionChanged="RequestRegularTeacher_SelectionChanged"/><NumberBox x:Name="RequestRegularPriority" Grid.Column="4" Header="優先度 1～5" Minimum="1" Maximum="5" Value="3"/>
         </Grid>
         <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
             <ComboBox x:Name="RequestPreferred1" Header="第1希望講師（任意）"/><ComboBox x:Name="RequestPreferred2" Grid.Column="1" Header="第2希望講師（任意）"/><ComboBox x:Name="RequestPreferred3" Grid.Column="2" Header="第3希望講師（任意）"/>

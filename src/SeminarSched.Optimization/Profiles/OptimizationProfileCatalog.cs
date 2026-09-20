@@ -68,7 +68,7 @@ public static class OptimizationProfileCatalog
             OptimizationQualityLevel.High,
             "高品質",
             "約10〜30分",
-            "複数候補から上位を選び、hint再探索と部分修復で改善します。",
+            "複数候補から上位を選び、hint再探索と複数の部分修復で改善します。",
             1800,
             420,
             Stage(OptimizationStageKind.InitialExploration, 0.40, 3,
@@ -80,14 +80,20 @@ public static class OptimizationProfileCatalog
             Stage(OptimizationStageKind.CandidateAdvancement, 0.35, 2,
                 OptimizationStrategyKind.MultiStage,
                 OptimizationStrategyKind.HintImprovement),
+            // 部分修復を1回だけでなく異なる乱数の近傍で複数回試す（NeighborhoodRepairStrategyBase参照）。
+            // CP-SATは証明済み最適解に達すると持ち時間を使い切らず早期に終わることが多いため、
+            // 高品質帯で長い名目時間を実際に活かすには「同じ探索を長く待つ」のではなく
+            // 「別の近傍を複数回試す」ほうが改善の見込みが立つ。
             Stage(OptimizationStageKind.NeighborhoodRepair, 0.25, 1,
-                OptimizationStrategyKind.NeighborhoodRepair));
+                OptimizationStrategyKind.NeighborhoodRepair,
+                OptimizationStrategyKind.NeighborhoodRepairB,
+                OptimizationStrategyKind.NeighborhoodRepairC));
 
         yield return Profile(
             OptimizationQualityLevel.Highest,
             "最高品質",
             "約30〜60分",
-            "有望な候補へ時間を集中し、部分修復と最終調整まで行います。",
+            "有望な候補へ時間を集中し、複数の部分修復と最終調整まで行います。",
             3600,
             600,
             Stage(OptimizationStageKind.InitialExploration, 0.30, 3,
@@ -100,9 +106,14 @@ public static class OptimizationProfileCatalog
                 OptimizationStrategyKind.MultiStage,
                 OptimizationStrategyKind.HintImprovement),
             Stage(OptimizationStageKind.NeighborhoodRepair, 0.25, 1,
-                OptimizationStrategyKind.NeighborhoodRepair),
+                OptimizationStrategyKind.NeighborhoodRepair,
+                OptimizationStrategyKind.NeighborhoodRepairB,
+                OptimizationStrategyKind.NeighborhoodRepairC,
+                OptimizationStrategyKind.NeighborhoodRepairD,
+                OptimizationStrategyKind.NeighborhoodRepairE),
             Stage(OptimizationStageKind.FinalPolishing, 0.15, 1,
-                OptimizationStrategyKind.FinalPolishing));
+                OptimizationStrategyKind.FinalPolishing,
+                OptimizationStrategyKind.FinalPolishingB));
     }
 
     private static OptimizationProfile Profile(

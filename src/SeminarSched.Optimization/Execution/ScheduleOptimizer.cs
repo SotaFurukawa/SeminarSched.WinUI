@@ -38,10 +38,13 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
         using var runCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, maximumTime.Token, control.AcceptBestToken);
 
+        var weightConsumed = 0.0;
+
         foreach (var stage in profile.Stages)
         {
             var stageBudget = TimeSpan.FromTicks((long)(profile.MaximumDuration.Ticks * stage.BudgetShare));
             var strategyBudget = TimeSpan.FromTicks(stageBudget.Ticks / stage.Strategies.Count);
+            var strategyWeight = stage.BudgetShare / stage.Strategies.Count;
             var stageCandidates = new List<ScheduleCandidate<TSolution>>();
 
             foreach (var kind in stage.Strategies)
@@ -58,10 +61,15 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
                     break;
                 }
 
-                var previousBest = Best(advancing.Count > 0 ? advancing : allCandidates);
+                // stageCandidates（このステージ内で既に得られた候補）も見ることで、同じステージ内で
+                // 後から実行される戦略が、直前の戦略の改善結果をhintとして引き継げるようにする
+                // （advancingはステージ完了時にしか更新されないため、これが無いとステージ内の
+                // 複数戦略が全員ステージ開始時点の古いhintのまま warm-start してしまっていた）。
+                var previousBest = Best(stageCandidates.Concat(advancing.Count > 0 ? advancing : allCandidates));
                 progress?.Report(new OptimizationProgress(
                     stopwatch.Elapsed, profile.MaximumDuration, stage.Kind, kind, completed, total,
-                    improvementCount, previousBest?.Evaluation));
+                    improvementCount, previousBest?.Evaluation,
+                    weightConsumed, strategyWeight, strategyBudget, IsStrategyStarting: true));
 
                 using var strategyTimeout = new CancellationTokenSource(strategyBudget);
                 using var strategyCancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -87,6 +95,7 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
                 }
 
                 completed++;
+                weightConsumed += strategyWeight;
                 if (candidate is not null)
                 {
                     allCandidates.Add(candidate);
@@ -101,7 +110,8 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
                 var currentBest = Best(allCandidates);
                 progress?.Report(new OptimizationProgress(
                     stopwatch.Elapsed, profile.MaximumDuration, stage.Kind, kind, completed, total,
-                    improvementCount, currentBest?.Evaluation));
+                    improvementCount, currentBest?.Evaluation,
+                    weightConsumed, strategyWeight, strategyBudget, IsStrategyStarting: false));
 
                 if (currentBest is not null && stopwatch.Elapsed - lastImprovement >= profile.StagnationTimeout)
                 {

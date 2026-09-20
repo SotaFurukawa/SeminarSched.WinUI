@@ -240,10 +240,17 @@ public sealed class CpSatScheduleSolver
         }
     }
 
+    // ユーザー指定の目安: 優先度が1下がるごとに、通常担当講師が入る割合の最低保証値が30ポイントずつ
+    // 下がる（5→100%・4→70%・3→40%・2→10%・1→保証なし）。優先度5については、この最低割合の
+    // 目標に加えて、BuildProblemAsync（SqliteScheduleRunService）側で「通常担当講師の出勤可能コマ数が
+    // 必要回数以上ある場合に限り、候補を通常担当・第1〜第3希望講師だけへ絞り込む」というハード制約も
+    // 別途課している。この関数はその制約が使えない場合（出勤可能コマ数が不足）や優先度2〜4のための、
+    // ソフトな最低保証（達成できないと目的関数が減点されるだけで、Infeasibleにはしない）を計算する。
     internal static int MinimumRegularTeacherSessions(int requiredSessions, int priority)
     {
         if (requiredSessions < 0) throw new ArgumentOutOfRangeException(nameof(requiredSessions));
         if (priority is < 1 or > 5) throw new ArgumentOutOfRangeException(nameof(priority));
-        return ((priority - 1) * requiredSessions + 3) / 4;
+        var targetPercentage = Math.Max(0, 100 - (5 - priority) * 30);
+        return (requiredSessions * targetPercentage + 99) / 100;
     }
 }
