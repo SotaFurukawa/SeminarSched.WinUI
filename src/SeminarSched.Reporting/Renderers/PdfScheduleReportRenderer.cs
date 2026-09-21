@@ -27,22 +27,27 @@ public sealed class PdfScheduleReportRenderer
     private static readonly Color HandoutHeaderBlankFill = ParseColor("#BFBFBF");
     private static readonly Color HandoutAcademicTestFill = ParseColor("#95B3D7");
     private static readonly Color HandoutOutOfRangeFill = ParseColor("#0E2841");
-    private static readonly Color OverviewTitleFill = ParseColor("#D9EAF7");
     private static readonly Color OverviewSubtitleFill = ParseColor("#EAF0F6");
     private static readonly Color OverviewHeaderFill = ParseColor("#1F4E78");
     private static readonly Color OverviewFootnoteFill = ParseColor("#F0F2F5");
+    private static readonly Color OverviewOneToOneFill = ParseColor("#FFF1CC");
+    private static readonly Color OverviewLockedFill = ParseColor("#DCEBFF");
+    private static readonly Color OverviewManualFill = ParseColor("#EADFFF");
+
+    /// <summary>Excel版OverviewCardFillと同じ優先順位（1対1＞ロック＞手動）。</summary>
+    private static Color? OverviewCardFill(OverviewCard card) =>
+        card.OneToOneRequired ? OverviewOneToOneFill : card.IsLocked ? OverviewLockedFill : card.IsManual ? OverviewManualFill : null;
 
     public void RenderOverall(ScheduleReport report, string path, OutputSettings? outputSettings = null)
     {
         var settings = outputSettings ?? OutputSettings.Default;
         EnsureFont(); var document = NewDocument("全体時間割", settings);
         var section = document.AddSection(); ApplyPageSetup(section, settings);
-        AddFullWidthBar(section, settings, "全体時間割", OverviewTitleFill, Colors.Black, 14, bold: true);
         AddFullWidthBar(section, settings, $"{report.ProjectTitle}／{report.GeneratedAtText}", OverviewSubtitleFill, Colors.Black, 9, bold: false);
 
         var teacherLabels = WeeklyCalendarLayout.BuildTeacherLabels(report.Rows.Select(x => x.Teacher).Concat(report.TeacherUnavailabilities.Select(u => u.Teacher)));
         var studentLabels = WeeklyCalendarLayout.BuildStudentLabels(report.Rows.Select(x => x.Student));
-        var overviewAssignments = report.Rows.Select(r => new OverviewAssignment(DateOnly.Parse(r.Date), teacherLabels[r.Teacher], r.TimeSlot, r.StudentGrade, r.SubjectShortName, studentLabels[r.Student])).ToArray();
+        var overviewAssignments = report.Rows.Select(r => new OverviewAssignment(DateOnly.Parse(r.Date), teacherLabels[r.Teacher], r.TimeSlot, r.StudentGrade, r.SubjectShortName, studentLabels[r.Student], r.OneToOneRequired, r.IsLocked, r.IsManual)).ToArray();
         var overviewUnavailabilities = report.TeacherUnavailabilities.Select(u => new OverviewUnavailability(DateOnly.Parse(u.Date), teacherLabels[u.Teacher], u.TimeSlot)).ToArray();
         var grid = OverviewGridLayout.Build(report.StartDate, report.EndDate, report.OpenDates.ToHashSet(), report.SlotLabels, overviewAssignments, overviewUnavailabilities);
         var slotDefinitionsByLabel = report.SlotDefinitions.ToDictionary(s => s.Label);
@@ -58,8 +63,8 @@ public sealed class PdfScheduleReportRenderer
     public void RenderTeacherPacket(ScheduleReport report, string teacherName, string path, OutputSettings? outputSettings = null)
     {
         var settings = outputSettings ?? OutputSettings.Default;
-        EnsureFont(); var document = NewDocument(teacherName, settings);
         var teacherLabels = WeeklyCalendarLayout.BuildTeacherLabels(report.Rows.Select(x => x.Teacher));
+        EnsureFont(); var document = NewDocument(teacherLabels[teacherName], settings);
         AddAbsenceSection(document, report, settings);
         var ordered = OrderStudentsForTeacher(report, teacherName);
         foreach (var s in ordered) AddStudentCalendarSection(document, report, s.Student, s.Grade, includeTeacher: true, teacherLabels, settings);
@@ -78,8 +83,9 @@ public sealed class PdfScheduleReportRenderer
         AddAbsenceSection(document, report, settings);
         foreach (var teacherName in teacherNames.OrderBy(x => x, StringComparer.Ordinal))
         {
+            var teacherLabel = teacherLabels[teacherName];
             var ordered = OrderStudentsForTeacher(report, teacherName);
-            foreach (var s in ordered) AddStudentCalendarSection(document, report, s.Student, s.Grade, includeTeacher: true, teacherLabels, settings, teacherLabelPrefix: $"{teacherName}t用");
+            foreach (var s in ordered) AddStudentCalendarSection(document, report, s.Student, s.Grade, includeTeacher: true, teacherLabels, settings, teacherLabelPrefix: $"{teacherLabel}t用");
             if (ordered.Count % 2 != 0) { var blank = document.AddSection(); ApplyPageSetup(blank, settings); }
         }
         Save(document, path);
@@ -332,6 +338,7 @@ public sealed class PdfScheduleReportRenderer
                             studentPara.AddLineBreak();
                             studentPara.AddText(string.Join("、", cell.Cards.Skip(1).Select(c => $"{c.Grade}{c.SubjectShortName}{c.Student}")));
                         }
+                        if (OverviewCardFill(card) is { } cardFill) { gradeCell.Shading.Color = cardFill; subjectCell.Shading.Color = cardFill; studentCell.Shading.Color = cardFill; }
                     }
                     else if (cell.Unavailable)
                     {
@@ -342,7 +349,7 @@ public sealed class PdfScheduleReportRenderer
                 }
             }
 
-            var legendPara = section.AddParagraph("凡例　灰色: 勤務不可コマ"); legendPara.Format.Font.Size = 8; legendPara.Format.SpaceBefore = Unit.FromCentimeter(0.1);
+            var legendPara = section.AddParagraph("凡例　灰色: 勤務不可コマ　[1対1] 1対1　[固定] ロック　[手] 手動変更"); legendPara.Format.Font.Size = 8; legendPara.Format.SpaceBefore = Unit.FromCentimeter(0.1);
             var footnotePara = section.AddParagraph("日曜始まり・土曜終わりの週単位です。出勤予定の講師のみ表示します。"); footnotePara.Format.Font.Size = 8;
         }
     }

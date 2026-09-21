@@ -1,6 +1,6 @@
 namespace SeminarSched.Reporting.Layout;
 
-public sealed record OverviewCard(string Grade, string SubjectShortName, string Student);
+public sealed record OverviewCard(string Grade, string SubjectShortName, string Student, bool OneToOneRequired = false, bool IsLocked = false, bool IsManual = false);
 
 public sealed record OverviewCell(string SlotLabel, IReadOnlyList<OverviewCard> Cards, bool Unavailable = false);
 
@@ -10,7 +10,7 @@ public sealed record OverviewDay(DateOnly Date, IReadOnlyList<OverviewTeacherCol
 
 public sealed record OverviewWeek(DateOnly SundayStart, IReadOnlyList<OverviewDay> Days);
 
-public sealed record OverviewAssignment(DateOnly Date, string Teacher, string SlotLabel, string Grade, string SubjectShortName, string Student);
+public sealed record OverviewAssignment(DateOnly Date, string Teacher, string SlotLabel, string Grade, string SubjectShortName, string Student, bool OneToOneRequired = false, bool IsLocked = false, bool IsManual = false);
 
 public sealed record OverviewUnavailability(DateOnly Date, string Teacher, string SlotLabel);
 
@@ -48,7 +48,7 @@ public static class OverviewGridLayout
                         var cells = slotLabels.Select(slot =>
                         {
                             var cards = dayAssignments.Where(a => a.Teacher == teacherName && a.SlotLabel == slot)
-                                .Select(a => new OverviewCard(a.Grade, a.SubjectShortName, a.Student)).ToArray();
+                                .Select(a => new OverviewCard(a.Grade, a.SubjectShortName, a.Student, a.OneToOneRequired, a.IsLocked, a.IsManual)).ToArray();
                             return new OverviewCell(slot, cards, cards.Length == 0 && unavailableCells.Contains((date, teacherName, slot)));
                         }).ToArray();
                         return new OverviewTeacherColumn(teacherName, cells);

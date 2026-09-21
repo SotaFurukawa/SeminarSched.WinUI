@@ -22,7 +22,7 @@ public sealed class ExcelScheduleReportRenderer
         // 側にしか登場せずKeyNotFoundExceptionになるため、両方の集合の講師名を渡す。
         var teacherLabels = WeeklyCalendarLayout.BuildTeacherLabels(report.Rows.Select(x => x.Teacher).Concat(report.TeacherUnavailabilities.Select(u => u.Teacher)));
         var studentLabels = WeeklyCalendarLayout.BuildStudentLabels(report.Rows.Select(x => x.Student));
-        var overviewAssignments = report.Rows.Select(r => new OverviewAssignment(DateOnly.Parse(r.Date), teacherLabels[r.Teacher], r.TimeSlot, r.StudentGrade, r.SubjectShortName, studentLabels[r.Student])).ToArray();
+        var overviewAssignments = report.Rows.Select(r => new OverviewAssignment(DateOnly.Parse(r.Date), teacherLabels[r.Teacher], r.TimeSlot, r.StudentGrade, r.SubjectShortName, studentLabels[r.Student], r.OneToOneRequired, r.IsLocked, r.IsManual)).ToArray();
         var overviewUnavailabilities = report.TeacherUnavailabilities.Select(u => new OverviewUnavailability(DateOnly.Parse(u.Date), teacherLabels[u.Teacher], u.TimeSlot)).ToArray();
         var grid = OverviewGridLayout.Build(report.StartDate, report.EndDate, report.OpenDates.ToHashSet(), report.SlotLabels, overviewAssignments, overviewUnavailabilities);
         var slotDefinitionsByLabel = report.SlotDefinitions.ToDictionary(s => s.Label);
@@ -87,12 +87,13 @@ public sealed class ExcelScheduleReportRenderer
         var blankIndex = 1;
         foreach (var teacherName in teacherNames.OrderBy(x => x, StringComparer.Ordinal))
         {
+            var teacherLabel = teacherLabels[teacherName];
             var ordered = OrderStudentsForTeacher(report, teacherName);
             foreach (var s in ordered)
             {
-                var sheet = workbook.AddWorksheet(UniqueSheetName(usedNames, $"{s.Grade}_{s.Student}_{teacherName}"));
+                var sheet = workbook.AddWorksheet(UniqueSheetName(usedNames, $"{s.Grade}_{s.Student}_{teacherLabel}"));
                 WriteStudentHandoutPage(sheet, report, s.Student, s.Grade, includeTeacher: true, teacherLabels, settings);
-                var label = sheet.Cell(2, 1); label.Value = $"{teacherName}t用"; label.Style.Font.Bold = true; label.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+                var label = sheet.Cell(2, 1); label.Value = $"{teacherLabel}t用"; label.Style.Font.Bold = true; label.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
             }
             if (ordered.Count % 2 != 0) workbook.AddWorksheet(UniqueSheetName(usedNames, $"空白_{blankIndex++}"));
         }
@@ -430,13 +431,20 @@ public sealed class ExcelScheduleReportRenderer
         sheet.Cell(3, 1).Value = "更新日時"; sheet.Cell(3, 2).Value = report.GeneratedAtText;
     }
 
-    private static readonly XLColor OverviewTitleFill = XLColor.FromHtml("#D9EAF7");
     private static readonly XLColor OverviewSubtitleFill = XLColor.FromHtml("#EAF0F6");
     private static readonly XLColor OverviewHeaderFill = XLColor.FromHtml("#1F4E78");
     private static readonly XLColor OverviewUnavailableFill = XLColor.FromHtml("#D9D9D9");
     private static readonly XLColor OverviewFootnoteFill = XLColor.FromHtml("#F0F2F5");
-    private const string OverviewLegendText = "凡例　灰色: 勤務不可コマ　[1対1] 1対1　[集団] 集団授業　[固定] ロック　[警告] 警告　[手] 手動変更";
+    private static readonly XLColor OverviewOneToOneFill = XLColor.FromHtml("#FFF1CC");
+    private static readonly XLColor OverviewLockedFill = XLColor.FromHtml("#DCEBFF");
+    private static readonly XLColor OverviewManualFill = XLColor.FromHtml("#EADFFF");
+    private const string OverviewLegendText = "凡例　灰色: 勤務不可コマ　[1対1] 1対1　[固定] ロック　[手] 手動変更";
     private const string OverviewFootnoteText = "日曜始まり・土曜終わりの週単位です。出勤予定の講師のみ表示します。";
+
+    /// <summary>Python版のstyle_rules優先順位（warning > closed > group > one_to_one > locked > manual）
+    /// のうち、本移植版が実際に持つ属性（1対1／ロック／手動）だけを同じ優先順で適用する。</summary>
+    private static XLColor? OverviewCardFill(OverviewCard card) =>
+        card.OneToOneRequired ? OverviewOneToOneFill : card.IsLocked ? OverviewLockedFill : card.IsManual ? OverviewManualFill : null;
 
     /// <summary>
     /// Python版timetable_builder.pyは日付panelごとに専用の「コマ」ラベル列を持つ構成だったが、
@@ -447,11 +455,10 @@ public sealed class ExcelScheduleReportRenderer
     /// </summary>
     private static void WriteOverviewWeekSheet(IXLWorksheet sheet, OverviewWeek week, IReadOnlyList<string> slotLabels, IReadOnlyDictionary<string, SlotDefinition> slotDefinitionsByLabel)
     {
-        const int dateHeaderRow = 3, comaHeaderRow = 4, slotStartRow = 5;
-        sheet.Cell(1, 1).Value = "全体時間割"; sheet.Cell(1, 1).Style.Fill.BackgroundColor = OverviewTitleFill;
+        const int dateHeaderRow = 2, comaHeaderRow = 3, slotStartRow = 4;
         var sundayEnd = week.SundayStart.AddDays(6);
-        sheet.Cell(2, 1).Value = $"{week.SundayStart:yyyy/M/d}（{WeeklyCalendarLayout.WeekdayHeaders[0]}） ～ {sundayEnd:yyyy/M/d}（{WeeklyCalendarLayout.WeekdayHeaders[6]}）";
-        sheet.Cell(2, 1).Style.Fill.BackgroundColor = OverviewSubtitleFill;
+        sheet.Cell(1, 1).Value = $"{week.SundayStart:yyyy/M/d}（{WeeklyCalendarLayout.WeekdayHeaders[0]}） ～ {sundayEnd:yyyy/M/d}（{WeeklyCalendarLayout.WeekdayHeaders[6]}）";
+        sheet.Cell(1, 1).Style.Fill.BackgroundColor = OverviewSubtitleFill;
 
         // A列＝週で共有する「コマ」ラベル列。中央ぞろえ（水平・垂直とも）で1回だけ書く。
         var comaCell = sheet.Cell(comaHeaderRow, 1); comaCell.Value = "コマ"; comaCell.Style.Font.Bold = true; comaCell.Style.Fill.BackgroundColor = OverviewSubtitleFill;
@@ -508,6 +515,7 @@ public sealed class ExcelScheduleReportRenderer
                                     sheet.Cell(rowBase + 1, cardCol).Value = card.SubjectShortName;
                                     var nameCell = sheet.Cell(rowBase + 2, cardCol); nameCell.Value = card.Student;
                                     nameCell.Style.Alignment.TextRotation = 255; nameCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                                    if (OverviewCardFill(card) is { } cardFill) sheet.Range(rowBase, cardCol, rowBase + 2, cardCol).Style.Fill.BackgroundColor = cardFill;
                                 }
                                 else if (cell.Cards.Count == 0 && cell.Unavailable)
                                 {
@@ -538,7 +546,7 @@ public sealed class ExcelScheduleReportRenderer
 
         var legendCell = sheet.Cell(legendRow, 1); legendCell.Value = OverviewLegendText; legendCell.Style.Fill.BackgroundColor = OverviewFootnoteFill;
         var footnoteCell = sheet.Cell(legendRow + 1, 1); footnoteCell.Value = OverviewFootnoteText; footnoteCell.Style.Fill.BackgroundColor = OverviewFootnoteFill;
-        sheet.Range(1, 1, 1, lastCol).Merge(); sheet.Range(2, 1, 2, lastCol).Merge();
+        sheet.Range(1, 1, 1, lastCol).Merge();
         sheet.Range(legendRow, 1, legendRow, lastCol).Merge(); sheet.Range(legendRow + 1, 1, legendRow + 1, lastCol).Merge();
         // ユーザー指示: A列（コマ・時刻ラベル）=45px、B列以降（出勤講師の列）は一律30px。
         sheet.Column(1).Width = PixelsToColumnWidth(45);

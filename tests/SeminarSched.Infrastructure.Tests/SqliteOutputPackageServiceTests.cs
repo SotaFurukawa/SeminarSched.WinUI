@@ -86,7 +86,7 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         Assert.Equal("severity",issues.Worksheet("警告一覧").Cell(1,1).GetString());
 
         Assert.True(Directory.Exists(result.TeacherPacketDirectory));
-        var teacherPacket=Path.Combine(result.TeacherPacketDirectory,"架空 講師t.xlsx");
+        var teacherPacket=Path.Combine(result.TeacherPacketDirectory,"架空t.xlsx");
         Assert.True(File.Exists(teacherPacket));
         using var packet=new XLWorkbook(teacherPacket);
         Assert.Contains(packet.Worksheets,ws=>ws.Name.EndsWith("_講師別",StringComparison.Ordinal));
@@ -172,18 +172,19 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         var warningSheet=issues.Worksheet("警告一覧");
         var warningRow=warningSheet.RowsUsed().Skip(1).First();
         Assert.Equal("通常担当不足",warningRow.Cell(2).GetString());
-        Assert.Contains("架空 通常担当",warningRow.Cell(6).GetString());
+        // ユーザー指示: 講師名は全て苗字のみで表示する。
+        Assert.Equal("架空",warningRow.Cell(6).GetString());
         Assert.Contains("目標2回中0回",warningRow.Cell(7).GetString());
         // 科目名は略称(ShortName)のみで表示する（「数学」ではなく「数」）。全xlsxで統一する仕様。
         Assert.StartsWith("数：通常担当",warningRow.Cell(7).GetString());
 
         Assert.True(Directory.Exists(result.TeacherPacketDirectory));
-        var substituteFile=Path.Combine(result.TeacherPacketDirectory,"架空 代講t.xlsx");
+        var substituteFile=Path.Combine(result.TeacherPacketDirectory,"架空t.xlsx");
         Assert.True(File.Exists(substituteFile));
         using var substituteWorkbook=new XLWorkbook(substituteFile);
         Assert.Contains(substituteWorkbook.Worksheets,ws=>ws.Name.EndsWith("_講師別",StringComparison.Ordinal));
 
-        var substitutePdf=Path.Combine(result.TeacherPacketDirectory,"架空 代講t.pdf");
+        var substitutePdf=Path.Combine(result.TeacherPacketDirectory,"架空t.pdf");
         Assert.True(File.Exists(substitutePdf));
         var pdfBytes=await File.ReadAllBytesAsync(substitutePdf);
         Assert.Equal("%PDF",System.Text.Encoding.ASCII.GetString(pdfBytes,0,4));
@@ -301,8 +302,10 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         var labelCell=Assert.Single(labelCells);
         Assert.Equal(1,labelCell.Address.ColumnNumber);
         Assert.Equal(XLAlignmentHorizontalValues.Center,labelCell.Style.Alignment.Horizontal);
-        Assert.Contains(week.CellsUsed(),cell=>cell.GetString()=="架空一");
-        Assert.Contains(week.CellsUsed(),cell=>cell.GetString()=="架空二");
+        // ユーザー指示: 講師名は同姓であっても常に苗字のみで表示する（Python版の同姓時の名前頭文字による
+        // 区別はしない）。ここでは同姓の2講師（架空一郎・架空二郎）の列見出し（3行目＝コマ見出し行）が
+        // 両方とも「架空」になる（生徒名セルにも同じ「架空」が出るため、行3に絞って確認する）。
+        Assert.Equal(2,week.Row(3).CellsUsed().Count(cell=>cell.GetString()=="架空"));
         Assert.Equal(Math.Round((45-5)/7.0,2),week.Column(1).Width);
         Assert.Equal(Math.Round((30-5)/7.0,2),week.Column(2).Width);
     }
