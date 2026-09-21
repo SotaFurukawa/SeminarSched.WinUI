@@ -34,8 +34,10 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         [OptimizationStrategyKind.NeighborhoodRepairC] = "部分修復探索C",
         [OptimizationStrategyKind.NeighborhoodRepairD] = "部分修復探索D",
         [OptimizationStrategyKind.NeighborhoodRepairE] = "部分修復探索E",
+        [OptimizationStrategyKind.GrindingNeighborhoodRepair] = "部分修復探索（連続）",
         [OptimizationStrategyKind.FinalPolishing] = "最終仕上げ探索",
         [OptimizationStrategyKind.FinalPolishingB] = "最終仕上げ探索B",
+        [OptimizationStrategyKind.GrindingFinalPolishing] = "最終仕上げ探索（連続）",
     };
 
     public OptimizationPage()
@@ -122,7 +124,8 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         var (percent, elapsed, remaining) = OptimizationRunState.Estimate();
         RunProgressBar.Value = percent;
         RunPercentText.Text = $"{percent:F0}%";
-        RunEtaText.Text = OptimizationRunState.LatestProgress is null ? "" : $"経過 {FormatDuration(elapsed)} / 残り目安 {FormatDuration(remaining)}";
+        var remainingText = remaining is { } remainingValue ? FormatDuration(remainingValue) : "計算中…";
+        RunEtaText.Text = OptimizationRunState.LatestProgress is null ? "" : $"経過 {FormatDuration(elapsed)} / 残り目安 {remainingText}";
 
         if (OptimizationRunState.LatestProgress is { } progress)
         {

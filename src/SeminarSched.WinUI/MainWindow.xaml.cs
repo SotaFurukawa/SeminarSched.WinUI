@@ -54,7 +54,8 @@ public sealed partial class MainWindow : Window
         if (!running) return;
         var (percent, _, remaining) = OptimizationRunState.Estimate();
         OptimizationStatusBar.Value = percent;
-        OptimizationStatusText.Text = $"{percent:F0}%　残り目安 {FormatDuration(remaining)}";
+        var remainingText = remaining is { } remainingValue ? FormatDuration(remainingValue) : "計算中…";
+        OptimizationStatusText.Text = $"{percent:F0}%　残り目安 {remainingText}";
     }
 
     private static string FormatDuration(TimeSpan span) => span.TotalMinutes >= 1 ? $"{(int)span.TotalMinutes}分{span.Seconds}秒" : $"{span.TotalSeconds:F0}秒";
