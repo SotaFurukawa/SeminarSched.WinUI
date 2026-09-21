@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.6.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 87（⑤時間割自動作成: 生徒ごとの授業間隔の均等化・同一科目の連続抑制）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
+Latest Development Checkpoint: checkpoint 88（⑤時間割自動作成: CP-SAT探索のCPU使用率上限・自動作成ゲージの滑らかな表示。v0.6.0公開後のユーザーfollow-up）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
 Latest Draft Release: `v0.6.0`（GitHub上にDraftとして作成済み。checkpoint86・87の内容をまとめてユーザーより「新しくドラフトリリースしてください」との指示を受け作成。Next Version Ruleに従いnew feature相当でv0.6.0とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.6.0.md](releases/v0.6.0.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -1231,6 +1231,24 @@ v0.5.0公開後、実際にアプリを使ったユーザーから複数件の�
 **新規/更新テスト（合計）:** `dotnet test`全180 tests passed（既存176件は無修正で通過、Optimizationのみ31→35）。
 
 **動作確認:** Debug構成でビルド警告0・エラー0。実際の受講希望データでの体感（授業間隔・科目の並びの見た目、時間割作成の所要時間への影響）はこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。新しいソフト目的関数の追加によりCP-SATモデルの変数・制約数が増える（生徒数×window数、受講希望数×window数のオーダー）ため、実データ規模での所要時間の変化にも注意して確認してほしい。
+
+v0.6.0としてDraft Release作成済み（checkpoint86・87をまとめた区切り。ユーザーより「新しくドラフトリリースしてください」との指示を受け作成。詳細は[docs/releases/v0.6.0.md](releases/v0.6.0.md)）。
+
+### v0.6.0 checkpoint 88 (Claude) — CP-SAT探索のCPU使用率上限、自動作成ゲージの滑らかな表示
+
+v0.6.0公開直後、ユーザーからcheckpoint86・87の内容を実際に使ってみた上での2件の報告。「計算量が増えてしっかり計算できているのはよくわかる。その調子でお願いしたいが、CPUにかなり負荷がかかってしまう。この制限をつけることはできますか」「自動作成のゲージについて、戦略が一個終わったら一気にぎゅんと移動してしまう。滑らかに変化するようにしてもらえますか」。
+
+**①CP-SAT探索のCPU使用率上限:** `CpSatScheduleSolver`は元々`num_search_workers:0`（OR-Tools自身に並列度を任せる）を既定にしていた（checkpoint未詳、1並列だと実データで40秒経ってもfeasible解すら出ないことを実測した上での意図的な選択）。checkpoint87のgrinding戦略（名目の持ち時間いっぱいまで独立した試行を繰り返す）により、この「0（任意）」が実質「論理コア全部を長時間専有し続ける」ことを意味するようになり、ユーザー報告のCPU負荷につながった。
+- `CpSatScheduleSolver.ResolvedAutoSearchWorkers`（`Math.Max(2, Environment.ProcessorCount / 2)`）を新設し、`CpSatSolveOptions.NumSearchWorkers`が0（既定）の場合はこの値を実際にCP-SATへ渡すようにした（呼び出し元が明示的に正の値を指定した場合はそのまま使う、後方互換）。論理コアの半分・下限2を確保することで、1並列より大幅に速いという既存の実測結果は活かしつつ、機械全体を専有しないようにした。
+- 新規テスト: `ResolvedAutoSearchWorkers_IsCappedButAtLeastTwo`（2以上・論理コア数以下であることを検証）。
+
+**②自動作成ゲージの滑らかな表示:** checkpoint86で追加した「1ストラテジーの持ち時間に対する経過時間の割合で補間する」仕組み自体は正しいが、CP-SATが名目の持ち時間よりずっと早く証明済み最適解に到達するケース（このアプリの実データ規模ではよくある、まさにgrinding戦略を追加した動機そのもの）では、戦略の完了時点でまだ補間値がその戦略の持ち時間の一部（例: 60秒中10秒）しか進んでいないうちに、完了報告で一気にその戦略の満額（100%分）へ切り替わる。これが「ぎゅんと移動する」という体感の原因だった。
+- `OptimizationRunState`に、真の目標値（`Estimate()`の計算ロジックを`EstimateRaw()`へ改名・非公開化）とは別に、実際に画面へ渡す`_displayedPercent`を新設した。表示用タイマー（従来1秒間隔→200ms間隔へ短縮）のtickごとに、目標値との差分の20%だけ追いつかせる指数緩和を行い、差が0.15pt未満になったら目標値へスナップする。目標値自体は単調増加のみなので、後退（表示が巻き戻る）は発生しない。実行が完了した瞬間（`IsRunning=false`）は緩和せず即座に100%へ切り替える（完了表示に遅延を持たせる必要は無いため）。
+- タイマー間隔の短縮（1秒→200ms）によるCPU影響は、軽量な数値計算とUI再描画要求だけなので無視できる（重いのはCP-SATの探索スレッド側であり、①で既に上限を設けた）。
+
+**新規/更新テスト（合計）:** `dotnet test`全181 tests passed（既存180件は無修正で通過、Optimizationのみ35→36）。UIの見た目（ゲージの滑らかさ）自体は自動テストの対象外。
+
+**動作確認:** Debug構成でビルド警告0・エラー0。CPU使用率の実際の下がり方、ゲージが滑らかに見えるかどうかは、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
 
 ### 次回最初に確認するファイル
 
