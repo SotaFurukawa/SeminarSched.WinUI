@@ -4,6 +4,17 @@ namespace SeminarSched.Optimization.Tests;
 
 public sealed class CpSatScheduleSolverTests
 {
+    // ユーザー報告: 「グリギング」戦略が名目時間いっぱい走り続けるようになったこと（checkpoint87）で、
+    // num_search_workers:0（"任意"）がOR-Tools側で論理コア全てを使い切ってしまい、長時間CPU負荷が
+    // 高止まりする問題が顕在化した。少なくとも2並列は維持しつつ（1並列だと実データで40秒経っても
+    // feasible解すら出ないことをコメントの通り実測済み）、機械全体を専有しないよう上限を設ける。
+    [Fact]
+    public void ResolvedAutoSearchWorkers_IsCappedButAtLeastTwo()
+    {
+        Assert.True(CpSatScheduleSolver.ResolvedAutoSearchWorkers >= 2);
+        Assert.True(CpSatScheduleSolver.ResolvedAutoSearchWorkers <= Environment.ProcessorCount);
+    }
+
     [Fact]
     public async Task SolveAsync_AssignsAllLessonsWithoutStudentOrTeacherCollision()
     {

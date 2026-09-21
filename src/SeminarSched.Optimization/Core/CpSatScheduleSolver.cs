@@ -18,6 +18,12 @@ namespace SeminarSched.Optimization.Core;
 /// (true single-threaded search) never even reached a feasible solution in 40 seconds, while 0 solved
 /// it in 32.4s - CP-SAT's own automatic parallelism matters enormously at this problem size, so no
 /// caller should have to remember to override this just to get the previously-working behavior back.
+/// A caller-supplied 0 is not passed to CP-SAT literally, though: <see cref="CpSatScheduleSolver"/>
+/// resolves it to <see cref="ResolvedAutoSearchWorkers"/> (a capped worker count), since letting
+/// OR-Tools pick unbounded parallelism pins every logical core for the run's entire duration - tolerable
+/// for a solve that finishes in seconds, but a real problem for the "grinding" strategies that now
+/// deliberately keep re-solving for the whole nominal budget (reported by a user as unacceptably heavy
+/// CPU load on their machine during Highest-quality runs).
 /// </remarks>
 public sealed record CpSatSolveOptions(
     TimeSpan MaximumDuration,
@@ -29,6 +35,13 @@ public sealed record CpSatSolveOptions(
 
 public sealed class CpSatScheduleSolver
 {
+    /// <summary>Worker count used in place of a caller's <c>NumSearchWorkers: 0</c> ("auto"). Half the
+    /// logical processors (floor 2, matching the smallest count actually measured as safe - see
+    /// <see cref="CpSatSolveOptions"/>) keeps CP-SAT's parallel search meaningfully faster than a single
+    /// thread while leaving roughly half the machine free for everything else during a long grinding
+    /// run.</summary>
+    public static int ResolvedAutoSearchWorkers { get; } = Math.Max(2, Environment.ProcessorCount / 2);
+
     public Task<ScheduleSolution> SolveAsync(
         ScheduleProblem problem,
         TimeSpan maximumDuration,
@@ -94,7 +107,8 @@ public sealed class CpSatScheduleSolver
             .Concat(regularTeacherShortfallTerms);
         model.Maximize(LinearExpr.Sum(objectiveTerms));
 
-        var parameters = $"max_time_in_seconds:{options.MaximumDuration.TotalSeconds.ToString(CultureInfo.InvariantCulture)} random_seed:{options.RandomSeed} num_search_workers:{options.NumSearchWorkers}";
+        var searchWorkers = options.NumSearchWorkers > 0 ? options.NumSearchWorkers : ResolvedAutoSearchWorkers;
+        var parameters = $"max_time_in_seconds:{options.MaximumDuration.TotalSeconds.ToString(CultureInfo.InvariantCulture)} random_seed:{options.RandomSeed} num_search_workers:{searchWorkers}";
         if (options.SearchBranching is not null) parameters += $" search_branching:{options.SearchBranching}";
         var solver = new CpSolver { StringParameters = parameters };
         using var registration = cancellationToken.Register(solver.StopSearch);
