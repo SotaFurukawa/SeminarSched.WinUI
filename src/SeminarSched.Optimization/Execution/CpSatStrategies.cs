@@ -167,6 +167,99 @@ public sealed class NeighborhoodRepairEStrategy() : NeighborhoodRepairStrategyBa
     public override OptimizationStrategyKind Kind => OptimizationStrategyKind.NeighborhoodRepairE;
 }
 
+/// <summary>
+/// Unlike the fixed-seed one-shot strategies above, which each make exactly one attempt and return as
+/// soon as CP-SAT proves that one (sub-)problem optimal, a "grinding" strategy keeps making fresh
+/// independent attempts - each its own full CP-SAT solve - back to back until its entire allotted
+/// <see cref="StrategyContext{TInput,TSolution}.TimeBudget"/> is actually used up, always keeping the
+/// best candidate found across every attempt as the hint for the next one. A single one-shot attempt
+/// (or even five of them) typically finishes in seconds once CP-SAT proves optimality, so a fixed-size
+/// list of strategies still returns well under a quality level's nominal duration; this is the
+/// mechanism that actually spends "give it 30 more minutes" on more genuine search instead of ending
+/// early with time unused. <see cref="FreezeToRandomNeighborhood"/> picks which of the two grinding
+/// variants a subclass is: true = Large Neighborhood Search (freeze ~75% of requests to the hint,
+/// only the solver only re-optimizes a fresh random ~25% each attempt); false = a full, unconstrained
+/// re-solve of the whole problem each attempt (for a last-stage "final polish" that isn't restricted
+/// to any neighborhood).
+/// </summary>
+public abstract class GrindingStrategyBase(bool freezeToRandomNeighborhood) : IScheduleStrategy<ScheduleProblem, ScheduleSolution>
+{
+    public abstract OptimizationStrategyKind Kind { get; }
+
+    // 1回の試行に持ち時間を全部使わせず、必ず複数回試せるように短く切る（最短10秒、最大60秒）。
+    private static readonly TimeSpan MinimumAttemptBudget = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan MaximumAttemptBudget = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan MinimumUsefulRemainder = TimeSpan.FromSeconds(3);
+
+    public async Task<ScheduleCandidate<ScheduleSolution>?> ExecuteAsync(
+        StrategyContext<ScheduleProblem, ScheduleSolution> context,
+        CancellationToken cancellationToken)
+    {
+        var overallWatch = Stopwatch.StartNew();
+        var perAttemptBudget = TimeSpan.FromSeconds(Math.Clamp(context.TimeBudget.TotalSeconds / 6, MinimumAttemptBudget.TotalSeconds, MaximumAttemptBudget.TotalSeconds));
+        ScheduleCandidate<ScheduleSolution>? best = context.Hint;
+        var attempt = 0;
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var remaining = context.TimeBudget - overallWatch.Elapsed;
+            // 最初の1回は、持ち時間がどれほど短くても必ず試す（さもないと、ステージのbudgetShare配分
+            // 次第でこの戦略に3秒未満しか渡らなかった場合に一度も試さずcontext.Hintをそのまま
+            // 返すだけになってしまう）。2回目以降は、中途半端な残り時間で新規solveを始めて
+            // オーバーヘッドだけ食う（モデル構築・ソルバー初期化）のを避けるため、ある程度の
+            // 残り時間が無ければ打ち切る。
+            if (attempt > 0 && remaining < MinimumUsefulRemainder) break;
+            if (remaining <= TimeSpan.Zero) break;
+            var attemptBudget = remaining < perAttemptBudget ? remaining : perAttemptBudget;
+            // 単純増加のseedだけだと近傍選択(Randomの内部状態)が予測しやすくなりすぎるため、
+            // 試行回数と経過ミリ秒を混ぜてばらけさせる（暗号強度は不要、探索の多様性だけが目的）。
+            var seed = unchecked(97 + attempt * 733 + (int)(overallWatch.ElapsedMilliseconds % 9973));
+            try
+            {
+                var watch = Stopwatch.StartNew();
+                var options = BuildOptions(context.Input, attemptBudget, seed, best);
+                var solution = await new CpSatScheduleSolver().SolveAsync(context.Input, options, cancellationToken).ConfigureAwait(false);
+                var evaluation = ScheduleEvaluationCalculator.Evaluate(context.Input, solution);
+                var candidate = new ScheduleCandidate<ScheduleSolution>(solution, evaluation, Kind, watch.Elapsed);
+                if (best is null || candidate.Evaluation.IsBetterThan(best.Evaluation)) best = candidate;
+            }
+            catch (InvalidOperationException)
+            {
+                // このneighborhoodでは解なし（滅多に起きないはずだが、hintそのものが常にfeasibleなので
+                // 理論上は起きない - 念のためのガード）。次の試行で再挑戦する。
+            }
+            attempt++;
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        // context.Hintそのものを一度も改善できなかった場合はnullを返す（このステージからの新規貢献は
+        // 無かった、とScheduleOptimizerに正しく伝える。hintを「新しい候補」として返すと同じ解が
+        // 何重にも二重計上されてしまう）。
+        return ReferenceEquals(best, context.Hint) ? null : best;
+    }
+
+    private CpSatSolveOptions BuildOptions(ScheduleProblem input, TimeSpan budget, int seed, ScheduleCandidate<ScheduleSolution>? hint)
+    {
+        var workerCount = Math.Max(1, Environment.ProcessorCount);
+        if (hint is null) return new CpSatSolveOptions(budget, seed, workerCount);
+        if (!freezeToRandomNeighborhood) return new CpSatSolveOptions(budget, seed, workerCount, Hint: hint.Solution);
+        var demandIds = input.Demands.Select(demand => demand.RequestId).ToArray();
+        var freeCount = Math.Max(1, demandIds.Length / 4);
+        var random = new Random(seed);
+        var freeRequestIds = demandIds.OrderBy(_ => random.Next()).Take(freeCount).ToHashSet();
+        return new CpSatSolveOptions(budget, seed, workerCount, Hint: hint.Solution, FreeRequestIds: freeRequestIds);
+    }
+}
+
+public sealed class GrindingNeighborhoodRepairStrategy() : GrindingStrategyBase(freezeToRandomNeighborhood: true)
+{
+    public override OptimizationStrategyKind Kind => OptimizationStrategyKind.GrindingNeighborhoodRepair;
+}
+
+public sealed class GrindingFinalPolishingStrategy() : GrindingStrategyBase(freezeToRandomNeighborhood: false)
+{
+    public override OptimizationStrategyKind Kind => OptimizationStrategyKind.GrindingFinalPolishing;
+}
+
 /// <summary>Last-stage attempt: hint warm start, no freezing, one more full pass at the whole problem.</summary>
 public sealed class FinalPolishingStrategy : CpSatStrategyBase
 {

@@ -14,6 +14,8 @@ public enum OptimizationStrategyKind
     NeighborhoodRepairC,
     NeighborhoodRepairD,
     NeighborhoodRepairE,
+    GrindingNeighborhoodRepair,
     FinalPolishing,
     FinalPolishingB,
+    GrindingFinalPolishing,
 }

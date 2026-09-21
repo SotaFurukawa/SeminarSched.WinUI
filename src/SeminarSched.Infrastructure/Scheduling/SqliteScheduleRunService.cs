@@ -50,8 +50,8 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         new StandardCpSatStrategy(), new SeededCpSatAStrategy(), new SeededCpSatBStrategy(), new SeededCpSatCStrategy(),
         new AlternateDecisionStrategy(), new MultiStageStrategy(), new HintImprovementStrategy(),
         new NeighborhoodRepairStrategy(), new NeighborhoodRepairBStrategy(), new NeighborhoodRepairCStrategy(),
-        new NeighborhoodRepairDStrategy(), new NeighborhoodRepairEStrategy(),
-        new FinalPolishingStrategy(), new FinalPolishingBStrategy(),
+        new NeighborhoodRepairDStrategy(), new NeighborhoodRepairEStrategy(), new GrindingNeighborhoodRepairStrategy(),
+        new FinalPolishingStrategy(), new FinalPolishingBStrategy(), new GrindingFinalPolishingStrategy(),
     ];
 
     private static async Task<ScheduleProblem> BuildProblemAsync(SqliteConnection connection, CancellationToken cancellationToken)

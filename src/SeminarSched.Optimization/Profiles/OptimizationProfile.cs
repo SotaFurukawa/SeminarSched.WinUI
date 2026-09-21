@@ -67,9 +67,12 @@ public sealed record OptimizationProfile
     public bool UsesHints => Stages.SelectMany(stage => stage.Strategies)
         .Contains(OptimizationStrategyKind.HintImprovement);
 
-    public bool UsesNeighborhoodRepair => Stages.SelectMany(stage => stage.Strategies)
-        .Contains(OptimizationStrategyKind.NeighborhoodRepair);
+    public bool UsesNeighborhoodRepair => Stages.SelectMany(stage => stage.Strategies).Any(kind => kind is
+        OptimizationStrategyKind.NeighborhoodRepair or OptimizationStrategyKind.NeighborhoodRepairB or
+        OptimizationStrategyKind.NeighborhoodRepairC or OptimizationStrategyKind.NeighborhoodRepairD or
+        OptimizationStrategyKind.NeighborhoodRepairE or OptimizationStrategyKind.GrindingNeighborhoodRepair);
 
-    public bool UsesFinalPolishing => Stages.SelectMany(stage => stage.Strategies)
-        .Contains(OptimizationStrategyKind.FinalPolishing);
+    public bool UsesFinalPolishing => Stages.SelectMany(stage => stage.Strategies).Any(kind => kind is
+        OptimizationStrategyKind.FinalPolishing or OptimizationStrategyKind.FinalPolishingB or
+        OptimizationStrategyKind.GrindingFinalPolishing);
 }

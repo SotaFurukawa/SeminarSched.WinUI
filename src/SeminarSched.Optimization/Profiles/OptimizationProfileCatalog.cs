@@ -80,14 +80,14 @@ public static class OptimizationProfileCatalog
             Stage(OptimizationStageKind.CandidateAdvancement, 0.35, 2,
                 OptimizationStrategyKind.MultiStage,
                 OptimizationStrategyKind.HintImprovement),
-            // 部分修復を1回だけでなく異なる乱数の近傍で複数回試す（NeighborhoodRepairStrategyBase参照）。
-            // CP-SATは証明済み最適解に達すると持ち時間を使い切らず早期に終わることが多いため、
-            // 高品質帯で長い名目時間を実際に活かすには「同じ探索を長く待つ」のではなく
-            // 「別の近傍を複数回試す」ほうが改善の見込みが立つ。
+            // CP-SATは証明済み最適解に達すると持ち時間を使い切らず早期に終わるため、固定数の
+            // 部分修復を並べるだけでは（当初3〜5個並べてみたが、実際に数分で全部終わってしまうこと
+            // をユーザーに指摘された）長い名目時間を活かせない。GrindingNeighborhoodRepairStrategyへ
+            // ステージの持ち時間まるごとを渡し、内部でこのステージの持ち時間を使い切るまで異なる
+            // 乱数近傍を試し続けさせる（1戦略だけをここに置くことで、strategyBudget=stageBudgetの
+            // 全体がこの1戦略に渡る）。
             Stage(OptimizationStageKind.NeighborhoodRepair, 0.25, 1,
-                OptimizationStrategyKind.NeighborhoodRepair,
-                OptimizationStrategyKind.NeighborhoodRepairB,
-                OptimizationStrategyKind.NeighborhoodRepairC));
+                OptimizationStrategyKind.GrindingNeighborhoodRepair));
 
         yield return Profile(
             OptimizationQualityLevel.Highest,
@@ -106,14 +106,9 @@ public static class OptimizationProfileCatalog
                 OptimizationStrategyKind.MultiStage,
                 OptimizationStrategyKind.HintImprovement),
             Stage(OptimizationStageKind.NeighborhoodRepair, 0.25, 1,
-                OptimizationStrategyKind.NeighborhoodRepair,
-                OptimizationStrategyKind.NeighborhoodRepairB,
-                OptimizationStrategyKind.NeighborhoodRepairC,
-                OptimizationStrategyKind.NeighborhoodRepairD,
-                OptimizationStrategyKind.NeighborhoodRepairE),
+                OptimizationStrategyKind.GrindingNeighborhoodRepair),
             Stage(OptimizationStageKind.FinalPolishing, 0.15, 1,
-                OptimizationStrategyKind.FinalPolishing,
-                OptimizationStrategyKind.FinalPolishingB));
+                OptimizationStrategyKind.GrindingFinalPolishing));
     }
 
     private static OptimizationProfile Profile(
