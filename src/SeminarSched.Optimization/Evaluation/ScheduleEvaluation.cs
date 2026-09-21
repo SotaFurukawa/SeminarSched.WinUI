@@ -7,6 +7,7 @@ public sealed record ScheduleEvaluation(
     long MajorPenalty,
     int TeacherGapSlots,
     long DistributionPenalty,
+    long SpacingPenalty,
     long OtherSoftPenalty,
     long ObjectiveValue) : IComparable<ScheduleEvaluation>
 {
@@ -23,6 +24,7 @@ public sealed record ScheduleEvaluation(
             ?? Compare(MajorPenalty, other.MajorPenalty)
             ?? Compare(TeacherGapSlots, other.TeacherGapSlots)
             ?? Compare(DistributionPenalty, other.DistributionPenalty)
+            ?? Compare(SpacingPenalty, other.SpacingPenalty)
             ?? Compare(OtherSoftPenalty, other.OtherSoftPenalty)
             ?? ObjectiveValue.CompareTo(other.ObjectiveValue);
     }

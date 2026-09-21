@@ -219,6 +219,53 @@ public sealed class CpSatScheduleSolverTests
         ScheduleSolutionValidator.Validate(problem,solution);
     }
 
+    // ユーザー要望「授業と授業の間隔が（休みの日を除いて）常に同じ程度であると良い。授業日が25回
+    // あったら大体3日空けくらいに」を検証する。9日間・1受講希望3回で、他の条件が全く同じ場合
+    // （どの日を選んでも点数が変わらないPreferencePenalty/AvailabilityPreference）、9÷3=3日おき
+    // に近い散らばりを持つ配置を、1〜3日目に固まった配置より優先するはず。
+    [Fact]
+    public async Task SolveAsync_PrefersEvenlySpacedLessonDaysOverClusteringWhenOtherwiseTied()
+    {
+        var demand = new LessonDemand(1, 10, 3, 0);
+        var candidates = Enumerable.Range(1, 9)
+            .Select(day => new PlacementCandidate(1, 10, 100, day, 1, day, 1))
+            .ToArray();
+        var problem = new ScheduleProblem([demand], candidates);
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(problem, TimeSpan.FromSeconds(5));
+
+        Assert.Equal(3, solution.Placements.Count);
+        var days = solution.Placements.Select(item => item.OpenDateId).OrderBy(item => item).ToArray();
+        var span = days[^1] - days[0];
+        Assert.True(span >= 6, $"expected lessons spread across most of the 9-day range (ideal gap 3 days), got days {string.Join(",", days)}");
+    }
+
+    // ユーザー要望「数数数数英英英英ではなく数英数英…に近い方が良い」を検証する。同じ生徒の2科目
+    // （各4回、16日間、科目ごとに別講師・別コマなので同日に両方入れることも可能）で、他の条件が
+    // 同じ場合、日付順に並べたときに同じ科目が隣り合う回数が、完全な「前半後半で固まる」配置
+    // （6回連続）よりずっと少ないはず。
+    [Fact]
+    public async Task SolveAsync_InterleavesTwoSubjectsInsteadOfClusteringSameSubjectSessions()
+    {
+        var demands = new[] { new LessonDemand(1, 10, 4, 0), new LessonDemand(2, 10, 4, 0) };
+        var candidates = Enumerable.Range(1, 16)
+            .SelectMany(day => new[]
+            {
+                new PlacementCandidate(1, 10, 100, day, 1, day, 1),
+                new PlacementCandidate(2, 10, 200, day, 2, day, 2),
+            })
+            .ToArray();
+        var problem = new ScheduleProblem(demands, candidates);
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(problem, TimeSpan.FromSeconds(8));
+
+        Assert.Equal(8, solution.Placements.Count);
+        var orderedRequestIds = solution.Placements.OrderBy(item => item.OpenDateId).Select(item => item.RequestId).ToArray();
+        var adjacentSameSubjectCount = Enumerable.Range(1, orderedRequestIds.Length - 1)
+            .Count(i => orderedRequestIds[i] == orderedRequestIds[i - 1]);
+        Assert.True(adjacentSameSubjectCount <= 2, $"expected mostly-alternating subjects, got sequence {string.Join(",", orderedRequestIds)}");
+    }
+
     [Fact]
     public async Task SolveAsync_RegularTeacherMinimumBecomesSoftWhenTwoDemandsCollide()
     {

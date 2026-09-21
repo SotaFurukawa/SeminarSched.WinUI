@@ -4,12 +4,12 @@ namespace SeminarSched.Optimization.Tests;
 
 public sealed class ScheduleEvaluationTests
 {
-    private static readonly ScheduleEvaluation Baseline = new(0, 0, 2, 10, 4, 20, 30, 100);
+    private static readonly ScheduleEvaluation Baseline = new(0, 0, 2, 10, 4, 20, 25, 30, 100);
 
     [Fact]
     public void HardViolation_DominatesEverySoftImprovement()
     {
-        var invalidButOtherwisePerfect = new ScheduleEvaluation(1, 0, 0, 0, 0, 0, 0, 0);
+        var invalidButOtherwisePerfect = new ScheduleEvaluation(1, 0, 0, 0, 0, 0, 0, 0, 0);
 
         Assert.True(Baseline.IsBetterThan(invalidButOtherwisePerfect));
     }
@@ -24,6 +24,7 @@ public sealed class ScheduleEvaluationTests
             MajorPenalty = 0,
             TeacherGapSlots = 0,
             DistributionPenalty = 0,
+            SpacingPenalty = 0,
             OtherSoftPenalty = 0,
             ObjectiveValue = 0,
         };

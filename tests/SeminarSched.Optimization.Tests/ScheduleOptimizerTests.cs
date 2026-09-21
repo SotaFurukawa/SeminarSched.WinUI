@@ -170,7 +170,7 @@ public sealed class ScheduleOptimizerTests
         new(kind, candidate);
 
     private static ScheduleCandidate<string> Candidate(string solution, int hard, int unassigned, long objective) =>
-        new(solution, new ScheduleEvaluation(hard, unassigned, 0, 0, 0, 0, 0, objective),
+        new(solution, new ScheduleEvaluation(hard, unassigned, 0, 0, 0, 0, 0, 0, objective),
             OptimizationStrategyKind.StandardCpSat, TimeSpan.Zero);
 
     private sealed class FakeStrategy(

@@ -84,9 +84,13 @@ public sealed class CpSatScheduleSolver
         // (v1.9.5 objectives.py), so it is weighted above the *100 preference term but stays
         // far below the 1,000,000-per-placement floor. The regular-teacher shortfall penalty
         // (see AddRegularTeacherMinimums) ranks between day-spread and the placement floor.
+        // EvenSpacing/SubjectSpacing (see BuildEvenSpacingTerms/BuildSubjectSpacingTerms) refine
+        // day-spread further - even interval, not just distinct-day count - and rank just below it.
         var objectiveTerms = variables.Select(item =>
             LinearExpr.Term(item.variable, 1_000_000L - (item.candidate.PreferencePenalty * 100L) + item.candidate.AvailabilityPreference))
             .Concat(BuildDayDispersionTerms(model, variables))
+            .Concat(BuildEvenSpacingTerms(model, problem, variables))
+            .Concat(BuildSubjectSpacingTerms(model, problem, variables))
             .Concat(regularTeacherShortfallTerms);
         model.Maximize(LinearExpr.Sum(objectiveTerms));
 
@@ -160,6 +164,157 @@ public sealed class CpSatScheduleSolver
             var dayUsed = model.NewBoolVar($"day_used_{index++}");
             model.AddMaxEquality(dayUsed, dayVariables);
             yield return LinearExpr.Term(dayUsed, DayDispersionWeight);
+        }
+    }
+
+    private const long EvenSpacingWeight = 4_000L;
+    private const long SubjectSpacingWeight = 2_000L;
+
+    /// <summary>
+    /// ユーザー要望「授業と授業の間隔が（休みの日を除いて）常に同じ程度であると良い。授業日が25回
+    /// あったら大体3日空けくらいに」への対応。開講日数を生徒の合計授業回数で割った「理想的な間隔
+    /// （日数）」をwindow幅とし、そのwindow幅でスライドさせた各区間内の「利用日数」が1からどれだけ
+    /// 乖離しているか（2以上＝密集、0＝間隔が開きすぎ）を目的関数で減点する。真の分散最小化ではなく、
+    /// AddStudentConsecutiveAndGapConstraintsと同じ「window幅でスライドさせた合計」という手法を
+    /// ハード制約ではなくソフトな目的関数へ応用した近似（CP-SATは選ばれる日付の集合を事前に知らない
+    /// ため、正確な「隣接する利用日同士の間隔」を線形モデルで直接表現できない）。
+    /// </summary>
+    private static IEnumerable<LinearExpr> BuildEvenSpacingTerms(
+        CpModel model,
+        ScheduleProblem problem,
+        IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables)
+    {
+        var dayOrder = BuildOpenDayOrder(problem);
+        if (dayOrder.Count < 2) yield break;
+
+        var totalSessionsByStudent = problem.Demands
+            .GroupBy(demand => demand.StudentId)
+            .ToDictionary(group => group.Key, group => group.Sum(demand => demand.RequiredSessions));
+        var dayUsedByStudentDay = BuildDayUsedVariables(model, variables, item => item.candidate.StudentId, "even_spacing_day");
+        var fixedDaysByStudent = problem.ExistingPlacements
+            .GroupBy(item => item.StudentId)
+            .ToDictionary(group => group.Key, group => group.Select(item => item.OpenDateId).ToHashSet());
+
+        foreach (var term in BuildSpacingTerms(model, dayOrder, totalSessionsByStudent, dayUsedByStudentDay, fixedDaysByStudent, EvenSpacingWeight, "even_spacing"))
+            yield return term;
+    }
+
+    /// <summary>
+    /// ユーザー要望「同じ科目が固まらないようにしてほしい（数数数数英英英英ではなく数英数英…に近い
+    /// 方が良い）」への対応。受講希望（＝生徒1名につき科目1つと1:1対応）単位で、その科目自身の
+    /// セッションだけを対象に上と同じ間隔均等化を適用する。各科目が個別に間隔を空けて配置されれば、
+    /// 結果として同じ科目が連続しにくくなる（完全な交互配置を保証するものではないが、同一科目の
+    /// 密集は強く抑制される）。
+    /// </summary>
+    private static IEnumerable<LinearExpr> BuildSubjectSpacingTerms(
+        CpModel model,
+        ScheduleProblem problem,
+        IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables)
+    {
+        var dayOrder = BuildOpenDayOrder(problem);
+        if (dayOrder.Count < 2) yield break;
+
+        var totalSessionsByRequest = problem.Demands
+            .Where(demand => demand.RequiredSessions >= 2)
+            .ToDictionary(demand => demand.RequestId, demand => demand.RequiredSessions);
+        if (totalSessionsByRequest.Count == 0) yield break;
+
+        var dayUsedByRequestDay = BuildDayUsedVariables(model, variables, item => item.candidate.RequestId, "subject_spacing_day");
+        var fixedDaysByRequest = problem.ExistingPlacements
+            .GroupBy(item => item.RequestId)
+            .ToDictionary(group => group.Key, group => group.Select(item => item.OpenDateId).ToHashSet());
+
+        foreach (var term in BuildSpacingTerms(model, dayOrder, totalSessionsByRequest, dayUsedByRequestDay, fixedDaysByRequest, SubjectSpacingWeight, "subject_spacing"))
+            yield return term;
+    }
+
+    /// <summary>Open (school) dates only, in calendar order - closed days never appear here, so every
+    /// gap computed from these ranks is automatically "excluding holidays" per the user's request.
+    /// Internal (not private) so ScheduleEvaluationCalculator can compute the same day-index space
+    /// when scoring a completed solution's spacing quality.</summary>
+    internal static IReadOnlyList<long> BuildOpenDayOrder(ScheduleProblem problem) =>
+        problem.AvailableSlots
+            .Select(slot => (slot.OpenDateId, slot.DayOrdinal))
+            .Distinct()
+            .OrderBy(item => item.DayOrdinal)
+            .Select(item => item.OpenDateId)
+            .ToArray();
+
+    private static Dictionary<(long EntityId, long OpenDateId), BoolVar> BuildDayUsedVariables(
+        CpModel model,
+        IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables,
+        Func<(PlacementCandidate candidate, BoolVar variable), long> entitySelector,
+        string namePrefix)
+    {
+        var result = new Dictionary<(long, long), BoolVar>();
+        var index = 0;
+        foreach (var group in variables.GroupBy(item => (EntityId: entitySelector(item), item.candidate.OpenDateId)))
+        {
+            var dayVariables = group.Select(item => item.variable).ToArray();
+            if (dayVariables.Length == 1)
+            {
+                result[group.Key] = dayVariables[0];
+                continue;
+            }
+            var dayUsed = model.NewBoolVar($"{namePrefix}_{index++}");
+            model.AddMaxEquality(dayUsed, dayVariables);
+            result[group.Key] = dayUsed;
+        }
+        return result;
+    }
+
+    /// <summary>Shared window-deviation penalty builder used by both BuildEvenSpacingTerms (per
+    /// student, across all subjects) and BuildSubjectSpacingTerms (per lesson request, i.e. per
+    /// student+subject). For every entity with >=2 total sessions, slides a window sized to that
+    /// entity's own "ideal gap" (openDays / sessions) across the whole open-day range and penalizes
+    /// any window containing 2+ used days (clustering) or 0 used days (an overly large gap) - windows
+    /// with nothing to optimize (no free variable inside them) are skipped entirely.</summary>
+    private static IEnumerable<LinearExpr> BuildSpacingTerms(
+        CpModel model,
+        IReadOnlyList<long> dayOrder,
+        IReadOnlyDictionary<long, int> totalSessionsByEntity,
+        IReadOnlyDictionary<(long EntityId, long OpenDateId), BoolVar> dayUsedByEntityDay,
+        IReadOnlyDictionary<long, HashSet<long>> fixedDaysByEntity,
+        long weight,
+        string namePrefix)
+    {
+        var totalOpenDays = dayOrder.Count;
+        var index = 0;
+        foreach (var (entityId, totalSessions) in totalSessionsByEntity)
+        {
+            if (totalSessions < 2) continue;
+            var window = (int)Math.Round((double)totalOpenDays / totalSessions);
+            if (window < 2) continue;
+
+            var fixedDays = fixedDaysByEntity.GetValueOrDefault(entityId);
+            for (var start = 0; start + window <= totalOpenDays; start++)
+            {
+                var termsInWindow = new List<BoolVar>();
+                var fixedCountInWindow = 0;
+                for (var offset = 0; offset < window; offset++)
+                {
+                    var openDateId = dayOrder[start + offset];
+                    if (dayUsedByEntityDay.TryGetValue((entityId, openDateId), out var v)) termsInWindow.Add(v);
+                    if (fixedDays is not null && fixedDays.Contains(openDateId)) fixedCountInWindow++;
+                }
+                if (termsInWindow.Count == 0) continue;
+                var countExpr = LinearExpr.Sum(termsInWindow) + fixedCountInWindow;
+                var maxPossible = termsInWindow.Count + fixedCountInWindow;
+
+                if (maxPossible >= 2)
+                {
+                    var over = model.NewIntVar(0, maxPossible - 1, $"{namePrefix}_over_{index}");
+                    model.Add(countExpr - 1 <= over);
+                    yield return LinearExpr.Term(over, -weight);
+                }
+                if (fixedCountInWindow == 0)
+                {
+                    var under = model.NewIntVar(0, 1, $"{namePrefix}_under_{index}");
+                    model.Add(1 - countExpr <= under);
+                    yield return LinearExpr.Term(under, -weight);
+                }
+                index++;
+            }
         }
     }
 
