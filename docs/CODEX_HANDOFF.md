@@ -6,16 +6,16 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.6.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
+Current Version: `v0.6.1 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
 Latest Development Checkpoint: checkpoint 88（⑤時間割自動作成: CP-SAT探索のCPU使用率上限・自動作成ゲージの滑らかな表示。v0.6.0公開後のユーザーfollow-up）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
-Latest Draft Release: `v0.6.0`（GitHub上にDraftとして作成済み。checkpoint86・87の内容をまとめてユーザーより「新しくドラフトリリースしてください」との指示を受け作成。Next Version Ruleに従いnew feature相当でv0.6.0とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.6.0.md](releases/v0.6.0.md)）
+Latest Draft Release: `v0.6.1`（GitHub上にDraftとして作成済み。checkpoint88の内容をユーザーより「今実装した内容をドラフトリリースしてください」との指示を受け作成。Next Version Ruleに従いbug fix/minor change相当でv0.6.1とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.6.1.md](releases/v0.6.1.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
 
-- v0.6.0 Draft Release後のbug fix / minor change -> `v0.6.1`
-- v0.6.0 Draft Release後のnew feature -> `v0.7.0`
+- v0.6.1 Draft Release後のbug fix / minor change -> `v0.6.2`
+- v0.6.1 Draft Release後のnew feature -> `v0.7.0`
 - `v1.0.0` -> ユーザーの明示指示がある場合のみ
-- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2がその例）。checkpoint83のv0.4.0・checkpoint84〜85のv0.5.0・checkpoint86〜87のv0.6.0は、いずれもユーザーが番号を指定しなかったため、この既定ルールをそのまま適用した例。
+- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2がその例）。checkpoint83のv0.4.0・checkpoint84〜85のv0.5.0・checkpoint86〜87のv0.6.0・checkpoint88のv0.6.1は、いずれもユーザーが番号を指定しなかったため、この既定ルールをそのまま適用した例。
 
 ### 実装済み
 
@@ -1249,6 +1249,8 @@ v0.6.0公開直後、ユーザーからcheckpoint86・87の内容を実際に使
 **新規/更新テスト（合計）:** `dotnet test`全181 tests passed（既存180件は無修正で通過、Optimizationのみ35→36）。UIの見た目（ゲージの滑らかさ）自体は自動テストの対象外。
 
 **動作確認:** Debug構成でビルド警告0・エラー0。CPU使用率の実際の下がり方、ゲージが滑らかに見えるかどうかは、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
+
+v0.6.1としてDraft Release作成済み（checkpoint88の区切り。ユーザーより「今実装した内容をドラフトリリースしてください」との指示を受け作成。詳細は[docs/releases/v0.6.1.md](releases/v0.6.1.md)）。
 
 ### 次回最初に確認するファイル
 
