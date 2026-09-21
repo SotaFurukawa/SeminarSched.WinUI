@@ -39,6 +39,7 @@ public sealed partial class HomePage : Page
         RefreshGeneratedTitle();
         RefreshCurrentProject();
         SharedRosterPathText.Text = $"保存先: {App.SharedRosterStore.WorkbookPath}";
+        SharedRosterLastModifiedText.Text = BuildLastModifiedText(App.SharedRosterStore.WorkbookPath);
         await RefreshRecentProjectsAsync();
     }
 
@@ -49,6 +50,7 @@ public sealed partial class HomePage : Page
             SetBusy(true);
             var path = await App.SharedRosterStore.EnsureWorkbookAsync();
             SharedRosterPathText.Text = $"保存先: {path}";
+            SharedRosterLastModifiedText.Text = BuildLastModifiedText(path);
             var started = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
             ShowStatus(started is null ? InfoBarSeverity.Warning : InfoBarSeverity.Success, started is null ? "既定のアプリで開けませんでした" : "共通名簿Excelを開きました", path);
         }
@@ -109,6 +111,7 @@ public sealed partial class HomePage : Page
                 var projectResult = await App.SharedRosterStore.CopyIntoProjectAsync(current.Path);
                 if (projectResult is not null) message += "。現在開いているプロジェクトへも反映しました";
             }
+            SharedRosterLastModifiedText.Text = BuildLastModifiedText(App.SharedRosterStore.WorkbookPath);
             ShowStatus(InfoBarSeverity.Success, "共通名簿を反映しました", message);
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException or SqliteException)
@@ -138,6 +141,7 @@ public sealed partial class HomePage : Page
         {
             SetBusy(true);
             var result = await App.SharedRosterStore.AdvanceStudentGradesAsync();
+            SharedRosterLastModifiedText.Text = BuildLastModifiedText(App.SharedRosterStore.WorkbookPath);
             ShowStatus(InfoBarSeverity.Success, "学年を繰り上げました", $"繰り上げ{result.AdvancedCount}名（うち既卒{result.GraduatedCount}名）");
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SqliteException)

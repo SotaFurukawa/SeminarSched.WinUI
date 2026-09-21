@@ -445,18 +445,28 @@ public sealed partial class SetupPage : WorkflowPageBase
     private async void MoveSlotUp_Click(object sender, RoutedEventArgs e) => await MoveSlotAsync(sender, -1);
     private async void MoveSlotDown_Click(object sender, RoutedEventArgs e) => await MoveSlotAsync(sender, 1);
 
+    // 隣接2件のSortOrderを入れ替えるだけの実装だと、既存データにSortOrderの重複・欠番（旧バージョンの
+    // 不具合や既定データ由来で起こり得る）があった場合、入れ替え後も表示順が視覚的に変わらない／
+    // 意図と違う場所に来ることがあった（ユーザー報告: 矢印では変わらないが、順序欄へ大きい数値を
+    // 直接入力すると変わる＝重複していないユニークな値にした途端に効く、という症状と一致）。
+    // 移動後の一覧全体を1から採番し直すことで、既存データの重複・欠番に関わらず必ず意図通りの
+    // 順序へ確実に反映されるようにした（旧ドラッグ並び替え実装と同じ「全件を1..Nへ再採番」方式）。
     private async Task MoveSlotAsync(object sender, int direction)
     {
         if (sender is not FrameworkElement { Tag: long slotId }) return;
-        var index = _timeSlotItems.ToList().FindIndex(x => x.Value.Id == slotId);
+        var items = _timeSlotItems.Select(item => item.Value).ToList();
+        var index = items.FindIndex(x => x.Id == slotId);
         var targetIndex = index + direction;
-        if (index < 0 || targetIndex < 0 || targetIndex >= _timeSlotItems.Count) return;
-        var current = _timeSlotItems[index].Value;
-        var target = _timeSlotItems[targetIndex].Value;
+        if (index < 0 || targetIndex < 0 || targetIndex >= items.Count) return;
+        (items[index], items[targetIndex]) = (items[targetIndex], items[index]);
         await ExecuteAsync(async path =>
         {
-            await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(current.Id, current.Code, current.DisplayName, current.StartTime, current.EndTime, target.SortOrder, current.Active));
-            await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(target.Id, target.Code, target.DisplayName, target.StartTime, target.EndTime, current.SortOrder, target.Active));
+            for (var i = 0; i < items.Count; i++)
+            {
+                var slot = items[i];
+                if (slot.SortOrder != i + 1)
+                    await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(slot.Id, slot.Code, slot.DisplayName, slot.StartTime, slot.EndTime, i + 1, slot.Active));
+            }
         }, "コマの表示順を更新しました");
     }
 

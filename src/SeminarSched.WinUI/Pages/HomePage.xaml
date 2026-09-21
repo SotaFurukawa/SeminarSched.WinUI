@@ -25,6 +25,7 @@
                         <Button Click="AdvanceGrades_Click" Content="学年を一括で繰り上げる" />
                     </StackPanel>
                     <TextBlock x:Name="SharedRosterPathText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                    <TextBlock x:Name="SharedRosterLastModifiedText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
 
