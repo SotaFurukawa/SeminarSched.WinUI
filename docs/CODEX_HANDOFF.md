@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.7.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 90（⑤CPU/ワーカー数の追加引き下げ・名目時間を超えても打ち切らず延長して続行。checkpoint89公開直後のユーザーfollow-up）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
+Latest Development Checkpoint: checkpoint 91（⑤延長フェーズ中に進捗パーセンテージが100%で止まる不具合の修正。v0.7.0公開直後のユーザーfollow-up）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
 Latest Draft Release: `v0.7.0`（GitHub上にDraftとして作成済み。checkpoint89・90の内容をユーザーより「ドラフトリリースしてください」との指示を受け作成。checkpoint89・90はいずれも新機能を含むため、Next Version Ruleに従いv0.7.0とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.7.0.md](releases/v0.7.0.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -1310,6 +1310,22 @@ checkpoint89公開直後、ユーザーから2件の追加報告。
 **動作確認:** Debug構成でビルド警告0・エラー0。①の実際のCPU使用率の下がり方・ログが実際に役立つか、②の延長フェーズの実機での見た目・体感（進捗ゲージの動き、警告の表示）は、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
 
 v0.7.0としてDraft Release作成済み（checkpoint89・90をまとめた区切り。ユーザーより「ドラフトリリースしてください」との指示を受け作成。詳細は[docs/releases/v0.7.0.md](releases/v0.7.0.md)）。
+
+### v0.7.0 checkpoint 91 (Claude) — 延長フェーズ中に進捗パーセンテージが100%で止まる不具合の修正
+
+v0.7.0公開直後、ユーザーから「おそらく自動作成のパーセンテージが時間依存になっているため、残り時間が0になり、100%になっても中々終わらないということが起きています。進捗状況によって依存するようにしてください」との報告。
+
+**原因:** checkpoint90で追加した延長フェーズ（名目時間を使い切っても未完成な場合に、もう1回分の時間を与えて`GrindingNeighborhoodRepairStrategy`を実行する仕組み）の進捗報告が、`ProgressWeight=weightConsumed`（延長開始時点で既にほぼ1.0＝100%相当）・`StrategyWeight=0`のまま`progress?.Report(...)`していた。`OptimizationRunState.EstimateRaw()`の補間式`(ProgressWeight + fraction*StrategyWeight)*100`は、`StrategyWeight=0`だと延長中ずっと`ProgressWeight`（≈100%）のまま一切動かない。つまり延長フェーズ全体（最大で名目時間と同じ長さ）が「100%だがまだ実行中」という、ユーザーが報告した通りの状態になっていた。
+
+**修正:** `ScheduleOptimizer.RunAsync`の延長フェーズを、目盛りを引き直す設計に変更した。延長を「計画全体がもう1単位増えた」とみなし、これまでの進捗（weightConsumed）と延長の持ち分（1単位）を合計が1.0になるよう比例配分し直す（`rescaledBaseWeight = weightConsumed/(weightConsumed+1)`、`rescaledExtensionShare = 1/(weightConsumed+1)`）。延長開始時点でこの新しい目盛りを報告し（`StrategyWeight`が0より大きくなるため、延長の実経過時間に応じて補間式が実際に動く）、延長終了時点で`ProgressWeight`がちょうど1.0（100%）になるよう報告する。
+
+延長が実際に始まった場合、表示は一度100%付近から後退する（例: 全体を消化していた場合は約50%へ戻り、そこから延長の経過に応じて100%まで再び上がる）。これは「少し時間を要しています」という既存の警告表示と一緒に見せることで、進捗が正しく巻き戻ったことを示す（ずっと100%のまま固まって見えるより正確で誠実、という判断）。
+
+`OptimizationRunState`側では、延長開始時点（`IsExtending && IsStrategyStarting`）で「直近に完了した戦略の実測ペース」（`_lastCompletedWeight`/`_lastCompletedElapsed`）をリセットするようにした。延長前の実測ペースは目盛りの単位が違う（延長後は同じ1.0が異なる意味を持つ）ため、そのまま使うと不正確な残り時間になる。延長中は次の完了報告（＝延長自体が終わる時）までデータが無いため、「計算中…」を表示するようにした。
+
+**新規/更新テスト:** `CpSatStrategyIntegrationTests.RunAsync_ExtendsPastNominalDurationWhenResultIsIncompleteAndReportsIsExtending`に、延長開始時点の`ProgressWeight`が100%未満であること・`StrategyWeight`が0より大きいこと・延長終了時点の`ProgressWeight`がちょうど1.0であることの検証を追加した。`dotnet test`全192 tests passed（既存189件は無修正で通過、変更したのは既存テスト1件への追加アサーションのみ）。
+
+**動作確認:** Debug構成でビルド警告0・エラー0。延長フェーズの実機での見た目（一度後退してから100%へ戻る動き、残り時間が「計算中…」になること）は、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
 
 ### 次回最初に確認するファイル
 
