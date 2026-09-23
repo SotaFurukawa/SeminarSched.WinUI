@@ -23,6 +23,26 @@
                 HorizontalAlignment="Left"
                 Text="Python版v1.9.5の機能を、C# + WinUI 3で段階的に移植しています。"
                 TextWrapping="Wrap" />
+
+            <TextBlock Margin="0,16,0,0" FontSize="16" FontWeight="SemiBold" Text="推奨動作環境" />
+            <TextBlock
+                MaxWidth="640"
+                HorizontalAlignment="Left"
+                Text="{x:Bind MinimumSpecText, Mode=OneTime}"
+                TextWrapping="Wrap" />
+            <TextBlock
+                MaxWidth="640"
+                HorizontalAlignment="Left"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="{x:Bind DetectedSpecText, Mode=OneTime}"
+                TextWrapping="Wrap" />
+            <InfoBar
+                x:Name="SystemRequirementsWarning"
+                MaxWidth="640"
+                HorizontalAlignment="Left"
+                IsClosable="False"
+                Severity="Warning"
+                Title="お使いのパソコンは推奨動作環境を下回っている可能性があります" />
         </StackPanel>
     </Grid>
 </Page>
