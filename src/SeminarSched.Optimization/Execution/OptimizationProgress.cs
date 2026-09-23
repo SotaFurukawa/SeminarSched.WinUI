@@ -29,4 +29,9 @@ public sealed record OptimizationProgress(
     double ProgressWeight = 0,
     double StrategyWeight = 0,
     TimeSpan StrategyBudget = default,
-    bool IsStrategyStarting = false);
+    bool IsStrategyStarting = false,
+    /// <summary>ユーザー指示「指定時間内に足りない場合は...少し時間を要していますといった警告を出して、
+    /// 続行してください」への対応。名目時間を使い切っても結果が未完成（未配置が残っている、または
+    /// 1件も解が得られていない）な場合の延長フェーズ中であることを示す。呼び出し側（WinUI）はこれを
+    /// 見て、進捗ゲージを止めずに「少し時間を要しています」という警告を追加表示する。</summary>
+    bool IsExtending = false);

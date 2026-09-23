@@ -142,4 +142,66 @@ public sealed class CpSatStrategyIntegrationTests
         Assert.Single(result!.Solution.Placements);
         ScheduleSolutionValidator.Validate(problem, result.Solution);
     }
+
+    // ユーザー指示「指定時間内に足りない場合がある。そういった場合は途中で中断するのではなく、少し
+    // 時間を要していますといった警告を出して、続行してください」を検証する。1受講希望が2回分必要
+    // だが候補は1コマ分しか無い、構造的に必ず1件未配置が残る問題（延長しても解決はしないが、
+    // 延長フェーズ自体が実際に走り、IsExtending付きの進捗が開始・終了の両方で報告されることを
+    // 検証する。延長しても直らないケースでも、Bestはそのまま返る＝無限に粘り続けて固まったりしない）。
+    [Fact]
+    public async Task RunAsync_ExtendsPastNominalDurationWhenResultIsIncompleteAndReportsIsExtending()
+    {
+        var demand = new LessonDemand(1, 10, RequiredSessions: 2, AlreadyFixedSessions: 0);
+        var candidates = new[] { new PlacementCandidate(1, 10, 100, 1, 1) };
+        var problem = new ScheduleProblem([demand], candidates);
+
+        var strategies = new IScheduleStrategy<ScheduleProblem, ScheduleSolution>[]
+        {
+            new StandardCpSatStrategy(), new GrindingNeighborhoodRepairStrategy(),
+        };
+        var profile = new OptimizationProfile(
+            OptimizationQualityLevel.Fast, "test", "test", "test",
+            TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1),
+            [new OptimizationStageDefinition(OptimizationStageKind.InitialExploration, 1.0, 1, [OptimizationStrategyKind.StandardCpSat])]);
+
+        var optimizer = new ScheduleOptimizer<ScheduleProblem, ScheduleSolution>(strategies);
+        using var control = new OptimizationRunControl();
+        var extendingReports = new List<OptimizationProgress>();
+        var progress = new Progress<OptimizationProgress>(p => { if (p.IsExtending) extendingReports.Add(p); });
+
+        var result = await optimizer.RunAsync(problem, profile, control, progress);
+
+        Assert.True(result.WasExtended);
+        Assert.Contains(extendingReports, p => p.IsStrategyStarting);
+        Assert.Contains(extendingReports, p => !p.IsStrategyStarting);
+        Assert.NotNull(result.Best);
+        Assert.Equal(1, result.Best!.Evaluation.UnassignedLessons);
+    }
+
+    // 延長しなくても最初のステージだけで完成した（未配置0件の）場合は、延長フェーズ自体が
+    // 一切走らないことを確認する（延長は「まだ足りない場合」だけの機能であるべき）。
+    [Fact]
+    public async Task RunAsync_DoesNotExtendWhenTheInitialStagesAlreadyProduceACompleteSchedule()
+    {
+        var demand = new LessonDemand(1, 10, RequiredSessions: 1, AlreadyFixedSessions: 0);
+        var candidates = new[] { new PlacementCandidate(1, 10, 100, 1, 1) };
+        var problem = new ScheduleProblem([demand], candidates);
+
+        var strategies = new IScheduleStrategy<ScheduleProblem, ScheduleSolution>[]
+        {
+            new StandardCpSatStrategy(), new GrindingNeighborhoodRepairStrategy(),
+        };
+        var profile = new OptimizationProfile(
+            OptimizationQualityLevel.Fast, "test", "test", "test",
+            TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2),
+            [new OptimizationStageDefinition(OptimizationStageKind.InitialExploration, 1.0, 1, [OptimizationStrategyKind.StandardCpSat])]);
+
+        var optimizer = new ScheduleOptimizer<ScheduleProblem, ScheduleSolution>(strategies);
+        using var control = new OptimizationRunControl();
+
+        var result = await optimizer.RunAsync(problem, profile, control);
+
+        Assert.False(result.WasExtended);
+        Assert.Equal(0, result.Best!.Evaluation.UnassignedLessons);
+    }
 }

@@ -96,6 +96,13 @@
                             </Grid>
                             <ProgressBar x:Name="RunProgressBar" Height="24" Minimum="0" Maximum="100" Value="0"/>
                             <TextBlock x:Name="RunEtaText" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <InfoBar
+                                x:Name="ExtendingInfoBar"
+                                IsClosable="False"
+                                IsOpen="False"
+                                Severity="Warning"
+                                Title="少し時間を要しています"
+                                Message="指定した品質の持ち時間内に完成しなかったため、途中で打ち切らずそのまま続けて探索しています。しばらくお待ちください。" />
                         </StackPanel>
                         <ProgressRing x:Name="RunProgress" Grid.Column="1" IsActive="False" Width="36" Height="36"/>
                     </Grid>

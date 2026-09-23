@@ -18,6 +18,7 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         [OptimizationStageKind.CandidateAdvancement] = "候補改善",
         [OptimizationStageKind.NeighborhoodRepair] = "近傍再探索",
         [OptimizationStageKind.FinalPolishing] = "仕上げ探索",
+        [OptimizationStageKind.Extension] = "延長探索",
     };
 
     private static readonly Dictionary<OptimizationStrategyKind, string> StrategyLabels = new()
@@ -133,6 +134,7 @@ public sealed partial class OptimizationPage : WorkflowPageBase
             var stageLabel = StageLabels.GetValueOrDefault(progress.Stage, progress.Stage.ToString());
             var strategyLabel = StrategyLabels.GetValueOrDefault(progress.Strategy, progress.Strategy.ToString());
             RunStageText.Text = running ? $"{stageLabel}：{strategyLabel}（{progress.StrategiesCompleted}/{progress.StrategiesTotal}戦略）" : "完了しました。";
+            ExtendingInfoBar.IsOpen = running && progress.IsExtending;
         }
 
         var outcome = OptimizationRunState.ConsumeLastOutcome();
@@ -140,7 +142,8 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         if (outcome is { Success: true, Summary: { } result })
         {
             RunStatus.Severity = InfoBarSeverity.Success; RunStatus.Title = "時間割を作成しました";
-            RunStatus.Message = $"配置 {result.PlacedLessons}件、未配置 {result.UnassignedLessons}件、{result.Elapsed.TotalSeconds:F1}秒（採用戦略: {StrategyDisplayName(result.StrategyLabel)}）。④時間割編集で変更内容を確認できます。";
+            var extendedNote = result.WasExtended ? "（指定した時間内には完成しなかったため延長して探索しました）" : "";
+            RunStatus.Message = $"配置 {result.PlacedLessons}件、未配置 {result.UnassignedLessons}件、{result.Elapsed.TotalSeconds:F1}秒（採用戦略: {StrategyDisplayName(result.StrategyLabel)}）{extendedNote}。④時間割編集で変更内容を確認できます。";
             RunStatus.IsOpen = true;
         }
         else

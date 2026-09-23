@@ -3,7 +3,7 @@ using SeminarSched.Optimization.Profiles;
 
 namespace SeminarSched.Application.Scheduling;
 
-public sealed record ScheduleRunSummary(int PlacedLessons, int UnassignedLessons, TimeSpan Elapsed, string StrategyLabel = "");
+public sealed record ScheduleRunSummary(int PlacedLessons, int UnassignedLessons, TimeSpan Elapsed, string StrategyLabel = "", bool WasExtended = false);
 
 public interface IScheduleRunService
 {

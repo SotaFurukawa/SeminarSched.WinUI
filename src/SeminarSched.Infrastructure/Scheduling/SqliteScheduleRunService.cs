@@ -42,7 +42,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         var solution = result.Best.Solution;
         ScheduleSolutionValidator.Validate(problem, solution);
         await SaveValidatedAsync(connection, problem, solution, profile.MaximumDuration, cancellationToken).ConfigureAwait(false);
-        return new ScheduleRunSummary(solution.Placements.Count, solution.UnassignedLessons, result.Elapsed, result.Best.Strategy.ToString());
+        return new ScheduleRunSummary(solution.Placements.Count, solution.UnassignedLessons, result.Elapsed, result.Best.Strategy.ToString(), result.WasExtended);
     }
 
     private static IEnumerable<IScheduleStrategy<ScheduleProblem, ScheduleSolution>> CreateStrategies() =>

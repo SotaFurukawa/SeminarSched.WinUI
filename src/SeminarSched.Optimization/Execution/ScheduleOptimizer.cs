@@ -132,13 +132,67 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
             }
         }
 
+        // ユーザー指示「指定時間内に足りない場合がある。そういった場合は途中で中断するのではなく、
+        // 少し時間を要していますといった警告を出して、続行してください」への対応。名目時間（全ステージ）
+        // を使い切っても結果が未完成（未配置が残っている、または1件も解が得られていない）な場合、
+        // ユーザーが「中断して現在の結果を採用」を押していない限り、名目時間と同じ長さだけ追加で
+        // grinding戦略（GrindingNeighborhoodRepairStrategyはヒントが無くても必ず1回は試行するため、
+        // Best が無い状態でも安全に呼べる）を実行する。これを「延長」と呼び、無限に粘り続けないよう
+        // 最大でも名目時間の2倍で必ず打ち切る（1回のみ延長し、延長後もなお未完成なら諦めてそのまま返す）。
+        var wasExtended = false;
+        var bestBeforeExtension = Best(allCandidates);
+        if (!acceptedEarly && !cancellationToken.IsCancellationRequested &&
+            (bestBeforeExtension is null || bestBeforeExtension.Evaluation.UnassignedLessons > 0) &&
+            _strategies.ContainsKey(OptimizationStrategyKind.GrindingNeighborhoodRepair))
+        {
+            wasExtended = true;
+            var extensionBudget = profile.MaximumDuration;
+            progress?.Report(new OptimizationProgress(
+                stopwatch.Elapsed, profile.MaximumDuration, OptimizationStageKind.Extension, OptimizationStrategyKind.GrindingNeighborhoodRepair,
+                completed, total, improvementCount, bestBeforeExtension?.Evaluation,
+                weightConsumed, 0, extensionBudget, IsStrategyStarting: true, IsExtending: true));
+
+            using var extensionTimeout = new CancellationTokenSource(extensionBudget);
+            using var extensionCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken, extensionTimeout.Token, control.AcceptBestToken);
+            ScheduleCandidate<TSolution>? extended = null;
+            try
+            {
+                extended = await _strategies[OptimizationStrategyKind.GrindingNeighborhoodRepair].ExecuteAsync(
+                    new StrategyContext<TInput, TSolution>(input, extensionBudget, bestBeforeExtension, progress),
+                    extensionCancellation.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (
+                !cancellationToken.IsCancellationRequested &&
+                (control.AcceptBestToken.IsCancellationRequested || extensionTimeout.IsCancellationRequested))
+            {
+                acceptedEarly = control.AcceptBestToken.IsCancellationRequested;
+            }
+
+            if (extended is not null)
+            {
+                allCandidates.Add(extended);
+                if (bestBeforeExtension is null || extended.Evaluation.IsBetterThan(bestBeforeExtension.Evaluation))
+                {
+                    improvementCount++;
+                }
+            }
+
+            var bestAfterExtension = Best(allCandidates);
+            progress?.Report(new OptimizationProgress(
+                stopwatch.Elapsed, profile.MaximumDuration, OptimizationStageKind.Extension, OptimizationStrategyKind.GrindingNeighborhoodRepair,
+                completed, total, improvementCount, bestAfterExtension?.Evaluation,
+                weightConsumed, 0, extensionBudget, IsStrategyStarting: false, IsExtending: true));
+        }
+
         return new OptimizationRunResult<TSolution>(
             Best(allCandidates),
             allCandidates.OrderBy(candidate => candidate.Evaluation).ToArray(),
             improvementCount,
             acceptedEarly,
             stoppedForStagnation,
-            stopwatch.Elapsed);
+            stopwatch.Elapsed,
+            wasExtended);
     }
 
     private void ValidateStrategies(OptimizationProfile profile)
