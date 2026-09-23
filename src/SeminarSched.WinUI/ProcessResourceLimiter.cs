@@ -1,120 +1,42 @@
-using System.Runtime.InteropServices;
+using System.Diagnostics;
 
 namespace SeminarSched_WinUI;
 
 /// <summary>
-/// ユーザー報告「CPUにかなり負荷がかかってしまう」への対応（checkpoint88でのnum_search_workers半減
-/// だけでは実機で改善が足りなかった、との追加報告を受けての強化）。Windows Job Object のCPU rate
-/// control（Docker Desktop等が実際に使う仕組みと同じ）で、プロセス全体のCPU使用率を実測OS値として
-/// 上限へハード制限する。num_search_workers（OR-Tools側の並列探索ワーカー数）を絞るだけでは、
-/// OR-Toolsが内部的に追加で立てるスレッド分を含めた実際のCPU使用率までは保証できないため、
-/// OSレベルでの制限と併用する。⑤時間割自動作成の実行中だけ有効にし、終了後は解除する（他の操作
-/// （帳票出力等）まで巻き込んで遅くしないため）。
+/// ユーザー報告「CPUにかなり負荷がかかってしまう」への対応。checkpoint88でnum_search_workersを
+/// 論理コアの半分へ絞ったが実機で改善が足りず、checkpoint89でWindows Job ObjectのCPU rate control
+/// （Docker Desktop等が使うのと同じ仕組み）を追加してプロセス全体のCPU使用率をハード制限した。
+/// しかし後続の報告「CPUの制限をしたせいか、最高品質だと2時間かけても終了しなかった」を受けて
+/// 調査した結果、HARD_CAPは他アプリが何もCPUを使っていなくても容赦なく上限で頭打ちにする方式
+/// （「競合時だけ譲る」のではなく「常に頭打ち」）だと判明した。塾のPCで他の作業をしていない間も
+/// 探索が上限で足止めされ続け、本来なら数十分で終わる探索が2時間の延長上限（
+/// <see cref="SeminarSched.Optimization.Execution.ScheduleOptimizer"/>の「延長」機構、名目時間の
+/// 最大2倍）を使い切っても終わらない、という直接の原因になっていた。
 ///
-/// checkpoint89でCpuRatePercent=50として導入したが、ユーザーから「i7-10700K（16論理コア、決して
-/// 非力ではない機種）でもCPU使用率が60%になる。塾の実機はもっと非力なので耐えられない」との
-/// 追加報告を受け、目標値を35%へ引き下げた（プロセッサの総容量に対する割合のため、コア数に関わらず
-/// 非力な機種にも同じ比率で効く）。60%という実測値がこの機能の狙い通りの上限（50%）を上回っていた
-/// 以上、Job Objectの制限が実際には効いていなかった可能性がある（MSIXパッケージのプロセスは
-/// 既に別のJob Objectに含まれており、環境によっては追加のJobへの割り当てが失敗することがある）ため、
-/// `SetInformationJobObject`の戻り値を確認し、失敗時はアプリのログへ記録するようにした
-/// （`%LocalAppData%\SeminarSched.WinUI\logs\`）。
-///
-/// メモリ使用率の同様のハード制限（JOBOBJECT_EXTENDED_LIMIT_INFORMATIONのJobMemoryLimit）は
-/// 意図的に実装していない: 超過時はOSがネイティブ側（OR-Tools、P/Invoke越しのC++ライブラリ）の
-/// メモリ確保を失敗させるが、その失敗は.NET側で安全に捕捉できず、探索の途中でプロセスごと
-/// クラッシュする恐れがある（CPU rate controlは超過時にスレッドを一時停止させるだけで、確保
-/// failureを起こさない点が本質的に異なる。安全に緩やかに絞れるCPUと違い、メモリは「硬く縛ると
-/// 落ちる」）。この機能ではCPU使用率の抑制（＝探索スレッドの実行機会そのものを減らす）を主な
-/// 手段とし、メモリはNumSearchWorkersを絞ること（並列探索ツリーの本数を減らす）による間接的な
-/// 抑制にとどめる。
+/// そのためJob Object HARD_CAPは撤去し、プロセス優先度を下げる方式（<see cref="Process.PriorityClass"/>
+/// ＝<see cref="ProcessPriorityClass.BelowNormal"/>）へ置き換えた。優先度を下げるだけなら、他のアプリが
+/// 実際にCPUを必要としている「競合時」にだけ道を譲り、PCがアイドルであれば探索は空いているCPU時間を
+/// 遠慮なく使って通常速度で走る。「他の作業の重さを減らす」という元の目的は保ったまま、アイドル時間を
+/// 無駄にする副作用（＝計算がPCの実性能に見合わず遅くなる）を取り除く狙い。
+/// NumSearchWorkers側の絞り込み（<see cref="SeminarSched.Optimization.Core.CpSatScheduleSolver.ResolvedAutoSearchWorkers"/>）は
+/// 論理コア数に応じて自動で軽くなる仕組みなので引き続き併用する。
 /// </summary>
 internal static class ProcessResourceLimiter
 {
-    private const int CpuRatePercent = 35;
-
-    private static IntPtr _job = IntPtr.Zero;
-    private static bool _unavailable;
-
-    /// <summary>初回呼び出し時に自プロセスを専用Job Objectへ割り当てる（MSIXパッケージのプロセスは
-    /// 既に別のJob Objectに入っていることがあるが、Windows 8以降はJob Objectのネストがサポートされて
-    /// いるため、通常は問題なく追加のJobへ割り当てられる）。以降の呼び出しは同じJobの制限値を
-    /// 更新するだけで、都度作り直しはしない。失敗した場合は以降の呼び出しを黙って諦める
-    /// （この機能自体は「あれば嬉しい」もので、失敗してもアプリ本体の動作を妨げてはいけない）が、
-    /// 診断のためログへは記録する。</summary>
+    /// <summary>⑤時間割自動作成の実行中だけ呼び出す。enabled=trueでBelowNormalへ下げ、falseでNormalへ
+    /// 戻す。失敗しても（別のJob Objectのポリシーで優先度変更が拒否される環境等）アプリ本体の動作を
+    /// 妨げてはならないため、例外は握りつぶしてログにだけ記録する。</summary>
     public static void SetCpuLimit(bool enabled)
     {
-        if (_unavailable) return;
         try
         {
-            if (_job == IntPtr.Zero)
-            {
-                _job = CreateJobObjectW(IntPtr.Zero, null);
-                if (_job == IntPtr.Zero)
-                {
-                    LogFailure("CreateJobObject");
-                    return;
-                }
-                if (!AssignProcessToJobObject(_job, GetCurrentProcess()))
-                {
-                    LogFailure("AssignProcessToJobObject");
-                    return;
-                }
-            }
-
-            var info = new JOBOBJECT_CPU_RATE_CONTROL_INFORMATION
-            {
-                ControlFlags = enabled ? JobObjectCpuRateControlEnable | JobObjectCpuRateControlHardCap : 0,
-                CpuRate = CpuRatePercent * 100, // 1/100パーセント単位（3500=35.00%）。CPU全体（全論理コア合計）に対する割合。
-            };
-            var size = Marshal.SizeOf<JOBOBJECT_CPU_RATE_CONTROL_INFORMATION>();
-            var ptr = Marshal.AllocHGlobal(size);
-            try
-            {
-                Marshal.StructureToPtr(info, ptr, false);
-                if (!SetInformationJobObject(_job, JobObjectCpuRateControlInformation, ptr, (uint)size))
-                {
-                    LogFailure("SetInformationJobObject");
-                }
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(ptr);
-            }
+            Process.GetCurrentProcess().PriorityClass = enabled
+                ? ProcessPriorityClass.BelowNormal
+                : ProcessPriorityClass.Normal;
         }
         catch (Exception exception)
         {
-            _unavailable = true;
-            App.Logger.Warning($"ProcessResourceLimiter: unexpected failure, giving up for the rest of this session ({exception.Message})");
+            App.Logger.Warning($"ProcessResourceLimiter: process priority の変更に失敗しました ({exception.Message})。CPU使用率の抑制は今回のセッションでは適用されません。");
         }
     }
-
-    private static void LogFailure(string apiName)
-    {
-        _unavailable = true;
-        App.Logger.Warning($"ProcessResourceLimiter: {apiName} failed (Win32 error {Marshal.GetLastWin32Error()}), CPU使用率の制限は今回のセッションでは適用されません。");
-    }
-
-    private const int JobObjectCpuRateControlInformation = 15;
-    private const uint JobObjectCpuRateControlEnable = 0x1;
-    private const uint JobObjectCpuRateControlHardCap = 0x4;
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct JOBOBJECT_CPU_RATE_CONTROL_INFORMATION
-    {
-        public uint ControlFlags;
-        public uint CpuRate;
-    }
-
-    [DllImport("kernel32.dll", SetLastError = true, EntryPoint = "CreateJobObjectW", CharSet = CharSet.Unicode)]
-    private static extern IntPtr CreateJobObjectW(IntPtr lpJobAttributes, string? lpName);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool AssignProcessToJobObject(IntPtr hJob, IntPtr hProcess);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool SetInformationJobObject(IntPtr hJob, int jobObjectInfoClass, IntPtr lpJobObjectInfo, uint cbJobObjectInfoLength);
-
-    [DllImport("kernel32.dll")]
-    private static extern IntPtr GetCurrentProcess();
 }

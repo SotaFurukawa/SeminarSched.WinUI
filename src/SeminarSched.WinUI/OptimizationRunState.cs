@@ -119,10 +119,12 @@ internal static class OptimizationRunState
         _displayedPercent = 0;
         LastOutcome = null;
         IsRunning = true;
-        // ユーザー報告「CPUにかなり負荷がかかってしまう」への対応。既定ではCPU使用率をOS側で50%へ
-        // 制限し（ProcessResourceLimiter、Job Object CPU rate control）、CP-SATの並列探索ワーカー数も
+        // ユーザー報告「CPUにかなり負荷がかかってしまう」への対応。既定ではプロセス優先度を下げ
+        // （ProcessResourceLimiter、他アプリと競合したときだけ譲る方式）、CP-SATの並列探索ワーカー数も
         // 論理コアの半分に制限する（SeminarSched.Optimization.Core.CpSatScheduleSolver.WorkerLimitEnabled）。
         // どちらも「制限しない」チェックボックスがオンの間だけ両方まとめて解除する。
+        // （以前はOS側のJob Object CPU rate controlでハード制限していたが、アイドル時間まで無駄に
+        // 頭打ちにしてしまい「最高品質が2時間かけても終わらない」の直接原因になったため撤去した。）
         SeminarSched.Optimization.Core.CpSatScheduleSolver.WorkerLimitEnabled = !unrestrictedResourceUsage;
         ProcessResourceLimiter.SetCpuLimit(enabled: !unrestrictedResourceUsage);
         _timer ??= CreateTimer();

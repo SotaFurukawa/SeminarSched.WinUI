@@ -80,7 +80,7 @@
                     <InfoBar x:Name="RunStatus" IsClosable="True"/>
                     <StackPanel Spacing="2">
                         <CheckBox x:Name="UnrestrictedResourceUsageCheckBox" Content="CPU使用率を制限しない（フルパワーで実行）" Checked="UnrestrictedResourceUsageCheckBox_Changed" Unchecked="UnrestrictedResourceUsageCheckBox_Changed"/>
-                        <TextBlock Margin="28,0,0,0" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="既定ではCPU使用率をおよそ50%までに抑え、他の作業への影響を減らします。オンにすると制限を外し、その分速くなる可能性がありますが、実行中はパソコンの動作が重くなることがあります。" TextWrapping="Wrap"/>
+                        <TextBlock Margin="28,0,0,0" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="既定では他の作業と競合したときに優先度を譲り、パソコンが重くなるのを防ぎます（パソコンが空いていれば速度は落ちません）。オンにすると常にフルパワーで実行し、その分速くなる可能性がありますが、実行中は他の作業が重くなることがあります。" TextWrapping="Wrap"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button x:Name="RunButton" Content="時間割を自動作成" Click="Run_Click" Style="{StaticResource AccentButtonStyle}"/>

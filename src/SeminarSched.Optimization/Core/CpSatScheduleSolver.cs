@@ -44,16 +44,18 @@ public sealed class CpSatScheduleSolver
     public static bool WorkerLimitEnabled { get; set; } = true;
 
     /// <summary>Worker count used in place of a caller's <c>NumSearchWorkers: 0</c> ("auto") while
-    /// <see cref="WorkerLimitEnabled"/> is true. A third of the logical processors (floor 2, matching the
+    /// <see cref="WorkerLimitEnabled"/> is true. Half the logical processors (floor 2, matching the
     /// smallest count actually measured as safe - see <see cref="CpSatSolveOptions"/>) keeps CP-SAT's
-    /// parallel search meaningfully faster than a single thread while leaving most of the machine free
-    /// for everything else during a long grinding run. Originally half the processors, but a user
-    /// reported still seeing ~60% CPU usage on a 16-thread i7-10700K (not a weak machine) and was
-    /// specifically worried about their actual (much weaker) school PC, so this was lowered further
-    /// alongside the WinUI layer's own OS-level CPU rate cap (ProcessResourceLimiter, a separate
-    /// project this one does not reference). When disabled, returns 0 so the caller's "auto" passes
-    /// straight through to CP-SAT.</summary>
-    public static int ResolvedAutoSearchWorkers => WorkerLimitEnabled ? Math.Max(2, Environment.ProcessorCount / 3) : 0;
+    /// parallel search meaningfully faster than a single thread while leaving room for everything else
+    /// on the machine during a long grinding run. Briefly lowered to a third of the processors alongside
+    /// a hard OS-level CPU rate cap (ProcessResourceLimiter, a separate project this one does not
+    /// reference), but that cap turned out to throttle the search even while the machine was otherwise
+    /// idle, and a user reported Highest-quality runs no longer finishing even after 2 hours as a direct
+    /// result. The OS-level cap was replaced with a process-priority reduction (which only yields CPU
+    /// time under real contention), so this worker count was restored to half the processors - it alone
+    /// is enough to keep CP-SAT from pinning every core, without also starving the search on an idle
+    /// machine. When disabled, returns 0 so the caller's "auto" passes straight through to CP-SAT.</summary>
+    public static int ResolvedAutoSearchWorkers => WorkerLimitEnabled ? Math.Max(2, Environment.ProcessorCount / 2) : 0;
 
     public Task<ScheduleSolution> SolveAsync(
         ScheduleProblem problem,
