@@ -176,9 +176,18 @@ internal static class OptimizationRunState
             LatestProgress = p;
             _lastReportedElapsed = p.Elapsed;
             _lastReportedAtUtc = DateTime.UtcNow;
+            if (p.IsExtending && p.IsStrategyStarting)
+            {
+                // 延長フェーズ開始時点。延長中はProgressWeightの目盛りを引き直す（ScheduleOptimizer参照）
+                // ため、延長前の実測ペース（weight/秒）をそのまま使うと単位が食い違い、不正確な残り時間に
+                // なる。延長中は次の完了報告（＝延長自体が終わる時）までデータが無いため、素直に
+                // 「計算中…」を表示する（不正確な数字を出すより誠実）。
+                _lastCompletedWeight = 0;
+                _lastCompletedElapsed = TimeSpan.Zero;
+            }
             // 「戦略が完了した」報告だけを実測ペースの基準にする（開始直後の報告はまだ何も終わって
             // いないため、外挿の元にすると常にMaximumDurationへ収束してしまい元の木阿弥になる）。
-            if (!p.IsStrategyStarting && p.Elapsed > TimeSpan.Zero)
+            else if (!p.IsStrategyStarting && p.Elapsed > TimeSpan.Zero)
             {
                 _lastCompletedWeight = p.ProgressWeight;
                 _lastCompletedElapsed = p.Elapsed;

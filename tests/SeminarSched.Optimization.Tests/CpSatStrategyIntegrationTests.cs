@@ -172,8 +172,17 @@ public sealed class CpSatStrategyIntegrationTests
         var result = await optimizer.RunAsync(problem, profile, control, progress);
 
         Assert.True(result.WasExtended);
-        Assert.Contains(extendingReports, p => p.IsStrategyStarting);
-        Assert.Contains(extendingReports, p => !p.IsStrategyStarting);
+        var startReport = Assert.Single(extendingReports, p => p.IsStrategyStarting);
+        var endReport = Assert.Single(extendingReports, p => !p.IsStrategyStarting);
+        // ユーザー報告バグ修正:「残り時間が0になり100%になってもなかなか終わらない」。延長開始時点で
+        // 既にProgressWeightが100%相当のままStrategyWeightが0だと、延長中ずっと100%表示に張り付いて
+        // 動かなくなる（元の不具合）。延長は目盛りを引き直すため、開始時点のProgressWeightは100%未満
+        // （まだ延長分の作業が残っている）で、かつStrategyWeightは0より大きい（延長の経過に応じて
+        // 実際に100%まで動く余地がある）はずで、延長完了時点ではちょうど100%（ProgressWeight+
+        // StrategyWeight=1.0）に達しているはず。
+        Assert.True(startReport.ProgressWeight < 0.999, $"expected extension start to leave room to progress, got ProgressWeight={startReport.ProgressWeight}");
+        Assert.True(startReport.StrategyWeight > 0, $"expected a non-zero StrategyWeight so the percentage can actually move during the extension, got {startReport.StrategyWeight}");
+        Assert.Equal(1.0, endReport.ProgressWeight, precision: 6);
         Assert.NotNull(result.Best);
         Assert.Equal(1, result.Best!.Evaluation.UnassignedLessons);
     }

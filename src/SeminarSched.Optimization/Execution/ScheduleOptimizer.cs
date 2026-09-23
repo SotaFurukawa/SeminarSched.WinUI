@@ -147,10 +147,24 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
         {
             wasExtended = true;
             var extensionBudget = profile.MaximumDuration;
+
+            // ユーザー報告バグ修正: 「残り時間が0になり100%になってもなかなか終わらない」。延長開始時点で
+            // weightConsumedは既に（ほぼ）1.0＝100%まで積み上がっているため、StrategyWeightを0のまま
+            // 報告すると、延長中はEstimateRawの補間式 (ProgressWeight + fraction*StrategyWeight) が
+            // ProgressWeightのまま張り付いて動かず、ずっと100%表示のまま実際には粘り続けてしまっていた
+            // （進捗ではなく事実上「名目時間との比較」に戻ってしまっていた）。延長を「計画全体がもう1単位
+            // 増えた」とみなして目盛りを引き直す: これまでの進捗(weightConsumed)と延長の持ち分を
+            // 合計1.0になるよう比例配分し直し、延長中の実経過時間に応じて滑らかにその範囲内で
+            // 100%まで進むようにする。延長が実際に始まった場合、表示は一度100%付近から後退することに
+            // なるが、これは「少し時間を要しています」の警告と一緒に見せることで、進捗が正しく
+            // 巻き戻ったことを示す（ずっと100%のまま固まって見えるより正確で誠実）。
+            var extensionShare = 1.0;
+            var rescaledBaseWeight = weightConsumed / (weightConsumed + extensionShare);
+            var rescaledExtensionShare = extensionShare / (weightConsumed + extensionShare);
             progress?.Report(new OptimizationProgress(
                 stopwatch.Elapsed, profile.MaximumDuration, OptimizationStageKind.Extension, OptimizationStrategyKind.GrindingNeighborhoodRepair,
                 completed, total, improvementCount, bestBeforeExtension?.Evaluation,
-                weightConsumed, 0, extensionBudget, IsStrategyStarting: true, IsExtending: true));
+                rescaledBaseWeight, rescaledExtensionShare, extensionBudget, IsStrategyStarting: true, IsExtending: true));
 
             using var extensionTimeout = new CancellationTokenSource(extensionBudget);
             using var extensionCancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -182,7 +196,7 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
             progress?.Report(new OptimizationProgress(
                 stopwatch.Elapsed, profile.MaximumDuration, OptimizationStageKind.Extension, OptimizationStrategyKind.GrindingNeighborhoodRepair,
                 completed, total, improvementCount, bestAfterExtension?.Evaluation,
-                weightConsumed, 0, extensionBudget, IsStrategyStarting: false, IsExtending: true));
+                rescaledBaseWeight + rescaledExtensionShare, rescaledExtensionShare, extensionBudget, IsStrategyStarting: false, IsExtending: true));
         }
 
         return new OptimizationRunResult<TSolution>(
