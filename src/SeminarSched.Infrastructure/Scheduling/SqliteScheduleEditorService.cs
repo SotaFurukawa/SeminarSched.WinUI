@@ -214,6 +214,11 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
     /// CountCandidatesAsync（旧実装）と同じ条件（資格・空き時間・出勤不可・同時刻の生徒衝突）を、
     /// 日付を1つに絞って実際のコマコードを返す形に書き換えたもの。講師の同時担当上限（2名まで）は
     /// solverの候補生成でも列挙時点ではフィルタしていないため、ここでも同様に含めない。
+    /// ユーザー報告バグ修正: 講師単位でNOT EXISTSをfallbackさせていたため、アンケートに一度も
+    /// 回答していない講師（TeacherAvailability行が0件）を「常に出勤可能」として扱っていた。
+    /// プロジェクト単位のNOT EXISTS（詳細はSqliteScheduleRunService.BuildProblemAsyncの同種の
+    /// 修正コメント参照）へ変更し、アンケート未取込みのプロジェクトでは従来通り全講師を候補のまま
+    /// 残しつつ、取込み済みプロジェクトでは未回答の講師個別だけを対象外にする。
     /// </summary>
     private static async Task<Dictionary<long,IReadOnlyList<string>>> GetAvailableSlotCodesForDateAsync(SqliteConnection connection,long openDateId,CancellationToken cancellationToken)
     {
@@ -230,7 +235,7 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
             LEFT JOIN StudentAvailability sa ON sa.ProjectId=r.ProjectId AND sa.StudentId=r.StudentId AND sa.OpenDateId=ds.OpenDateId AND sa.TimeSlotId=ds.TimeSlotId
             LEFT JOIN TeacherAvailability ta ON ta.ProjectId=r.ProjectId AND ta.TeacherId=tq.TeacherId AND ta.OpenDateId=ds.OpenDateId AND ta.TimeSlotId=ds.TimeSlotId
             WHERE (NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE ProjectId=r.ProjectId AND StudentId=r.StudentId) OR COALESCE(sa.AvailabilityLevel,0)>0)
-              AND (NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=r.ProjectId AND TeacherId=tq.TeacherId) OR COALESCE(ta.AvailabilityLevel,0)>0)
+              AND (NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=r.ProjectId) OR COALESCE(ta.AvailabilityLevel,0)>0)
               AND NOT EXISTS(SELECT 1 FROM TeacherUnavailability u WHERE u.TeacherId=tq.TeacherId AND u.OpenDateId=ds.OpenDateId AND u.TimeSlotId=ds.TimeSlotId)
               AND NOT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest ar ON ar.Id=a.LessonRequestId WHERE (a.IsLocked=1 OR a.IsManual=1) AND a.OpenDateId=ds.OpenDateId AND a.TimeSlotId=ds.TimeSlotId AND ar.StudentId=r.StudentId)
             ORDER BY r.Id,ts.SortOrder;

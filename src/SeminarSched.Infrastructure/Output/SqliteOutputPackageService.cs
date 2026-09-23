@@ -230,6 +230,10 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
 
     private sealed class CandidateAccumulator{public int Count;public List<(string Date,string Slot,string Teacher)> Top{get;}=new();}
 
+    // ユーザー報告バグ修正: 講師単位でNOT EXISTSをfallbackさせていたため、アンケートに一度も
+    // 回答していない講師（TeacherAvailability行が0件）を「常に出勤可能」として扱っていた。
+    // プロジェクト単位のNOT EXISTS（詳細はSqliteScheduleRunService.BuildProblemAsyncの同種の
+    // 修正コメント参照）へ変更した。
     private static async Task<Dictionary<long,CandidateAccumulator>> CountAndListCandidatesAsync(SqliteConnection c,bool includeStudentCollisionCheck,CancellationToken token)
     {
         var result=new Dictionary<long,CandidateAccumulator>();
@@ -246,7 +250,7 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
             LEFT JOIN StudentAvailability sa ON sa.ProjectId=r.ProjectId AND sa.StudentId=r.StudentId AND sa.OpenDateId=ds.OpenDateId AND sa.TimeSlotId=ds.TimeSlotId
             LEFT JOIN TeacherAvailability ta ON ta.ProjectId=r.ProjectId AND ta.TeacherId=tq.TeacherId AND ta.OpenDateId=ds.OpenDateId AND ta.TimeSlotId=ds.TimeSlotId
             WHERE (NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE ProjectId=r.ProjectId AND StudentId=r.StudentId) OR COALESCE(sa.AvailabilityLevel,0)>0)
-              AND (NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=r.ProjectId AND TeacherId=tq.TeacherId) OR COALESCE(ta.AvailabilityLevel,0)>0)
+              AND (NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=r.ProjectId) OR COALESCE(ta.AvailabilityLevel,0)>0)
               AND NOT EXISTS(SELECT 1 FROM TeacherUnavailability u WHERE u.TeacherId=tq.TeacherId AND u.OpenDateId=ds.OpenDateId AND u.TimeSlotId=ds.TimeSlotId)
               {(includeStudentCollisionCheck?"AND NOT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest ar ON ar.Id=a.LessonRequestId WHERE (a.IsLocked=1 OR a.IsManual=1) AND a.OpenDateId=ds.OpenDateId AND a.TimeSlotId=ds.TimeSlotId AND ar.StudentId=r.StudentId)":"")}
             ORDER BY r.Id,d.Date,ts.SortOrder;

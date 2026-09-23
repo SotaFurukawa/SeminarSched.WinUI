@@ -220,6 +220,16 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
         await InsertRawAssignmentAsync(state.Path,state.RequestId,state.Teacher1Id,state.DateId,state.Slot1Id,isLocked:false,isManual:false);
         var master=new SqliteMasterDataRepository();
         var unqualifiedTeacher=await master.SaveTeacherAsync(state.Path,new Teacher(0,"T-BOARD3","架空 盤講師三"));
+        // このテストは資格外講師のqualification overrideだけを検証したいため、出勤可否は明示的に
+        // 「出勤可能」として登録する（アンケート未回答講師を出勤不可扱いにする不具合修正後は、
+        // 出勤可否データが1件も無い新規講師は他の講師にデータがある限りRedになってしまうため）。
+        await using(var connection=new SqliteConnection($"Data Source={state.Path};Pooling=False"))
+        {
+            await connection.OpenAsync();await using var availability=connection.CreateCommand();
+            availability.CommandText="INSERT INTO TeacherAvailability(ProjectId,TeacherId,OpenDateId,TimeSlotId,AvailabilityLevel) VALUES(1,$teacher,$date,$slot,2);";
+            availability.Parameters.AddWithValue("$teacher",unqualifiedTeacher.Id);availability.Parameters.AddWithValue("$date",state.DateId);availability.Parameters.AddWithValue("$slot",state.Slot2Id);
+            await availability.ExecuteNonQueryAsync();
+        }
         var editor=new SqliteScheduleEditorService();var assignment=Assert.Single(await editor.GetAssignmentsAsync(state.Path));
 
         var preview=await editor.PreviewMoveAsync(state.Path,assignment.Id,unqualifiedTeacher.Id,state.DateId,state.Slot2Id);

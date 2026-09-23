@@ -390,10 +390,18 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
     {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
+        // ユーザー報告バグ修正: 講師側は「行が1件でもあれば、この時間帯の行が無い＝出勤不可」という
+        // 条件だった（EXISTS(any row) AND NOT EXISTS(this slot available)）ため、アンケートに一度も
+        // 回答していない講師（TeacherAvailability行が0件）は前段のEXISTSがfalseとなり、常に出勤可能
+        // 扱いになっていた。判定の粒度を「講師単位」ではなく「プロジェクト単位」に変更した
+        // （プロジェクト全体でまだ出勤可否データを1件も取込んでいなければ、従来通り出勤可能扱いの
+        // ままにする。詳細はSqliteScheduleRunService.BuildProblemAsyncの同種の修正コメント参照。
+        // このアプリは1ファイル1プロジェクト固定のためProjectId=1で決め打ちする、この付近の他の
+        // クエリと同じ慣習）。生徒側は意図的な既定動作（未回答なら空き扱い）のため据え置く。
         command.CommandText = """
             SELECT
               (EXISTS(SELECT 1 FROM StudentAvailability WHERE StudentId=$student) AND NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE StudentId=$student AND OpenDateId=$date AND TimeSlotId=$slot AND AvailabilityLevel>0))
-              OR (EXISTS(SELECT 1 FROM TeacherAvailability WHERE TeacherId=$teacher) AND NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE TeacherId=$teacher AND OpenDateId=$date AND TimeSlotId=$slot AND AvailabilityLevel>0))
+              OR (EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=1) AND NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE TeacherId=$teacher AND OpenDateId=$date AND TimeSlotId=$slot AND AvailabilityLevel>0))
               OR EXISTS(SELECT 1 FROM TeacherUnavailability WHERE TeacherId=$teacher AND OpenDateId=$date AND TimeSlotId=$slot);
             """;
         command.Parameters.AddWithValue("$student", studentId);

@@ -103,6 +103,18 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
             }
         }
 
+        // ユーザー報告バグ修正: 生徒側は「アンケート回答行が1件も無い＝まだ取込みしていない」場合だけ
+        // NOT EXISTS(...)で全コマ候補扱いへfallbackする（CourseSurveyImportServiceは回答があった生徒
+        // にしかLessonRequest自体を作らないため、この分岐は実質到達しない安全弁）。一方、講師は
+        // TeacherQualification経由で常にJOINへ乗るため、講師単位でNOT EXISTSをfallbackさせると、
+        // アンケートに一度も回答していない講師（TeacherAvailability行が1件も無い）が「常に出勤可能」
+        // として全コマの候補に混入してしまう。かといってfallback自体を完全に無くすと、今度は
+        // プロジェクト全体でまだ一度も出勤可否を取込んでいない（TeacherAvailability行がプロジェクトに
+        // 1件も無い）通常の初期状態で、全講師が候補から消えてしまう（試験用fixtureや、アンケート機能を
+        // 使わない小規模運用が壊れる）。そこで判定の粒度を「講師単位」ではなく「プロジェクト単位」に
+        // 変更した: プロジェクト内に出勤可否データが1件もまだ無ければ（＝アンケート未取込み状態）
+        // 全コマ候補のまま、1件でもあれば（＝アンケートを取込み済み）、回答していない講師個別を
+        // 対象外とする。
         var candidates = new List<PlacementCandidate>();
         await using (var command = connection.CreateCommand())
         {
@@ -122,7 +134,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
                 LEFT JOIN StudentAvailability sa ON sa.ProjectId=r.ProjectId AND sa.StudentId=r.StudentId AND sa.OpenDateId=ds.OpenDateId AND sa.TimeSlotId=ds.TimeSlotId
                 LEFT JOIN TeacherAvailability ta ON ta.ProjectId=r.ProjectId AND ta.TeacherId=tq.TeacherId AND ta.OpenDateId=ds.OpenDateId AND ta.TimeSlotId=ds.TimeSlotId
                 WHERE (NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE ProjectId=r.ProjectId AND StudentId=r.StudentId) OR COALESCE(sa.AvailabilityLevel,0)>0)
-                  AND (NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=r.ProjectId AND TeacherId=tq.TeacherId) OR COALESCE(ta.AvailabilityLevel,0)>0)
+                  AND (NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=r.ProjectId) OR COALESCE(ta.AvailabilityLevel,0)>0)
                   AND NOT EXISTS(SELECT 1 FROM TeacherUnavailability u WHERE u.TeacherId=tq.TeacherId AND u.OpenDateId=ds.OpenDateId AND u.TimeSlotId=ds.TimeSlotId)
                   AND NOT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest ar ON ar.Id=a.LessonRequestId WHERE (a.IsLocked=1 OR a.IsManual=1) AND a.OpenDateId=ds.OpenDateId AND a.TimeSlotId=ds.TimeSlotId AND ar.StudentId=r.StudentId);
                 """;

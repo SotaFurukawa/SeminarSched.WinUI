@@ -93,6 +93,57 @@ public sealed class SqliteScheduleRunServiceTests : IDisposable
         Assert.Equal(0L, Convert.ToInt64(await countOther.ExecuteScalarAsync()));
     }
 
+    // ユーザー報告バグ修正: アンケートに一度も回答していない講師（TeacherAvailability行が0件）が
+    // 「常に出勤可能」として扱われ、候補に混入していた。資格はあるが行が0件の講師は、実際に行を
+    // 持つ講師がいるにもかかわらず一切配置されないことを確認する。
+    [Fact]
+    public async Task RunAsync_TreatsTeacherWithNoAvailabilityResponseAsFullyUnavailable()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "no-survey-response.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
+        var master = new SqliteMasterDataRepository();
+        var student = await master.SaveStudentAsync(path, new Student(0, "S-NR", "架空 生徒", "中2"));
+        var responded = await master.SaveTeacherAsync(path, new Teacher(0, "T-RESP", "架空 回答講師"));
+        var noResponse = await master.SaveTeacherAsync(path, new Teacher(0, "T-NORESP", "架空 未回答講師"));
+        var subject = await master.SaveSubjectAsync(path, new Subject(0, "JH_MATH2", "数学", "数", "中学", 1));
+        await master.SaveQualificationAsync(path, new TeacherQualification(responded.Id, subject.Id, true));
+        await master.SaveQualificationAsync(path, new TeacherQualification(noResponse.Id, subject.Id, true));
+        var course = new SqliteCourseSettingsRepository();
+        var slot = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "1", "1限", new TimeOnly(9, 0), new TimeOnly(10, 0), 1));
+        await course.SaveCourseDayAsync(path, new CourseDay(new DateOnly(2026, 7, 20), true, "", [slot.Id]));
+
+        await using (var connection = new SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using (var insertRequest = connection.CreateCommand())
+            {
+                insertRequest.CommandText = "INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,$student,$subject,1);";
+                insertRequest.Parameters.AddWithValue("$student", student.Id);
+                insertRequest.Parameters.AddWithValue("$subject", subject.Id);
+                await insertRequest.ExecuteNonQueryAsync();
+            }
+            // 「回答講師」だけがTeacherAvailability行を持つ（アンケートに回答した想定）。
+            // 「未回答講師」は資格はあるがTeacherAvailability行が0件（一度も回答していない想定）。
+            await using var availability = connection.CreateCommand();
+            availability.CommandText = "INSERT INTO TeacherAvailability(ProjectId,TeacherId,OpenDateId,TimeSlotId,AvailabilityLevel) SELECT 1,$teacher,Id,$slot,1 FROM OpenDate;";
+            availability.Parameters.AddWithValue("$teacher", responded.Id);
+            availability.Parameters.AddWithValue("$slot", slot.Id);
+            await availability.ExecuteNonQueryAsync();
+        }
+
+        var result = await new SqliteScheduleRunService().RunAsync(path, TimeSpan.FromSeconds(5));
+        Assert.Equal(1, result.PlacedLessons);
+        Assert.Equal(0, result.UnassignedLessons);
+
+        await using var verify = new SqliteConnection($"Data Source={path};Mode=ReadOnly;Pooling=False");
+        await verify.OpenAsync();
+        await using var count = verify.CreateCommand();
+        count.CommandText = "SELECT COUNT(*) FROM Assignment WHERE TeacherId=$noResponse;";
+        count.Parameters.AddWithValue("$noResponse", noResponse.Id);
+        Assert.Equal(0L, Convert.ToInt64(await count.ExecuteScalarAsync()));
+    }
+
     // 通常担当講師の出勤可能コマ数(2)が必要回数(3)に満たない場合は、制限を適用せず他の講師も
     // 候補に残す（さもなければ1コマ未配置のまま終わってしまう）。
     [Fact]
