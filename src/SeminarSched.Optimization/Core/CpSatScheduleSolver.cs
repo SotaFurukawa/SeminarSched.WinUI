@@ -103,7 +103,10 @@ public sealed class CpSatScheduleSolver
             LinearExpr.Term(item.variable, 1_000_000L - (item.candidate.PreferencePenalty * 100L) + item.candidate.AvailabilityPreference))
             .Concat(BuildDayDispersionTerms(model, variables))
             .Concat(BuildEvenSpacingTerms(model, problem, variables))
+            .Concat(BuildPairingBonusTerms(model, variables))
             .Concat(BuildSubjectSpacingTerms(model, problem, variables))
+            .Concat(BuildTeacherGapAvoidanceTerms(model, problem, variables))
+            .Concat(BuildTeacherDayConcentrationTerms(model, variables))
             .Concat(regularTeacherShortfallTerms);
         model.Maximize(LinearExpr.Sum(objectiveTerms));
 
@@ -240,6 +243,107 @@ public sealed class CpSatScheduleSolver
 
         foreach (var term in BuildSpacingTerms(model, dayOrder, totalSessionsByRequest, dayUsedByRequestDay, fixedDaysByRequest, SubjectSpacingWeight, "subject_spacing"))
             yield return term;
+    }
+
+    private const long PairingBonusWeight = 3_000L;
+
+    /// <summary>
+    /// ユーザー要望「1対1が多いように見える。絶対ダメではないが1対2の方がいい」への対応。1講師は
+    /// 同時に生徒2名まで担当できる（1対1必須でない受講希望に限る、下のTeacherId/OpenDateId/
+    /// TimeSlotIdごとのハード容量制約 `<= 2` 参照）が、これまでの目的関数にはその2枠目を実際に
+    /// 埋めることへの加点が無く、他の項が偶然2人分埋めない限り1対1のまま（容量の半分しか使わない）
+    /// になっても目的関数上は無差別だった。各（講師・日付・コマ）の組について、実際に2名分埋まって
+    /// いる場合だけ加点する（1名なら加点なし）。`2*paired <= 実際に埋まっている人数` という制約は、
+    /// pairedを0にすることは常に許されるが、1にできるのは人数が2の場合だけ、という片方向の緩和で、
+    /// 最大化の性質上ソルバーは可能な限りpaired=1を選ぶ（＝ズルはできない）。
+    /// </summary>
+    private static IEnumerable<LinearExpr> BuildPairingBonusTerms(
+        CpModel model,
+        IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables)
+    {
+        var index = 0;
+        foreach (var group in variables.GroupBy(item => (item.candidate.TeacherId, item.candidate.OpenDateId, item.candidate.TimeSlotId)))
+        {
+            var pairable = group.Where(item => !item.candidate.OneToOneRequired).Select(item => item.variable).ToArray();
+            if (pairable.Length < 2) continue;
+            var paired = model.NewBoolVar($"paired_{index++}");
+            model.Add(LinearExpr.Term(paired, 2) <= LinearExpr.Sum(pairable));
+            yield return LinearExpr.Term(paired, PairingBonusWeight);
+        }
+    }
+
+    private const long TeacherGapWeight = 2_500L;
+
+    /// <summary>
+    /// ユーザー要望「講師の空きコマも基本作らないでください」への対応。生徒側の
+    /// AddStudentConsecutiveAndGapConstraints（AllowGap=falseなら常にハード制約）と同じ「前後のコマは
+    /// 埋まっているのに真ん中だけ空いている」判定を講師側にも適用するが、講師の出勤不可
+    /// （TeacherUnavailability）等によって穴が構造的に避けられない場合にInfeasibleへ追い込むと
+    /// 元も子もないため、ハードではなくソフトなペナルティとする（「基本」という言葉通り、絶対の
+    /// 禁止ではなく強い推奨として扱う）。1講師が同時に生徒2名まで担当できる（容量2）ため、
+    /// 前後のコマの占有人数が最大2になり得る点を考慮し、スラック変数の上限は0〜3とする。
+    /// </summary>
+    private static IEnumerable<LinearExpr> BuildTeacherGapAvoidanceTerms(
+        CpModel model,
+        ScheduleProblem problem,
+        IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables)
+    {
+        var teacherDays = variables.Select(item => (item.candidate.TeacherId, item.candidate.OpenDateId))
+            .Concat(problem.ExistingPlacements.Select(item => (item.TeacherId, item.OpenDateId)))
+            .Distinct();
+        var index = 0;
+        foreach (var (teacherId, openDateId) in teacherDays)
+        {
+            var teacherDay = variables.Where(item => item.candidate.TeacherId == teacherId && item.candidate.OpenDateId == openDateId).ToArray();
+            var fixedForDay = problem.ExistingPlacements.Where(item => item.TeacherId == teacherId && item.OpenDateId == openDateId).ToArray();
+            var slotOrders = problem.AvailableSlots.Where(slot => slot.OpenDateId == openDateId).Select(slot => slot.SlotOrder).Distinct().Order().ToArray();
+            var occupancy = slotOrders.Select(slotOrder => new
+            {
+                Variables = teacherDay.Where(item => item.candidate.SlotOrder == slotOrder).Select(item => item.variable).ToArray(),
+                Fixed = fixedForDay.Count(item => item.SlotOrder == slotOrder),
+            }).ToArray();
+
+            for (var first = 0; first < occupancy.Length; first++)
+            for (var last = first + 2; last < occupancy.Length; last++)
+            for (var middle = first + 1; middle < last; middle++)
+            {
+                var firstExpr = LinearExpr.Sum(occupancy[first].Variables) + occupancy[first].Fixed;
+                var middleExpr = LinearExpr.Sum(occupancy[middle].Variables) + occupancy[middle].Fixed;
+                var lastExpr = LinearExpr.Sum(occupancy[last].Variables) + occupancy[last].Fixed;
+                var slack = model.NewIntVar(0, 3, $"teacher_gap_slack_{index++}");
+                model.Add(firstExpr + lastExpr - middleExpr <= 1 + slack);
+                yield return LinearExpr.Term(slack, -TeacherGapWeight);
+            }
+        }
+    }
+
+    private const long TeacherDayConcentrationWeight = 1_500L;
+
+    /// <summary>
+    /// ユーザー要望「1日当たりのコマ数も多い方がいい。Aタイムのためだけに出勤させるのは申し訳ない」
+    /// への対応。生徒側のBuildDayDispersionTerms（使用日数が多いほど加点）とは正反対に、講師については
+    /// 使用日数が増えるごとに減点する。これにより、同じ総コマ数であれば、講師の出勤日を（他の制約が
+    /// 許す範囲で）できるだけ少ない日数へ集約し、1日あたりのコマ数を増やす方向へ誘導する。生徒の
+    /// 都合（希望講師・希望コマ・EvenSpacing等）を優先させたいため、重みはそれらの生徒側の項より
+    /// 低く設定している。
+    /// </summary>
+    private static IEnumerable<LinearExpr> BuildTeacherDayConcentrationTerms(
+        CpModel model,
+        IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables)
+    {
+        var index = 0;
+        foreach (var group in variables.GroupBy(item => (item.candidate.TeacherId, item.candidate.OpenDateId)))
+        {
+            var dayVariables = group.Select(item => item.variable).ToArray();
+            if (dayVariables.Length == 1)
+            {
+                yield return LinearExpr.Term(dayVariables[0], -TeacherDayConcentrationWeight);
+                continue;
+            }
+            var dayUsed = model.NewBoolVar($"teacher_day_used_{index++}");
+            model.AddMaxEquality(dayUsed, dayVariables);
+            yield return LinearExpr.Term(dayUsed, -TeacherDayConcentrationWeight);
+        }
     }
 
     /// <summary>Open (school) dates only, in calendar order - closed days never appear here, so every

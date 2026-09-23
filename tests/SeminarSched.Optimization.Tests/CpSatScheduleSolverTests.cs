@@ -215,6 +215,80 @@ public sealed class CpSatScheduleSolverTests
         Assert.Equal(2, solution.Placements.Select(p => p.OpenDateId).Distinct().Count());
     }
 
+    // ユーザー要望「1対1が多いように見える。絶対ダメではないが1対2の方がいい」を検証する。2名の
+    // 生徒が同じ講師・同じ日の2コマのどちらにも配置可能（1対1必須ではない）とき、他の条件が同じなら
+    // 片方のコマへ2名ともまとめて配置（1対2）し、もう片方のコマは空けたままにするはず。
+    [Fact]
+    public async Task SolveAsync_PrefersPairingTwoStudentsInTheSameSlotOverSplittingAcrossSlotsWhenOtherwiseTied()
+    {
+        var demands = new[] { new LessonDemand(1, 10, 1, 0), new LessonDemand(2, 20, 1, 0) };
+        var candidates = new[]
+        {
+            new PlacementCandidate(1, 10, 100, 1, 1),
+            new PlacementCandidate(1, 10, 100, 1, 2),
+            new PlacementCandidate(2, 20, 100, 1, 1),
+            new PlacementCandidate(2, 20, 100, 1, 2),
+        };
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates), TimeSpan.FromSeconds(5));
+
+        Assert.Equal(2, solution.Placements.Count);
+        Assert.Single(solution.Placements.Select(p => p.TimeSlotId).Distinct());
+    }
+
+    // ユーザー要望「講師の空きコマも基本作らないでください」を検証する。1対1必須の2受講希望が、
+    // 同じ講師の3コマ（連続する順序）のうちどれか2つを使える（他の条件は同じ）とき、真ん中を
+    // 空けたまま両端（1・3コマ目）を使う「空きコマ」配置ではなく、隣接する2コマを使うはず。
+    [Fact]
+    public async Task SolveAsync_PrefersAdjacentTeacherSlotsOverLeavingAGapBetweenThemWhenOtherwiseTied()
+    {
+        var demands = new[]
+        {
+            new LessonDemand(1, 10, 1, 0, OneToOneRequired: true),
+            new LessonDemand(2, 20, 1, 0, OneToOneRequired: true),
+        };
+        var candidates = Enumerable.Range(1, 3)
+            .SelectMany(slot => new[]
+            {
+                new PlacementCandidate(1, 10, 100, 1, slot, SlotOrder: slot, OneToOneRequired: true),
+                new PlacementCandidate(2, 20, 100, 1, slot, SlotOrder: slot, OneToOneRequired: true),
+            })
+            .ToArray();
+        var slots = Enumerable.Range(1, 3).Select(slot => new ScheduleSlot(1, slot, 0, slot)).ToArray();
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, slots), TimeSpan.FromSeconds(5));
+
+        Assert.Equal(2, solution.Placements.Count);
+        var usedSlots = solution.Placements.Select(p => p.TimeSlotId).OrderBy(x => x).ToArray();
+        Assert.Equal(1, usedSlots[1] - usedSlots[0]);
+    }
+
+    // ユーザー要望「1日当たりのコマ数も多い方がいい。Aタイムのためだけに出勤させるのは申し訳ない」を
+    // 検証する。1対1必須の2受講希望が、同じ講師の2日間×各2コマのどれでも使える（他の条件は同じ）
+    // とき、2日に1コマずつ分散させるのではなく、1日へ集約して2コマとも使うはず。
+    [Fact]
+    public async Task SolveAsync_ConcentratesATeachersSessionsIntoFewerDaysWhenOtherwiseTied()
+    {
+        var demands = new[]
+        {
+            new LessonDemand(1, 10, 1, 0, OneToOneRequired: true),
+            new LessonDemand(2, 20, 1, 0, OneToOneRequired: true),
+        };
+        var candidates = new[] { 1L, 2L }
+            .SelectMany(day => new[] { 1L, 2L }.SelectMany(slot => new[]
+            {
+                new PlacementCandidate(1, 10, 100, day, slot, OneToOneRequired: true),
+                new PlacementCandidate(2, 20, 100, day, slot, OneToOneRequired: true),
+            }))
+            .ToArray();
+        var slots = new[] { 1L, 2L }.SelectMany(day => new[] { 1L, 2L }.Select(slot => new ScheduleSlot(day, slot, (int)day, (int)slot))).ToArray();
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, slots), TimeSpan.FromSeconds(5));
+
+        Assert.Equal(2, solution.Placements.Count);
+        Assert.Single(solution.Placements.Select(p => p.OpenDateId).Distinct());
+    }
+
     [Fact]
     public void Validator_AcceptsUnsatisfiedRegularTeacherMinimum()
     {
