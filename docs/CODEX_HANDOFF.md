@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.6.1 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 89（⑤講師優先の探索調整（1対2ペア・講師の空きコマ回避・コマ集約）・講師未回答バグ修正・CPU/メモリ制限の強化・集団授業への講師登録・推奨動作環境の表示。v0.6.1公開後のユーザーfollow-up）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
+Latest Development Checkpoint: checkpoint 90（⑤CPU/ワーカー数の追加引き下げ・名目時間を超えても打ち切らず延長して続行。checkpoint89公開直後のユーザーfollow-up）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
 Latest Draft Release: `v0.6.1`（GitHub上にDraftとして作成済み。checkpoint88の内容をユーザーより「今実装した内容をドラフトリリースしてください」との指示を受け作成。Next Version Ruleに従いbug fix/minor change相当でv0.6.1とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.6.1.md](releases/v0.6.1.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -1286,6 +1286,28 @@ v0.6.1公開後、ユーザーから一度にまとめて5件の指示・報告�
 **新規/更新テスト（合計）:** `dotnet test`全190 tests passed（既存181件から、①③④の新規テスト9件・②の新規テスト1件・既存テスト1件の期待値更新）。`SystemRequirements`自体はWindows実機のレジストリ・P/Invokeに依存するためこの環境では単体テストしていない（`ProcessResourceLimiter`/`TaskbarProgress`など他のWinUI層OS連携コードと同様の扱い）。
 
 **動作確認:** Debug構成でビルド警告0・エラー0。①の実際の配置結果・②の実データでの改善・③のCPU/メモリ使用率の実際の下がり方とチェックボックスの効果・④の3.2画面の見た目・⑤のアプリ情報ページの表示とお使いの環境での実際の警告有無は、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
+
+GitHub CIで1件だけ`RunAsync_PreservesUnlockedManualPlacement`が失敗（`すべての戦略で解が得られませんでした`）していたのをユーザー報告で発見・調査。直後の無関係なdocsのみのcommitで同じテストが問題無く通過していたため、CP-SAT単一戦略・2秒という短い持ち時間の組み合わせがCI実行機の混雑時にまれに間に合わなかった一時的なタイミング問題と判断し、5秒へ余裕を持たせた。
+
+### v0.6.1 checkpoint 90 (Claude) — CPU/ワーカー数の追加引き下げ、名目時間を超えても打ち切らず延長して続行
+
+checkpoint89公開直後、ユーザーから2件の追加報告。
+
+**①CPU使用率が依然重い:** 「もう少し動作を軽くしてほしい。i7-10700K（16論理コア、非力な機種ではない）で動かしていてCPU使用率が60%になる。塾のPCは性能が良くないので、この負荷に耐えられないと思う」。checkpoint89のCPU rate control（Job Object、目標50%）とNumSearchWorkers半減だけでは、実測60%と目標の50%を上回っており、制限が意図通りに効いていない可能性を考慮した。
+- `ProcessResourceLimiter`のCPU rate control目標を50%→35%へ引き下げた。
+- `CpSatScheduleSolver.ResolvedAutoSearchWorkers`の計算を「論理コアの半分」→「論理コアの3分の1」へ引き下げた（下限2は維持）。
+- `SetInformationJobObject`の戻り値をこれまで確認していなかった（常に成功したものとして扱っていた）ため、失敗時はアプリのログ（`%LocalAppData%\SeminarSched.WinUI\logs\`）へ記録するようにした。MSIXパッケージのプロセスが既存のJob Objectに含まれていることなどが原因で、Job割り当てや制限の設定自体が失敗している可能性を次回以降このログから診断できるようにする狙い。実機で60%という実測値そのものが「制限は効いているが60%が実際の上限」なのか「制限自体が効いていない」のかは、このログが無いと判別できなかった。
+
+**②名目時間内に終わらない場合は打ち切らず延長:** 「指定時間内に足りない場合がある。そういった場合は途中で中断するのではなく、少し時間を要していますといった警告を出して、続行してください」。①でCPU/ワーカー数を絞ったことで、名目時間内に完成しない（未配置が残る）ケースが増えることが想定されるための直接のfollow-up。
+- `ScheduleOptimizer.RunAsync`に、全ステージを使い切った時点でもBestが無い、またはBestに未配置が残っている場合の「延長フェーズ」を追加した。名目時間（`profile.MaximumDuration`）と同じ長さをもう1回だけ追加で与え、`GrindingNeighborhoodRepairStrategy`（ヒントが無くても必ず1回は試行する設計のため、Bestが無い状態でも安全に呼べる）へ丸ごと使わせる。無限に粘り続けないよう、延長は1回のみ（合計で名目時間の最大2倍）とし、ユーザーが「中断して現在の結果を採用」を押した場合はそこで確実に打ち切る。
+- `OptimizationProgress.IsExtending`（新規フィールド）と`OptimizationRunResult.WasExtended`（新規フィールド）を追加し、延長フェーズ中であることをWinUI層まで伝搬。⑤画面の進捗パネルに警告InfoBar「少し時間を要しています」を追加し、延長中は開く。完了メッセージにも延長が発生したことを注記する。
+- 新規ステージ種別`OptimizationStageKind.Extension`（表示名「延長探索」）を追加。
+- 延長ロジックは`GrindingNeighborhoodRepair`戦略が登録されている場合だけ動く防御的な実装にした（`ScheduleOptimizerTests`の軽量fake戦略テストがこの戦略を登録していないため、無条件に呼ぶと`KeyNotFoundException`で既存テストが壊れていた）。
+- 新規テスト2件（`CpSatStrategyIntegrationTests`）: 構造的に必ず未配置が残る問題で延長フェーズが実際に走り`IsExtending`付きの進捗が開始・終了とも報告されること、逆に最初のステージだけで完成した場合は延長が一切走らないことを、実際にCP-SATを解かせて検証。
+
+**新規/更新テスト（合計）:** `dotnet test`全192 tests passed（既存190件は無修正で通過、Optimizationのみ40→42）。
+
+**動作確認:** Debug構成でビルド警告0・エラー0。①の実際のCPU使用率の下がり方・ログが実際に役立つか、②の延長フェーズの実機での見た目・体感（進捗ゲージの動き、警告の表示）は、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
 
 ### 次回最初に確認するファイル
 
