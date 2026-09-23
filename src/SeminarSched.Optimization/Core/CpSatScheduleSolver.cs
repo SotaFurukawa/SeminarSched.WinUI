@@ -35,12 +35,21 @@ public sealed record CpSatSolveOptions(
 
 public sealed class CpSatScheduleSolver
 {
-    /// <summary>Worker count used in place of a caller's <c>NumSearchWorkers: 0</c> ("auto"). Half the
-    /// logical processors (floor 2, matching the smallest count actually measured as safe - see
-    /// <see cref="CpSatSolveOptions"/>) keeps CP-SAT's parallel search meaningfully faster than a single
-    /// thread while leaving roughly half the machine free for everything else during a long grinding
-    /// run.</summary>
-    public static int ResolvedAutoSearchWorkers { get; } = Math.Max(2, Environment.ProcessorCount / 2);
+    /// <summary>Set false to let a caller's <c>NumSearchWorkers: 0</c> pass through to CP-SAT literally
+    /// (true unbounded auto-parallelism) instead of being resolved to <see cref="ResolvedAutoSearchWorkers"/>.
+    /// This is the "CPU使用率を制限しない" escape hatch checkbox on the ⑤画面: a single process-wide
+    /// switch is safe here because only one optimization run is ever active at a time
+    /// (<c>OptimizationRunState.StartAsync</c> throws if one is already running), so there is no
+    /// concurrent-run race to worry about. Defaults to true (limited).</summary>
+    public static bool WorkerLimitEnabled { get; set; } = true;
+
+    /// <summary>Worker count used in place of a caller's <c>NumSearchWorkers: 0</c> ("auto") while
+    /// <see cref="WorkerLimitEnabled"/> is true. Half the logical processors (floor 2, matching the
+    /// smallest count actually measured as safe - see <see cref="CpSatSolveOptions"/>) keeps CP-SAT's
+    /// parallel search meaningfully faster than a single thread while leaving roughly half the machine
+    /// free for everything else during a long grinding run. When disabled, returns 0 so the caller's
+    /// "auto" passes straight through to CP-SAT.</summary>
+    public static int ResolvedAutoSearchWorkers => WorkerLimitEnabled ? Math.Max(2, Environment.ProcessorCount / 2) : 0;
 
     public Task<ScheduleSolution> SolveAsync(
         ScheduleProblem problem,

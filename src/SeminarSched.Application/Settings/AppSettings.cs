@@ -6,7 +6,8 @@ public sealed record RecentProjectEntry(string Path, string Title, DateTimeOffse
 
 public sealed record AppSettings(
     OptimizationQualityLevel OptimizationQualityLevel,
-    IReadOnlyList<RecentProjectEntry>? RecentProjects = null)
+    IReadOnlyList<RecentProjectEntry>? RecentProjects = null,
+    bool UnrestrictedResourceUsage = false)
 {
     public static AppSettings Default { get; } = new(OptimizationProfileCatalog.DefaultLevel);
 

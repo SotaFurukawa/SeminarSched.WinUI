@@ -15,6 +15,25 @@ public sealed class CpSatScheduleSolverTests
         Assert.True(CpSatScheduleSolver.ResolvedAutoSearchWorkers <= Environment.ProcessorCount);
     }
 
+    // ユーザー要望「CPU使用率を制限しないチェックボックス」を検証する。WorkerLimitEnabledを
+    // falseにすると、呼び出し元のNumSearchWorkers:0（既定）がOR-Tools側へそのまま渡る（真の
+    // 無制限auto）ようにResolvedAutoSearchWorkersが0を返す。他のテストへ影響しないよう、
+    // 元の値へ必ず戻す。
+    [Fact]
+    public void ResolvedAutoSearchWorkers_ReturnsZeroWhenWorkerLimitDisabled()
+    {
+        var original = CpSatScheduleSolver.WorkerLimitEnabled;
+        try
+        {
+            CpSatScheduleSolver.WorkerLimitEnabled = false;
+            Assert.Equal(0, CpSatScheduleSolver.ResolvedAutoSearchWorkers);
+        }
+        finally
+        {
+            CpSatScheduleSolver.WorkerLimitEnabled = original;
+        }
+    }
+
     [Fact]
     public async Task SolveAsync_AssignsAllLessonsWithoutStudentOrTeacherCollision()
     {

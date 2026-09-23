@@ -57,6 +57,7 @@ public sealed partial class OptimizationPage : WorkflowPageBase
             var settings = await App.SettingsStore.LoadAsync();
             ViewModel.Select((int)settings.OptimizationQualityLevel);
             QualitySlider.Value = ViewModel.SliderValue;
+            UnrestrictedResourceUsageCheckBox.IsChecked = settings.UnrestrictedResourceUsage;
             _isLoaded = true;
             var ready = EnsureProject(ProjectRequired);
             ContentPanel.IsEnabled = ready;
@@ -94,7 +95,7 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         {
             var path = App.ProjectService.Current!.Path;
             var profile = OptimizationProfileCatalog.Get(ViewModel.Level);
-            await OptimizationRunState.StartAsync(path, profile);
+            await OptimizationRunState.StartAsync(path, profile, UnrestrictedResourceUsageCheckBox.IsChecked == true);
             RefreshRunUi();
         }
         catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
@@ -179,6 +180,24 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+        }
+        catch (IOException)
+        {
+            SaveErrorInfoBar.IsOpen = true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            SaveErrorInfoBar.IsOpen = true;
+        }
+    }
+
+    private async void UnrestrictedResourceUsageCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_isLoaded) return;
+        try
+        {
+            var settings = await App.SettingsStore.LoadAsync();
+            await App.SettingsStore.SaveAsync(settings with { UnrestrictedResourceUsage = UnrestrictedResourceUsageCheckBox.IsChecked == true });
         }
         catch (IOException)
         {

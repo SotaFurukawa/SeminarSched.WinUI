@@ -103,7 +103,7 @@ internal static class OptimizationRunState
         return (percent, elapsed, remaining);
     }
 
-    public static async Task StartAsync(string projectPath, OptimizationProfile profile)
+    public static async Task StartAsync(string projectPath, OptimizationProfile profile, bool unrestrictedResourceUsage = false)
     {
         if (IsRunning) throw new InvalidOperationException("既に時間割自動作成が実行中です。");
         var beforeRun = await App.ScheduleEditor.CaptureSnapshotAsync(projectPath);
@@ -119,6 +119,12 @@ internal static class OptimizationRunState
         _displayedPercent = 0;
         LastOutcome = null;
         IsRunning = true;
+        // ユーザー報告「CPUにかなり負荷がかかってしまう」への対応。既定ではCPU使用率をOS側で50%へ
+        // 制限し（ProcessResourceLimiter、Job Object CPU rate control）、CP-SATの並列探索ワーカー数も
+        // 論理コアの半分に制限する（SeminarSched.Optimization.Core.CpSatScheduleSolver.WorkerLimitEnabled）。
+        // どちらも「制限しない」チェックボックスがオンの間だけ両方まとめて解除する。
+        SeminarSched.Optimization.Core.CpSatScheduleSolver.WorkerLimitEnabled = !unrestrictedResourceUsage;
+        ProcessResourceLimiter.SetCpuLimit(enabled: !unrestrictedResourceUsage);
         _timer ??= CreateTimer();
         _timer.Start();
         Changed?.Invoke();
@@ -198,6 +204,10 @@ internal static class OptimizationRunState
             _timer?.Stop();
             _control?.Dispose();
             _control = null;
+            // 実行専用のCPU制限は、実行が終わったら解除する（帳票出力など他の操作まで巻き込んで
+            // 遅くしないため）。次回実行時にチェックボックスの状態へ応じて改めて設定される。
+            SeminarSched.Optimization.Core.CpSatScheduleSolver.WorkerLimitEnabled = true;
+            ProcessResourceLimiter.SetCpuLimit(enabled: false);
             if (App.MainWindow is { } window)
             {
                 var hwnd = WindowNative.GetWindowHandle(window);
