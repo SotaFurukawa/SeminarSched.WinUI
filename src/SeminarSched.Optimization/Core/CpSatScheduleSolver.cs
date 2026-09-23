@@ -44,12 +44,16 @@ public sealed class CpSatScheduleSolver
     public static bool WorkerLimitEnabled { get; set; } = true;
 
     /// <summary>Worker count used in place of a caller's <c>NumSearchWorkers: 0</c> ("auto") while
-    /// <see cref="WorkerLimitEnabled"/> is true. Half the logical processors (floor 2, matching the
+    /// <see cref="WorkerLimitEnabled"/> is true. A third of the logical processors (floor 2, matching the
     /// smallest count actually measured as safe - see <see cref="CpSatSolveOptions"/>) keeps CP-SAT's
-    /// parallel search meaningfully faster than a single thread while leaving roughly half the machine
-    /// free for everything else during a long grinding run. When disabled, returns 0 so the caller's
-    /// "auto" passes straight through to CP-SAT.</summary>
-    public static int ResolvedAutoSearchWorkers => WorkerLimitEnabled ? Math.Max(2, Environment.ProcessorCount / 2) : 0;
+    /// parallel search meaningfully faster than a single thread while leaving most of the machine free
+    /// for everything else during a long grinding run. Originally half the processors, but a user
+    /// reported still seeing ~60% CPU usage on a 16-thread i7-10700K (not a weak machine) and was
+    /// specifically worried about their actual (much weaker) school PC, so this was lowered further
+    /// alongside the WinUI layer's own OS-level CPU rate cap (ProcessResourceLimiter, a separate
+    /// project this one does not reference). When disabled, returns 0 so the caller's "auto" passes
+    /// straight through to CP-SAT.</summary>
+    public static int ResolvedAutoSearchWorkers => WorkerLimitEnabled ? Math.Max(2, Environment.ProcessorCount / 3) : 0;
 
     public Task<ScheduleSolution> SolveAsync(
         ScheduleProblem problem,
