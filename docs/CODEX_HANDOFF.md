@@ -7,7 +7,7 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 ## 0. WinUI版の現在地点
 
 Current Version: `v0.6.1 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 88（⑤時間割自動作成: CP-SAT探索のCPU使用率上限・自動作成ゲージの滑らかな表示。v0.6.0公開後のユーザーfollow-up）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
+Latest Development Checkpoint: checkpoint 89（⑤講師優先の探索調整（1対2ペア・講師の空きコマ回避・コマ集約）・講師未回答バグ修正・CPU/メモリ制限の強化・集団授業への講師登録・推奨動作環境の表示。v0.6.1公開後のユーザーfollow-up）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
 Latest Draft Release: `v0.6.1`（GitHub上にDraftとして作成済み。checkpoint88の内容をユーザーより「今実装した内容をドラフトリリースしてください」との指示を受け作成。Next Version Ruleに従いbug fix/minor change相当でv0.6.1とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.6.1.md](releases/v0.6.1.md)）
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
@@ -1251,6 +1251,41 @@ v0.6.0公開直後、ユーザーからcheckpoint86・87の内容を実際に使
 **動作確認:** Debug構成でビルド警告0・エラー0。CPU使用率の実際の下がり方、ゲージが滑らかに見えるかどうかは、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
 
 v0.6.1としてDraft Release作成済み（checkpoint88の区切り。ユーザーより「今実装した内容をドラフトリリースしてください」との指示を受け作成。詳細は[docs/releases/v0.6.1.md](releases/v0.6.1.md)）。
+
+### v0.6.1 checkpoint 89 (Claude) — 講師優先の探索調整、講師未回答バグ修正、CPU/メモリ制限の強化、集団授業への講師登録、推奨動作環境の表示
+
+v0.6.1公開後、ユーザーから一度にまとめて5件の指示・報告。セッションの利用上限に達し中断したため、次回セッションで「トークンが復活したので私が送ったものでできていないものを実装してください」との指示を受け、まとめて対応した。
+
+**①時間割自動作成: 1対2ペアの優先・講師の空きコマ回避・1日あたりのコマ集約:** 「1対1が多いように見える。絶対ダメではないが1対2の方がいい」「講師の空きコマも基本作らないで下さい」「1日当たりのコマ数も多い方がいい（Aタイムのためだけに出勤させるのは申し訳ない）」の3点。
+- `CpSatScheduleSolver.BuildPairingBonusTerms`: 同じ（講師・日付・コマ）に1対1必須でない生徒が2名入っている場合だけ加点する（`2*paired<=実際の人数`という片方向緩和で、最大化の性質上ズルはできない）。
+- `BuildTeacherGapAvoidanceTerms`: 生徒側の`AddStudentConsecutiveAndGapConstraints`と同じ「前後のコマは埋まっているのに真ん中だけ空いている」判定を講師側にも適用するが、講師の出勤不可等で構造的に穴を避けられない場合にInfeasibleへ追い込まないよう、ハードではなくスラック変数によるソフトペナルティとした。
+- `BuildTeacherDayConcentrationTerms`: 生徒側の`BuildDayDispersionTerms`（使用日数が多いほど加点）とは正反対に、講師については使用日数が増えるごとに減点し、同じ総コマ数ならできるだけ少ない出勤日数へ集約する方向へ誘導する。
+- 3つとも生徒側の日程分散・間隔均等化（DayDispersion/EvenSpacing/SubjectSpacing）より弱い重み（3,000/2,500/1,500）とし、生徒の都合を優先させた。
+- 新規テスト3件（CpSatScheduleSolverTests）: 他の条件が同じ場合に、実際にペアリング・隣接コマ・同日集約が選ばれることをCP-SATを実際に解かせて検証。
+
+**②講師のアンケート未回答バグ修正:** 「アンケートに答えていない講師は全て出席できるようになってしまう。アンケートに答えていない講師は全て出席不可としてください」。原因は、候補生成クエリの`NOT EXISTS(...) OR COALESCE(AvailabilityLevel,0)>0`という判定が「講師単位」でTeacherAvailability行の有無を見ていたこと。生徒はアンケート未回答なら`LessonRequest`自体が作られないためこのfallbackは実質到達しない安全弁だが、講師は`TeacherQualification`経由で常にJOINへ乗るため、未回答講師（行0件）がそのまま「常に出勤可能」として候補に混入していた。
+- 修正は「講師単位」の判定を「プロジェクト単位」へ変更: プロジェクト内にまだ出勤可否データが1件も無ければ（＝アンケート未取込みの初期状態）従来通り全講師を候補のまま残し、1件でもあれば（＝アンケートを取込み済み）未回答の講師個別だけを対象外にする。最初は講師単位で`COALESCE(...)>0`のみに単純化する案を実装したが、`CreateBoardStateAsync`等の既存test fixture・実運用で「アンケート機能を使わず講師にAvailabilityデータを一切登録しない」構成が普通にあり得ることが判明し（既存テスト4件が全滅した）、プロジェクト単位の粒度へ設計変更した。
+- 対象4箇所（`SqliteScheduleRunService`・`SqliteScheduleEditorService`・`SqliteOutputPackageService`の候補生成クエリ、`SqliteFixedLessonService.IsAvailableAsync`の手動配置競合チェック）を修正。後者は判定ロジック自体が逆転していた別種のバグ（行が1件でもあれば「この時間帯の行が無い＝出勤不可」という条件だったため、未回答＝行0件だと前段のEXISTSがfalseになり出勤不可判定に到達しなかった）も併せて修正。
+- 新規テスト: `RunAsync_TreatsTeacherWithNoAvailabilityResponseAsFullyUnavailable`（未回答講師が実際に一切配置されないことをCP-SATを実際に解かせて検証）。既存の`MoveAsync_DowngradesUnqualifiedTeacherToYellowAndAllowsConfirmedOverride`は、テスト用の新規講師にたまたま出勤可否データが無かったことで意図せず不具合の恩恵を受けていたため、テスト側で明示的に出勤可能データを与えるよう修正（このテスト本来の検証対象である資格外講師のqualification overrideとは無関係な差分のため）。
+
+**③CPU・メモリ使用率の追加制限（チェックボックスで解除可）:** v0.6.1のnum_search_workers半減だけでは実機で改善が足りなかったとの追加報告「CPU使用率及びメモリ使用率について、最大でも50%にすることは可能か。ただしチェックボックスを用意しておいて、それが押されたら制限をなくすようにする」。
+- `ProcessResourceLimiter`（新規、Windows Job ObjectのCPU rate control）でプロセス全体のCPU使用率を実測OS値として50%へハード制限する。OR-Toolsが内部的に追加で立てるスレッド分も含めて実際にTask Managerで見える数値を制限できる点が、num_search_workers半減との違い。⑤の実行中だけ有効にし、終了時に解除する。
+- `CpSatScheduleSolver.WorkerLimitEnabled`（新規static）を追加し、チェックボックスで両方の制限をまとめて解除できるようにした。
+- メモリの同様のハード制限は意図的に実装していない: Windows Job Objectのメモリ上限は超過時にネイティブ側（OR-Tools、P/Invoke越しのC++ライブラリ）のメモリ確保を失敗させるが、その失敗は.NET側で安全に捕捉できず、探索の途中でプロセスごとクラッシュする恐れがある（CPU rate controlはスレッドを一時停止させるだけで確保failureを起こさない点が本質的に異なる）。メモリはNumSearchWorkersを絞ることによる間接的な抑制にとどめた。
+- ⑤画面に「CPU使用率を制限しない（フルパワーで実行）」チェックボックスを追加（既定オフ＝制限あり）。品質スライダーと同じくAppSettingsへ即時保存。
+- 新規テスト: `ResolvedAutoSearchWorkers_ReturnsZeroWhenWorkerLimitDisabled`、`JsonAppSettingsStoreTests`に`UnrestrictedResourceUsage`の往復・既定値のテスト2件。
+
+**④集団授業の受講登録に講師登録を追加:** 「集団授業の受講登録について、講師の登録もできるようにしたい」。`GroupLessonTeacher`（ClassId,TeacherId）テーブルを新設し、既存の`GroupLessonEnrollment`（生徒の受講登録）と全く同じ形の`GetTeacherCandidatesAsync`/`SetTeacherAssignmentAsync`を追加。3.2 集団授業の受講登録ページに「担当講師」セクション（チェックボックス、複数人可、即時保存）を生徒セクションの上に追加した。個別指導の自動作成・手動配置とは連携しない（集団授業自体が二重予約回避へ未連携なのと同じ制約、情報記録のみ）。
+- 新規テスト2件（`GetTeacherCandidatesAsync`の往復、`DeleteClassAsync`のカスケード削除）。
+
+**⑤アプリ情報に推奨動作環境の表示・警告を追加:** 「性能の最低条件みたいなのをアプリの情報に書いておいてください。もし下回る場合は警告を出してください。CPUの性能などは10年ほど前の型からリスト作っておき(ノートPCも含む)、そこからその基準を作ってください」。
+- 10年ほど前（2015〜2016年頃、Windows 10発売前後）に一般的だったCPU（デスクトップ: Pentium G4400・Core i3-6100、ノートPC: Celeron N3050・Core i5-6200U）のうち最も控えめな構成を基準に、論理プロセッサ数2個以上・CPUベースクロック1.6GHz以上・メモリ4GB以上を最低条件とした。
+- `SystemRequirements`（新規）: CPU名はレジストリ（`HARDWARE\DESCRIPTION\System\CentralProcessor\0\ProcessorNameString`）、コア数は`Environment.ProcessorCount`、メモリは`GetPhysicallyInstalledSystemMemory`（kernel32 P/Invoke）から取得。クロック数はCPU名文字列からのベストエフォート正規表現抽出（取得できない場合は判定をスキップし、誤警告を避ける）。`System.Management`（WMI）は本ソリューションに参照が無く、新規追加も避けたためレジストリ方式を採用。
+- アプリ情報ページに最低条件・検出したハードウェア情報を常時表示し、下回る場合は警告InfoBarを開く。
+
+**新規/更新テスト（合計）:** `dotnet test`全190 tests passed（既存181件から、①③④の新規テスト9件・②の新規テスト1件・既存テスト1件の期待値更新）。`SystemRequirements`自体はWindows実機のレジストリ・P/Invokeに依存するためこの環境では単体テストしていない（`ProcessResourceLimiter`/`TaskbarProgress`など他のWinUI層OS連携コードと同様の扱い）。
+
+**動作確認:** Debug構成でビルド警告0・エラー0。①の実際の配置結果・②の実データでの改善・③のCPU/メモリ使用率の実際の下がり方とチェックボックスの効果・④の3.2画面の見た目・⑤のアプリ情報ページの表示とお使いの環境での実際の警告有無は、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
 
 ### 次回最初に確認するファイル
 
