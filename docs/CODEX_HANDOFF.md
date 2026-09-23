@@ -6,16 +6,16 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.7.0 (beta)`（Draft Release作成済み。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 91（⑤延長フェーズ中に進捗パーセンテージが100%で止まる不具合の修正。v0.7.0公開直後のユーザーfollow-up）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
-Latest Draft Release: `v0.7.0`（GitHub上にDraftとして作成済み。checkpoint89・90の内容をユーザーより「ドラフトリリースしてください」との指示を受け作成。checkpoint89・90はいずれも新機能を含むため、Next Version Ruleに従いv0.7.0とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.7.0.md](releases/v0.7.0.md)）
+Current Version: `v0.7.1 (beta)`（Draft Release作成予定。最適化探索品質等の継続課題は次version以降）
+Latest Development Checkpoint: checkpoint 92（⑤CPUハード上限（Job Object）がアイドル時間まで浪費し「最高品質が2時間かけても終わらない」原因になっていた不具合の修正。プロセス優先度の引き下げ方式へ置き換え。v0.7.0公開直後のユーザーfollow-up）。checkpoint91（⑤延長フェーズ中に進捗パーセンテージが100%で止まる不具合の修正）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
+Latest Draft Release: `v0.7.1`（GitHub上にDraftとして作成予定。checkpoint92の内容はbug fixのため、Next Version Ruleに従いv0.7.1とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.7.1.md](releases/v0.7.1.md)）。1つ前のDraft Releaseは`v0.7.0`（checkpoint89・90、詳細は[docs/releases/v0.7.0.md](releases/v0.7.0.md)）。
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
 
-- v0.7.0 Draft Release後のbug fix / minor change -> `v0.7.1`
-- v0.7.0 Draft Release後のnew feature -> `v0.8.0`
+- v0.7.1 Draft Release後のbug fix / minor change -> `v0.7.2`
+- v0.7.1 Draft Release後のnew feature -> `v0.8.0`
 - `v1.0.0` -> ユーザーの明示指示がある場合のみ
-- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2がその例）。checkpoint83のv0.4.0・checkpoint84〜85のv0.5.0・checkpoint86〜87のv0.6.0・checkpoint88のv0.6.1・checkpoint89〜90のv0.7.0は、いずれもユーザーが番号を指定しなかったため、この既定ルールをそのまま適用した例。
+- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2がその例）。checkpoint83のv0.4.0・checkpoint84〜85のv0.5.0・checkpoint86〜87のv0.6.0・checkpoint88のv0.6.1・checkpoint89〜90のv0.7.0・checkpoint92のv0.7.1は、いずれもユーザーが番号を指定しなかったため、この既定ルールをそのまま適用した例。
 
 ### 実装済み
 
@@ -1326,6 +1326,28 @@ v0.7.0公開直後、ユーザーから「おそらく自動作成のパーセ�
 **新規/更新テスト:** `CpSatStrategyIntegrationTests.RunAsync_ExtendsPastNominalDurationWhenResultIsIncompleteAndReportsIsExtending`に、延長開始時点の`ProgressWeight`が100%未満であること・`StrategyWeight`が0より大きいこと・延長終了時点の`ProgressWeight`がちょうど1.0であることの検証を追加した。`dotnet test`全192 tests passed（既存189件は無修正で通過、変更したのは既存テスト1件への追加アサーションのみ）。
 
 **動作確認:** Debug構成でビルド警告0・エラー0。延長フェーズの実機での見た目（一度後退してから100%へ戻る動き、残り時間が「計算中…」になること）は、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
+
+### v0.7.1 checkpoint 92 (Claude) — CPUハード上限がアイドル時間まで浪費していた問題の修正（延長しても終わらない不具合）
+
+v0.7.0公開後、ユーザーから「CPUの制限をしたせいか、最高品質だと2時間かけても終了しませんでした。PCの性能に合わせた計算の複雑さにするようにしてもらえますか」との報告。
+
+**原因:** checkpoint89で導入・checkpoint90で強化した`ProcessResourceLimiter`（Windows Job ObjectのCPU rate control、`JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP`、目標35%）は、他のアプリが実際にCPUを必要としているかどうかに関わらず、上限に達すると探索スレッドを容赦なく一時停止させる方式だった。つまりユーザーが他の作業をしていないアイドル時間帯であっても、探索は常に35%相当の速度でしか進まない。checkpoint90で追加した「延長フェーズ」は名目時間の最大2倍（最高品質なら60分＋60分＝最大2時間）で必ず打ち切る設計だが、この2時間という枠自体が、本来なら不要な足止めのせいで実際の計算量に対して不足するようになっていた。「CPUの制限をしたせいか」というユーザーの推測は的確だった。
+
+**修正:** `ProcessResourceLimiter`をWindows Job ObjectのCPU rate control（ハード上限）から、`Process.PriorityClass = ProcessPriorityClass.BelowNormal`（プロセス優先度の引き下げ）へ置き換えた。優先度を下げる方式は、Windowsのスケジューラが実際に他のスレッドがCPU時間を必要としている「競合時」にだけ道を譲らせ、PCが空いていれば通常速度で走らせる。「⑤実行中はパソコンが重くなる」という元の懸念（checkpoint88由来）には引き続き対応しつつ、アイドル時間を無駄に浪費する副作用を取り除いた。P/InvokeによるJob Object関連コード（`CreateJobObjectW`・`AssignProcessToJobObject`・`SetInformationJobObject`等）は不要になったため削除した。
+
+`CpSatScheduleSolver.ResolvedAutoSearchWorkers`の上限も、checkpoint90で「論理コアの1/3」まで絞っていたのを「論理コアの1/2」（checkpoint88時点の値）へ戻した。CPU専有の抑制はプロセス優先度側が担うため、ワーカー数側を過剰に絞る必要がなくなった（絞りすぎると並列探索の並列度が下がり、解の発見自体が遅くなる）。
+
+⑤画面の「CPU使用率を制限しない（フルパワーで実行）」チェックボックスの説明文も、新しい挙動（優先度を下げる方式）に合わせて更新した。
+
+延長フェーズ自体の「名目時間の最大2倍で打ち切る」という上限は変更していない。今回の修正でアイドル時間の浪費が無くなれば、実際の完了時間はこの枠に収まりやすくなると見込んでいる。
+
+**「PCの性能に合わせた計算の複雑さにする」という要望について:** 今回は「CPU抑制方式そのものの副作用除去」による速度改善にとどめた。検出したハードウェア性能（`SystemRequirements`、checkpoint89で追加）に応じて品質プロファイルの構成（strategy数・近傍サイズ等）自体を自動的に軽くする、という踏み込んだ対応は行っていない。まずは今回の修正で実機の体感がどう変わるかを見てから、必要であれば追加対応を検討する（ユーザーへの確認が必要な設計判断のため、ADR化は保留）。
+
+**新規/更新テスト:** 既存テストの変更・追加はなし（`ResolvedAutoSearchWorkers`関連のテストは具体的な分母を検証していないため、divisor変更の影響を受けない）。`dotnet test`全192 tests passed。
+
+**動作確認:** Debug構成でビルド警告0・エラー0。実機でのCPU負荷・最高品質での完了時間の改善は、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
+
+v0.7.1としてDraft Release作成予定（bug fixのためNext Version Ruleの既定を適用。詳細は[docs/releases/v0.7.1.md](releases/v0.7.1.md)）。
 
 ### 次回最初に確認するファイル
 
