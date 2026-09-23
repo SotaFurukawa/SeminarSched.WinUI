@@ -17,6 +17,15 @@ public sealed record GroupLessonEnrollmentCandidate(long StudentId, string Exter
     public override string ToString() => $"{(Enrolled ? "✓ " : "")}{Display}";
 }
 
+// ユーザー指示「集団授業の受講登録について、講師の登録もできるようにしたい」への対応。生徒の
+// GroupLessonEnrollmentCandidateと同じ形（在籍中の全講師 + 割当済みかどうか）だが、講師には
+// 学年・AllowOtherGradesに相当する絞り込みが無いため常に在籍中の全講師を返す。
+public sealed record GroupLessonTeacherCandidate(long TeacherId, string ExternalId, string Name, bool Assigned)
+{
+    public string Display => $"{ExternalId}　{Name}";
+    public override string ToString() => $"{(Assigned ? "✓ " : "")}{Display}";
+}
+
 public interface IGroupLessonService
 {
     Task<IReadOnlyList<GroupLessonClass>> GetClassesAsync(string projectPath, CancellationToken cancellationToken = default);
@@ -37,4 +46,9 @@ public interface IGroupLessonService
     // allowOtherGradesがfalseの場合はvalue.Gradeと一致する生徒のみ、trueの場合は全学年の生徒を返す。
     Task<IReadOnlyList<GroupLessonEnrollmentCandidate>> GetEnrollmentCandidatesAsync(string projectPath, long classId, CancellationToken cancellationToken = default);
     Task SetEnrollmentAsync(string projectPath, long classId, long studentId, bool enrolled, CancellationToken cancellationToken = default);
+
+    // 集団授業クラスを担当する講師の登録（複数人可）。個別指導の自動作成・手動配置とは連携しない
+    // （情報として記録するのみ。集団授業自体が個別指導の二重予約回避へ未連携なのと同じ制約）。
+    Task<IReadOnlyList<GroupLessonTeacherCandidate>> GetTeacherCandidatesAsync(string projectPath, long classId, CancellationToken cancellationToken = default);
+    Task SetTeacherAssignmentAsync(string projectPath, long classId, long teacherId, bool assigned, CancellationToken cancellationToken = default);
 }

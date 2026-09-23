@@ -96,6 +96,37 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
         Assert.Contains(withOtherGrades,c=>c.StudentId==state.Student2Id);
     }
 
+    // ユーザー指示「集団授業の受講登録について、講師の登録もできるようにしたい」を検証する。
+    [Fact]
+    public async Task GetTeacherCandidatesAsync_ReturnsAllActiveTeachersAndReflectsAssignment()
+    {
+        var state=await CreateStateAsync();var service=new SqliteGroupLessonService();
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学"));
+
+        var candidates=await service.GetTeacherCandidatesAsync(state.Path,cls.Id);
+        var candidate=Assert.Single(candidates);
+        Assert.Equal(state.Teacher1Id,candidate.TeacherId);Assert.False(candidate.Assigned);
+
+        await service.SetTeacherAssignmentAsync(state.Path,cls.Id,state.Teacher1Id,true);
+        var afterAssign=Assert.Single(await service.GetTeacherCandidatesAsync(state.Path,cls.Id));
+        Assert.True(afterAssign.Assigned);
+
+        await service.SetTeacherAssignmentAsync(state.Path,cls.Id,state.Teacher1Id,false);
+        Assert.False(Assert.Single(await service.GetTeacherCandidatesAsync(state.Path,cls.Id)).Assigned);
+    }
+
+    [Fact]
+    public async Task DeleteClassAsync_CascadesTeacherAssignments()
+    {
+        var state=await CreateStateAsync();var service=new SqliteGroupLessonService();
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学"));
+        await service.SetTeacherAssignmentAsync(state.Path,cls.Id,state.Teacher1Id,true);
+
+        await service.DeleteClassAsync(state.Path,cls.Id);
+
+        Assert.Empty(await service.GetClassesAsync(state.Path));
+    }
+
     private async Task<State> CreateStateAsync()
     {
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,$"{Guid.NewGuid():N}.jukuschedule");
@@ -103,12 +134,13 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
         var master=new SqliteMasterDataRepository();
         var student1=await master.SaveStudentAsync(path,new Student(0,"S-GROUP1","架空 集団生徒一","中2"));
         var student2=await master.SaveStudentAsync(path,new Student(0,"S-GROUP2","架空 集団生徒二","中1"));
+        var teacher1=await master.SaveTeacherAsync(path,new Teacher(0,"T-GROUP1","架空 集団講師一"));
         await using var connection=new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False");
         await connection.OpenAsync();await using var command=connection.CreateCommand();command.CommandText="SELECT Id FROM OpenDate LIMIT 1;";
         var date=Convert.ToInt64(await command.ExecuteScalarAsync());
-        return new State(path,student1.Id,student2.Id,date);
+        return new State(path,student1.Id,student2.Id,teacher1.Id,date);
     }
 
     public void Dispose(){if(Directory.Exists(_directory))Directory.Delete(_directory,true);}
-    private sealed record State(string Path,long Student1Id,long Student2Id,long DateId);
+    private sealed record State(string Path,long Student1Id,long Student2Id,long Teacher1Id,long DateId);
 }

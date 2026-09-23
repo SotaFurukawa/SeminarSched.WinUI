@@ -151,6 +151,37 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<GroupLessonTeacherCandidate>> GetTeacherCandidatesAsync(string projectPath, long classId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT te.Id,te.ExternalId,te.Name,
+                   CASE WHEN gt.TeacherId IS NOT NULL THEN 1 ELSE 0 END
+            FROM Teacher te
+            LEFT JOIN GroupLessonTeacher gt ON gt.TeacherId=te.Id AND gt.ClassId=$class
+            WHERE te.Active=1
+            ORDER BY te.ExternalId;
+            """;
+        command.Parameters.AddWithValue("$class", classId);
+        var result = new List<GroupLessonTeacherCandidate>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            result.Add(new GroupLessonTeacherCandidate(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetBoolean(3)));
+        return result;
+    }
+
+    public async Task SetTeacherAssignmentAsync(string projectPath, long classId, long teacherId, bool assigned, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = assigned
+            ? "INSERT INTO GroupLessonTeacher(ClassId,TeacherId) VALUES($class,$teacher) ON CONFLICT(ClassId,TeacherId) DO NOTHING;"
+            : "DELETE FROM GroupLessonTeacher WHERE ClassId=$class AND TeacherId=$teacher;";
+        command.Parameters.AddWithValue("$class", classId); command.Parameters.AddWithValue("$teacher", teacherId);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     private static async Task<SqliteConnection> OpenAsync(string path, CancellationToken cancellationToken)
     {
         var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Path.GetFullPath(path), Mode = SqliteOpenMode.ReadWrite, ForeignKeys = true, Pooling = false }.ToString());

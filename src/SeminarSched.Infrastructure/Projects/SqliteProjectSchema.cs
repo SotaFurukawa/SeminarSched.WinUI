@@ -363,6 +363,11 @@ internal static class SqliteProjectSchema
             StudentId INTEGER NOT NULL REFERENCES Student(Id) ON DELETE CASCADE,
             PRIMARY KEY(ClassId,StudentId)
         );
+        CREATE TABLE IF NOT EXISTS GroupLessonTeacher (
+            ClassId INTEGER NOT NULL REFERENCES GroupLessonClass(Id) ON DELETE CASCADE,
+            TeacherId INTEGER NOT NULL REFERENCES Teacher(Id) ON DELETE CASCADE,
+            PRIMARY KEY(ClassId,TeacherId)
+        );
         CREATE INDEX IF NOT EXISTS IX_AuditLog_Project_Timestamp ON AuditLog(ProjectId,TimestampUtc);
         CREATE INDEX IF NOT EXISTS IX_ValidationIssue_Project_Resolved ON ValidationIssue(ProjectId,Resolved,Severity);
         CREATE INDEX IF NOT EXISTS IX_OptimizationRun_Project_Started ON OptimizationRun(ProjectId,StartedUtc);

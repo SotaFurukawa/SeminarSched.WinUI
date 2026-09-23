@@ -15,6 +15,18 @@
 
                 <ComboBox x:Name="EnrollmentClass" Header="クラス" SelectionChanged="EnrollmentClass_SelectionChanged" MinWidth="280" />
                 <TextBlock x:Name="EnrollmentClassInfo" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="担当講師" />
+                <TextBlock Text="このクラスを担当する講師にチェックを入れます（複数人可）。個別指導の自動作成・手動配置とは連携しません（記録のみ）。" TextWrapping="Wrap" />
+                <ListView x:Name="EnrollmentTeachers" MaxHeight="240">
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding Assigned}" Checked="TeacherCheck_Changed" Unchecked="TeacherCheck_Changed" Content="{Binding Display}" />
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="受講生徒" />
                 <TextBox x:Name="EnrollmentSearch" Header="生徒名検索" TextChanged="EnrollmentSearch_TextChanged" />
                 <ListView x:Name="EnrollmentStudents" MaxHeight="480">
                     <ListView.ItemTemplate>
