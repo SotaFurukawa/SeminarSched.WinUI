@@ -6,16 +6,16 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.7.1 (beta)`（Draft Release作成予定。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 92（⑤CPUハード上限（Job Object）がアイドル時間まで浪費し「最高品質が2時間かけても終わらない」原因になっていた不具合の修正。プロセス優先度の引き下げ方式へ置き換え。v0.7.0公開直後のユーザーfollow-up）。checkpoint91（⑤延長フェーズ中に進捗パーセンテージが100%で止まる不具合の修正）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
-Latest Draft Release: `v0.7.1`（GitHub上にDraftとして作成予定。checkpoint92の内容はbug fixのため、Next Version Ruleに従いv0.7.1とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.7.1.md](releases/v0.7.1.md)）。1つ前のDraft Releaseは`v0.7.0`（checkpoint89・90、詳細は[docs/releases/v0.7.0.md](releases/v0.7.0.md)）。
+Current Version: `v0.7.2 (beta)`（Draft Release作成予定。最適化探索品質等の継続課題は次version以降）
+Latest Development Checkpoint: checkpoint 93（⑤CP-SATの並列探索ワーカー数制限が、全戦略が明示的に全論理コア数を指定していたせいで一度も実際の探索へ反映されていなかった不具合の修正。高品質/最高品質の探索構成を、名目時間の75%で完成させ25%で改善する配分へ再設計。v0.7.1公開直後もユーザーから「2時間経過しても最高品質が終わらない」との追加報告を受けての対応）。checkpoint92（⑤CPUハード上限（Job Object）がアイドル時間まで浪費し「最高品質が2時間かけても終わらない」原因になっていた不具合の修正。プロセス優先度の引き下げ方式へ置き換え）。checkpoint91（⑤延長フェーズ中に進捗パーセンテージが100%で止まる不具合の修正）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
+Latest Draft Release: `v0.7.2`（GitHub上にDraftとして作成予定。checkpoint93の内容はbug fixのため、Next Version Ruleに従いv0.7.2とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.7.2.md](releases/v0.7.2.md)）。1つ前のDraft Releaseは`v0.7.1`（checkpoint92、詳細は[docs/releases/v0.7.1.md](releases/v0.7.1.md)）、その前は`v0.7.0`（checkpoint89・90、詳細は[docs/releases/v0.7.0.md](releases/v0.7.0.md)）。
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
 
-- v0.7.1 Draft Release後のbug fix / minor change -> `v0.7.2`
-- v0.7.1 Draft Release後のnew feature -> `v0.8.0`
+- v0.7.2 Draft Release後のbug fix / minor change -> `v0.7.3`
+- v0.7.2 Draft Release後のnew feature -> `v0.8.0`
 - `v1.0.0` -> ユーザーの明示指示がある場合のみ
-- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2がその例）。checkpoint83のv0.4.0・checkpoint84〜85のv0.5.0・checkpoint86〜87のv0.6.0・checkpoint88のv0.6.1・checkpoint89〜90のv0.7.0・checkpoint92のv0.7.1は、いずれもユーザーが番号を指定しなかったため、この既定ルールをそのまま適用した例。
+- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2がその例）。checkpoint83のv0.4.0・checkpoint84〜85のv0.5.0・checkpoint86〜87のv0.6.0・checkpoint88のv0.6.1・checkpoint89〜90のv0.7.0・checkpoint92のv0.7.1・checkpoint93のv0.7.2は、いずれもユーザーが番号を指定しなかったため、この既定ルールをそのまま適用した例。
 
 ### 実装済み
 
@@ -1347,7 +1347,29 @@ v0.7.0公開後、ユーザーから「CPUの制限をしたせいか、最高�
 
 **動作確認:** Debug構成でビルド警告0・エラー0。実機でのCPU負荷・最高品質での完了時間の改善は、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
 
-v0.7.1としてDraft Release作成予定（bug fixのためNext Version Ruleの既定を適用。詳細は[docs/releases/v0.7.1.md](releases/v0.7.1.md)）。
+v0.7.1としてDraft Release作成済み（bug fixのためNext Version Ruleの既定を適用。詳細は[docs/releases/v0.7.1.md](releases/v0.7.1.md)）。
+
+### v0.7.2 checkpoint 93 (Claude) — ワーカー数制限が実際には効いていなかった不具合の修正、高品質/最高品質を完成優先の時間配分へ再設計
+
+v0.7.1公開後もユーザーから「2時間経過しても最高品質のものが終わりませんでした。もう少し軽量な仕様にしてください。これだとおそらくもっと性能の悪いPCはたぶん解を一生求められません。イメージだと45分くらいで終わらせて、残りの15分は合間合間でもう少し良いものがないか探索する時間です」との報告。checkpoint92の修正だけでは足りなかったことを受け、さらに調査した。
+
+**原因1（重大）: ワーカー数制限が一度も実際の探索に反映されていなかった。** `CpSatScheduleSolver.ResolvedAutoSearchWorkers`（`WorkerLimitEnabled`経由で有効/無効を切り替える、論理コア数に応じた上限）は、呼び出し元が`CpSatSolveOptions.NumSearchWorkers`を既定の0（自動）のまま渡した場合にだけ`CpSatScheduleSolver.Solve()`内で適用される設計だった（`searchWorkers = options.NumSearchWorkers > 0 ? options.NumSearchWorkers : ResolvedAutoSearchWorkers`）。ところが`CpSatStrategies.cs`の実際の戦略実装（`CpSatStrategyBase.DefaultWorkerCount => Math.Max(1, Environment.ProcessorCount)`、`GrindingStrategyBase.BuildOptions`内の同様のコード）は、どの戦略も明示的にプロセッサの全論理コア数を`NumSearchWorkers`へ渡していたため、`options.NumSearchWorkers > 0`が常に真になり、`ResolvedAutoSearchWorkers`の分岐へは一度も到達していなかった。v0.6.1（1/2）→v0.7.0（1/3）→v0.7.1（1/2に復元）と重ねてきたワーカー数上限の調整は、すべて実質デッドコードに対する変更であり、実際の探索スレッド数を一度も制限できていなかったことが判明した。実際にCPU負荷を抑えていたのはcheckpoint89〜90のJob Object CPU rate control（checkpoint92で撤去済み）だけであり、それがアイドル時間まで浪費する副作用を持っていたことと合わせると、「CPUの制限をしたせいで最高品質が終わらない」というユーザーの推測は、この2つの不具合が重なった結果だったと考えられる。
+
+**修正1:** `CpSatStrategyBase`の`ColdStart`/`WarmStart`、および`GrindingStrategyBase.BuildOptions`から、明示的な`NumSearchWorkers`指定を削除し、既定の0（自動）のまま`CpSatSolveOptions`を構築するようにした。これにより`ResolvedAutoSearchWorkers`の制限（および⑤画面の「CPU使用率を制限しない」チェックボックス）が、このversionで初めて実際の探索へ反映されるようになる。
+
+**原因2: 高品質/最高品質の探索構成が、初期探索を多数の戦略へ均等分割していたため、1戦略あたりの持ち時間が短く「完成させる」こと自体に失敗しやすかった。** 従来の最高品質（名目60分）は、初期探索(0.30=18分)を5戦略で均等分割（1戦略あたり3.6分）、候補改善(0.30=18分)を2戦略で分割（9分）、部分修復(0.25=15分)・最終調整(0.15=9分)をgrinding戦略に割り当てる構成だった。同じ問題を毎回ゼロから短時間（3.6分）で解き直す試行を5回繰り返すより、少数の戦略へまとまった時間を与えた方が、そもそも全コマを配置しきる「完成」に到達しやすい。ユーザー自身の提案（45分で完成・残り15分で改善）はこの直感と一致する。
+
+**修正2:** `OptimizationProfileCatalog`の高品質・最高品質を再設計した。名目時間の75%（初期探索＋候補改善＝「まず完成させる」）と25%（部分修復＋最終調整＝「時間が余ったので改善を試す」）の配分に統一し、初期探索の戦略数も高品質5→3・最高品質5→4へ減らして1戦略あたりの持ち時間を底上げした。
+- 高品質（名目30分）: 初期探索0.50(15分/3戦略=5分each)、候補改善0.25(7.5分/2戦略=3.75分each)、部分修復0.25(7.5分、grinding)。
+- 最高品質（名目60分）: 初期探索0.50(30分/4戦略=7.5分each)、候補改善0.25(15分/2戦略=7.5分each)、部分修復0.15(9分、grinding)、最終調整0.10(6分、grinding)。IE+CA=45分、NR+FP=15分と、ユーザー提案の比率にちょうど一致する。
+
+`OptimizationProfileCatalogTests`の既存アサーション（`UsesTournament`・`UsesHints`・`UsesNeighborhoodRepair`・`UsesFinalPolishing`・`StagnationTimeout`・戦略数の単調非減少・budgetShare合計1.0）はいずれも変更なしで成立することを確認した上でこの構成にした。延長フェーズ（名目時間の最大2倍で打ち切り）自体は変更していない。
+
+**新規/更新テスト:** 既存テストの変更・追加はなし。`dotnet test`全192 tests passed（既存テストの前提を壊さない再設計にしたため）。
+
+**動作確認:** Debug構成でビルド警告0・エラー0。実機でのCPU負荷・最高品質での完了時間の改善（特に今回のワーカー数制限が実際に効くようになったことの効果）は、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
+
+v0.7.2としてDraft Release作成予定（bug fixのためNext Version Ruleの既定を適用。詳細は[docs/releases/v0.7.2.md](releases/v0.7.2.md)）。
 
 ### 次回最初に確認するファイル
 
