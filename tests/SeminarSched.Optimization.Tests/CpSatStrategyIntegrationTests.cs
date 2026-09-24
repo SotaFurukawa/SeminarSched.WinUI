@@ -200,9 +200,12 @@ public sealed class CpSatStrategyIntegrationTests
         {
             new StandardCpSatStrategy(), new GrindingNeighborhoodRepairStrategy(),
         };
+        // CIの実行機が混雑していると、この程度の自明なモデルでもCP-SATの起動・presolveが短い持ち時間
+        // に間に合わないことがある（2026-09-24、CIで実際に発生: RunAsync_PreservesUnlockedManualPlacement
+        // で以前に確認したのと同種の、コードの不具合ではなく一時的なタイミングの問題）ため、余裕を持たせる。
         var profile = new OptimizationProfile(
             OptimizationQualityLevel.Fast, "test", "test", "test",
-            TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2),
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5),
             [new OptimizationStageDefinition(OptimizationStageKind.InitialExploration, 1.0, 1, [OptimizationStrategyKind.StandardCpSat])]);
 
         var optimizer = new ScheduleOptimizer<ScheduleProblem, ScheduleSolution>(strategies);
