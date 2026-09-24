@@ -141,9 +141,29 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         if (outcome is null) return;
         if (outcome is { Success: true, Summary: { } result })
         {
-            RunStatus.Severity = InfoBarSeverity.Success; RunStatus.Title = "時間割を作成しました";
             var extendedNote = result.WasExtended ? "（指定した時間内には完成しなかったため延長して探索しました）" : "";
-            RunStatus.Message = $"配置 {result.PlacedLessons}件、未配置 {result.UnassignedLessons}件、{result.Elapsed.TotalSeconds:F1}秒（採用戦略: {StrategyDisplayName(result.StrategyLabel)}）{extendedNote}。④時間割編集で変更内容を確認できます。";
+            var baseMessage = $"配置 {result.PlacedLessons}件、未配置 {result.UnassignedLessons}件、{result.Elapsed.TotalSeconds:F1}秒（採用戦略: {StrategyDisplayName(result.StrategyLabel)}）{extendedNote}。④時間割編集で変更内容を確認できます。";
+            if (result.UnassignedLessons > 0)
+            {
+                // ユーザー報告「2倍の時間をかけてしまうと...何も生み出していないことになります」への対応。
+                // 未配置が残った結果を、以前は他の完成ケースと同じ緑のSuccess表示で埋もれさせていた
+                // （メッセージ文中に件数はあったが、見た目上は「成功しました」にしか見えない）。未配置が
+                // 1件でもあれば、無理やり作った不完全な時間割であることが一目で分かるようWarning表示にする。
+                RunStatus.Severity = InfoBarSeverity.Warning;
+                RunStatus.Title = $"未配置が{result.UnassignedLessons}件残ったまま作成しました（要確認）";
+                var reasons = new List<string>();
+                if (result.UnassignedDueToRegularTeacherPriority > 0)
+                    reasons.Add($"うち{result.UnassignedDueToRegularTeacherPriority}件は、担当講師優先度が「5（固定）」に設定されている生徒で、指定講師の空きコマ不足が原因の可能性があります。「①設定」の担当設定タブで優先度や講師の出勤可否を見直してください。");
+                if (result.UnassignedWithNoQualifiedTeacher > 0)
+                    reasons.Add($"うち{result.UnassignedWithNoQualifiedTeacher}件は、対応できる講師の候補コマが構造的に見つかりませんでした（講師の資格・出勤可否をご確認ください）。時間をかけても解決しません。");
+                var reasonNote = reasons.Count > 0 ? " " + string.Join(" ", reasons) : "";
+                RunStatus.Message = baseMessage + reasonNote;
+            }
+            else
+            {
+                RunStatus.Severity = InfoBarSeverity.Success; RunStatus.Title = "時間割を作成しました";
+                RunStatus.Message = baseMessage;
+            }
             RunStatus.IsOpen = true;
         }
         else

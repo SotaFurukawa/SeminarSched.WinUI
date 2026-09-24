@@ -189,6 +189,8 @@ public abstract class GrindingStrategyBase(bool freezeToRandomNeighborhood) : IS
     public abstract OptimizationStrategyKind Kind { get; }
 
     // 1回の試行に持ち時間を全部使わせず、必ず複数回試せるように短く切る（最短10秒、最大60秒）。
+    // ただしこの60秒はあくまで初期値: 試行がfeasible解にすら届かず失敗し続ける場合は、下の
+    // ExecuteAsync内で段階的に伸ばす（問題規模に対してこの初期値が短すぎるケースへの対応）。
     private static readonly TimeSpan MinimumAttemptBudget = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan MaximumAttemptBudget = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan MinimumUsefulRemainder = TimeSpan.FromSeconds(3);
@@ -227,8 +229,15 @@ public abstract class GrindingStrategyBase(bool freezeToRandomNeighborhood) : IS
             }
             catch (InvalidOperationException)
             {
-                // このneighborhoodでは解なし（滅多に起きないはずだが、hintそのものが常にfeasibleなので
-                // 理論上は起きない - 念のためのガード）。次の試行で再挑戦する。
+                // hintありの再挑戦では、hint自体が常にfeasibleなので理論上起きないはずのガード。だが
+                // hintが無い状態（Bestが一度も見つかっていないcold start、他の全戦略が未完成のまま
+                // ここへ来た場合など）では、この試行budget自体が問題規模（モデル構築＋presolveの
+                // オーバーヘッド）に対して短すぎて、feasible解にすら届かなかった可能性がある。
+                // ユーザー報告「最高品質だと2時間かけても終わらない」の調査で判明した、粘っても
+                // 一向に前進しないケースの一因。次回以降の試行budgetを倍にして様子を見る
+                // （このステージの持ち時間全体は超えない。それでも届かなければ、単純にこのステージの
+                // 残り時間を使い切って抜ける）。
+                perAttemptBudget = TimeSpan.FromSeconds(Math.Min(context.TimeBudget.TotalSeconds, perAttemptBudget.TotalSeconds * 2));
             }
             attempt++;
         }

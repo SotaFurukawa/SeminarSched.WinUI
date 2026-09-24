@@ -32,7 +32,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
         await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
-        var problem = await BuildProblemAsync(connection, cancellationToken).ConfigureAwait(false);
+        var (problem, regularTeacherRestrictedRequestIds) = await BuildProblemAsync(connection, cancellationToken).ConfigureAwait(false);
 
         var optimizer = new ScheduleOptimizer<ScheduleProblem, ScheduleSolution>(CreateStrategies());
         var result = await optimizer.RunAsync(problem, profile, control, progress, cancellationToken).ConfigureAwait(false);
@@ -42,7 +42,35 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         var solution = result.Best.Solution;
         ScheduleSolutionValidator.Validate(problem, solution);
         await SaveValidatedAsync(connection, problem, solution, profile.MaximumDuration, cancellationToken).ConfigureAwait(false);
-        return new ScheduleRunSummary(solution.Placements.Count, solution.UnassignedLessons, result.Elapsed, result.Best.Strategy.ToString(), result.WasExtended);
+        var (priorityFiveShortfall, noQualifiedTeacher) = DiagnoseUnassignedDemands(problem, solution, regularTeacherRestrictedRequestIds);
+        return new ScheduleRunSummary(
+            solution.Placements.Count, solution.UnassignedLessons, result.Elapsed, result.Best.Strategy.ToString(), result.WasExtended,
+            priorityFiveShortfall, noQualifiedTeacher);
+    }
+
+    // ユーザー報告「配置できない原因がある場合はその警告を出す。例えば、優先度5になっていることで
+    // ハード条件が加えられ、それにより実装できない場合はその旨を伝える」への対応。未配置のまま残った
+    // 受講希望ごとに、原因をベストエフォートで分類する:
+    // - 候補コマが1件も無い（講師の資格・出勤可否等の時点で構造的に配置不可能。時間をかけても解決しない）
+    // - 担当講師優先度5により候補が通常担当講師（＋希望講師）へ絞り込まれ、かつ絞り込み後も余った
+    //   （＝その講師の空きコマ不足が理由である可能性が高い）
+    // どちらにも当てはまらない残りは、他の生徒・講師との競合または探索時間不足など、単一の原因に
+    // 帰属させられないケースとして区別しない（UnassignedLessonsとの差分で分かる）。
+    private static (int PriorityFiveShortfall, int NoQualifiedTeacher) DiagnoseUnassignedDemands(
+        ScheduleProblem problem, ScheduleSolution solution, IReadOnlySet<long> regularTeacherRestrictedRequestIds)
+    {
+        var placedByRequest = solution.Placements.GroupBy(p => p.RequestId).ToDictionary(g => g.Key, g => g.Count());
+        var candidateCountByRequest = problem.Candidates.GroupBy(c => c.RequestId).ToDictionary(g => g.Key, g => g.Count());
+        var priorityFiveShortfall = 0;
+        var noQualifiedTeacher = 0;
+        foreach (var demand in problem.Demands)
+        {
+            var shortfall = Math.Max(0, demand.RequiredSessions - demand.AlreadyFixedSessions - placedByRequest.GetValueOrDefault(demand.RequestId));
+            if (shortfall <= 0) continue;
+            if (candidateCountByRequest.GetValueOrDefault(demand.RequestId) == 0) { noQualifiedTeacher++; continue; }
+            if (regularTeacherRestrictedRequestIds.Contains(demand.RequestId)) priorityFiveShortfall++;
+        }
+        return (priorityFiveShortfall, noQualifiedTeacher);
     }
 
     private static IEnumerable<IScheduleStrategy<ScheduleProblem, ScheduleSolution>> CreateStrategies() =>
@@ -54,7 +82,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         new FinalPolishingStrategy(), new FinalPolishingBStrategy(), new GrindingFinalPolishingStrategy(),
     ];
 
-    private static async Task<ScheduleProblem> BuildProblemAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    private static async Task<(ScheduleProblem Problem, HashSet<long> RegularTeacherRestrictedRequestIds)> BuildProblemAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
         var demands = new List<LessonDemand>();
         var metadata = new Dictionary<long, RequestMetadata>();
@@ -193,8 +221,8 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 fixedPlacements.Add(new FixedPlacement(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3), reader.GetInt64(4), reader.GetInt32(5), reader.GetInt32(6), reader.GetBoolean(7)));
         }
-        var restrictedCandidates = RestrictPriorityFiveCandidatesToPreferredTeachers(candidates, demands, metadata);
-        return new ScheduleProblem(demands, restrictedCandidates, slots, fixedPlacements);
+        var (restrictedCandidates, regularTeacherRestrictedRequestIds) = RestrictPriorityFiveCandidatesToPreferredTeachers(candidates, demands, metadata);
+        return (new ScheduleProblem(demands, restrictedCandidates, slots, fixedPlacements), regularTeacherRestrictedRequestIds);
     }
 
     // ユーザー指示: 担当講師優先度5は通常担当講師に限る（他の講師が候補として残らないようにする）。
@@ -202,13 +230,17 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
     // 場合は、全回数を通常担当講師だけで満たすこと自体が不可能なため、この絞り込みを適用しない
     // （元の全候補のまま残す）。第2希望・第3希望が設定されている場合はそれらも候補として残す
     // （通常担当＝第1希望が優先されるべきという前提は、PreferencePenaltyの得点差で維持される）。
-    private static List<PlacementCandidate> RestrictPriorityFiveCandidatesToPreferredTeachers(
+    // 戻り値のRestrictedRequestIdsは、実際にこの絞り込みが適用された受講希望のID集合
+    // （DiagnoseUnassignedDemandsが、未配置のまま残った理由を「優先度5の講師の空き不足」と
+    // 説明してよいかどうかの判定に使う）。
+    private static (List<PlacementCandidate> Candidates, HashSet<long> RestrictedRequestIds) RestrictPriorityFiveCandidatesToPreferredTeachers(
         List<PlacementCandidate> candidates,
         List<LessonDemand> demands,
         IReadOnlyDictionary<long, RequestMetadata> metadata)
     {
         var demandsById = demands.ToDictionary(demand => demand.RequestId);
         var restricted = new List<PlacementCandidate>(candidates.Count);
+        var restrictedRequestIds = new HashSet<long>();
         foreach (var group in candidates.GroupBy(candidate => candidate.RequestId))
         {
             var demand = demandsById[group.Key];
@@ -224,12 +256,13 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
                     if (meta.PreferredTeacher2Id is long preferred2) allowedTeacherIds.Add(preferred2);
                     if (meta.PreferredTeacher3Id is long preferred3) allowedTeacherIds.Add(preferred3);
                     restricted.AddRange(group.Where(candidate => allowedTeacherIds.Contains(candidate.TeacherId)));
+                    restrictedRequestIds.Add(group.Key);
                     continue;
                 }
             }
             restricted.AddRange(group);
         }
-        return restricted;
+        return (restricted, restrictedRequestIds);
     }
 
     private static int PreferencePenalty(RequestMetadata request, long teacherId)

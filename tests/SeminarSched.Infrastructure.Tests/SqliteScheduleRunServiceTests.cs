@@ -200,5 +200,87 @@ public sealed class SqliteScheduleRunServiceTests : IDisposable
         Assert.Equal(1L, Convert.ToInt64(await countOther.ExecuteScalarAsync()));
     }
 
+    // ユーザー報告「配置できない原因がある場合はその警告を出す。例えば、優先度5になっていることで
+    // ハード条件が加えられ、それにより実装できない場合はその旨を伝える」への対応。2名の生徒が同じ
+    // 通常担当講師（優先度5）を指定し、その講師の出勤可能コマ数が2人分の合計必要回数を満たさない
+    // 状況を作る。各生徒individuallyの必要回数だけを見た絞り込み判定（RestrictPriorityFive...)は
+    // 通過してしまう（単独では足りているように見える）が、2人が同じ講師の同じ枠を取り合うため
+    // OneToOneRequired（ペア不可）にして合計必要回数(4)がその講師の総コマ数(2)を上回るようにし、
+    // 未配置が発生してもDiagnoseUnassignedDemandsが優先度5起因と分類できることを確認する。
+    [Fact]
+    public async Task RunAsync_ReportsUnassignedDueToRegularTeacherPriorityWhenSharedRegularTeacherCapacityIsInsufficient()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "priority5-shared-shortage.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
+        var master = new SqliteMasterDataRepository();
+        var studentA = await master.SaveStudentAsync(path, new Student(0, "S-P5C1", "架空 優先度5生徒三", "中2"));
+        var studentB = await master.SaveStudentAsync(path, new Student(0, "S-P5C2", "架空 優先度5生徒四", "中2"));
+        var regularTeacher = await master.SaveTeacherAsync(path, new Teacher(0, "T-REGC", "架空 通常担当講師三"));
+        var subject = await master.SaveSubjectAsync(path, new Subject(0, "JH_P5C", "優先度5科目三", "共", "中学", 1));
+        await master.SaveQualificationAsync(path, new TeacherQualification(regularTeacher.Id, subject.Id, true));
+        var course = new SqliteCourseSettingsRepository();
+        var slot1 = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "1", "1限", new TimeOnly(9, 0), new TimeOnly(10, 0), 1));
+        var slot2 = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "2", "2限", new TimeOnly(10, 10), new TimeOnly(11, 10), 2));
+        await course.SaveCourseDayAsync(path, new CourseDay(new DateOnly(2026, 7, 20), true, "", [slot1.Id, slot2.Id]));
+
+        await using (var connection = new SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            // 通常担当講師の出勤可能コマは合計2つだけ。両生徒ともOneToOneRequired（ペア不可）で
+            // 各2回必要とする（合計必要回数4 > 講師の総コマ数2）。
+            await using var insertRequest = connection.CreateCommand();
+            insertRequest.CommandText = """
+                INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions,RegularTeacherId,RegularTeacherPriority,OneToOneRequired) VALUES
+                    (1,$studentA,$subject,2,$regular,5,1),
+                    (1,$studentB,$subject,2,$regular,5,1);
+                """;
+            insertRequest.Parameters.AddWithValue("$studentA", studentA.Id);
+            insertRequest.Parameters.AddWithValue("$studentB", studentB.Id);
+            insertRequest.Parameters.AddWithValue("$subject", subject.Id);
+            insertRequest.Parameters.AddWithValue("$regular", regularTeacher.Id);
+            await insertRequest.ExecuteNonQueryAsync();
+        }
+
+        var result = await new SqliteScheduleRunService().RunAsync(path, TimeSpan.FromSeconds(5));
+        Assert.Equal(2, result.PlacedLessons);
+        Assert.Equal(2, result.UnassignedLessons);
+        Assert.True(result.UnassignedDueToRegularTeacherPriority > 0);
+        Assert.Equal(0, result.UnassignedWithNoQualifiedTeacher);
+    }
+
+    // 対応できる講師が資格の時点で1人もいない（＝どれだけ時間をかけても解決しない）科目のケースを
+    // NoQualifiedTeacherとして分類できることを確認する。
+    [Fact]
+    public async Task RunAsync_ReportsUnassignedWithNoQualifiedTeacherWhenNoTeacherCanTeachTheSubject()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "no-qualified-teacher.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
+        var master = new SqliteMasterDataRepository();
+        var student = await master.SaveStudentAsync(path, new Student(0, "S-NQ", "架空 無資格科目生徒", "中2"));
+        var subject = await master.SaveSubjectAsync(path, new Subject(0, "JH_NQ", "無資格科目", "無", "中学", 1));
+        // 講師を1人も資格登録しない（対応できる講師が構造的に0人）。
+        var course = new SqliteCourseSettingsRepository();
+        var slot = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "1", "1限", new TimeOnly(9, 0), new TimeOnly(10, 0), 1));
+        await course.SaveCourseDayAsync(path, new CourseDay(new DateOnly(2026, 7, 20), true, "", [slot.Id]));
+
+        await using (var connection = new SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using var insertRequest = connection.CreateCommand();
+            insertRequest.CommandText = "INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,$student,$subject,1);";
+            insertRequest.Parameters.AddWithValue("$student", student.Id);
+            insertRequest.Parameters.AddWithValue("$subject", subject.Id);
+            await insertRequest.ExecuteNonQueryAsync();
+        }
+
+        var result = await new SqliteScheduleRunService().RunAsync(path, TimeSpan.FromSeconds(5));
+        Assert.Equal(0, result.PlacedLessons);
+        Assert.Equal(1, result.UnassignedLessons);
+        Assert.Equal(1, result.UnassignedWithNoQualifiedTeacher);
+        Assert.Equal(0, result.UnassignedDueToRegularTeacherPriority);
+    }
+
     public void Dispose(){if(Directory.Exists(_directory))Directory.Delete(_directory,true);}
 }
