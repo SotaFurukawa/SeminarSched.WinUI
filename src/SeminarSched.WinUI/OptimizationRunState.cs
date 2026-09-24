@@ -26,6 +26,13 @@ internal static class OptimizationRunState
     public static TimeSpan MaximumDuration { get; private set; }
     public static OptimizationRunOutcome? LastOutcome { get; private set; }
 
+    // ユーザー要望「一時停止ボタンを作ってほしい」（checkpoint99）への対応。IsPauseRequestedは
+    // ボタンを押した瞬間から真になる（すぐ「再開」へ切り替えられるように）。IsPausedは実際に
+    // 探索が止まって待機に入った瞬間（OptimizationRunControl.PausedChanged）から真になり、その間に
+    // 実行中の1戦略・1延長パス分のタイムラグがありうる（画面側はこの2つを区別して案内文を出す）。
+    public static bool IsPauseRequested { get; private set; }
+    public static bool IsPaused { get; private set; }
+
     private static OptimizationRunControl? _control;
     private static TimeSpan _lastReportedElapsed;
     private static DateTime _lastReportedAtUtc;
@@ -74,11 +81,18 @@ internal static class OptimizationRunState
         // 進捗の比率は100%未満のまま止まって見える。実行が終わっている（成功・失敗問わず）
         // 時点で、ユーザーから見れば「もう終わった」ので100%・残り0として表示する。
         if (!IsRunning) return (100, _lastReportedElapsed, TimeSpan.Zero);
-        var elapsed = _lastReportedElapsed + (DateTime.UtcNow - _lastReportedAtUtc);
+        // 一時停止中（checkpoint99）は経過時間・パーセンテージとも動かさず、一時停止した瞬間の値で
+        // 固定表示する（DateTime.UtcNowをそのまま使うと、止まっているはずの間も経過時間が増え続け、
+        // ストラテジー内挿の分だけパーセンテージも動いてしまう）。
+        var elapsed = IsPaused ? _lastReportedElapsed : _lastReportedElapsed + (DateTime.UtcNow - _lastReportedAtUtc);
 
         var progress = LatestProgress;
         double percent;
-        if (progress.IsStrategyStarting)
+        if (IsPaused)
+        {
+            percent = progress.ProgressWeight * 100.0;
+        }
+        else if (progress.IsStrategyStarting)
         {
             var strategyElapsed = DateTime.UtcNow - _lastReportedAtUtc;
             var fraction = progress.StrategyBudget.TotalSeconds <= 0
@@ -111,6 +125,7 @@ internal static class OptimizationRunState
         ScheduleUndoState.Push(beforeRun);
         ScheduleUndoState.ReoptimizationBaseline = beforeRun;
         _control = new OptimizationRunControl();
+        _control.PausedChanged += OnPausedChanged;
         MaximumDuration = profile.MaximumDuration;
         LatestProgress = null;
         _lastReportedElapsed = TimeSpan.Zero;
@@ -119,6 +134,8 @@ internal static class OptimizationRunState
         _lastCompletedElapsed = TimeSpan.Zero;
         _displayedPercent = 0;
         LastOutcome = null;
+        IsPauseRequested = false;
+        IsPaused = false;
         IsRunning = true;
         // ユーザー報告「CPUにかなり負荷がかかってしまう」への対応。既定ではプロセス優先度を下げ
         // （ProcessResourceLimiter、他アプリと競合したときだけ譲る方式）、CP-SATの並列探索ワーカー数も
@@ -135,6 +152,37 @@ internal static class OptimizationRunState
     }
 
     public static void AcceptCurrentBest() => _control?.AcceptCurrentBest();
+
+    public static void RequestPause()
+    {
+        _control?.RequestPause();
+        IsPauseRequested = true;
+        Changed?.Invoke();
+    }
+
+    public static void ResumeFromPause()
+    {
+        _control?.Resume();
+        IsPauseRequested = false;
+        Changed?.Invoke();
+    }
+
+    // OptimizationRunControl.PausedChangedは、ScheduleOptimizer.RunAsync内部（ConfigureAwait(false)で
+    // 実行されるバックグラウンドスレッド）から直接発火する。progress?.Report()経由の更新はSystem.
+    // Progress<T>が生成時に捕捉したSynchronizationContext（UIスレッド）へ自動的にマーシャリングされる
+    // が、このイベントは素のAction<bool>のためその恩恵が無い。UIスレッド側のDispatcherTimerが同じ
+    // フィールドを読むため、必ずDispatcherQueueへ積んでからフィールドを触る。
+    private static void OnPausedChanged(bool isPaused) =>
+        App.MainWindow?.DispatcherQueue.TryEnqueue(() =>
+        {
+            IsPaused = isPaused;
+            // 実際に止まった／再開した瞬間に、経過時間の補間基準を今この瞬間へ合わせ直す。合わせないと、
+            // 一時停止中に進んでいない実時間分が「経過時間」の表示へそのまま加算され続けてしまう
+            // （EstimateRaw()の_lastReportedAtUtcからの経過時間の補間はIsRunningの間ずっと動き続けるため）。
+            _lastReportedElapsed += DateTime.UtcNow - _lastReportedAtUtc;
+            _lastReportedAtUtc = DateTime.UtcNow;
+            Changed?.Invoke();
+        });
 
     public static OptimizationRunOutcome? ConsumeLastOutcome()
     {
@@ -222,7 +270,10 @@ internal static class OptimizationRunState
         finally
         {
             IsRunning = false;
+            IsPauseRequested = false;
+            IsPaused = false;
             _timer?.Stop();
+            if (_control is not null) _control.PausedChanged -= OnPausedChanged;
             _control?.Dispose();
             _control = null;
             // 実行専用のCPU制限は、実行が終わったら解除する（帳票出力など他の操作まで巻き込んで

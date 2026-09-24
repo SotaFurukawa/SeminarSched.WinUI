@@ -89,6 +89,22 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
                     break;
                 }
 
+                // ユーザー要望「一時停止ボタンを作ってほしい」（checkpoint99）への対応。次の戦略を
+                // 開始する直前のこの区切りでのみ一時停止を確認する（実行中の1戦略の途中では止まらない。
+                // OptimizationRunControlのコメント参照）。待機中に「中断して現在の結果を採用」や
+                // 名目時間満了・本当のキャンセルが来た場合は、通常の探索と同じ扱いで抜ける。
+                try
+                {
+                    await control.WaitIfPausedAsync(runCancellation.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (
+                    !cancellationToken.IsCancellationRequested &&
+                    (control.AcceptBestToken.IsCancellationRequested || maximumTime.IsCancellationRequested))
+                {
+                    acceptedEarly = control.AcceptBestToken.IsCancellationRequested;
+                    break;
+                }
+
                 // stageCandidates（このステージ内で既に得られた候補）も見ることで、同じステージ内で
                 // 後から実行される戦略が、直前の戦略の改善結果をhintとして引き継げるようにする
                 // （advancingはステージ完了時にしか更新されないため、これが無いとステージ内の
@@ -209,6 +225,20 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
                 (continueBeyondNominalTimeIfIncomplete && bestBeforeExtension is null &&
                  consecutiveNeverFoundStagnantPasses < NeverFoundAnyCandidatePatienceLimit)))
         {
+            // ユーザー要望「一時停止ボタンを作ってほしい」（checkpoint99）への対応。次の延長パスを
+            // 開始する直前のこの区切りでのみ一時停止を確認する（実行中の1延長パスの途中では止まらない）。
+            try
+            {
+                await control.WaitIfPausedAsync(runCancellation.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (
+                !cancellationToken.IsCancellationRequested &&
+                (control.AcceptBestToken.IsCancellationRequested || maximumTime.IsCancellationRequested))
+            {
+                acceptedEarly = control.AcceptBestToken.IsCancellationRequested;
+                break;
+            }
+
             wasExtended = true;
             extensionPassIndex++;
             var hadCandidateBeforeThisPass = bestBeforeExtension is not null;

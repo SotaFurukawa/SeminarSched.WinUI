@@ -163,7 +163,19 @@ public sealed partial class OptimizationPage : WorkflowPageBase
     {
         OptimizationRunState.AcceptCurrentBest();
         AcceptBestButton.IsEnabled = false;
+        PauseButton.IsEnabled = false;
         RunStageText.Text = "現在の結果を採用しています…";
+    }
+
+    // ユーザー要望「一時停止ボタンを作ってほしい」（checkpoint99）。CP-SATの探索そのものは途中で
+    // 止めて後から続きから再開することができないため、次の戦略・次の延長パスを開始する直前でだけ
+    // 止める方式（OptimizationRunControl参照）。要求してから実際に止まるまで、実行中の1戦略・
+    // 1延長パス分のタイムラグがありうる。
+    private void Pause_Click(object sender, RoutedEventArgs e)
+    {
+        if (OptimizationRunState.IsPauseRequested) OptimizationRunState.ResumeFromPause();
+        else OptimizationRunState.RequestPause();
+        RefreshRunUi();
     }
 
     // ⑤の実行状態はOptimizationRunState（アプリ全体で1つ）が持つため、このPageは1秒ごとのTickや
@@ -172,10 +184,18 @@ public sealed partial class OptimizationPage : WorkflowPageBase
     private void RefreshRunUi()
     {
         var running = OptimizationRunState.IsRunning;
+        var pauseRequested = OptimizationRunState.IsPauseRequested;
         RunButton.IsEnabled = !running && App.ProjectService.Current is not null;
+        PauseButton.IsEnabled = running;
+        PauseButton.Content = pauseRequested ? "再開" : "一時停止";
         AcceptBestButton.IsEnabled = running;
-        RunProgress.IsActive = running;
+        RunProgress.IsActive = running && !OptimizationRunState.IsPaused;
         if (running || OptimizationRunState.LatestProgress is not null) ProgressPanel.Visibility = Visibility.Visible;
+
+        PausedInfoBar.IsOpen = running && pauseRequested;
+        PausedInfoBar.Message = OptimizationRunState.IsPaused
+            ? "「再開」を押すまで、次の探索を開始しません。"
+            : "現在の探索が終わり次第、一時停止します（多少お待ちください）。";
 
         var (percent, elapsed, remaining) = OptimizationRunState.Estimate();
         RunProgressBar.Value = percent;
@@ -187,7 +207,9 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         {
             var stageLabel = StageLabels.GetValueOrDefault(progress.Stage, progress.Stage.ToString());
             var strategyLabel = StrategyLabels.GetValueOrDefault(progress.Strategy, progress.Strategy.ToString());
-            RunStageText.Text = running ? $"{stageLabel}：{strategyLabel}（{progress.StrategiesCompleted}/{progress.StrategiesTotal}戦略）" : "完了しました。";
+            RunStageText.Text = !running ? "完了しました。"
+                : OptimizationRunState.IsPaused ? $"一時停止中（{stageLabel}：{strategyLabel}）"
+                : $"{stageLabel}：{strategyLabel}（{progress.StrategiesCompleted}/{progress.StrategiesTotal}戦略）";
             ExtendingInfoBar.IsOpen = running && progress.IsExtending;
         }
 

@@ -65,6 +65,87 @@ public sealed class ScheduleOptimizerTests
         Assert.Single(result.Candidates);
     }
 
+    // ユーザー要望「一時停止ボタンを作ってほしい」（checkpoint99）を検証する。CP-SATの探索そのものは
+    // pause/resumeできないため、次の戦略を開始する直前の区切りでのみ一時停止を確認する設計
+    // （OptimizationRunControl参照）。1つ目の戦略が実行中に一時停止を要求しても、その戦略自体は
+    // 最後まで走り、2つ目の戦略は「再開」が呼ばれるまで一切開始されないことを検証する。
+    [Fact]
+    public async Task RunAsync_PauseBlocksNextStrategyUntilResumed()
+    {
+        // 数値が小さいほど「良い」評価として扱われる（RunAsync_SelectsBestCandidateUsing
+        // CommonLexicographicEvaluation参照）ため、2つ目の戦略の結果をobjectiveの小さい値にして、
+        // 最終的にBestとして採用されることも合わせて確認する。
+        var first = new GatedStrategy(OptimizationStrategyKind.StandardCpSat, Candidate("first", 0, 0, 2));
+        var second = new GatedStrategy(OptimizationStrategyKind.SeededCpSatA, Candidate("second", 0, 0, 1));
+        var optimizer = new ScheduleOptimizer<string, string>([first, second]);
+        using var control = new OptimizationRunControl();
+        var profile = new OptimizationProfile(
+            OptimizationQualityLevel.Fast, "test", "test", "test",
+            TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30),
+            [new OptimizationStageDefinition(OptimizationStageKind.InitialExploration, 1.0, 1,
+                [OptimizationStrategyKind.StandardCpSat, OptimizationStrategyKind.SeededCpSatA])]);
+
+        var run = optimizer.RunAsync("input", profile, control);
+        await first.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        control.RequestPause();
+        first.Complete();
+
+        // 一時停止中は、1つ目の戦略が終わっても2つ目の戦略を一切開始しないはず。
+        await Task.Delay(TimeSpan.FromMilliseconds(200));
+        Assert.False(second.Started.Task.IsCompleted);
+
+        control.Resume();
+        second.Complete();
+        var result = await run.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal("second", result.Best?.Solution);
+    }
+
+    // 一時停止中に「中断して現在の結果を採用」を押した場合、待機したまま固まらず、直前までの最良の
+    // 結果ですぐに終了することを検証する（一時停止は「中断」の代わりにはならない、という設計）。
+    [Fact]
+    public async Task RunAsync_AcceptCurrentBestUnblocksAPausedRun()
+    {
+        var first = new GatedStrategy(OptimizationStrategyKind.StandardCpSat, Candidate("usable", 0, 0, 10));
+        var second = new GatedStrategy(OptimizationStrategyKind.SeededCpSatA, Candidate("not reached", 0, 0, 0));
+        var optimizer = new ScheduleOptimizer<string, string>([first, second]);
+        using var control = new OptimizationRunControl();
+        var profile = new OptimizationProfile(
+            OptimizationQualityLevel.Fast, "test", "test", "test",
+            TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30),
+            [new OptimizationStageDefinition(OptimizationStageKind.InitialExploration, 1.0, 1,
+                [OptimizationStrategyKind.StandardCpSat, OptimizationStrategyKind.SeededCpSatA])]);
+
+        var run = optimizer.RunAsync("input", profile, control);
+        await first.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        control.RequestPause();
+        first.Complete();
+        await Task.Delay(TimeSpan.FromMilliseconds(200));
+
+        control.AcceptCurrentBest();
+        var result = await run.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(result.AcceptedEarly);
+        Assert.Equal("usable", result.Best?.Solution);
+        Assert.False(second.Started.Task.IsCompleted);
+    }
+
+    private sealed class GatedStrategy(OptimizationStrategyKind kind, ScheduleCandidate<string>? candidate) : IScheduleStrategy<string, string>
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _complete = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public OptimizationStrategyKind Kind => kind;
+
+        public void Complete() => _complete.TrySetResult();
+
+        public async Task<ScheduleCandidate<string>?> ExecuteAsync(StrategyContext<string, string> context, CancellationToken cancellationToken)
+        {
+            Started.TrySetResult();
+            await _complete.Task.ConfigureAwait(false);
+            return candidate;
+        }
+    }
+
     [Fact]
     public async Task RunAsync_UserCancellationDoesNotReturnPartialResult()
     {
