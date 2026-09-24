@@ -127,6 +127,43 @@ public sealed class ScheduleOptimizerTests
         Assert.Equal(new[] { 0.0, 0.3, 0.3, 0.6, 0.6, 1.0 }, weights);
     }
 
+    // ユーザー報告「持ち時間内に完成しなかった場合、このパーセンテージが減少してしまう。これはおかしい
+    // ので、初めから低く見えるようにしてください」を検証する（checkpoint96）。延長
+    // （GrindingNeighborhoodRepair）が戦略registryに登録されている＝構造的に起こり得る場合、
+    // このテストのように実際には延長が一切発生しない（最初のステージだけで未配置0件のまま完成する）
+    // 場合でも、通常ステージの進捗は目盛りの半分（0〜0.5）までしか使わないはず（上のテストと同じ
+    // ステージ構成・同じ重み比だが、GrindingNeighborhoodRepairがregistryに無い上のテストとは異なり
+    // 全ての値がちょうど半分になる）。
+    [Fact]
+    public async Task RunAsync_ReservesHalfTheProgressScaleForAPossibleExtensionEvenWhenNoneIsNeeded()
+    {
+        var strategies = new[]
+        {
+            Strategy(OptimizationStrategyKind.StandardCpSat, Candidate("a", 0, 0, 1)),
+            Strategy(OptimizationStrategyKind.SeededCpSatA, Candidate("b", 0, 0, 2)),
+            Strategy(OptimizationStrategyKind.AlternateDecision, Candidate("c", 0, 0, 3)),
+            Strategy(OptimizationStrategyKind.GrindingNeighborhoodRepair, Candidate("unused", 0, 0, 0)),
+        };
+        var optimizer = new ScheduleOptimizer<string, string>(strategies);
+        using var control = new OptimizationRunControl();
+        var profile = new OptimizationProfile(
+            OptimizationQualityLevel.Fast, "test", "test", "test",
+            TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30),
+            [
+                new OptimizationStageDefinition(OptimizationStageKind.InitialExploration, 0.6, 1,
+                    [OptimizationStrategyKind.StandardCpSat, OptimizationStrategyKind.SeededCpSatA]),
+                new OptimizationStageDefinition(OptimizationStageKind.CandidateAdvancement, 0.4, 1,
+                    [OptimizationStrategyKind.AlternateDecision]),
+            ]);
+
+        var reports = new List<OptimizationProgress>();
+        var result = await optimizer.RunAsync("input", profile, control, new SynchronousProgress<OptimizationProgress>(reports.Add));
+
+        Assert.False(result.WasExtended);
+        var weights = reports.Select(r => Math.Round(r.ProgressWeight, 3)).ToArray();
+        Assert.Equal(new[] { 0.0, 0.15, 0.15, 0.3, 0.3, 0.5 }, weights);
+    }
+
     private sealed class SynchronousProgress<T>(Action<T> callback) : IProgress<T>
     {
         public void Report(T value) => callback(value);

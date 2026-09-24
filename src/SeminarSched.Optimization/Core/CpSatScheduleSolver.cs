@@ -154,7 +154,15 @@ public sealed class CpSatScheduleSolver
         var searchWorkers = options.NumSearchWorkers > 0 ? options.NumSearchWorkers : ResolvedAutoSearchWorkers;
         var parameters = $"max_time_in_seconds:{options.MaximumDuration.TotalSeconds.ToString(CultureInfo.InvariantCulture)} random_seed:{options.RandomSeed} num_search_workers:{searchWorkers}";
         if (options.SearchBranching is not null) parameters += $" search_branching:{options.SearchBranching}";
-        var solver = new CpSolver { StringParameters = parameters };
+        // ユーザー報告「品質レベル3で実行したとき...部分修復探索（連続）(6/6)まで進んでいるにも関わらず、
+        // 途中で強制終了されてしまう。他の品質レベルでも見られる」の調査で発見した不具合。
+        // Google.OrTools.Sat.CpSolverはIDisposable（ネイティブ側のリソースを保持する）だが、
+        // このSolve()は毎回新しいCpSolverを生成するだけで一度も破棄していなかった。grinding戦略
+        // （近傍再探索の連続試行、延長フェーズ）は同じ持ち時間の間に何十〜何百回も新規solveを繰り返す
+        // 設計のため、この未破棄のCpSolverがそのたびに積み重なり、長く走らせるほどネイティブメモリが
+        // 蓄積し続け、最終的にプロセスごと不可解にクラッシュする（.NET側の例外を経由しない、外から見ると
+        // 「強制終了」にしか見えない落ち方になる）実質的なネイティブメモリリークだったと考えられる。
+        using var solver = new CpSolver { StringParameters = parameters };
         using var registration = cancellationToken.Register(solver.StopSearch);
         var status = solver.Solve(model);
         cancellationToken.ThrowIfCancellationRequested();

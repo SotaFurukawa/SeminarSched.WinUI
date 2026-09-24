@@ -181,10 +181,13 @@ internal static class OptimizationRunState
             _lastReportedAtUtc = DateTime.UtcNow;
             if (p.IsExtending && p.IsStrategyStarting)
             {
-                // 延長フェーズ開始時点。延長中はProgressWeightの目盛りを引き直す（ScheduleOptimizer参照）
-                // ため、延長前の実測ペース（weight/秒）をそのまま使うと単位が食い違い、不正確な残り時間に
-                // なる。延長中は次の完了報告（＝延長自体が終わる時）までデータが無いため、素直に
-                // 「計算中…」を表示する（不正確な数字を出すより誠実）。
+                // 延長フェーズ開始時点（checkpoint96で目盛りの単位自体は通常ステージと統一済み、
+                // ScheduleOptimizer.ExtensionReservedShare参照）。それでも延長前の実測ペース
+                // （weight/秒）をそのまま使わない: 通常ステージはCP-SATが早期に証明済み最適解へ
+                // 到達しがちで速いペースになりやすい一方、延長（grinding）は持ち時間いっぱいまで
+                // 試行を粘り続けるため大幅に遅いペースになるのが通常で、そのまま外挿すると残り時間を
+                // 実際より大幅に少なく見積もってしまう。延長中は次の完了報告（＝延長自体が終わる時）
+                // までデータが無いため、素直に「計算中…」を表示する（不正確な数字を出すより誠実）。
                 _lastCompletedWeight = 0;
                 _lastCompletedElapsed = TimeSpan.Zero;
             }
@@ -203,7 +206,13 @@ internal static class OptimizationRunState
             LastOutcome = new OptimizationRunOutcome(true, result, null);
             App.Logger.Info($"Schedule run completed: placed={result.PlacedLessons} unassigned={result.UnassignedLessons} elapsedSec={result.Elapsed.TotalSeconds:F1} strategy={result.StrategyLabel}");
         }
-        catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
+        // ユーザー報告「途中で強制終了されてしまう」の調査で判明: RunCoreAsyncはStartAsyncから
+        // '_ = RunCoreAsync(...)'（await無し）で起動されるため、ここで捕まえ損ねた例外はどこにも
+        // 表示されず、実行中の表示がただ消えるだけの「原因不明の強制終了」に見えてしまう
+        // （.NET自体は既定でプロセスを落とさないが、ユーザーからは成功・失敗どちらの通知も出ない
+        // まま止まって見える）。以前は3種類の例外だけを対象にしていたが、原因を問わず必ず何らかの
+        // 結果（エラーメッセージ）を表示できるよう、対象をすべての例外へ広げた。
+        catch (Exception ex)
         {
             if (ScheduleUndoState.UndoStack.Count > 0) ScheduleUndoState.UndoStack.Pop();
             ScheduleUndoState.ReoptimizationBaseline = null;

@@ -5,6 +5,14 @@ namespace SeminarSched.Optimization.Execution;
 
 public sealed class ScheduleOptimizer<TInput, TSolution>
 {
+    // ユーザー報告「持ち時間内に完成しなかった場合、このパーセンテージが減少してしまう。これはおかしい
+    // ので、初めから低く見えるようにしてください」への対応（checkpoint96）。延長が構造的に起こり得る
+    // 実行では、通常ステージの進捗目盛りをこの割合までしか使わない（残りは延長用に予約しておく）。
+    // 延長は名目時間と同じ長さ（最大で名目時間の2倍）なので、0.5（半分）が実際の時間配分と一致する
+    // 最も誠実な値。延長が発生しない大多数のケースでは、通常ステージ完了時点で最大50%までしか進まず、
+    // 実行終了時に一度だけ100%へ前進する（後退は起きないが、前方向への段差は生じる）。
+    private const double ExtensionReservedShare = 0.5;
+
     private readonly IReadOnlyDictionary<OptimizationStrategyKind, IScheduleStrategy<TInput, TSolution>> _strategies;
 
     public ScheduleOptimizer(IEnumerable<IScheduleStrategy<TInput, TSolution>> strategies)
@@ -38,6 +46,17 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
         using var runCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, maximumTime.Token, control.AcceptBestToken);
 
+        // ユーザー報告「持ち時間内に完成しなかった場合、このパーセンテージが減少してしまう。これは
+        // おかしいので、初めから低く見えるようにしてください」への対応。延長（下記）が構造的に
+        // 起こり得る場合、通常ステージの進捗は名目上の目盛り全体（0.0〜1.0）ではなく、その半分
+        // （0.0〜0.5）だけを使って報告する。延長が実際に発生した場合は残り半分（0.5〜1.0）を
+        // そのまま使えるため、checkpoint91のような「目盛りを後から引き直す」再スケーリングが
+        // 一切不要になり、パーセンテージが後退することが無くなる（延長が発生しない多数派のケースでは、
+        // 通常ステージ完了時点で最大50%までしか進まず、実行終了時（OptimizationRunState側の
+        // !IsRunning判定）に一度で100%へ前進する。後退は無いが前方向への段差は生じる）。
+        var canExtend = _strategies.ContainsKey(OptimizationStrategyKind.GrindingNeighborhoodRepair);
+        var stageWeightScale = canExtend ? ExtensionReservedShare : 1.0;
+
         var weightConsumed = 0.0;
 
         foreach (var stage in profile.Stages)
@@ -69,7 +88,7 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
                 progress?.Report(new OptimizationProgress(
                     stopwatch.Elapsed, profile.MaximumDuration, stage.Kind, kind, completed, total,
                     improvementCount, previousBest?.Evaluation,
-                    weightConsumed, strategyWeight, strategyBudget, IsStrategyStarting: true));
+                    weightConsumed * stageWeightScale, strategyWeight * stageWeightScale, strategyBudget, IsStrategyStarting: true));
 
                 using var strategyTimeout = new CancellationTokenSource(strategyBudget);
                 using var strategyCancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -111,7 +130,7 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
                 progress?.Report(new OptimizationProgress(
                     stopwatch.Elapsed, profile.MaximumDuration, stage.Kind, kind, completed, total,
                     improvementCount, currentBest?.Evaluation,
-                    weightConsumed, strategyWeight, strategyBudget, IsStrategyStarting: false));
+                    weightConsumed * stageWeightScale, strategyWeight * stageWeightScale, strategyBudget, IsStrategyStarting: false));
 
                 if (currentBest is not null && stopwatch.Elapsed - lastImprovement >= profile.StagnationTimeout)
                 {
@@ -148,23 +167,22 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
             wasExtended = true;
             var extensionBudget = profile.MaximumDuration;
 
-            // ユーザー報告バグ修正: 「残り時間が0になり100%になってもなかなか終わらない」。延長開始時点で
-            // weightConsumedは既に（ほぼ）1.0＝100%まで積み上がっているため、StrategyWeightを0のまま
-            // 報告すると、延長中はEstimateRawの補間式 (ProgressWeight + fraction*StrategyWeight) が
-            // ProgressWeightのまま張り付いて動かず、ずっと100%表示のまま実際には粘り続けてしまっていた
-            // （進捗ではなく事実上「名目時間との比較」に戻ってしまっていた）。延長を「計画全体がもう1単位
-            // 増えた」とみなして目盛りを引き直す: これまでの進捗(weightConsumed)と延長の持ち分を
-            // 合計1.0になるよう比例配分し直し、延長中の実経過時間に応じて滑らかにその範囲内で
-            // 100%まで進むようにする。延長が実際に始まった場合、表示は一度100%付近から後退することに
-            // なるが、これは「少し時間を要しています」の警告と一緒に見せることで、進捗が正しく
-            // 巻き戻ったことを示す（ずっと100%のまま固まって見えるより正確で誠実）。
-            var extensionShare = 1.0;
-            var rescaledBaseWeight = weightConsumed / (weightConsumed + extensionShare);
-            var rescaledExtensionShare = extensionShare / (weightConsumed + extensionShare);
+            // ユーザー報告バグ修正（checkpoint91）: 「残り時間が0になり100%になってもなかなか終わらない」。
+            // 当初はStrategyWeightを0のまま報告しており、延長中はEstimateRawの補間式が張り付いて
+            // 動かなかった。この修正では「これまでの進捗と延長の持ち分を合計1.0になるよう事後的に
+            // 比例配分し直す」方式にしたが、延長開始の瞬間に表示が100%付近から後退する（＝今回の
+            // ユーザー報告の原因）副作用があった。
+            //
+            // checkpoint96で再設計: 上記の「事後的な再スケーリング」をやめ、延長が構造的に起こり得る
+            // 場合は最初から通常ステージの目盛りをExtensionReservedShare（0.5）までしか使わないように
+            // した（ステージループ内のprogress報告を参照）。そのため延長開始時点では、目盛りの残り半分
+            // （ExtensionReservedShare〜1.0）がそもそも未使用のまま手つかずで残っており、ここへ
+            // そのまま延長の進捗を割り当てるだけでよい（事後的な再計算・後退が一切不要）。
+            var extensionShare = 1.0 - stageWeightScale;
             progress?.Report(new OptimizationProgress(
                 stopwatch.Elapsed, profile.MaximumDuration, OptimizationStageKind.Extension, OptimizationStrategyKind.GrindingNeighborhoodRepair,
                 completed, total, improvementCount, bestBeforeExtension?.Evaluation,
-                rescaledBaseWeight, rescaledExtensionShare, extensionBudget, IsStrategyStarting: true, IsExtending: true));
+                stageWeightScale, extensionShare, extensionBudget, IsStrategyStarting: true, IsExtending: true));
 
             using var extensionTimeout = new CancellationTokenSource(extensionBudget);
             using var extensionCancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -196,7 +214,7 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
             progress?.Report(new OptimizationProgress(
                 stopwatch.Elapsed, profile.MaximumDuration, OptimizationStageKind.Extension, OptimizationStrategyKind.GrindingNeighborhoodRepair,
                 completed, total, improvementCount, bestAfterExtension?.Evaluation,
-                rescaledBaseWeight + rescaledExtensionShare, rescaledExtensionShare, extensionBudget, IsStrategyStarting: false, IsExtending: true));
+                1.0, extensionShare, extensionBudget, IsStrategyStarting: false, IsExtending: true));
         }
 
         return new OptimizationRunResult<TSolution>(
