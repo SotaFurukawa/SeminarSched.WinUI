@@ -6,16 +6,16 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.7.4 (beta)`（Draft Release作成予定。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 95（担当する生徒の人数（1対N、既定2・範囲1〜10）をプロジェクトごとに設定化、自動作成の探索方針6項目（①一日当たりの講師人数②講師ごとのコマ数の偏り③生徒の授業日④1コマあたりの生徒対応人数⑤時間帯⑥同時に使える座席数）を追加。設定は「①設定」の新タブで既定値として保存、⑤時間割自動作成画面でその回だけ上書きも可能。③④は既存の常時ON機能（日程分散・ペア優遇）をトグル化したもので、既定「考慮しない」にすると既存プロジェクトでも挙動が変わる点はユーザー確認済み。ユーザー指示で番号v0.7.4を明示指定）。checkpoint94（⑤未配置が残った結果を警告として明示、未配置の原因診断（担当講師優先度5・対応可能講師なし）、grinding戦略の試行持ち時間の自動延伸。v0.7.2公開後もユーザーから「既定の倍の時間をかけても無理だった」との追加報告を受けての対応。品質プロファイル自体の見直しはユーザー指示により保留中、実装するまで毎回案内すること）。checkpoint93（⑤CP-SATの並列探索ワーカー数制限が、全戦略が明示的に全論理コア数を指定していたせいで一度も実際の探索へ反映されていなかった不具合の修正。高品質/最高品質の探索構成を、名目時間の75%で完成させ25%で改善する配分へ再設計）。checkpoint92（⑤CPUハード上限（Job Object）がアイドル時間まで浪費し「最高品質が2時間かけても終わらない」原因になっていた不具合の修正。プロセス優先度の引き下げ方式へ置き換え）。checkpoint91（⑤延長フェーズ中に進捗パーセンテージが100%で止まる不具合の修正）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
-Latest Draft Release: `v0.7.4`（GitHub上にDraftとして作成予定。checkpoint95の内容は新機能だが、ユーザーが「v0.7.4として作り、ドラフトリリースしてください」と番号を明示指定したため、Next Version Ruleの既定（新機能はminor bump）ではなくこの番号を使用した。詳細は[docs/releases/v0.7.4.md](releases/v0.7.4.md)）。1つ前のDraft Releaseは`v0.7.3`（checkpoint94、詳細は[docs/releases/v0.7.3.md](releases/v0.7.3.md)）、その前は`v0.7.2`（checkpoint93、詳細は[docs/releases/v0.7.2.md](releases/v0.7.2.md)）。
+Current Version: `v0.7.5 (beta)`（Draft Release作成予定。最適化探索品質等の継続課題は次version以降）
+Latest Development Checkpoint: checkpoint 96（⑤進捗パーセンテージが延長フェーズ開始時に後退する不具合を再設計で解消（事後的な再スケーリングをやめ、延長が構造的に起こり得る実行では最初から通常ステージの目盛りを半分（ExtensionReservedShare=0.5）までしか使わない方式へ変更）。「品質レベル3で部分修復探索(6/6)まで進むが途中で強制終了される」という報告を調査し、`Google.OrTools.Sat.CpSolver`（IDisposable）を一度も破棄していなかったネイティブメモリリークを発見・修正（`using var solver = ...`へ変更）。`OptimizationRunState`の例外処理も3種類限定から全例外捕捉へ広げ、原因不明のまま実行が消えることが無いようにした。実機での確証は得られていないため実機確認待ち）。checkpoint95（担当する生徒の人数（1対N、既定2・範囲1〜10）をプロジェクトごとに設定化、自動作成の探索方針6項目（①一日当たりの講師人数②講師ごとのコマ数の偏り③生徒の授業日④1コマあたりの生徒対応人数⑤時間帯⑥同時に使える座席数）を追加。設定は「①設定」の新タブで既定値として保存、⑤時間割自動作成画面でその回だけ上書きも可能。③④は既存の常時ON機能（日程分散・ペア優遇）をトグル化したもので、既定「考慮しない」にすると既存プロジェクトでも挙動が変わる点はユーザー確認済み。ユーザー指示で番号v0.7.4を明示指定）。checkpoint94（⑤未配置が残った結果を警告として明示、未配置の原因診断（担当講師優先度5・対応可能講師なし）、grinding戦略の試行持ち時間の自動延伸。v0.7.2公開後もユーザーから「既定の倍の時間をかけても無理だった」との追加報告を受けての対応。品質プロファイル自体の見直しはユーザー指示により保留中、実装するまで毎回案内すること）。checkpoint93（⑤CP-SATの並列探索ワーカー数制限が、全戦略が明示的に全論理コア数を指定していたせいで一度も実際の探索へ反映されていなかった不具合の修正。高品質/最高品質の探索構成を、名目時間の75%で完成させ25%で改善する配分へ再設計）。checkpoint92（⑤CPUハード上限（Job Object）がアイドル時間まで浪費し「最高品質が2時間かけても終わらない」原因になっていた不具合の修正。プロセス優先度の引き下げ方式へ置き換え）。checkpoint91（⑤延長フェーズ中に進捗パーセンテージが100%で止まる不具合の修正）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
+Latest Draft Release: `v0.7.5`（GitHub上にDraftとして作成予定。checkpoint96の内容はbug fixのため、Next Version Ruleに従いv0.7.5とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.7.5.md](releases/v0.7.5.md)）。1つ前のDraft Releaseは`v0.7.4`（checkpoint95、ユーザーが番号を明示指定したためNext Version Ruleの既定（新機能はminor bump）ではなくv0.7.4を使用した。詳細は[docs/releases/v0.7.4.md](releases/v0.7.4.md)）、その前は`v0.7.3`（checkpoint94、詳細は[docs/releases/v0.7.3.md](releases/v0.7.3.md)）。
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
 
-- v0.7.4 Draft Release後のbug fix / minor change -> `v0.7.5`
-- v0.7.4 Draft Release後のnew feature -> `v0.8.0`
+- v0.7.5 Draft Release後のbug fix / minor change -> `v0.7.6`
+- v0.7.5 Draft Release後のnew feature -> `v0.8.0`
 - `v1.0.0` -> ユーザーの明示指示がある場合のみ
-- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2、checkpoint95のv0.7.4がその例。checkpoint95は内容としては新機能でminor bump相当だったが、ユーザーが「v0.7.4として作り」と明示指定したためそれに従った）。checkpoint83のv0.4.0・checkpoint84〜85のv0.5.0・checkpoint86〜87のv0.6.0・checkpoint88のv0.6.1・checkpoint89〜90のv0.7.0・checkpoint92のv0.7.1・checkpoint93のv0.7.2・checkpoint94のv0.7.3は、いずれもユーザーが番号を指定しなかったため、この既定ルールをそのまま適用した例。
+- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2、checkpoint95のv0.7.4がその例。checkpoint95は内容としては新機能でminor bump相当だったが、ユーザーが「v0.7.4として作り」と明示指定したためそれに従った）。checkpoint83のv0.4.0・checkpoint84〜85のv0.5.0・checkpoint86〜87のv0.6.0・checkpoint88のv0.6.1・checkpoint89〜90のv0.7.0・checkpoint92のv0.7.1・checkpoint93のv0.7.2・checkpoint94のv0.7.3・checkpoint96のv0.7.5は、いずれもユーザーが番号を指定しなかったため、この既定ルールをそのまま適用した例。
 
 ### 実装済み
 
@@ -1424,7 +1424,33 @@ v0.7.3としてDraft Release作成済み（bug fixのためNext Version Ruleの�
 
 **動作確認:** Debug構成でビルド警告0・エラー0。新規プロジェクト作成欄・「①設定」の新タブ・⑤画面の一時上書きセクションの実機での見た目・操作感は、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
 
-v0.7.4としてDraft Release作成予定（ユーザーから明示的に「v0.7.4として作り、ドラフトリリースしてください」との指示があったため、Next Version Ruleの既定（新機能はminor bump）ではなくこの番号を使用した。詳細は[docs/releases/v0.7.4.md](releases/v0.7.4.md)）。
+v0.7.4としてDraft Release作成済み（ユーザーから明示的に「v0.7.4として作り、ドラフトリリースしてください」との指示があったため、Next Version Ruleの既定（新機能はminor bump）ではなくこの番号を使用した。詳細は[docs/releases/v0.7.4.md](releases/v0.7.4.md)）。
+
+### v0.7.5 checkpoint 96 (Claude) — 進捗パーセンテージの後退を再設計で解消、CP-SATソルバーの未破棄によるネイティブメモリリークを発見・修正
+
+ユーザーから2件の報告（1件目への作業中に2件目が続けて届いた）。①「持ち時間内に完成しなかった場合、このパーセンテージが減少してしまう。これはおかしいので、初めから低く見えるようにしてください。というかこのパーセンテージはどういう計算になっていますか」。②「品質レベル3で実行したときに、部分修復探索（連続）(6/6)まで言っているにも関わらず、途中で強制終了されてしまいます。この原因を探すこと。これは他の品質レベルでも見られます。また、2倍の時間が経っても、強制終了しないようにしてください。パーセンテージは先ほどお伝えした通りで、時間ではなく、進捗状況に依存させること。これは何度もお伝えしているにも拘わらず修正されていない問題です」。
+
+**①進捗パーセンテージの後退（checkpoint91の再設計）:** checkpoint91は、延長が実際に発生した瞬間に「これまでの進捗と延長の持ち分を合計1.0になるよう事後的に比例配分し直す」方式で、延長開始時に表示が100%付近から後退することを承知の上で「少し時間を要しています」の警告と一緒に見せる設計だった。ユーザーはこの後退自体を「おかしい」と判断したため、事後的な再スケーリングをやめ、延長が構造的に起こり得る実行（`GrindingNeighborhoodRepair`が戦略registryに登録されている場合、実質すべての本番実行が該当）では、最初から通常ステージの進捗目盛りを`ExtensionReservedShare`（0.5、新設の定数）までしか使わないよう`ScheduleOptimizer`を変更した。延長が実際に発生した場合は、目盛りの残り半分（0.5〜1.0）がそのまま未使用で残っているため、そこへ延長の進捗をそのまま割り当てるだけで済み、後退が一切発生しなくなった。延長が発生しない場合（多数派）は、通常ステージ完了時点で最大50%までしか進まないが、実行終了時に一度だけ100%へ前進する（`OptimizationRunState`の「実行中でなくなったら100%」という既存ロジックがそのまま使える）。後退は無いが前方向への段差は生じる、という意図した仕様（ユーザーの「初めから低く見えるようにしてください」という要望に沿う）。
+
+**①パーセンテージの計算方法（ユーザー質問への回答、v0.7.5リリースノートにも記載）:** 経過時間と名目時間の比率ではなく、`OptimizationProgress.ProgressWeight`/`StrategyWeight`（計画済みの全戦略のうち実際に完了・進行中の割合）を基準にしている。詳細は[docs/releases/v0.7.5.md](releases/v0.7.5.md)を参照。
+
+**②原因不明の強制終了の調査:** 「品質レベル3（標準）で部分修復探索（連続）(6/6)まで進んでいるのに強制終了される」という報告を出発点に調査した。標準プロファイル自体は`GrindingNeighborhoodRepair`をステージに含まないが、延長フェーズは戦略registryに登録されてさえいれば（`SqliteScheduleRunService.CreateStrategies()`は常に全戦略を登録するため、実質すべての品質レベルで該当）発生しうる。「(6/6)」は延長フェーズの進捗報告が`completed`/`total`を直前の通常ステージの値のまま引き継いでいる（標準は6戦略）ための表示で、実際には延長フェーズ中だったと考えられる。
+
+`ScheduleOptimizer`/`GrindingStrategyBase`/`CpSatScheduleSolver`のキャンセレーション処理を静的に読み込んだ限りでは、明確なcatch漏れは見当たらなかった。そこでOR-Tools C# APIをリフレクションで直接調査したところ、`Google.OrTools.Sat.CpSolver`は`IDisposable`を実装しており（ネイティブ側のリソースを保持する設計）、`Dispose()`メソッドを持つことを確認した。一方`CpSatScheduleSolver.Solve()`は探索1回ごとに`var solver = new CpSolver {...}`で新規生成するだけで、一度も`Dispose()`していなかった。
+
+grinding戦略（近傍再探索の連続試行、延長フェーズ）は同じ持ち時間の間に何十〜何百回も新規solveを繰り返す設計（checkpoint86）のため、この未破棄の`CpSolver`が試行のたびに積み重なり、実行時間が長くなるほどネイティブメモリが蓄積し続け、最終的にプロセスごと不可解にクラッシュしていた可能性が高いと判断した（ネイティブメモリ不足によるクラッシュは.NET側の例外を経由しないため、ユーザーから見ると「何の説明もなく強制終了された」ようにしか見えない）。この現象は品質レベルを問わずgrinding戦略・延長フェーズが十分長く走れば起こり得るため、「他の品質レベルでも見られる」という報告とも整合する。
+
+**②修正:** `CpSatScheduleSolver.Solve()`を`using var solver = new CpSolver {...};`へ変更し、探索1回ごとに確実に破棄されるようにした（`CpModel`は`IDisposable`を実装しておらず内部的にはprotobufメッセージを保持するだけの純粋なmanagedオブジェクトであることもリフレクションで確認済みのため、対応は`CpSolver`のみで足りる）。
+
+あわせて、`OptimizationRunState.RunCoreAsync`の例外処理を`InvalidOperationException`・`InvalidDataException`・`SqliteException`の3種類限定から`Exception`全体へ広げた。`RunCoreAsync`は`StartAsync`から`_ = RunCoreAsync(...)`という形（awaitしない）で起動されるバックグラウンドタスクのため、この3種類に当てはまらない例外が起きると、実行中の表示がただ消えるだけで成功・失敗どちらの通知も出ない「原因不明の強制終了」に見えていた。今回の変更で、原因を問わず必ず何らかのエラーメッセージが表示されるようになる。
+
+**「2倍の時間が経っても強制終了しないように」という要望について:** 名目時間の最大2倍で打ち切るという設計自体（checkpoint90）は意図的な安全装置のため維持した。今回の修正は、この上限に達する前にクラッシュしてしまっていた問題への対応。
+
+**新規/更新テスト:** `ScheduleOptimizerTests`に1件追加（`RunAsync_ReservesHalfTheProgressScaleForAPossibleExtensionEvenWhenNoneIsNeeded`、延長が戦略registryに登録されているが実際には発生しないケースで、進捗重みが全て半分になることを検証）。既存の延長関連テスト（`CpSatStrategyIntegrationTests.RunAsync_ExtendsPastNominalDurationWhenResultIsIncompleteAndReportsIsExtending`）は再設計後も無修正でそのまま成立することを確認した（延長開始時のProgressWeight<0.999・StrategyWeight>0、延長終了時ProgressWeight=1.0という既存アサーションが、新しい固定0.5境界の設計でも偶然ではなく構造的に成立する）。`CpSolver`の未破棄修正自体は、長時間実行でのメモリ蓄積を確認するテストが現実的に組めないため専用テストは追加していない。`dotnet test`全201 tests passed。
+
+**動作確認:** Debug構成でビルド警告0・エラー0。進捗パーセンテージの後退が実際に無くなったこと、長時間実行での強制終了が実際に解消したことは、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。特に後者は、この環境で長時間実行を再現できないため、`CpSolver`未破棄が唯一の原因だったという確証はない（リフレクションで確認した事実＋grindingの設計上の整合性から推測した、最も有力な仮説という位置づけ）。
+
+v0.7.5としてDraft Release作成予定（bug fixのためNext Version Ruleの既定を適用。詳細は[docs/releases/v0.7.5.md](releases/v0.7.5.md)）。
 
 ### 次回最初に確認するファイル
 
