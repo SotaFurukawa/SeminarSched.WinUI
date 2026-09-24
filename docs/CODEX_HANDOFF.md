@@ -6,16 +6,16 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.7.3 (beta)`（Draft Release作成予定。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 94（⑤未配置が残った結果を警告として明示、未配置の原因診断（担当講師優先度5・対応可能講師なし）、grinding戦略の試行持ち時間の自動延伸。v0.7.2公開後もユーザーから「既定の倍の時間をかけても無理だった」との追加報告を受けての対応。品質プロファイル自体の見直しはユーザー指示により保留中、実装するまで毎回案内すること）。checkpoint93（⑤CP-SATの並列探索ワーカー数制限が、全戦略が明示的に全論理コア数を指定していたせいで一度も実際の探索へ反映されていなかった不具合の修正。高品質/最高品質の探索構成を、名目時間の75%で完成させ25%で改善する配分へ再設計）。checkpoint92（⑤CPUハード上限（Job Object）がアイドル時間まで浪費し「最高品質が2時間かけても終わらない」原因になっていた不具合の修正。プロセス優先度の引き下げ方式へ置き換え）。checkpoint91（⑤延長フェーズ中に進捗パーセンテージが100%で止まる不具合の修正）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
-Latest Draft Release: `v0.7.3`（GitHub上にDraftとして作成予定。checkpoint94の内容はbug fixのため、Next Version Ruleに従いv0.7.3とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.7.3.md](releases/v0.7.3.md)）。1つ前のDraft Releaseは`v0.7.2`（checkpoint93、詳細は[docs/releases/v0.7.2.md](releases/v0.7.2.md)）、その前は`v0.7.1`（checkpoint92、詳細は[docs/releases/v0.7.1.md](releases/v0.7.1.md)）。
+Current Version: `v0.7.4 (beta)`（Draft Release作成予定。最適化探索品質等の継続課題は次version以降）
+Latest Development Checkpoint: checkpoint 95（担当する生徒の人数（1対N、既定2・範囲1〜10）をプロジェクトごとに設定化、自動作成の探索方針6項目（①一日当たりの講師人数②講師ごとのコマ数の偏り③生徒の授業日④1コマあたりの生徒対応人数⑤時間帯⑥同時に使える座席数）を追加。設定は「①設定」の新タブで既定値として保存、⑤時間割自動作成画面でその回だけ上書きも可能。③④は既存の常時ON機能（日程分散・ペア優遇）をトグル化したもので、既定「考慮しない」にすると既存プロジェクトでも挙動が変わる点はユーザー確認済み。ユーザー指示で番号v0.7.4を明示指定）。checkpoint94（⑤未配置が残った結果を警告として明示、未配置の原因診断（担当講師優先度5・対応可能講師なし）、grinding戦略の試行持ち時間の自動延伸。v0.7.2公開後もユーザーから「既定の倍の時間をかけても無理だった」との追加報告を受けての対応。品質プロファイル自体の見直しはユーザー指示により保留中、実装するまで毎回案内すること）。checkpoint93（⑤CP-SATの並列探索ワーカー数制限が、全戦略が明示的に全論理コア数を指定していたせいで一度も実際の探索へ反映されていなかった不具合の修正。高品質/最高品質の探索構成を、名目時間の75%で完成させ25%で改善する配分へ再設計）。checkpoint92（⑤CPUハード上限（Job Object）がアイドル時間まで浪費し「最高品質が2時間かけても終わらない」原因になっていた不具合の修正。プロセス優先度の引き下げ方式へ置き換え）。checkpoint91（⑤延長フェーズ中に進捗パーセンテージが100%で止まる不具合の修正）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
+Latest Draft Release: `v0.7.4`（GitHub上にDraftとして作成予定。checkpoint95の内容は新機能だが、ユーザーが「v0.7.4として作り、ドラフトリリースしてください」と番号を明示指定したため、Next Version Ruleの既定（新機能はminor bump）ではなくこの番号を使用した。詳細は[docs/releases/v0.7.4.md](releases/v0.7.4.md)）。1つ前のDraft Releaseは`v0.7.3`（checkpoint94、詳細は[docs/releases/v0.7.3.md](releases/v0.7.3.md)）、その前は`v0.7.2`（checkpoint93、詳細は[docs/releases/v0.7.2.md](releases/v0.7.2.md)）。
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
 
-- v0.7.3 Draft Release後のbug fix / minor change -> `v0.7.4`
-- v0.7.3 Draft Release後のnew feature -> `v0.8.0`
+- v0.7.4 Draft Release後のbug fix / minor change -> `v0.7.5`
+- v0.7.4 Draft Release後のnew feature -> `v0.8.0`
 - `v1.0.0` -> ユーザーの明示指示がある場合のみ
-- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2がその例）。checkpoint83のv0.4.0・checkpoint84〜85のv0.5.0・checkpoint86〜87のv0.6.0・checkpoint88のv0.6.1・checkpoint89〜90のv0.7.0・checkpoint92のv0.7.1・checkpoint93のv0.7.2・checkpoint94のv0.7.3は、いずれもユーザーが番号を指定しなかったため、この既定ルールをそのまま適用した例。
+- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2、checkpoint95のv0.7.4がその例。checkpoint95は内容としては新機能でminor bump相当だったが、ユーザーが「v0.7.4として作り」と明示指定したためそれに従った）。checkpoint83のv0.4.0・checkpoint84〜85のv0.5.0・checkpoint86〜87のv0.6.0・checkpoint88のv0.6.1・checkpoint89〜90のv0.7.0・checkpoint92のv0.7.1・checkpoint93のv0.7.2・checkpoint94のv0.7.3は、いずれもユーザーが番号を指定しなかったため、この既定ルールをそのまま適用した例。
 
 ### 実装済み
 
@@ -1388,9 +1388,43 @@ v0.7.2公開後もユーザーから「やはり既定の倍の時間をかけ�
 
 **動作確認:** Debug構成でビルド警告0・エラー0。①②の実機での見た目、③による実際の完了時間の改善は、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
 
-v0.7.3としてDraft Release作成予定（bug fixのためNext Version Ruleの既定を適用。詳細は[docs/releases/v0.7.3.md](releases/v0.7.3.md)）。
+v0.7.3としてDraft Release作成済み（bug fixのためNext Version Ruleの既定を適用。詳細は[docs/releases/v0.7.3.md](releases/v0.7.3.md)）。
 
 **保留事項（ユーザーへの案内継続中）:** 品質プロファイル（`OptimizationProfileCatalog`）自体のさらなる見直しは、ユーザーから「品質プロファイルを変えるのはまた後でで良いですが、忘れそうなので、実装するまでは毎回お知らせしてください」との明示指示があり保留中。実装するまで、CODEXへの引き継ぎ・ユーザーへの応答の両方で毎回言及すること。
+
+### v0.7.4 checkpoint 95 (Claude) — 担当する生徒の人数（1対N）の設定化、自動作成の探索方針6項目の追加
+
+ユーザーから2件の要望（同一メッセージ）。①「今は担当する生徒の人数が2人ですが、これをデフォルト値とし、変更できるようにしたい。他の校舎では1対2以外に1対3、1対4があるらしい。これを新しいプロジェクトの部分で選択できるようにしたい。また、後から設定でも変更できるようにしてほしい」。②「いくつかの自動作成時の機能をつけたい」として①一日当たりの講師人数（少なく/多く/考慮しない）、②講師ごとのコマ数の偏り（均等/考慮しない）、③生徒の授業日（減らす/分散/考慮しない）、④1コマあたりの生徒対応人数（多く/少なく/考慮しない）、⑤時間帯（遅く/早く/考慮しない）、⑥同時に使える座席数（N人/考慮しない）の6項目。「デフォルトはすべて考慮しないとしておき、もし変更されたら重み付けをけるようなイメージ」。事前にAskUserQuestionで2点確認: (a) 設定の置き場所→「両方（プロジェクトの既定値＋実行時に上書き可）」、(b) ⑥座席数の意味→「学校全体の合計人数の上限」。後日、実装着手前にもう1点確認: ③（既存の日程分散機能、常時ON・weight 10,000）をトグル化した際の既定値→「③も既定を『考慮しない』にする」（＝既存プロジェクトでも日程分散が既定でOFFになることを承知の上で選択）。この後、v0.7.3公開後の追加報告（checkpoint94のCPU/未配置警告対応）を挟んで、ユーザーから「v0.7.3で追加してほしいとお願いしたいくつかのアルゴリズム調整（遅めのコマに調整するなど）が、実装されていないように見えます。もしまだ未実装ならv0.7.4として作り、ドラフトリリースしてください」との催促を受け、このcheckpointで実装した。
+
+**新規: `SchedulingPolicy`（`SeminarSched.Domain.Scheduling`）。** `MaxStudentsPerTeacher`（既定2、範囲1〜10）と6つのPreference enum（`TeacherCountPerDayPreference`/`TeacherLoadBalancePreference`/`StudentAttendanceDaysPreference`/`PairingSizePreference`/`TimeOfDayPreference`、いずれも既定`None`）・`MaxConcurrentSeats`（既定0）を持つrecord。`OutputSettings`と同じ「明示コンストラクタ＋検証＋get-onlyプロパティ」の形。
+
+**プロジェクトDBスキーマ: `SchedulingPolicy`テーブル（新規、1行/プロジェクト）。** `SqliteProjectSchema.CompleteSchemaSql`へ`CREATE TABLE IF NOT EXISTS`で追加（`OutputSetting`と同じ構成）。既存プロジェクトも次回`EnsureCurrentAsync`実行時に自動でテーブルが作成される（行は無い状態のまま＝`GetAsync`が`SchedulingPolicy.Default`へfallback）ため、専用の移行処理は不要だった。
+
+**`ISchedulingPolicyRepository`/`SqliteSchedulingPolicyRepository`（新規）。** `IOutputSettingsRepository`/`SqliteOutputSettingsRepository`と同じ`GetAsync(path)`/`SaveAsync(path, policy)`の形。`App.SchedulingPolicy`として登録。
+
+**`CpSatScheduleSolver`の一般化・新規項:**
+- ハード容量制約（1講師あたりの同時担当人数上限）を、固定の`2`から`problem.Policy.MaxStudentsPerTeacher`へ一般化した。
+- ⑥同時に使える座席数（学校全体、0で考慮しない）をハード制約として新規追加。
+- `BuildDayDispersionTerms`（③、既存の日程分散weight 10,000）と`BuildTeacherDayConcentrationTerms`→`BuildTeacherCountPerDayTerms`（①、既存の講師出勤日集約weight 1,500）を、`preference == None`なら項自体を生成しない・方向（Spread/Concentrate、Minimize/Maximize）に応じて符号を反転するよう一般化した。
+- `BuildPairingBonusTerms`→`BuildPairingSizeTerms`（④、既存のペア優遇weight 3,000）を、固定の閾値`2`から`problem.Policy.MaxStudentsPerTeacher`まで複数のしきい値（2〜N）を積み上げる形へ一般化し、Maximize/Minimizeで符号を反転できるようにした。
+- ②講師ごとのコマ数の偏り（`BuildTeacherLoadBalanceTerms`）・⑤時間帯（`BuildTimeOfDayTerms`）は完全新規。②は「講師の総コマ数の最大値をできるだけ小さくする」というmin-max近似（真の分散最小化はCP-SATの線形モデルで直接表現できないため）。⑤は`PlacementCandidate.SlotOrder`に比例した加点/減点（補助変数不要）。
+- `ScheduleProblem`に`Policy`（既定`SchedulingPolicy.Default`）を追加。
+
+**`ScheduleSolutionValidator`・`SqliteFixedLessonService`の一般化（自己レビューで発見・修正）:** 最初の実装では`CpSatScheduleSolver`だけ一般化し、この2箇所の固定`2`を見落としていた。新規テスト`SolveAsync_AllowsUpToConfiguredMaxStudentsPerTeacher`（MaxStudentsPerTeacher=3で3名配置を検証）が`ScheduleSolutionValidator`内蔵の自己検証（`Solve()`が返す前に自分の解を検証する）で「Teacher capacity violation detected」に失敗して発覚。`ScheduleSolutionValidator`の容量チェック・⑥座席数チェックを追加、`SqliteFixedLessonService`（④時間割編集の手動配置・移動時のハード容量チェック、警告文言）も`SchedulingPolicy.MaxStudentsPerTeacher`を読み取るよう一般化した。ソフト指標「1対2ペア配置数」（手動移動プレビューの比較指標）も「2名ちょうど」から「2名以上」へ一般化し、ラベルを「複数人ペア配置数」へ変更した。
+
+**WinUI:**
+- `HomePage`（新規プロジェクト作成）: 「1人の講師が同時に担当できる生徒数」NumberBox（既定2、1〜10）を追加。作成直後に`App.SchedulingPolicy.SaveAsync`で保存する。
+- `SetupPage`（①設定）: 新しい「スケジュール設定」タブに7項目すべて（比率＋6方針、RadioButton×5グループ＋NumberBox×2）を追加。`OutputSetting`タブと同じLoad/Save/`ExecuteAsync`パターン。
+- `OptimizationPage`（⑤時間割自動作成）: 「この回だけ探索の方針を変更する」という`Expander`（既定折りたたみ）に同じ7項目を追加。画面を開いた時点でプロジェクトの既定値を表示し、実行時にその場の値を`SchedulingPolicy`としてoverride引数で渡す（プロジェクトの既定値そのものは変更しない）。
+- `IScheduleRunService.RunAsync`/`OptimizationRunState.StartAsync`/`RunCoreAsync`に、末尾の追加省略可能引数として`SchedulingPolicy? policyOverride`を追加（既存の呼び出し箇所を壊さないため、末尾に追加）。`SqliteScheduleRunService.RunAsync`は`policyOverride`が`null`ならプロジェクト保存済みの方針（`ReadSchedulingPolicyAsync`、`SqliteSchedulingPolicyRepository`と同じSELECTだが接続を使い回す）を使う。
+
+**既存テストの修正（3件）:** `CpSatScheduleSolverTests`の`SolveAsync_PrefersSpreadingAStudentsSessionsAcrossDistinctDaysWhenOtherwiseTied`・`SolveAsync_PrefersPairingTwoStudentsInTheSameSlotOverSplittingAcrossSlotsWhenOtherwiseTied`・`SolveAsync_ConcentratesATeachersSessionsIntoFewerDaysWhenOtherwiseTied`は、③④①が常時ONだった前提のテストだったため、明示的に`SchedulingPolicy`で該当preferenceをONにするよう修正した（既定Noneのままでは検証対象の挙動自体が起きなくなるため）。
+
+**新規/更新テスト:** `SqliteSchedulingPolicyRepositoryTests`（新規、GetAsync/SaveAsyncの往復2件）、`CpSatScheduleSolverTests`に3件追加（`SolveAsync_AllowsUpToConfiguredMaxStudentsPerTeacher`・`SolveAsync_RespectsMaxConcurrentSeatsAcrossDifferentTeachers`・`SolveAsync_PrefersConfiguredTimeOfDayWhenOtherwiseTied`、後者は`[Theory]`でLate/Earlyの両方を検証）。`dotnet test`全200 tests passed。
+
+**動作確認:** Debug構成でビルド警告0・エラー0。新規プロジェクト作成欄・「①設定」の新タブ・⑤画面の一時上書きセクションの実機での見た目・操作感は、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
+
+v0.7.4としてDraft Release作成予定（ユーザーから明示的に「v0.7.4として作り、ドラフトリリースしてください」との指示があったため、Next Version Ruleの既定（新機能はminor bump）ではなくこの番号を使用した。詳細は[docs/releases/v0.7.4.md](releases/v0.7.4.md)）。
 
 ### 次回最初に確認するファイル
 
