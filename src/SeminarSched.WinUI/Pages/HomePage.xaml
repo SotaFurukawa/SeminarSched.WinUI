@@ -117,6 +117,20 @@
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="オンにすると③アンケート取込みに「集団授業クラスの登録」・「受講登録」の項目が追加されます。個別指導以外に集団授業も受講する生徒がいる場合に、選択してください。このオプションを選択すると、後から変更できません。"
                         TextWrapping="Wrap" />
+                    <NumberBox
+                        x:Name="MaxStudentsPerTeacherBox"
+                        Header="1人の講師が同時に担当できる生徒数"
+                        Minimum="1"
+                        Maximum="10"
+                        SmallChange="1"
+                        SpinButtonPlacementMode="Inline"
+                        Value="2"
+                        HorizontalAlignment="Left"
+                        Width="220" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="既定は1対2です。校舎によっては1対3・1対4等も運用されているため、必要に応じて変更してください。後から「①設定」の「スケジュール設定」タブでも変更できます。"
+                        TextWrapping="Wrap" />
                     <Button
                         HorizontalAlignment="Right"
                         Click="CreateProject_Click"

@@ -78,6 +78,8 @@ public partial class App : Application
 
     public static IScheduleEditorService ScheduleEditor { get; } = new SqliteScheduleEditorService();
 
+    public static ISchedulingPolicyRepository SchedulingPolicy { get; } = new SqliteSchedulingPolicyRepository();
+
     public static IOutputSettingsRepository OutputSettings { get; } = new SqliteOutputSettingsRepository();
 
     public static IOutputPackageService OutputPackage { get; } = new SqliteOutputPackageService();

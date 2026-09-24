@@ -118,6 +118,51 @@
                     <Button Content="保存" Click="SaveOutputSettings_Click" HorizontalAlignment="Left"/>
                 </StackPanel>
             </TabViewItem>
+            <TabViewItem Header="スケジュール設定">
+                <StackPanel Padding="16" Spacing="12">
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="⑦最適化探索の方針設定"/>
+                    <TextBlock Text="ここで保存した内容がこのプロジェクトの既定値になります。⑤時間割自動作成の画面でも、その回だけの一時的な変更ができます。" TextWrapping="Wrap"/>
+                    <NumberBox x:Name="PolicyMaxStudentsPerTeacher" Header="1人の講師が同時に担当できる生徒数（既定1対2）" Minimum="1" Maximum="10" SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" Width="260"/>
+
+                    <TextBlock FontWeight="SemiBold" Margin="0,8,0,0" Text="①一日当たりの講師人数"/>
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <RadioButton x:Name="PolicyTeacherCountPerDayNone" Content="考慮しない" GroupName="PolicyTeacherCountPerDay" IsChecked="True"/>
+                        <RadioButton x:Name="PolicyTeacherCountPerDayMinimize" Content="できるだけ少なくする" GroupName="PolicyTeacherCountPerDay"/>
+                        <RadioButton x:Name="PolicyTeacherCountPerDayMaximize" Content="できるだけ多くする" GroupName="PolicyTeacherCountPerDay"/>
+                    </StackPanel>
+
+                    <TextBlock FontWeight="SemiBold" Text="②講師ごとのコマ数の偏り"/>
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <RadioButton x:Name="PolicyTeacherLoadBalanceNone" Content="考慮しない" GroupName="PolicyTeacherLoadBalance" IsChecked="True"/>
+                        <RadioButton x:Name="PolicyTeacherLoadBalanceBalance" Content="均等にする" GroupName="PolicyTeacherLoadBalance"/>
+                    </StackPanel>
+
+                    <TextBlock FontWeight="SemiBold" Text="③生徒の授業日"/>
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <RadioButton x:Name="PolicyStudentAttendanceDaysNone" Content="考慮しない" GroupName="PolicyStudentAttendanceDays" IsChecked="True"/>
+                        <RadioButton x:Name="PolicyStudentAttendanceDaysConcentrate" Content="できるだけ減らす（同じ日にまとめる）" GroupName="PolicyStudentAttendanceDays"/>
+                        <RadioButton x:Name="PolicyStudentAttendanceDaysSpread" Content="分散する" GroupName="PolicyStudentAttendanceDays"/>
+                    </StackPanel>
+
+                    <TextBlock FontWeight="SemiBold" Text="④1コマあたりの生徒の対応人数"/>
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <RadioButton x:Name="PolicyPairingSizeNone" Content="考慮しない" GroupName="PolicyPairingSize" IsChecked="True"/>
+                        <RadioButton x:Name="PolicyPairingSizeMaximize" Content="できるだけ多くする" GroupName="PolicyPairingSize"/>
+                        <RadioButton x:Name="PolicyPairingSizeMinimize" Content="できるだけ少なくする" GroupName="PolicyPairingSize"/>
+                    </StackPanel>
+
+                    <TextBlock FontWeight="SemiBold" Text="⑤時間帯"/>
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <RadioButton x:Name="PolicyTimeOfDayNone" Content="考慮しない" GroupName="PolicyTimeOfDay" IsChecked="True"/>
+                        <RadioButton x:Name="PolicyTimeOfDayLate" Content="できるだけ遅くする" GroupName="PolicyTimeOfDay"/>
+                        <RadioButton x:Name="PolicyTimeOfDayEarly" Content="できるだけ早くする" GroupName="PolicyTimeOfDay"/>
+                    </StackPanel>
+
+                    <NumberBox x:Name="PolicyMaxConcurrentSeats" Header="⑥同時に使える座席数（0=考慮しない）" Minimum="0" SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" Width="280"/>
+
+                    <Button Content="保存" Click="SaveSchedulingPolicy_Click" HorizontalAlignment="Left"/>
+                </StackPanel>
+            </TabViewItem>
         </TabView>
     </StackPanel></ScrollViewer>
 </local:WorkflowPageBase>

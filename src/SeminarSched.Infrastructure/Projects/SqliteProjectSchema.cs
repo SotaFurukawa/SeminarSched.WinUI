@@ -368,6 +368,16 @@ internal static class SqliteProjectSchema
             TeacherId INTEGER NOT NULL REFERENCES Teacher(Id) ON DELETE CASCADE,
             PRIMARY KEY(ClassId,TeacherId)
         );
+        CREATE TABLE IF NOT EXISTS SchedulingPolicy (
+            ProjectId INTEGER PRIMARY KEY REFERENCES CourseProject(Id) ON DELETE CASCADE,
+            MaxStudentsPerTeacher INTEGER NOT NULL DEFAULT 2 CHECK(MaxStudentsPerTeacher BETWEEN 1 AND 10),
+            TeacherCountPerDayPreference INTEGER NOT NULL DEFAULT 0 CHECK(TeacherCountPerDayPreference BETWEEN 0 AND 2),
+            TeacherLoadBalancePreference INTEGER NOT NULL DEFAULT 0 CHECK(TeacherLoadBalancePreference BETWEEN 0 AND 1),
+            StudentAttendanceDaysPreference INTEGER NOT NULL DEFAULT 0 CHECK(StudentAttendanceDaysPreference BETWEEN 0 AND 2),
+            PairingSizePreference INTEGER NOT NULL DEFAULT 0 CHECK(PairingSizePreference BETWEEN 0 AND 2),
+            TimeOfDayPreference INTEGER NOT NULL DEFAULT 0 CHECK(TimeOfDayPreference BETWEEN 0 AND 2),
+            MaxConcurrentSeats INTEGER NOT NULL DEFAULT 0 CHECK(MaxConcurrentSeats >= 0)
+        );
         CREATE INDEX IF NOT EXISTS IX_AuditLog_Project_Timestamp ON AuditLog(ProjectId,TimestampUtc);
         CREATE INDEX IF NOT EXISTS IX_ValidationIssue_Project_Resolved ON ValidationIssue(ProjectId,Resolved,Severity);
         CREATE INDEX IF NOT EXISTS IX_OptimizationRun_Project_Started ON OptimizationRun(ProjectId,StartedUtc);

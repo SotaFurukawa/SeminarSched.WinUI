@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using SeminarSched.Domain.Scheduling;
 using SeminarSched.Optimization.Execution;
 using SeminarSched.Optimization.Profiles;
 using SeminarSched_WinUI.ViewModels;
@@ -62,6 +63,7 @@ public sealed partial class OptimizationPage : WorkflowPageBase
             _isLoaded = true;
             var ready = EnsureProject(ProjectRequired);
             ContentPanel.IsEnabled = ready;
+            if (ready) await LoadRunPolicyAsync(App.ProjectService.Current!.Path);
             RefreshRunUi();
         }
         catch (IOException)
@@ -86,6 +88,54 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         QualityTickLabels.Margin = new Thickness(inset, 4, inset, 0);
     }
 
+    // ユーザー要望「両方（プロジェクトの既定値＋実行時に上書き可）」への対応。この画面を開いたときは
+    // プロジェクトに保存済みの方針をそのまま表示し（＝何も変更しなければ既定値通りに実行される）、
+    // ユーザーがこの画面だけで変更した内容は、実行時に一度だけ渡すoverrideとして使う
+    // （「①設定」側の保存済み既定値そのものは変更しない）。
+    private async Task LoadRunPolicyAsync(string projectPath)
+    {
+        var policy = await App.SchedulingPolicy.GetAsync(projectPath);
+        RunPolicyMaxStudentsPerTeacher.Value = policy.MaxStudentsPerTeacher;
+
+        RunPolicyTeacherCountPerDayMinimize.IsChecked = policy.TeacherCountPerDayPreference == TeacherCountPerDayPreference.Minimize;
+        RunPolicyTeacherCountPerDayMaximize.IsChecked = policy.TeacherCountPerDayPreference == TeacherCountPerDayPreference.Maximize;
+        RunPolicyTeacherCountPerDayNone.IsChecked = policy.TeacherCountPerDayPreference == TeacherCountPerDayPreference.None;
+
+        RunPolicyTeacherLoadBalanceBalance.IsChecked = policy.TeacherLoadBalancePreference == TeacherLoadBalancePreference.Balance;
+        RunPolicyTeacherLoadBalanceNone.IsChecked = policy.TeacherLoadBalancePreference == TeacherLoadBalancePreference.None;
+
+        RunPolicyStudentAttendanceDaysConcentrate.IsChecked = policy.StudentAttendanceDaysPreference == StudentAttendanceDaysPreference.Concentrate;
+        RunPolicyStudentAttendanceDaysSpread.IsChecked = policy.StudentAttendanceDaysPreference == StudentAttendanceDaysPreference.Spread;
+        RunPolicyStudentAttendanceDaysNone.IsChecked = policy.StudentAttendanceDaysPreference == StudentAttendanceDaysPreference.None;
+
+        RunPolicyPairingSizeMaximize.IsChecked = policy.PairingSizePreference == PairingSizePreference.Maximize;
+        RunPolicyPairingSizeMinimize.IsChecked = policy.PairingSizePreference == PairingSizePreference.Minimize;
+        RunPolicyPairingSizeNone.IsChecked = policy.PairingSizePreference == PairingSizePreference.None;
+
+        RunPolicyTimeOfDayLate.IsChecked = policy.TimeOfDayPreference == TimeOfDayPreference.Late;
+        RunPolicyTimeOfDayEarly.IsChecked = policy.TimeOfDayPreference == TimeOfDayPreference.Early;
+        RunPolicyTimeOfDayNone.IsChecked = policy.TimeOfDayPreference == TimeOfDayPreference.None;
+
+        RunPolicyMaxConcurrentSeats.Value = policy.MaxConcurrentSeats;
+    }
+
+    private SchedulingPolicy BuildRunPolicyOverride() => new(
+        checked((int)RunPolicyMaxStudentsPerTeacher.Value),
+        RunPolicyTeacherCountPerDayMinimize.IsChecked == true ? TeacherCountPerDayPreference.Minimize
+            : RunPolicyTeacherCountPerDayMaximize.IsChecked == true ? TeacherCountPerDayPreference.Maximize
+            : TeacherCountPerDayPreference.None,
+        RunPolicyTeacherLoadBalanceBalance.IsChecked == true ? TeacherLoadBalancePreference.Balance : TeacherLoadBalancePreference.None,
+        RunPolicyStudentAttendanceDaysConcentrate.IsChecked == true ? StudentAttendanceDaysPreference.Concentrate
+            : RunPolicyStudentAttendanceDaysSpread.IsChecked == true ? StudentAttendanceDaysPreference.Spread
+            : StudentAttendanceDaysPreference.None,
+        RunPolicyPairingSizeMaximize.IsChecked == true ? PairingSizePreference.Maximize
+            : RunPolicyPairingSizeMinimize.IsChecked == true ? PairingSizePreference.Minimize
+            : PairingSizePreference.None,
+        RunPolicyTimeOfDayLate.IsChecked == true ? TimeOfDayPreference.Late
+            : RunPolicyTimeOfDayEarly.IsChecked == true ? TimeOfDayPreference.Early
+            : TimeOfDayPreference.None,
+        checked((int)RunPolicyMaxConcurrentSeats.Value));
+
     private void Page_Unloaded(object sender, RoutedEventArgs e) => OptimizationRunState.Changed -= OnRunStateChanged;
 
     private void OnRunStateChanged() => DispatcherQueue.TryEnqueue(RefreshRunUi);
@@ -96,7 +146,7 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         {
             var path = App.ProjectService.Current!.Path;
             var profile = OptimizationProfileCatalog.Get(ViewModel.Level);
-            await OptimizationRunState.StartAsync(path, profile, UnrestrictedResourceUsageCheckBox.IsChecked == true);
+            await OptimizationRunState.StartAsync(path, profile, UnrestrictedResourceUsageCheckBox.IsChecked == true, BuildRunPolicyOverride());
             RefreshRunUi();
         }
         catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)

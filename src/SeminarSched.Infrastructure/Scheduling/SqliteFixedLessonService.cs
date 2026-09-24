@@ -88,9 +88,10 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
             warnings.Add("生徒または講師がこの日時に参加できない設定になっています。");
             deltas.Add(new SoftMetricDelta("availability_override", "出勤・出席可否の設定", HigherIsBetter: false, 0, 1));
         }
-        if (!await IsWithinTeacherCapacityAsync(connection, transaction, teacherId, openDateId, timeSlotId, request.OneToOneRequired ? 2 : 1, null, cancellationToken).ConfigureAwait(false))
+        var addMaxCapacity = await ReadMaxStudentsPerTeacherAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
+        if (!await IsWithinTeacherCapacityAsync(connection, transaction, teacherId, openDateId, timeSlotId, request.OneToOneRequired ? addMaxCapacity : 1, addMaxCapacity, null, cancellationToken).ConfigureAwait(false))
         {
-            warnings.Add("この講師は同じ日時の担当人数上限（2人）を超えます。");
+            warnings.Add($"この講師は同じ日時の担当人数上限（{addMaxCapacity}人）を超えます。");
             deltas.Add(new SoftMetricDelta("capacity_override", "講師の同時担当人数", HigherIsBetter: false, 0, 1));
         }
 
@@ -157,7 +158,8 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
             // 他の全ハード制約を満たす場合に限りYELLOW（確認の上で許可）へ回す。
             qualified = await IsTeacherQualifiedAsync(connection, transaction, teacherId, current.SubjectId, cancellationToken).ConfigureAwait(false);
             await EnsureAvailabilityAsync(connection, transaction, current.StudentId, teacherId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
-            await EnsureTeacherCapacityAsync(connection, transaction, teacherId, openDateId, timeSlotId, current.OneToOneRequired ? 2 : 1, assignmentId, cancellationToken).ConfigureAwait(false);
+            var moveMaxCapacity = await ReadMaxStudentsPerTeacherAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
+            await EnsureTeacherCapacityAsync(connection, transaction, teacherId, openDateId, timeSlotId, current.OneToOneRequired ? moveMaxCapacity : 1, moveMaxCapacity, assignmentId, cancellationToken).ConfigureAwait(false);
         }
         catch (InvalidOperationException ex)
         {
@@ -200,15 +202,18 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
         var afterTuples = allSlots.Select(a => a.Id == assignmentId ? (newTeacherId, newOpenDateId, newTimeSlotId) : (a.TeacherId, a.OpenDateId, a.TimeSlotId)).ToList();
         var activeBefore = beforeTuples.Distinct().Count();
         var activeAfter = afterTuples.Distinct().Count();
-        var pairedBefore = beforeTuples.GroupBy(t => t).Count(g => g.Count() == 2);
-        var pairedAfter = afterTuples.GroupBy(t => t).Count(g => g.Count() == 2);
+        // ユーザー要望「担当する生徒の人数（既定1対2）を1対3・1対4等へ変更できるようにしたい」への
+        // 対応。以前は「ちょうど2名」だけをペア扱いしていたが、上限が3・4等に変更されている場合も
+        // 「複数名まとめて配置されているコマ数」として意味を持たせるため「2名以上」に一般化した。
+        var pairedBefore = beforeTuples.GroupBy(t => t).Count(g => g.Count() > 1);
+        var pairedAfter = afterTuples.GroupBy(t => t).Count(g => g.Count() > 1);
 
         return
         [
             new SoftMetricDelta("preferred_teacher", "優先講師との一致度", HigherIsBetter: false, preferenceBefore, preferenceAfter),
             new SoftMetricDelta("preferred_time", "希望日時との一致度", HigherIsBetter: true, availabilityBefore, availabilityAfter),
             new SoftMetricDelta("active_teacher_slots", "使用コマ数（講師×日時）", HigherIsBetter: false, activeBefore, activeAfter),
-            new SoftMetricDelta("paired_slots", "1対2ペア配置数", HigherIsBetter: true, pairedBefore, pairedAfter),
+            new SoftMetricDelta("paired_slots", "複数人ペア配置数", HigherIsBetter: true, pairedBefore, pairedAfter),
         ];
     }
 
@@ -417,12 +422,24 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
             throw new InvalidOperationException("生徒または講師が参加できない日時です。");
     }
 
-    private static async Task<bool> IsWithinTeacherCapacityAsync(SqliteConnection connection, SqliteTransaction transaction, long teacherId, long openDateId, long timeSlotId, int requestedLoad, long? excludeAssignmentId, CancellationToken cancellationToken)
+    // ユーザー要望「担当する生徒の人数（既定1対2）を1対3・1対4等へ変更できるようにしたい」への対応。
+    // checkpoint93まで固定だった"2"をSchedulingPolicy.MaxStudentsPerTeacherへ一般化した。行が無い
+    // （＝一度も保存されていない）プロジェクトはSchedulingPolicy.Default（2）扱いとする。
+    private static async Task<int> ReadMaxStudentsPerTeacherAsync(SqliteConnection connection, SqliteTransaction transaction, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT MaxStudentsPerTeacher FROM SchedulingPolicy WHERE ProjectId=1;";
+        var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+        return value is null or DBNull ? SeminarSched.Domain.Scheduling.SchedulingPolicy.Default.MaxStudentsPerTeacher : Convert.ToInt32(value);
+    }
+
+    private static async Task<bool> IsWithinTeacherCapacityAsync(SqliteConnection connection, SqliteTransaction transaction, long teacherId, long openDateId, long timeSlotId, int requestedLoad, int maxCapacity, long? excludeAssignmentId, CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            SELECT COALESCE(SUM(CASE WHEN r.OneToOneRequired=1 OR COALESCE(p.OneToOneRequired,0)=1 THEN 2 ELSE 1 END),0)
+            SELECT COALESCE(SUM(CASE WHEN r.OneToOneRequired=1 OR COALESCE(p.OneToOneRequired,0)=1 THEN $maxCapacity ELSE 1 END),0)
             FROM Assignment a
             JOIN LessonRequest r ON r.Id=a.LessonRequestId
             LEFT JOIN RegularLessonProfile p ON p.ProjectId=r.ProjectId AND p.StudentId=r.StudentId AND p.SubjectId=r.SubjectId
@@ -432,14 +449,15 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
         command.Parameters.AddWithValue("$date", openDateId);
         command.Parameters.AddWithValue("$slot", timeSlotId);
         command.Parameters.AddWithValue("$exclude", excludeAssignmentId ?? 0L);
+        command.Parameters.AddWithValue("$maxCapacity", maxCapacity);
         var existingLoad = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
-        return existingLoad + requestedLoad <= 2;
+        return existingLoad + requestedLoad <= maxCapacity;
     }
 
-    private static async Task EnsureTeacherCapacityAsync(SqliteConnection connection, SqliteTransaction transaction, long teacherId, long openDateId, long timeSlotId, int requestedLoad, long? excludeAssignmentId, CancellationToken cancellationToken)
+    private static async Task EnsureTeacherCapacityAsync(SqliteConnection connection, SqliteTransaction transaction, long teacherId, long openDateId, long timeSlotId, int requestedLoad, int maxCapacity, long? excludeAssignmentId, CancellationToken cancellationToken)
     {
-        if (!await IsWithinTeacherCapacityAsync(connection, transaction, teacherId, openDateId, timeSlotId, requestedLoad, excludeAssignmentId, cancellationToken).ConfigureAwait(false))
-            throw new InvalidOperationException("同じ日時の講師担当上限（2人）を超えます。");
+        if (!await IsWithinTeacherCapacityAsync(connection, transaction, teacherId, openDateId, timeSlotId, requestedLoad, maxCapacity, excludeAssignmentId, cancellationToken).ConfigureAwait(false))
+            throw new InvalidOperationException($"同じ日時の講師担当上限（{maxCapacity}人）を超えます。");
     }
 
     private static async Task<SqliteConnection> OpenAsync(string projectPath, CancellationToken cancellationToken)

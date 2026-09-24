@@ -82,6 +82,48 @@
                         <CheckBox x:Name="UnrestrictedResourceUsageCheckBox" Content="CPU使用率を制限しない（フルパワーで実行）" Checked="UnrestrictedResourceUsageCheckBox_Changed" Unchecked="UnrestrictedResourceUsageCheckBox_Changed"/>
                         <TextBlock Margin="28,0,0,0" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="既定では他の作業と競合したときに優先度を譲り、パソコンが重くなるのを防ぎます（パソコンが空いていれば速度は落ちません）。オンにすると常にフルパワーで実行し、その分速くなる可能性がありますが、実行中は他の作業が重くなることがあります。" TextWrapping="Wrap"/>
                     </StackPanel>
+                    <Expander Header="この回だけ探索の方針を変更する" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                        <StackPanel Padding="4,12,4,4" Spacing="12" MaxWidth="900">
+                            <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Text="既定は「①設定」の「スケジュール設定」タブで保存した内容です。ここで変更しても、このプロジェクトの既定値そのものは変わりません（今回の自動作成にだけ適用されます）。"/>
+                            <NumberBox x:Name="RunPolicyMaxStudentsPerTeacher" Header="1人の講師が同時に担当できる生徒数" Minimum="1" Maximum="10" SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" Width="260"/>
+
+                            <TextBlock FontWeight="SemiBold" Text="①一日当たりの講師人数"/>
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <RadioButton x:Name="RunPolicyTeacherCountPerDayNone" Content="考慮しない" GroupName="RunPolicyTeacherCountPerDay"/>
+                                <RadioButton x:Name="RunPolicyTeacherCountPerDayMinimize" Content="できるだけ少なくする" GroupName="RunPolicyTeacherCountPerDay"/>
+                                <RadioButton x:Name="RunPolicyTeacherCountPerDayMaximize" Content="できるだけ多くする" GroupName="RunPolicyTeacherCountPerDay"/>
+                            </StackPanel>
+
+                            <TextBlock FontWeight="SemiBold" Text="②講師ごとのコマ数の偏り"/>
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <RadioButton x:Name="RunPolicyTeacherLoadBalanceNone" Content="考慮しない" GroupName="RunPolicyTeacherLoadBalance"/>
+                                <RadioButton x:Name="RunPolicyTeacherLoadBalanceBalance" Content="均等にする" GroupName="RunPolicyTeacherLoadBalance"/>
+                            </StackPanel>
+
+                            <TextBlock FontWeight="SemiBold" Text="③生徒の授業日"/>
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <RadioButton x:Name="RunPolicyStudentAttendanceDaysNone" Content="考慮しない" GroupName="RunPolicyStudentAttendanceDays"/>
+                                <RadioButton x:Name="RunPolicyStudentAttendanceDaysConcentrate" Content="できるだけ減らす（同じ日にまとめる）" GroupName="RunPolicyStudentAttendanceDays"/>
+                                <RadioButton x:Name="RunPolicyStudentAttendanceDaysSpread" Content="分散する" GroupName="RunPolicyStudentAttendanceDays"/>
+                            </StackPanel>
+
+                            <TextBlock FontWeight="SemiBold" Text="④1コマあたりの生徒の対応人数"/>
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <RadioButton x:Name="RunPolicyPairingSizeNone" Content="考慮しない" GroupName="RunPolicyPairingSize"/>
+                                <RadioButton x:Name="RunPolicyPairingSizeMaximize" Content="できるだけ多くする" GroupName="RunPolicyPairingSize"/>
+                                <RadioButton x:Name="RunPolicyPairingSizeMinimize" Content="できるだけ少なくする" GroupName="RunPolicyPairingSize"/>
+                            </StackPanel>
+
+                            <TextBlock FontWeight="SemiBold" Text="⑤時間帯"/>
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <RadioButton x:Name="RunPolicyTimeOfDayNone" Content="考慮しない" GroupName="RunPolicyTimeOfDay"/>
+                                <RadioButton x:Name="RunPolicyTimeOfDayLate" Content="できるだけ遅くする" GroupName="RunPolicyTimeOfDay"/>
+                                <RadioButton x:Name="RunPolicyTimeOfDayEarly" Content="できるだけ早くする" GroupName="RunPolicyTimeOfDay"/>
+                            </StackPanel>
+
+                            <NumberBox x:Name="RunPolicyMaxConcurrentSeats" Header="⑥同時に使える座席数（0=考慮しない）" Minimum="0" SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" Width="280"/>
+                        </StackPanel>
+                    </Expander>
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button x:Name="RunButton" Content="時間割を自動作成" Click="Run_Click" Style="{StaticResource AccentButtonStyle}"/>
                         <Button x:Name="AcceptBestButton" Content="中断して現在の結果を採用" Click="AcceptBest_Click" IsEnabled="False"/>

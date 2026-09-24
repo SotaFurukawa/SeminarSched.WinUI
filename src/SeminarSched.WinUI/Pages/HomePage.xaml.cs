@@ -8,6 +8,7 @@ using SeminarSched.Application.MasterData;
 using SeminarSched.Application.Projects;
 using SeminarSched.Application.Settings;
 using SeminarSched.Domain.Projects;
+using SeminarSched.Domain.Scheduling;
 using WinRT.Interop;
 
 namespace SeminarSched_WinUI.Pages;
@@ -180,6 +181,13 @@ public sealed partial class HomePage : Page
             var (path, renamed) = ResolveUniqueProjectPath(folder.Path, definition.Title);
             SetBusy(true);
             var summary = await App.ProjectService.CreateAsync(path, definition);
+            // ユーザー要望「担当する生徒の人数（1対2）をデフォルト値とし、新しいプロジェクトの部分で
+            // 選択できるようにしたい」への対応。既定2以外が選ばれた場合はもちろん、2のままでも
+            // 明示的に保存しておく（SchedulingPolicyテーブルへ行が無ければDefaultへfallbackするだけ
+            // なので省略しても動作は変わらないが、後から「①設定」を開いたときに実際に保存されている
+            // 値と表示が一致するようにするため）。
+            var maxStudentsPerTeacher = (int)Math.Clamp(double.IsNaN(MaxStudentsPerTeacherBox.Value) ? 2 : MaxStudentsPerTeacherBox.Value, 1, 10);
+            await App.SchedulingPolicy.SaveAsync(summary.Path, new SchedulingPolicy(maxStudentsPerTeacher));
             var sharedRosterResult = await App.SharedRosterStore.CopyIntoProjectAsync(summary.Path);
             await App.RecentProjects.TouchAsync(summary.Path, summary.Title);
             RefreshCurrentProject();

@@ -1,3 +1,4 @@
+using SeminarSched.Domain.Scheduling;
 using SeminarSched.Optimization.Execution;
 using SeminarSched.Optimization.Profiles;
 
@@ -23,10 +24,14 @@ public interface IScheduleRunService
 {
     Task<ScheduleRunSummary> RunAsync(string projectPath, TimeSpan maximumDuration, CancellationToken cancellationToken = default);
 
+    // policyOverride: 実行時だけの方針上書き（ユーザー要望「両方（プロジェクトの既定値＋実行時に
+    // 上書き可）」）。nullならプロジェクトに保存済みの方針（未保存ならSchedulingPolicy.Default）を
+    // そのまま使う。省略時の互換のため引数リストの末尾に追加してある。
     Task<ScheduleRunSummary> RunAsync(
         string projectPath,
         OptimizationProfile profile,
         OptimizationRunControl control,
         IProgress<OptimizationProgress>? progress = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        SchedulingPolicy? policyOverride = null);
 }

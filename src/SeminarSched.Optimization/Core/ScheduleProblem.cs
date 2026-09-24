@@ -1,3 +1,5 @@
+using SeminarSched.Domain.Scheduling;
+
 namespace SeminarSched.Optimization.Core;
 
 public sealed record LessonDemand(
@@ -37,8 +39,11 @@ public sealed record ScheduleProblem(
     IReadOnlyList<LessonDemand> Demands,
     IReadOnlyList<PlacementCandidate> Candidates,
     IReadOnlyList<ScheduleSlot>? Slots = null,
-    IReadOnlyList<FixedPlacement>? FixedPlacements = null)
+    IReadOnlyList<FixedPlacement>? FixedPlacements = null,
+    SchedulingPolicy? Policy = null)
 {
+    public SchedulingPolicy Policy { get; } = Policy ?? SchedulingPolicy.Default;
+
     public IReadOnlyList<ScheduleSlot> AvailableSlots { get; } = Slots ??
         Candidates.Select(candidate => new ScheduleSlot(candidate.OpenDateId, candidate.TimeSlotId, candidate.DayOrdinal, candidate.SlotOrder))
             .Distinct()

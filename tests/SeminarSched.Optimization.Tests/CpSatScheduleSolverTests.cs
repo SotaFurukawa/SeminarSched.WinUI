@@ -1,3 +1,4 @@
+using SeminarSched.Domain.Scheduling;
 using SeminarSched.Optimization.Core;
 
 namespace SeminarSched.Optimization.Tests;
@@ -227,8 +228,11 @@ public sealed class CpSatScheduleSolverTests
             }))
             .ToArray();
         var slots = new[] { 1L, 2L }.SelectMany(day => new[] { new ScheduleSlot(day, 1, (int)day, 1), new ScheduleSlot(day, 2, (int)day, 2) }).ToArray();
+        // checkpoint94: 日程分散はユーザー要望によりトグル化され既定「考慮しない」になったため、
+        // この挙動を検証するにはPolicyで明示的にSpreadを指定する必要がある。
+        var policy = new SchedulingPolicy(studentAttendanceDaysPreference: StudentAttendanceDaysPreference.Spread);
 
-        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, slots), TimeSpan.FromSeconds(5));
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, slots, Policy: policy), TimeSpan.FromSeconds(5));
 
         Assert.Equal(2, solution.Placements.Count);
         Assert.Equal(2, solution.Placements.Select(p => p.OpenDateId).Distinct().Count());
@@ -248,8 +252,11 @@ public sealed class CpSatScheduleSolverTests
             new PlacementCandidate(2, 20, 100, 1, 1),
             new PlacementCandidate(2, 20, 100, 1, 2),
         };
+        // checkpoint94: ペア優遇はユーザー要望によりトグル化され既定「考慮しない」になったため、
+        // この挙動を検証するにはPolicyで明示的にMaximizeを指定する必要がある。
+        var policy = new SchedulingPolicy(pairingSizePreference: PairingSizePreference.Maximize);
 
-        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates), TimeSpan.FromSeconds(5));
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, Policy: policy), TimeSpan.FromSeconds(5));
 
         Assert.Equal(2, solution.Placements.Count);
         Assert.Single(solution.Placements.Select(p => p.TimeSlotId).Distinct());
@@ -301,8 +308,11 @@ public sealed class CpSatScheduleSolverTests
             }))
             .ToArray();
         var slots = new[] { 1L, 2L }.SelectMany(day => new[] { 1L, 2L }.Select(slot => new ScheduleSlot(day, slot, (int)day, (int)slot))).ToArray();
+        // checkpoint94: 講師の出勤日集約はユーザー要望によりトグル化され既定「考慮しない」になったため、
+        // この挙動を検証するにはPolicyで明示的にMinimizeを指定する必要がある。
+        var policy = new SchedulingPolicy(teacherCountPerDayPreference: TeacherCountPerDayPreference.Minimize);
 
-        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, slots), TimeSpan.FromSeconds(5));
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, slots, Policy: policy), TimeSpan.FromSeconds(5));
 
         Assert.Equal(2, solution.Placements.Count);
         Assert.Single(solution.Placements.Select(p => p.OpenDateId).Distinct());
@@ -392,5 +402,69 @@ public sealed class CpSatScheduleSolverTests
 
         Assert.True(solution.Placements.Count <= 1);
         ScheduleSolutionValidator.Validate(problem, solution);
+    }
+
+    // ユーザー要望「担当する生徒の人数（既定1対2）を1対3・1対4等へ変更できるようにしたい」を検証する。
+    // MaxStudentsPerTeacher=3の下で、同じ講師・同じコマに3名とも配置可能（1対1必須ではない）なら、
+    // 3名全員が配置されるはず（既定の2までしか許さないハード制約のままなら1名は必ず未配置になる）。
+    [Fact]
+    public async Task SolveAsync_AllowsUpToConfiguredMaxStudentsPerTeacher()
+    {
+        var demands = new[] { new LessonDemand(1, 10, 1, 0), new LessonDemand(2, 20, 1, 0), new LessonDemand(3, 30, 1, 0) };
+        var candidates = new[]
+        {
+            new PlacementCandidate(1, 10, 100, 1, 1),
+            new PlacementCandidate(2, 20, 100, 1, 1),
+            new PlacementCandidate(3, 30, 100, 1, 1),
+        };
+        var policy = new SchedulingPolicy(maxStudentsPerTeacher: 3);
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, Policy: policy), TimeSpan.FromSeconds(5));
+
+        Assert.Equal(3, solution.Placements.Count);
+        Assert.Equal(0, solution.UnassignedLessons);
+        ScheduleSolutionValidator.Validate(new ScheduleProblem(demands, candidates, Policy: policy), solution);
+    }
+
+    // ユーザー要望⑥「同時に使える座席数を『〇人までに設定する』」を検証する。学校全体で同時刻に
+    // MaxConcurrentSeats=1しか許さない場合、2名の生徒が別々の講師で同じ日時にしか対応できなくても、
+    // 同時に配置できるのはどちらか1名だけのはず。
+    [Fact]
+    public async Task SolveAsync_RespectsMaxConcurrentSeatsAcrossDifferentTeachers()
+    {
+        var demands = new[] { new LessonDemand(1, 10, 1, 0), new LessonDemand(2, 20, 1, 0) };
+        var candidates = new[]
+        {
+            new PlacementCandidate(1, 10, 100, 1, 1, OneToOneRequired: true),
+            new PlacementCandidate(2, 20, 200, 1, 1, OneToOneRequired: true),
+        };
+        var policy = new SchedulingPolicy(maxConcurrentSeats: 1);
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, Policy: policy), TimeSpan.FromSeconds(5));
+
+        Assert.Single(solution.Placements);
+        Assert.Equal(1, solution.UnassignedLessons);
+    }
+
+    // ユーザー要望⑤「時間帯をできるだけ遅くする」を検証する。1受講希望が同日の2コマ（早い/遅い）の
+    // どちらでも配置可能で他の条件が同じとき、Lateを指定すれば遅いコマを、Earlyを指定すれば早いコマを
+    // 選ぶはず。
+    [Theory]
+    [InlineData(TimeOfDayPreference.Late, 2)]
+    [InlineData(TimeOfDayPreference.Early, 1)]
+    public async Task SolveAsync_PrefersConfiguredTimeOfDayWhenOtherwiseTied(TimeOfDayPreference preference, int expectedSlotOrder)
+    {
+        var demand = new LessonDemand(1, 10, 1, 0);
+        var candidates = new[]
+        {
+            new PlacementCandidate(1, 10, 100, 1, 1, SlotOrder: 1),
+            new PlacementCandidate(1, 10, 100, 1, 2, SlotOrder: 2),
+        };
+        var policy = new SchedulingPolicy(timeOfDayPreference: preference);
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem([demand], candidates, Policy: policy), TimeSpan.FromSeconds(5));
+
+        Assert.Single(solution.Placements);
+        Assert.Equal(expectedSlotOrder, solution.Placements[0].TimeSlotId);
     }
 }

@@ -9,6 +9,7 @@ using Microsoft.UI.Xaml.Media;
 using SeminarSched.Domain.MasterData;
 using SeminarSched.Domain.CourseSettings;
 using SeminarSched.Domain.Output;
+using SeminarSched.Domain.Scheduling;
 using SeminarSched.Application.MasterData;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -40,6 +41,7 @@ public sealed partial class SetupPage : WorkflowPageBase
         CourseDayPeriodLabel.Text = $"{current.StartDate:yyyy年M月d日} ～ {current.EndDate:yyyy年M月d日}（変更はすぐに保存されます）";
         await ReloadAsync();
         await LoadOutputSettingsAsync(current.Path);
+        await LoadSchedulingPolicyAsync(current.Path);
     }
 
     private async Task LoadOutputSettingsAsync(string path)
@@ -63,6 +65,62 @@ public sealed partial class SetupPage : WorkflowPageBase
             OutputClosedColor.Text, OutputUnavailableColor.Text, OutputGroupColor.Text);
         await App.OutputSettings.SaveAsync(path, settings);
     }, "出力設定を保存しました");
+
+    // ユーザー要望「担当する生徒の人数・一日当たりの講師人数・講師ごとのコマ数の偏り・生徒の授業日・
+    // 1コマあたりの生徒対応人数・時間帯・同時に使える座席数を自由に選択できるようにしたい。後から
+    // 設定でも変更できるようにしてほしい」への対応。ここで保存した内容がプロジェクトの既定値になる
+    // （⑤時間割自動作成の画面でその回だけ上書きすることもできる）。
+    private async Task LoadSchedulingPolicyAsync(string path)
+    {
+        var policy = await App.SchedulingPolicy.GetAsync(path);
+        PolicyMaxStudentsPerTeacher.Value = policy.MaxStudentsPerTeacher;
+        SetSchedulingPolicyRadios(policy);
+        PolicyMaxConcurrentSeats.Value = policy.MaxConcurrentSeats;
+    }
+
+    private void SetSchedulingPolicyRadios(SchedulingPolicy policy)
+    {
+        PolicyTeacherCountPerDayMinimize.IsChecked = policy.TeacherCountPerDayPreference == TeacherCountPerDayPreference.Minimize;
+        PolicyTeacherCountPerDayMaximize.IsChecked = policy.TeacherCountPerDayPreference == TeacherCountPerDayPreference.Maximize;
+        PolicyTeacherCountPerDayNone.IsChecked = policy.TeacherCountPerDayPreference == TeacherCountPerDayPreference.None;
+
+        PolicyTeacherLoadBalanceBalance.IsChecked = policy.TeacherLoadBalancePreference == TeacherLoadBalancePreference.Balance;
+        PolicyTeacherLoadBalanceNone.IsChecked = policy.TeacherLoadBalancePreference == TeacherLoadBalancePreference.None;
+
+        PolicyStudentAttendanceDaysConcentrate.IsChecked = policy.StudentAttendanceDaysPreference == StudentAttendanceDaysPreference.Concentrate;
+        PolicyStudentAttendanceDaysSpread.IsChecked = policy.StudentAttendanceDaysPreference == StudentAttendanceDaysPreference.Spread;
+        PolicyStudentAttendanceDaysNone.IsChecked = policy.StudentAttendanceDaysPreference == StudentAttendanceDaysPreference.None;
+
+        PolicyPairingSizeMaximize.IsChecked = policy.PairingSizePreference == PairingSizePreference.Maximize;
+        PolicyPairingSizeMinimize.IsChecked = policy.PairingSizePreference == PairingSizePreference.Minimize;
+        PolicyPairingSizeNone.IsChecked = policy.PairingSizePreference == PairingSizePreference.None;
+
+        PolicyTimeOfDayLate.IsChecked = policy.TimeOfDayPreference == TimeOfDayPreference.Late;
+        PolicyTimeOfDayEarly.IsChecked = policy.TimeOfDayPreference == TimeOfDayPreference.Early;
+        PolicyTimeOfDayNone.IsChecked = policy.TimeOfDayPreference == TimeOfDayPreference.None;
+    }
+
+    private SchedulingPolicy BuildSchedulingPolicyFromForm() => new(
+        checked((int)PolicyMaxStudentsPerTeacher.Value),
+        PolicyTeacherCountPerDayMinimize.IsChecked == true ? TeacherCountPerDayPreference.Minimize
+            : PolicyTeacherCountPerDayMaximize.IsChecked == true ? TeacherCountPerDayPreference.Maximize
+            : TeacherCountPerDayPreference.None,
+        PolicyTeacherLoadBalanceBalance.IsChecked == true ? TeacherLoadBalancePreference.Balance : TeacherLoadBalancePreference.None,
+        PolicyStudentAttendanceDaysConcentrate.IsChecked == true ? StudentAttendanceDaysPreference.Concentrate
+            : PolicyStudentAttendanceDaysSpread.IsChecked == true ? StudentAttendanceDaysPreference.Spread
+            : StudentAttendanceDaysPreference.None,
+        PolicyPairingSizeMaximize.IsChecked == true ? PairingSizePreference.Maximize
+            : PolicyPairingSizeMinimize.IsChecked == true ? PairingSizePreference.Minimize
+            : PairingSizePreference.None,
+        PolicyTimeOfDayLate.IsChecked == true ? TimeOfDayPreference.Late
+            : PolicyTimeOfDayEarly.IsChecked == true ? TimeOfDayPreference.Early
+            : TimeOfDayPreference.None,
+        checked((int)PolicyMaxConcurrentSeats.Value));
+
+    private async void SaveSchedulingPolicy_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
+    {
+        await App.SchedulingPolicy.SaveAsync(path, BuildSchedulingPolicyFromForm());
+    }, "スケジュール設定を保存しました");
 
     private async void AddStudent_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
     {

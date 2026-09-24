@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using SeminarSched.Application.Scheduling;
+using SeminarSched.Domain.Scheduling;
 using SeminarSched.Infrastructure.Projects;
 using SeminarSched.Optimization.Core;
 using SeminarSched.Optimization.Execution;
@@ -28,11 +29,13 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         OptimizationProfile profile,
         OptimizationRunControl control,
         IProgress<OptimizationProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        SchedulingPolicy? policyOverride = null)
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
         await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
-        var (problem, regularTeacherRestrictedRequestIds) = await BuildProblemAsync(connection, cancellationToken).ConfigureAwait(false);
+        var policy = policyOverride ?? await ReadSchedulingPolicyAsync(connection, cancellationToken).ConfigureAwait(false);
+        var (problem, regularTeacherRestrictedRequestIds) = await BuildProblemAsync(connection, policy, cancellationToken).ConfigureAwait(false);
 
         var optimizer = new ScheduleOptimizer<ScheduleProblem, ScheduleSolution>(CreateStrategies());
         var result = await optimizer.RunAsync(problem, profile, control, progress, cancellationToken).ConfigureAwait(false);
@@ -82,7 +85,32 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         new FinalPolishingStrategy(), new FinalPolishingBStrategy(), new GrindingFinalPolishingStrategy(),
     ];
 
-    private static async Task<(ScheduleProblem Problem, HashSet<long> RegularTeacherRestrictedRequestIds)> BuildProblemAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    // SqliteSchedulingPolicyRepositoryと同じSELECTだが、既に開いているconnectionをそのまま使い回す
+    // （RunAsyncはこの後BuildProblemAsyncで同じprojectへ何度もクエリを投げるため、ここだけ別途
+    // 新しいconnectionを開き直すのは無駄。SetupPage側の読み書きはSqliteSchedulingPolicyRepository
+    // 経由で行う）。
+    private static async Task<SchedulingPolicy> ReadSchedulingPolicyAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT MaxStudentsPerTeacher,TeacherCountPerDayPreference,TeacherLoadBalancePreference,
+                   StudentAttendanceDaysPreference,PairingSizePreference,TimeOfDayPreference,MaxConcurrentSeats
+            FROM SchedulingPolicy WHERE ProjectId=1;
+            """;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return SchedulingPolicy.Default;
+
+        return new SchedulingPolicy(
+            reader.GetInt32(0),
+            (TeacherCountPerDayPreference)reader.GetInt32(1),
+            (TeacherLoadBalancePreference)reader.GetInt32(2),
+            (StudentAttendanceDaysPreference)reader.GetInt32(3),
+            (PairingSizePreference)reader.GetInt32(4),
+            (TimeOfDayPreference)reader.GetInt32(5),
+            reader.GetInt32(6));
+    }
+
+    private static async Task<(ScheduleProblem Problem, HashSet<long> RegularTeacherRestrictedRequestIds)> BuildProblemAsync(SqliteConnection connection, SchedulingPolicy policy, CancellationToken cancellationToken)
     {
         var demands = new List<LessonDemand>();
         var metadata = new Dictionary<long, RequestMetadata>();
@@ -222,7 +250,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
                 fixedPlacements.Add(new FixedPlacement(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3), reader.GetInt64(4), reader.GetInt32(5), reader.GetInt32(6), reader.GetBoolean(7)));
         }
         var (restrictedCandidates, regularTeacherRestrictedRequestIds) = RestrictPriorityFiveCandidatesToPreferredTeachers(candidates, demands, metadata);
-        return (new ScheduleProblem(demands, restrictedCandidates, slots, fixedPlacements), regularTeacherRestrictedRequestIds);
+        return (new ScheduleProblem(demands, restrictedCandidates, slots, fixedPlacements, policy), regularTeacherRestrictedRequestIds);
     }
 
     // ユーザー指示: 担当講師優先度5は通常担当講師に限る（他の講師が候補として残らないようにする）。

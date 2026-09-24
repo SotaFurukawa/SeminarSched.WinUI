@@ -23,14 +23,27 @@ public static class ScheduleSolutionValidator
                 throw new InvalidDataException("A lesson request was over-assigned.");
         }
 
+        // ユーザー要望「担当する生徒の人数（既定1対2）を1対3・1対4等へ変更できるようにしたい」への
+        // 対応。checkpoint93まで固定だった"2"をproblem.Policy.MaxStudentsPerTeacherへ一般化した
+        // （CpSatScheduleSolverのハード制約と同じ値でなければ、正しい解まで誤ってここで弾いてしまう）。
+        var maxCapacity = problem.Policy.MaxStudentsPerTeacher;
         var teacherLoads = solution.Placements.Select(placement =>
         {
             var candidate = candidatesByKey[PlacementKey(placement)];
-            return (placement.TeacherId, placement.OpenDateId, placement.TimeSlotId, Load: candidate.OneToOneRequired ? 2 : 1);
+            return (placement.TeacherId, placement.OpenDateId, placement.TimeSlotId, Load: candidate.OneToOneRequired ? maxCapacity : 1);
         }).Concat(problem.ExistingPlacements.Select(placement =>
-            (placement.TeacherId, placement.OpenDateId, placement.TimeSlotId, Load: placement.OneToOneRequired ? 2 : 1)));
-        if (teacherLoads.GroupBy(item => (item.TeacherId, item.OpenDateId, item.TimeSlotId)).Any(group => group.Sum(item => item.Load) > 2))
+            (placement.TeacherId, placement.OpenDateId, placement.TimeSlotId, Load: placement.OneToOneRequired ? maxCapacity : 1)));
+        if (teacherLoads.GroupBy(item => (item.TeacherId, item.OpenDateId, item.TimeSlotId)).Any(group => group.Sum(item => item.Load) > maxCapacity))
             throw new InvalidDataException("Teacher capacity violation detected.");
+
+        // ⑥同時に使える座席数（学校全体・0は考慮しない）。
+        if (problem.Policy.MaxConcurrentSeats > 0)
+        {
+            var seatOccupancy = solution.Placements.Select(placement => (placement.OpenDateId, placement.TimeSlotId))
+                .Concat(problem.ExistingPlacements.Select(placement => (placement.OpenDateId, placement.TimeSlotId)));
+            if (seatOccupancy.GroupBy(item => item).Any(group => group.Count() > problem.Policy.MaxConcurrentSeats))
+                throw new InvalidDataException("Concurrent seat capacity violation detected.");
+        }
 
         // Regular-teacher minimums are enforced by CpSatScheduleSolver as a penalized soft target
         // (AddRegularTeacherMinimums), not a hard requirement - two demands for the same student

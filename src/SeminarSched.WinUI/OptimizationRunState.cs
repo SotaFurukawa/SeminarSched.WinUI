@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using SeminarSched.Application.Scheduling;
+using SeminarSched.Domain.Scheduling;
 using SeminarSched.Optimization.Execution;
 using SeminarSched.Optimization.Profiles;
 using WinRT.Interop;
@@ -103,7 +104,7 @@ internal static class OptimizationRunState
         return (percent, elapsed, remaining);
     }
 
-    public static async Task StartAsync(string projectPath, OptimizationProfile profile, bool unrestrictedResourceUsage = false)
+    public static async Task StartAsync(string projectPath, OptimizationProfile profile, bool unrestrictedResourceUsage = false, SchedulingPolicy? policyOverride = null)
     {
         if (IsRunning) throw new InvalidOperationException("既に時間割自動作成が実行中です。");
         var beforeRun = await App.ScheduleEditor.CaptureSnapshotAsync(projectPath);
@@ -130,7 +131,7 @@ internal static class OptimizationRunState
         _timer ??= CreateTimer();
         _timer.Start();
         Changed?.Invoke();
-        _ = RunCoreAsync(projectPath, profile);
+        _ = RunCoreAsync(projectPath, profile, policyOverride);
     }
 
     public static void AcceptCurrentBest() => _control?.AcceptCurrentBest();
@@ -171,7 +172,7 @@ internal static class OptimizationRunState
             : _displayedPercent + (target - _displayedPercent) * 0.2;
     }
 
-    private static async Task RunCoreAsync(string projectPath, OptimizationProfile profile)
+    private static async Task RunCoreAsync(string projectPath, OptimizationProfile profile, SchedulingPolicy? policyOverride)
     {
         var progress = new Progress<OptimizationProgress>(p =>
         {
@@ -198,7 +199,7 @@ internal static class OptimizationRunState
         });
         try
         {
-            var result = await App.ScheduleRun.RunAsync(projectPath, profile, _control!, progress);
+            var result = await App.ScheduleRun.RunAsync(projectPath, profile, _control!, progress, policyOverride: policyOverride);
             LastOutcome = new OptimizationRunOutcome(true, result, null);
             App.Logger.Info($"Schedule run completed: placed={result.PlacedLessons} unassigned={result.UnassignedLessons} elapsedSec={result.Elapsed.TotalSeconds:F1} strategy={result.StrategyLabel}");
         }
