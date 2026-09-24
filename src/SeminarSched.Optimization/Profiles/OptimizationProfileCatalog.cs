@@ -64,20 +64,27 @@ public static class OptimizationProfileCatalog
                 OptimizationStrategyKind.MultiStage,
                 OptimizationStrategyKind.HintImprovement));
 
+        // checkpoint93（ユーザー報告「2時間経過しても最高品質のものが終わりませんでした。もう少し
+        // 軽量な仕様にしてください...イメージだと45分くらいで終わらせて、残りの15分は合間合間で
+        // もう少し良いものがないか探索する時間です」）: High/Highestとも、まず「完成させる」ことに
+        // 名目時間の75%（IE+CA）を割き、残り25%（NR[+FP]）だけを「時間が余ったので改善を試す」枠に
+        // 充てるよう再設計した。以前は65〜70%を初期探索・候補改善に、25〜40%を改善枠に割きつつ、
+        // 初期探索を5個の戦略で均等分割していたため、1戦略あたりの持ち時間が短く（Highestで3.6分）
+        // 「完成させる」こと自体に失敗しやすかった（同じ問題を毎回ゼロから解き直す短い試行を5回
+        // 繰り返すより、少数の戦略へまとまった時間を与えた方が完成に到達しやすい）。戦略数も
+        // 5→3（High）・5→4（Highest）へ減らし、1戦略あたりの持ち時間を底上げした。
         yield return Profile(
             OptimizationQualityLevel.High,
             "高品質",
             "約10〜30分",
-            "複数候補から上位を選び、hint再探索と複数の部分修復で改善します。",
+            "まず完成させることを優先し、残り時間で部分修復による改善を試みます。",
             1800,
             420,
-            Stage(OptimizationStageKind.InitialExploration, 0.40, 3,
+            Stage(OptimizationStageKind.InitialExploration, 0.50, 2,
                 OptimizationStrategyKind.StandardCpSat,
                 OptimizationStrategyKind.SeededCpSatA,
-                OptimizationStrategyKind.SeededCpSatB,
-                OptimizationStrategyKind.SeededCpSatC,
                 OptimizationStrategyKind.AlternateDecision),
-            Stage(OptimizationStageKind.CandidateAdvancement, 0.35, 2,
+            Stage(OptimizationStageKind.CandidateAdvancement, 0.25, 2,
                 OptimizationStrategyKind.MultiStage,
                 OptimizationStrategyKind.HintImprovement),
             // CP-SATは証明済み最適解に達すると持ち時間を使い切らず早期に終わるため、固定数の
@@ -93,21 +100,20 @@ public static class OptimizationProfileCatalog
             OptimizationQualityLevel.Highest,
             "最高品質",
             "約30〜60分",
-            "有望な候補へ時間を集中し、複数の部分修復と最終調整まで行います。",
+            "まず完成させることを優先し（目安45分）、残り時間（目安15分）で部分修復と最終調整を試みます。",
             3600,
             600,
-            Stage(OptimizationStageKind.InitialExploration, 0.30, 3,
+            Stage(OptimizationStageKind.InitialExploration, 0.50, 3,
                 OptimizationStrategyKind.StandardCpSat,
                 OptimizationStrategyKind.SeededCpSatA,
                 OptimizationStrategyKind.SeededCpSatB,
-                OptimizationStrategyKind.SeededCpSatC,
                 OptimizationStrategyKind.AlternateDecision),
-            Stage(OptimizationStageKind.CandidateAdvancement, 0.30, 2,
+            Stage(OptimizationStageKind.CandidateAdvancement, 0.25, 2,
                 OptimizationStrategyKind.MultiStage,
                 OptimizationStrategyKind.HintImprovement),
-            Stage(OptimizationStageKind.NeighborhoodRepair, 0.25, 1,
+            Stage(OptimizationStageKind.NeighborhoodRepair, 0.15, 1,
                 OptimizationStrategyKind.GrindingNeighborhoodRepair),
-            Stage(OptimizationStageKind.FinalPolishing, 0.15, 1,
+            Stage(OptimizationStageKind.FinalPolishing, 0.10, 1,
                 OptimizationStrategyKind.GrindingFinalPolishing));
     }
 

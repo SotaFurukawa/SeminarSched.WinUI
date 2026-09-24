@@ -38,17 +38,19 @@ public abstract class CpSatStrategyBase : IScheduleStrategy<ScheduleProblem, Sch
         }
     }
 
-    // Measured directly against a real 57-student/83-request import (41,575 candidate variables):
-    // num_search_workers:1 (true single-threaded search) never even reached a feasible solution in
-    // 40s, while num_search_workers:0 (the solver's own "auto" choice, what every strategy used
-    // before this multi-strategy rewrite) solved it in 32.4s, and explicit counts matching the
-    // machine's core count did as well or better (23-31s). So no strategy here ever asks for a
-    // single worker - the "diversity" between strategies comes from the seed and search_branching
-    // parameters instead, never from artificially crippling parallelism.
-    protected static int DefaultWorkerCount => Math.Max(1, Environment.ProcessorCount);
+    // checkpoint93より前は、ここでMath.Max(1, Environment.ProcessorCount)を明示的にNumSearchWorkersへ
+    // 渡していた（測定根拠: 実データ57名/83件・41,575変数でnum_search_workers:1が40秒経ってもfeasible
+    // 解すら出せなかった一方、0（当時は素通りしていたauto）が32.4秒、コア数と同じ値も23〜31秒で解けた
+    // ため、どの戦略も1並列だけは避けていた）。しかしこれは、NumSearchWorkersを明示的に正の値へ
+    // 固定していたせいで、CpSatScheduleSolver.ResolvedAutoSearchWorkers（WorkerLimitEnabled/
+    // 「CPU使用率を制限しない」チェックボックス経由の上限）が実質デッドコードになる副作用を伴っていた。
+    // ユーザー報告「CPUの制限をしたせいか、最高品質だと2時間かけても終了しない」の調査で発覚したため、
+    // NumSearchWorkersを渡さない（既定の0=autoのまま）ようにし、ResolvedAutoSearchWorkersの制限が
+    // 実際の探索へ反映されるようにした。checkpoint93のプロファイル再設計（1ステージあたりの戦略数を
+    // 減らし持ち時間を伸ばす）は、この分だけ1並列あたりの持ち時間が長くなることを見込んでいる。
 
     protected static CpSatSolveOptions ColdStart(StrategyContext<ScheduleProblem, ScheduleSolution> context, int seed, string? searchBranching = null) =>
-        new(context.TimeBudget, seed, DefaultWorkerCount, searchBranching);
+        new(context.TimeBudget, seed, SearchBranching: searchBranching);
 
     /// <summary>
     /// Warm-starts from the previous stage's best candidate, if any. Falls back to a plain cold
@@ -57,8 +59,8 @@ public abstract class CpSatStrategyBase : IScheduleStrategy<ScheduleProblem, Sch
     /// </summary>
     protected static CpSatSolveOptions WarmStart(StrategyContext<ScheduleProblem, ScheduleSolution> context, int seed, IReadOnlySet<long>? freeRequestIds = null) =>
         context.Hint is null
-            ? new CpSatSolveOptions(context.TimeBudget, seed, DefaultWorkerCount)
-            : new CpSatSolveOptions(context.TimeBudget, seed, DefaultWorkerCount, Hint: context.Hint.Solution, FreeRequestIds: freeRequestIds);
+            ? new CpSatSolveOptions(context.TimeBudget, seed)
+            : new CpSatSolveOptions(context.TimeBudget, seed, Hint: context.Hint.Solution, FreeRequestIds: freeRequestIds);
 }
 
 /// <summary>Plain CP-SAT, the safe baseline every quality level starts from.</summary>
@@ -239,14 +241,16 @@ public abstract class GrindingStrategyBase(bool freezeToRandomNeighborhood) : IS
 
     private CpSatSolveOptions BuildOptions(ScheduleProblem input, TimeSpan budget, int seed, ScheduleCandidate<ScheduleSolution>? hint)
     {
-        var workerCount = Math.Max(1, Environment.ProcessorCount);
-        if (hint is null) return new CpSatSolveOptions(budget, seed, workerCount);
-        if (!freezeToRandomNeighborhood) return new CpSatSolveOptions(budget, seed, workerCount, Hint: hint.Solution);
+        // NumSearchWorkersは渡さない(既定の0=auto)。CpSatStrategyBaseの上のコメント参照:
+        // checkpoint93より前はここもEnvironment.ProcessorCountを明示的に渡しており、
+        // CpSatScheduleSolver.ResolvedAutoSearchWorkersによる制限が効かなかった。
+        if (hint is null) return new CpSatSolveOptions(budget, seed);
+        if (!freezeToRandomNeighborhood) return new CpSatSolveOptions(budget, seed, Hint: hint.Solution);
         var demandIds = input.Demands.Select(demand => demand.RequestId).ToArray();
         var freeCount = Math.Max(1, demandIds.Length / 4);
         var random = new Random(seed);
         var freeRequestIds = demandIds.OrderBy(_ => random.Next()).Take(freeCount).ToHashSet();
-        return new CpSatSolveOptions(budget, seed, workerCount, Hint: hint.Solution, FreeRequestIds: freeRequestIds);
+        return new CpSatSolveOptions(budget, seed, Hint: hint.Solution, FreeRequestIds: freeRequestIds);
     }
 }
 

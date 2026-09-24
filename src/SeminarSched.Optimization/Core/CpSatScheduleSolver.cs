@@ -23,7 +23,12 @@ namespace SeminarSched.Optimization.Core;
 /// OR-Tools pick unbounded parallelism pins every logical core for the run's entire duration - tolerable
 /// for a solve that finishes in seconds, but a real problem for the "grinding" strategies that now
 /// deliberately keep re-solving for the whole nominal budget (reported by a user as unacceptably heavy
-/// CPU load on their machine during Highest-quality runs).
+/// CPU load on their machine during Highest-quality runs). Until checkpoint93, every concrete strategy
+/// in <c>CpSatStrategies.cs</c> explicitly passed a positive worker count anyway (matching
+/// <c>Environment.ProcessorCount</c>), which silently defeated this whole mechanism - the cap existed
+/// but nothing ever actually asked for "auto". Fixed alongside a report that Highest-quality still
+/// would not finish in 2 hours even with the OS-level throttling from checkpoint92, since the search
+/// itself had never actually been running at a reduced worker count.
 /// </remarks>
 public sealed record CpSatSolveOptions(
     TimeSpan MaximumDuration,
