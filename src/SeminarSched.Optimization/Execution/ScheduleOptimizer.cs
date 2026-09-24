@@ -21,12 +21,21 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
         _strategies = strategies.ToDictionary(strategy => strategy.Kind);
     }
 
+    // ユーザー要望「一応2倍の時間まで待つのは目安ではあるが、2倍以上の時間を待ってもいい。既定の
+    // 時間になっても終了しなかった場合に、そのまま継続する、という項目を追加してほしい」への対応
+    // （checkpoint97）。既定true: 延長（下記）を使い切ってもなお未完成なら、3回目・4回目...と
+    // 延長を繰り返し、完成するかユーザーが「中断して現在の結果を採用」を押すまで上限なく粘り続ける。
+    // falseなら従来通り延長は1回のみ（名目時間の最大2倍で必ず打ち切る）。既存の呼び出し元
+    // （テスト等）を壊さないよう既定値はfalse（末尾の追加引数）にしてあり、実際のアプリからは
+    // SqliteScheduleRunServiceがSchedulingPolicy.ContinueBeyondNominalTimeIfIncomplete（既定true）を
+    // 明示的に渡す。
     public async Task<OptimizationRunResult<TSolution>> RunAsync(
         TInput input,
         OptimizationProfile profile,
         OptimizationRunControl control,
         IProgress<OptimizationProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool continueBeyondNominalTimeIfIncomplete = false)
     {
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(control);
@@ -156,33 +165,62 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
         // を使い切っても結果が未完成（未配置が残っている、または1件も解が得られていない）な場合、
         // ユーザーが「中断して現在の結果を採用」を押していない限り、名目時間と同じ長さだけ追加で
         // grinding戦略（GrindingNeighborhoodRepairStrategyはヒントが無くても必ず1回は試行するため、
-        // Best が無い状態でも安全に呼べる）を実行する。これを「延長」と呼び、無限に粘り続けないよう
-        // 最大でも名目時間の2倍で必ず打ち切る（1回のみ延長し、延長後もなお未完成なら諦めてそのまま返す）。
+        // Best が無い状態でも安全に呼べる）を実行する。これを「延長」と呼ぶ。
+        //
+        // checkpoint97（ユーザー要望「2倍以上の時間を待ってもいい。既定の時間になっても終了しな
+        // かった場合に、そのまま継続する、という項目を追加してほしい」）: continueBeyondNominal
+        // TimeIfIncompleteがfalse（既定）なら、従来通り延長は1回のみ・最大で名目時間の2倍で必ず
+        // 打ち切る。trueなら、1回の延長を使い切ってもなお未完成な場合に2回目・3回目...と繰り返し、
+        // 完成するかユーザーが「中断して現在の結果を採用」を押すまで上限なく粘り続ける
+        // （実データでの調査により、大規模な問題では1回の延長（名目時間と同じ長さ）を使い切っても
+        // まだfeasible解を安定して得られないことがあると判明したための対応）。
+        // checkpoint97の自己レビューで発覚: continueBeyondNominalTimeIfIncomplete=trueのまま無条件に
+        // ループさせると、そもそも時間をいくら与えても解決しない構造的な未配置（対応できる講師が
+        // 1人もいない、担当講師優先度5の絞り込みでその講師の空きが恒久的に不足している等）のケースで
+        // 無限ループしてしまう（実際にテストスイートで1件、この形の既存テストが本当にハングして発覚：
+        // テストのホストプロセスごと強制終了する必要があった）。「時間が足りないだけ」なら追加の
+        // 延長で改善するはずなので、直近の延長で一切改善が無かった場合はそこで打ち切る（＝
+        // continueBeyondNominalTimeIfIncompleteはあくまで「時間切れで終わらせない」ためのものであり、
+        // 「構造的に不可能でも無限に粘る」ためのものではない）。
         var wasExtended = false;
+        var extensionPassIndex = 0;
+        var stagnantExtensionPass = false;
         var bestBeforeExtension = Best(allCandidates);
-        if (!acceptedEarly && !cancellationToken.IsCancellationRequested &&
-            (bestBeforeExtension is null || bestBeforeExtension.Evaluation.UnassignedLessons > 0) &&
-            _strategies.ContainsKey(OptimizationStrategyKind.GrindingNeighborhoodRepair))
+        while (!acceptedEarly && !cancellationToken.IsCancellationRequested &&
+               (bestBeforeExtension is null || bestBeforeExtension.Evaluation.UnassignedLessons > 0) &&
+               _strategies.ContainsKey(OptimizationStrategyKind.GrindingNeighborhoodRepair) &&
+               (extensionPassIndex == 0 || (continueBeyondNominalTimeIfIncomplete && !stagnantExtensionPass)))
         {
             wasExtended = true;
+            extensionPassIndex++;
             var extensionBudget = profile.MaximumDuration;
 
             // ユーザー報告バグ修正（checkpoint91）: 「残り時間が0になり100%になってもなかなか終わらない」。
             // 当初はStrategyWeightを0のまま報告しており、延長中はEstimateRawの補間式が張り付いて
             // 動かなかった。この修正では「これまでの進捗と延長の持ち分を合計1.0になるよう事後的に
-            // 比例配分し直す」方式にしたが、延長開始の瞬間に表示が100%付近から後退する（＝今回の
-            // ユーザー報告の原因）副作用があった。
+            // 比例配分し直す」方式にしたが、延長開始の瞬間に表示が100%付近から後退する副作用があった。
             //
             // checkpoint96で再設計: 上記の「事後的な再スケーリング」をやめ、延長が構造的に起こり得る
             // 場合は最初から通常ステージの目盛りをExtensionReservedShare（0.5）までしか使わないように
-            // した（ステージループ内のprogress報告を参照）。そのため延長開始時点では、目盛りの残り半分
-            // （ExtensionReservedShare〜1.0）がそもそも未使用のまま手つかずで残っており、ここへ
-            // そのまま延長の進捗を割り当てるだけでよい（事後的な再計算・後退が一切不要）。
-            var extensionShare = 1.0 - stageWeightScale;
+            // した（ステージループ内のprogress報告を参照）。延長1回のみ（continueBeyondNominalTime
+            // IfIncomplete=false）ならそのままExtensionReservedShare〜1.0を1回で使い切る。
+            //
+            // checkpoint97でさらに複数回の延長に対応: 1.0へ近づくが決して到達しない等比数列
+            // （1回目=0.5〜0.75、2回目=0.75〜0.875、3回目=0.875〜0.9375...）で目盛りを配分する。
+            // 何回目の延長で完成するか事前に分からないため、後退させずに済む唯一の方法。「本当に
+            // 終わった」ことの表現（真の100%）は、この関数の外側（OptimizationRunState、実行中で
+            // なくなった時点で100%とみなす既存ロジック）に任せる。
+            var passStartWeight = continueBeyondNominalTimeIfIncomplete
+                ? 1.0 - Math.Pow(ExtensionReservedShare, extensionPassIndex)
+                : ExtensionReservedShare;
+            var passEndWeight = continueBeyondNominalTimeIfIncomplete
+                ? 1.0 - Math.Pow(ExtensionReservedShare, extensionPassIndex + 1)
+                : 1.0;
+            var extensionShare = passEndWeight - passStartWeight;
             progress?.Report(new OptimizationProgress(
                 stopwatch.Elapsed, profile.MaximumDuration, OptimizationStageKind.Extension, OptimizationStrategyKind.GrindingNeighborhoodRepair,
                 completed, total, improvementCount, bestBeforeExtension?.Evaluation,
-                stageWeightScale, extensionShare, extensionBudget, IsStrategyStarting: true, IsExtending: true));
+                passStartWeight, extensionShare, extensionBudget, IsStrategyStarting: true, IsExtending: true));
 
             using var extensionTimeout = new CancellationTokenSource(extensionBudget);
             using var extensionCancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -201,6 +239,11 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
                 acceptedEarly = control.AcceptBestToken.IsCancellationRequested;
             }
 
+            // GrindingNeighborhoodRepairStrategy.ExecuteAsync（GrindingStrategyBase）は、このパスで
+            // ヒントより良い候補を1つも見つけられなかった場合に必ずnullを返す契約（ヒントが元々null
+            // ＝何も無い状態から一度も何も得られなかった場合も、ヒントはあったが一度も改善できなかった
+            // 場合も、どちらもnull）。そのため「今回のパスは何も得られなかった＝これ以上粘っても
+            // 無意味」の判定は、この戻り値がnullかどうかだけで一貫して判定できる。
             if (extended is not null)
             {
                 allCandidates.Add(extended);
@@ -210,11 +253,12 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
                 }
             }
 
-            var bestAfterExtension = Best(allCandidates);
+            bestBeforeExtension = Best(allCandidates);
+            stagnantExtensionPass = extended is null;
             progress?.Report(new OptimizationProgress(
                 stopwatch.Elapsed, profile.MaximumDuration, OptimizationStageKind.Extension, OptimizationStrategyKind.GrindingNeighborhoodRepair,
-                completed, total, improvementCount, bestAfterExtension?.Evaluation,
-                1.0, extensionShare, extensionBudget, IsStrategyStarting: false, IsExtending: true));
+                completed, total, improvementCount, bestBeforeExtension?.Evaluation,
+                passEndWeight, extensionShare, extensionBudget, IsStrategyStarting: false, IsExtending: true));
         }
 
         return new OptimizationRunResult<TSolution>(

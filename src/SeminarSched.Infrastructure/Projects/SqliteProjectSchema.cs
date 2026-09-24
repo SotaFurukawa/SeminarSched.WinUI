@@ -178,6 +178,11 @@ internal static class SqliteProjectSchema
         // ドメイン型（GroupLessonClass）は空文字列を許容するため読み戻しでは壊れず、3.1画面での保存時に
         // 入力を促す。
         await AddColumnIfMissingAsync(connection, transaction, "GroupLessonClass", "Subject", "TEXT NOT NULL DEFAULT ''", cancellationToken);
+
+        // checkpoint95で追加したSchedulingPolicyテーブル（CREATE TABLE IF NOT EXISTSは新規プロジェクト
+        // にしか列を追加しないため、v0.7.4〜v0.7.5時点で既にプロジェクトを作成済みのユーザーにも
+        // この新しい列が届くよう、既存テーブルへのALTER TABLEでも追加する）。
+        await AddColumnIfMissingAsync(connection, transaction, "SchedulingPolicy", "ContinueBeyondNominalTimeIfIncomplete", "INTEGER NOT NULL DEFAULT 1 CHECK(ContinueBeyondNominalTimeIfIncomplete IN(0,1))", cancellationToken);
     }
 
     private static async Task AddColumnIfMissingAsync(
@@ -376,7 +381,8 @@ internal static class SqliteProjectSchema
             StudentAttendanceDaysPreference INTEGER NOT NULL DEFAULT 0 CHECK(StudentAttendanceDaysPreference BETWEEN 0 AND 2),
             PairingSizePreference INTEGER NOT NULL DEFAULT 0 CHECK(PairingSizePreference BETWEEN 0 AND 2),
             TimeOfDayPreference INTEGER NOT NULL DEFAULT 0 CHECK(TimeOfDayPreference BETWEEN 0 AND 2),
-            MaxConcurrentSeats INTEGER NOT NULL DEFAULT 0 CHECK(MaxConcurrentSeats >= 0)
+            MaxConcurrentSeats INTEGER NOT NULL DEFAULT 0 CHECK(MaxConcurrentSeats >= 0),
+            ContinueBeyondNominalTimeIfIncomplete INTEGER NOT NULL DEFAULT 1 CHECK(ContinueBeyondNominalTimeIfIncomplete IN(0,1))
         );
         CREATE INDEX IF NOT EXISTS IX_AuditLog_Project_Timestamp ON AuditLog(ProjectId,TimestampUtc);
         CREATE INDEX IF NOT EXISTS IX_ValidationIssue_Project_Resolved ON ValidationIssue(ProjectId,Resolved,Severity);

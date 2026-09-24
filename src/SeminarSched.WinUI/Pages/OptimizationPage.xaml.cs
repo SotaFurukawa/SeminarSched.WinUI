@@ -117,6 +117,9 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         RunPolicyTimeOfDayNone.IsChecked = policy.TimeOfDayPreference == TimeOfDayPreference.None;
 
         RunPolicyMaxConcurrentSeats.Value = policy.MaxConcurrentSeats;
+
+        RunPolicyContinueBeyondNominalTimeYes.IsChecked = policy.ContinueBeyondNominalTimeIfIncomplete;
+        RunPolicyContinueBeyondNominalTimeNo.IsChecked = !policy.ContinueBeyondNominalTimeIfIncomplete;
     }
 
     private SchedulingPolicy BuildRunPolicyOverride() => new(
@@ -134,7 +137,8 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         RunPolicyTimeOfDayLate.IsChecked == true ? TimeOfDayPreference.Late
             : RunPolicyTimeOfDayEarly.IsChecked == true ? TimeOfDayPreference.Early
             : TimeOfDayPreference.None,
-        checked((int)RunPolicyMaxConcurrentSeats.Value));
+        checked((int)RunPolicyMaxConcurrentSeats.Value),
+        RunPolicyContinueBeyondNominalTimeNo.IsChecked != true);
 
     private void Page_Unloaded(object sender, RoutedEventArgs e) => OptimizationRunState.Changed -= OnRunStateChanged;
 

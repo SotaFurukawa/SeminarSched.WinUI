@@ -38,7 +38,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         var (problem, regularTeacherRestrictedRequestIds) = await BuildProblemAsync(connection, policy, cancellationToken).ConfigureAwait(false);
 
         var optimizer = new ScheduleOptimizer<ScheduleProblem, ScheduleSolution>(CreateStrategies());
-        var result = await optimizer.RunAsync(problem, profile, control, progress, cancellationToken).ConfigureAwait(false);
+        var result = await optimizer.RunAsync(problem, profile, control, progress, cancellationToken, policy.ContinueBeyondNominalTimeIfIncomplete).ConfigureAwait(false);
         if (result.Best is null)
             throw new InvalidOperationException("時間割を作成できませんでした: すべての戦略で解が得られませんでした。");
 
@@ -94,7 +94,8 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT MaxStudentsPerTeacher,TeacherCountPerDayPreference,TeacherLoadBalancePreference,
-                   StudentAttendanceDaysPreference,PairingSizePreference,TimeOfDayPreference,MaxConcurrentSeats
+                   StudentAttendanceDaysPreference,PairingSizePreference,TimeOfDayPreference,MaxConcurrentSeats,
+                   ContinueBeyondNominalTimeIfIncomplete
             FROM SchedulingPolicy WHERE ProjectId=1;
             """;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -107,7 +108,8 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
             (StudentAttendanceDaysPreference)reader.GetInt32(3),
             (PairingSizePreference)reader.GetInt32(4),
             (TimeOfDayPreference)reader.GetInt32(5),
-            reader.GetInt32(6));
+            reader.GetInt32(6),
+            reader.GetBoolean(7));
     }
 
     private static async Task<(ScheduleProblem Problem, HashSet<long> RegularTeacherRestrictedRequestIds)> BuildProblemAsync(SqliteConnection connection, SchedulingPolicy policy, CancellationToken cancellationToken)

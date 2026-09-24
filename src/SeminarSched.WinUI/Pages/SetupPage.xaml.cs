@@ -98,6 +98,9 @@ public sealed partial class SetupPage : WorkflowPageBase
         PolicyTimeOfDayLate.IsChecked = policy.TimeOfDayPreference == TimeOfDayPreference.Late;
         PolicyTimeOfDayEarly.IsChecked = policy.TimeOfDayPreference == TimeOfDayPreference.Early;
         PolicyTimeOfDayNone.IsChecked = policy.TimeOfDayPreference == TimeOfDayPreference.None;
+
+        PolicyContinueBeyondNominalTimeYes.IsChecked = policy.ContinueBeyondNominalTimeIfIncomplete;
+        PolicyContinueBeyondNominalTimeNo.IsChecked = !policy.ContinueBeyondNominalTimeIfIncomplete;
     }
 
     private SchedulingPolicy BuildSchedulingPolicyFromForm() => new(
@@ -115,7 +118,8 @@ public sealed partial class SetupPage : WorkflowPageBase
         PolicyTimeOfDayLate.IsChecked == true ? TimeOfDayPreference.Late
             : PolicyTimeOfDayEarly.IsChecked == true ? TimeOfDayPreference.Early
             : TimeOfDayPreference.None,
-        checked((int)PolicyMaxConcurrentSeats.Value));
+        checked((int)PolicyMaxConcurrentSeats.Value),
+        PolicyContinueBeyondNominalTimeNo.IsChecked != true);
 
     private async void SaveSchedulingPolicy_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
     {

@@ -187,6 +187,46 @@ public sealed class CpSatStrategyIntegrationTests
         Assert.Equal(1, result.Best!.Evaluation.UnassignedLessons);
     }
 
+    // ユーザー要望「2倍以上の時間を待ってもいい。既定の時間になっても終了しなかった場合に、そのまま
+    // 継続する、という項目を追加してほしい」（checkpoint97）の安全装置を検証する。上のテストと全く
+    // 同じ構造的に絶対解決しない問題（1受講希望が2回分必要だが候補は1コマ分しか無い）で
+    // continueBeyondNominalTimeIfIncomplete:trueを指定した場合、これが無ければ延長を無限に繰り返し
+    // 続けてしまう（実際に実装時、この形の別テストがテストスイートを本当にハングさせて発覚した）。
+    // 改善が得られない延長パスが続いたら打ち切る仕組み（stagnantExtensionPass）により、有限回数の
+    // 延長パスで終わることを検証する。
+    [Fact]
+    public async Task RunAsync_StopsRepeatingExtensionWhenStructurallyNeverCompletableEvenWithContinueBeyondNominalTime()
+    {
+        var demand = new LessonDemand(1, 10, RequiredSessions: 2, AlreadyFixedSessions: 0);
+        var candidates = new[] { new PlacementCandidate(1, 10, 100, 1, 1) };
+        var problem = new ScheduleProblem([demand], candidates);
+
+        var strategies = new IScheduleStrategy<ScheduleProblem, ScheduleSolution>[]
+        {
+            new StandardCpSatStrategy(), new GrindingNeighborhoodRepairStrategy(),
+        };
+        var profile = new OptimizationProfile(
+            OptimizationQualityLevel.Fast, "test", "test", "test",
+            TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1),
+            [new OptimizationStageDefinition(OptimizationStageKind.InitialExploration, 1.0, 1, [OptimizationStrategyKind.StandardCpSat])]);
+
+        var optimizer = new ScheduleOptimizer<ScheduleProblem, ScheduleSolution>(strategies);
+        using var control = new OptimizationRunControl();
+        var extensionStartReports = new List<OptimizationProgress>();
+        var progress = new Progress<OptimizationProgress>(p => { if (p.IsExtending && p.IsStrategyStarting) extensionStartReports.Add(p); });
+
+        // このテスト自体がタイムアウトせず完了すること自体が、無限ループしていないことの直接的な証拠。
+        var result = await optimizer.RunAsync(problem, profile, control, progress, continueBeyondNominalTimeIfIncomplete: true)
+            .WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.True(result.WasExtended);
+        Assert.NotNull(result.Best);
+        Assert.Equal(1, result.Best!.Evaluation.UnassignedLessons);
+        // 1回目は必ず試す（改善の余地があるかもしれない）が、1回も改善しなければすぐ打ち切るはずなので、
+        // 延長パス数はごく少数（目安2回程度）に収まるはず。
+        Assert.True(extensionStartReports.Count <= 3, $"expected the stagnation circuit breaker to stop extension quickly, got {extensionStartReports.Count} passes");
+    }
+
     // 延長しなくても最初のステージだけで完成した（未配置0件の）場合は、延長フェーズ自体が
     // 一切走らないことを確認する（延長は「まだ足りない場合」だけの機能であるべき）。
     [Fact]

@@ -47,7 +47,8 @@ public sealed record SchedulingPolicy
         StudentAttendanceDaysPreference studentAttendanceDaysPreference = StudentAttendanceDaysPreference.None,
         PairingSizePreference pairingSizePreference = PairingSizePreference.None,
         TimeOfDayPreference timeOfDayPreference = TimeOfDayPreference.None,
-        int maxConcurrentSeats = 0)
+        int maxConcurrentSeats = 0,
+        bool continueBeyondNominalTimeIfIncomplete = true)
     {
         if (maxStudentsPerTeacher is < 1 or > 10)
             throw new ArgumentOutOfRangeException(nameof(maxStudentsPerTeacher), "1人の講師が同時に担当できる生徒数は1〜10で指定してください。");
@@ -61,6 +62,7 @@ public sealed record SchedulingPolicy
         PairingSizePreference = pairingSizePreference;
         TimeOfDayPreference = timeOfDayPreference;
         MaxConcurrentSeats = maxConcurrentSeats;
+        ContinueBeyondNominalTimeIfIncomplete = continueBeyondNominalTimeIfIncomplete;
     }
 
     /// <summary>1人の講師が同時（同じ講師・日付・時間帯）に担当できる生徒数の上限。既定2（1対2）。
@@ -73,6 +75,13 @@ public sealed record SchedulingPolicy
     public TimeOfDayPreference TimeOfDayPreference { get; }
     /// <summary>学校（プロジェクト）全体で同時刻に授業を受けられる生徒の合計人数の上限。0は考慮しない。</summary>
     public int MaxConcurrentSeats { get; }
+    /// <summary>ユーザー要望「一応2倍の時間まで待つのは目安ではあるが、2倍以上の時間を待っても
+    /// 別にいい。既定の時間になっても終了しなかった場合に、そのまま継続する、という項目を追加して
+    /// ほしい」への対応（checkpoint97）。既定true: 名目時間の2倍（延長1回分）を使い切ってもなお
+    /// 未配置が残る場合、3回目・4回目...と延長を繰り返し、完成するか「中断して現在の結果を採用」を
+    /// 押すまで粘り続ける（上限なし）。falseにすると従来通り延長は1回のみで、2倍の時間で必ず
+    /// 打ち切る。</summary>
+    public bool ContinueBeyondNominalTimeIfIncomplete { get; }
 
     public static readonly SchedulingPolicy Default = new();
 }

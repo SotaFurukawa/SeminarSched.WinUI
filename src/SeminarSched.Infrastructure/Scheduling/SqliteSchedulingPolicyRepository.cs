@@ -13,7 +13,8 @@ public sealed class SqliteSchedulingPolicyRepository : ISchedulingPolicyReposito
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT MaxStudentsPerTeacher,TeacherCountPerDayPreference,TeacherLoadBalancePreference,
-                   StudentAttendanceDaysPreference,PairingSizePreference,TimeOfDayPreference,MaxConcurrentSeats
+                   StudentAttendanceDaysPreference,PairingSizePreference,TimeOfDayPreference,MaxConcurrentSeats,
+                   ContinueBeyondNominalTimeIfIncomplete
             FROM SchedulingPolicy WHERE ProjectId=1;
             """;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -26,7 +27,8 @@ public sealed class SqliteSchedulingPolicyRepository : ISchedulingPolicyReposito
             (StudentAttendanceDaysPreference)reader.GetInt32(3),
             (PairingSizePreference)reader.GetInt32(4),
             (TimeOfDayPreference)reader.GetInt32(5),
-            reader.GetInt32(6));
+            reader.GetInt32(6),
+            reader.GetBoolean(7));
     }
 
     public async Task SaveAsync(string projectPath, SchedulingPolicy policy, CancellationToken cancellationToken = default)
@@ -34,8 +36,8 @@ public sealed class SqliteSchedulingPolicyRepository : ISchedulingPolicyReposito
         await using var connection = await OpenAsync(projectPath, cancellationToken); await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            INSERT INTO SchedulingPolicy(ProjectId,MaxStudentsPerTeacher,TeacherCountPerDayPreference,TeacherLoadBalancePreference,StudentAttendanceDaysPreference,PairingSizePreference,TimeOfDayPreference,MaxConcurrentSeats)
-            VALUES(1,@maxStudents,@teacherCountPerDay,@teacherLoadBalance,@studentAttendanceDays,@pairingSize,@timeOfDay,@maxSeats)
+            INSERT INTO SchedulingPolicy(ProjectId,MaxStudentsPerTeacher,TeacherCountPerDayPreference,TeacherLoadBalancePreference,StudentAttendanceDaysPreference,PairingSizePreference,TimeOfDayPreference,MaxConcurrentSeats,ContinueBeyondNominalTimeIfIncomplete)
+            VALUES(1,@maxStudents,@teacherCountPerDay,@teacherLoadBalance,@studentAttendanceDays,@pairingSize,@timeOfDay,@maxSeats,@continueBeyond)
             ON CONFLICT(ProjectId) DO UPDATE SET
                 MaxStudentsPerTeacher=excluded.MaxStudentsPerTeacher,
                 TeacherCountPerDayPreference=excluded.TeacherCountPerDayPreference,
@@ -43,7 +45,8 @@ public sealed class SqliteSchedulingPolicyRepository : ISchedulingPolicyReposito
                 StudentAttendanceDaysPreference=excluded.StudentAttendanceDaysPreference,
                 PairingSizePreference=excluded.PairingSizePreference,
                 TimeOfDayPreference=excluded.TimeOfDayPreference,
-                MaxConcurrentSeats=excluded.MaxConcurrentSeats;
+                MaxConcurrentSeats=excluded.MaxConcurrentSeats,
+                ContinueBeyondNominalTimeIfIncomplete=excluded.ContinueBeyondNominalTimeIfIncomplete;
             """;
         command.Parameters.AddWithValue("@maxStudents", policy.MaxStudentsPerTeacher);
         command.Parameters.AddWithValue("@teacherCountPerDay", (int)policy.TeacherCountPerDayPreference);
@@ -52,6 +55,7 @@ public sealed class SqliteSchedulingPolicyRepository : ISchedulingPolicyReposito
         command.Parameters.AddWithValue("@pairingSize", (int)policy.PairingSizePreference);
         command.Parameters.AddWithValue("@timeOfDay", (int)policy.TimeOfDayPreference);
         command.Parameters.AddWithValue("@maxSeats", policy.MaxConcurrentSeats);
+        command.Parameters.AddWithValue("@continueBeyond", policy.ContinueBeyondNominalTimeIfIncomplete);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

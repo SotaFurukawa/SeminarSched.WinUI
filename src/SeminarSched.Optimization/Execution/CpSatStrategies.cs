@@ -188,11 +188,21 @@ public abstract class GrindingStrategyBase(bool freezeToRandomNeighborhood) : IS
 {
     public abstract OptimizationStrategyKind Kind { get; }
 
-    // 1回の試行に持ち時間を全部使わせず、必ず複数回試せるように短く切る（最短10秒、最大60秒）。
-    // ただしこの60秒はあくまで初期値: 試行がfeasible解にすら届かず失敗し続ける場合は、下の
-    // ExecuteAsync内で段階的に伸ばす（問題規模に対してこの初期値が短すぎるケースへの対応）。
-    private static readonly TimeSpan MinimumAttemptBudget = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan MaximumAttemptBudget = TimeSpan.FromSeconds(60);
+    // 1回の試行に持ち時間を全部使わせず、必ず複数回試せるように短く切る。ただしこれらはあくまで
+    // 初期値: 試行がfeasible解にすら届かず失敗し続ける場合は、下のExecuteAsync内で段階的に伸ばす
+    // （問題規模に対してこの初期値が短すぎるケースへの対応）。
+    //
+    // checkpoint97（ユーザー報告「品質レベル3で実行しても途中で（実質的に）何も得られないまま
+    // 終わってしまう」の実データでの再現調査）: 最短10秒は、実際の校舎データ（生徒75名・受講希望
+    // 83件・必要回数計458件・候補約39,475件）に対しては短すぎることを実測で確認した。同一の
+    // モデル・同一の見込み（hint）から、15秒の試行は毎回Unknown（feasible解にすら届かない）で
+    // 終わる一方、30秒の試行は複数回にわたって安定してfeasible（多くの場合458件全て配置済みの
+    // 完全解）を得られた。この問題規模ではモデルの読み込み・presolve自体に数秒〜十数秒かかる
+    // ため、10〜20秒という短い試行はその大半を探索ではなくpresolveに費やして終わってしまい、
+    // 「毎回わずかに時間が足りず何も得られない」という結果を安定して再現していた。最短値を
+    // 30秒へ引き上げ、このクラスの問題規模でも初回から意味のある探索時間が残るようにした。
+    private static readonly TimeSpan MinimumAttemptBudget = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan MaximumAttemptBudget = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan MinimumUsefulRemainder = TimeSpan.FromSeconds(3);
 
     public async Task<ScheduleCandidate<ScheduleSolution>?> ExecuteAsync(
