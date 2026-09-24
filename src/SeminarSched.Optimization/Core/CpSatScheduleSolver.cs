@@ -165,9 +165,27 @@ public sealed class CpSatScheduleSolver
         using var solver = new CpSolver { StringParameters = parameters };
         using var registration = cancellationToken.Register(solver.StopSearch);
         var status = solver.Solve(model);
-        cancellationToken.ThrowIfCancellationRequested();
+        // 重大な不具合の修正（checkpoint98）: ユーザー報告「ハード制約を外しても優先度を下げても
+        // 実行が完了しない」の実データ再調査で発覚。この試行の持ち時間ちょうどで探索が打ち切られた
+        // 場合、cancellationToken（呼び出し元が持ち時間経過で発火させるCancellationTokenSource）と
+        // CP-SAT自身のmax_time_in_secondsは同じ長さだが計測の起点がずれている（.NET側はモデル構築
+        // 開始前から、CP-SAT側は実際の探索開始から計測する）ため、.NET側のトークンがCP-SATより先に
+        // 発火し、StopSearch()経由でCP-SATを早期終了させることがしばしば起こる。このとき既に
+        // Feasible/Optimalな解が得られていても、直後にThrowIfCancellationRequested()を無条件で
+        // 呼んでいた旧実装は、その解をまるごと捨てて例外にしてしまっていた。実際に、ユーザーの
+        // 実プロジェクトファイル（生徒75名・必要回数計458件）で標準品質を実行したところ、個々の
+        // 試行のほぼ全てがFeasible/Optimalを返しているにも関わらず、最終的な結果が「すべての戦略で
+        // 解が得られませんでした」という空の例外になる現象を直接確認した（試行の持ち時間を長くする
+        // ほど、この競合の対象になる試行の割合が増えるため、checkpoint97でgrinding試行の最短時間を
+        // 10秒→30秒へ伸ばしたことが、むしろこの不具合の影響を悪化させていた可能性が高い）。
+        // Feasible/Optimalが得られなかった場合に限りキャンセルを確認する（本当のキャンセル要求なら
+        // OperationCanceledExceptionとして伝播し、そうでなければ純粋な探索失敗としてInvalidOperation
+        // Exceptionを投げる）よう、キャンセル確認を「結果が無かった場合」の分岐の中へ移した。
         if (status is not CpSolverStatus.Optimal and not CpSolverStatus.Feasible)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             throw new InvalidOperationException($"時間割を作成できませんでした: {status}");
+        }
 
         var placements = variables
             .Where(item => solver.BooleanValue(item.variable))

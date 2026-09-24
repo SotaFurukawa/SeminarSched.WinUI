@@ -164,6 +164,46 @@ public sealed class ScheduleOptimizerTests
         Assert.Equal(new[] { 0.0, 0.15, 0.15, 0.3, 0.3, 0.5 }, weights);
     }
 
+    // ユーザーの実プロジェクトファイルでの再確認調査（checkpoint97）で発覚: 標準品質で実行したところ、
+    // 初期探索6戦略＋延長1回（延長パス内だけでgrinding試行十数回）が丸ごと1件もfeasible解を
+    // 得られずに完全失敗した一方、直後に全く同じ設定で再実行しただけで初回の戦略から複数回連続で
+    // feasible解を得られた。この規模の問題ではCP-SATの結果に強い実行ごとのばらつきがあるため、
+    // 「候補が1件も無いまま延長1回が丸ごと空振りした」だけで諦めるのは（stagnantExtensionPass=trueで
+    // 即座に打ち切る従来のpatience=1）早すぎると判断し、候補が1件も無い状態に限り追加の猶予
+    // （NeverFoundAnyCandidatePatienceLimit、既定5）を設けた。候補が既にある状態（下の
+    // RunAsync_ReservesHalfTheProgressScaleForAPossibleExtensionEvenWhenNoneIsNeeded等が扱う通常の
+    // 「これ以上改善しない」ケース）は、既に採用できる結果があり延長を続ける価値が薄いため、
+    // 従来通りpatience=1のまま変更していない。
+    [Fact]
+    public async Task RunAsync_GrantsExtraPatienceWhenNoCandidateHasEverBeenFoundBeforeGivingUp()
+    {
+        var strategies = new IScheduleStrategy<string, string>[]
+        {
+            Strategy(OptimizationStrategyKind.StandardCpSat, null),
+            Strategy(OptimizationStrategyKind.GrindingNeighborhoodRepair, null),
+        };
+        var optimizer = new ScheduleOptimizer<string, string>(strategies);
+        using var control = new OptimizationRunControl();
+        var profile = new OptimizationProfile(
+            OptimizationQualityLevel.Fast, "test", "test", "test",
+            TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1),
+            [new OptimizationStageDefinition(OptimizationStageKind.InitialExploration, 1.0, 1, [OptimizationStrategyKind.StandardCpSat])]);
+
+        var extensionStartReports = new List<OptimizationProgress>();
+        var progress = new Progress<OptimizationProgress>(p => { if (p.IsExtending && p.IsStrategyStarting) extensionStartReports.Add(p); });
+
+        // このテスト自体がタイムアウトせず完了すること自体が、無限ループしていないことの直接的な証拠。
+        var result = await optimizer.RunAsync("input", profile, control, progress, continueBeyondNominalTimeIfIncomplete: true)
+            .WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(result.WasExtended);
+        Assert.Null(result.Best);
+        // NeverFoundAnyCandidatePatienceLimit(既定5)と一致するはず。候補がある場合のpatience=1
+        // （CpSatStrategyIntegrationTests.RunAsync_StopsRepeatingExtensionWhenStructurallyNever
+        // CompletableEvenWithContinueBeyondNominalTimeが検証する通り）より明確に多いことを確認する。
+        Assert.Equal(5, extensionStartReports.Count);
+    }
+
     private sealed class SynchronousProgress<T>(Action<T> callback) : IProgress<T>
     {
         public void Report(T value) => callback(value);

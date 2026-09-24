@@ -182,17 +182,36 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
         // 延長で改善するはずなので、直近の延長で一切改善が無かった場合はそこで打ち切る（＝
         // continueBeyondNominalTimeIfIncompleteはあくまで「時間切れで終わらせない」ためのものであり、
         // 「構造的に不可能でも無限に粘る」ためのものではない）。
+        // checkpoint97の実データ再確認で判明: 「候補が1件も見つかっていない（bestBeforeExtensionが
+        // null）」状態は、「候補はあるが改善できない（bestBeforeExtensionがあるのに変化が無い）」
+        // 状態と、粘る価値がまるで違う。後者は既に採用できる結果があるため、1回で見切りを付けても
+        // 失うものが無い（今の設計通りpatience=1のままでよい）。しかし前者で1回のみの延長で諦めると
+        // 「時間割を作成できませんでした」という何も残らない例外になる、最悪の結果になる。実際、
+        // ユーザーの実プロジェクトファイルで標準品質を実行したところ、初期探索6戦略＋延長1回
+        // （合計20分、grinding試行だけで十数回）すべてが1件もfeasible解を得られず完全に失敗した一方、
+        // 直後に全く同じ設定で再実行しただけで初期探索の1戦略目から複数回連続でfeasible解を得られた
+        // （458/458の完全解に近い結果）。この規模の問題ではCP-SATの探索結果に強い実行ごとの
+        // ばらつきがあり、「1回全く見つからなかった」だけでは「構造的に不可能」と判断する根拠として
+        // 弱すぎることを直接確認した。そのため、候補が1件も無い状態でのみ猶予（patience）を設け、
+        // これを使い切るまでは諦めずに追加の延長パスを繰り返す。
+        const int NeverFoundAnyCandidatePatienceLimit = 5;
+
         var wasExtended = false;
         var extensionPassIndex = 0;
         var stagnantExtensionPass = false;
+        var consecutiveNeverFoundStagnantPasses = 0;
         var bestBeforeExtension = Best(allCandidates);
         while (!acceptedEarly && !cancellationToken.IsCancellationRequested &&
                (bestBeforeExtension is null || bestBeforeExtension.Evaluation.UnassignedLessons > 0) &&
                _strategies.ContainsKey(OptimizationStrategyKind.GrindingNeighborhoodRepair) &&
-               (extensionPassIndex == 0 || (continueBeyondNominalTimeIfIncomplete && !stagnantExtensionPass)))
+               (extensionPassIndex == 0 ||
+                (continueBeyondNominalTimeIfIncomplete && !stagnantExtensionPass) ||
+                (continueBeyondNominalTimeIfIncomplete && bestBeforeExtension is null &&
+                 consecutiveNeverFoundStagnantPasses < NeverFoundAnyCandidatePatienceLimit)))
         {
             wasExtended = true;
             extensionPassIndex++;
+            var hadCandidateBeforeThisPass = bestBeforeExtension is not null;
             var extensionBudget = profile.MaximumDuration;
 
             // ユーザー報告バグ修正（checkpoint91）: 「残り時間が0になり100%になってもなかなか終わらない」。
@@ -255,6 +274,9 @@ public sealed class ScheduleOptimizer<TInput, TSolution>
 
             bestBeforeExtension = Best(allCandidates);
             stagnantExtensionPass = extended is null;
+            consecutiveNeverFoundStagnantPasses = !hadCandidateBeforeThisPass && stagnantExtensionPass
+                ? consecutiveNeverFoundStagnantPasses + 1
+                : 0;
             progress?.Report(new OptimizationProgress(
                 stopwatch.Elapsed, profile.MaximumDuration, OptimizationStageKind.Extension, OptimizationStrategyKind.GrindingNeighborhoodRepair,
                 completed, total, improvementCount, bestBeforeExtension?.Evaluation,
