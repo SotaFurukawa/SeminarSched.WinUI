@@ -6,16 +6,16 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.7.2 (beta)`（Draft Release作成予定。最適化探索品質等の継続課題は次version以降）
-Latest Development Checkpoint: checkpoint 93（⑤CP-SATの並列探索ワーカー数制限が、全戦略が明示的に全論理コア数を指定していたせいで一度も実際の探索へ反映されていなかった不具合の修正。高品質/最高品質の探索構成を、名目時間の75%で完成させ25%で改善する配分へ再設計。v0.7.1公開直後もユーザーから「2時間経過しても最高品質が終わらない」との追加報告を受けての対応）。checkpoint92（⑤CPUハード上限（Job Object）がアイドル時間まで浪費し「最高品質が2時間かけても終わらない」原因になっていた不具合の修正。プロセス優先度の引き下げ方式へ置き換え）。checkpoint91（⑤延長フェーズ中に進捗パーセンテージが100%で止まる不具合の修正）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
-Latest Draft Release: `v0.7.2`（GitHub上にDraftとして作成予定。checkpoint93の内容はbug fixのため、Next Version Ruleに従いv0.7.2とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.7.2.md](releases/v0.7.2.md)）。1つ前のDraft Releaseは`v0.7.1`（checkpoint92、詳細は[docs/releases/v0.7.1.md](releases/v0.7.1.md)）、その前は`v0.7.0`（checkpoint89・90、詳細は[docs/releases/v0.7.0.md](releases/v0.7.0.md)）。
+Current Version: `v0.7.3 (beta)`（Draft Release作成予定。最適化探索品質等の継続課題は次version以降）
+Latest Development Checkpoint: checkpoint 94（⑤未配置が残った結果を警告として明示、未配置の原因診断（担当講師優先度5・対応可能講師なし）、grinding戦略の試行持ち時間の自動延伸。v0.7.2公開後もユーザーから「既定の倍の時間をかけても無理だった」との追加報告を受けての対応。品質プロファイル自体の見直しはユーザー指示により保留中、実装するまで毎回案内すること）。checkpoint93（⑤CP-SATの並列探索ワーカー数制限が、全戦略が明示的に全論理コア数を指定していたせいで一度も実際の探索へ反映されていなかった不具合の修正。高品質/最高品質の探索構成を、名目時間の75%で完成させ25%で改善する配分へ再設計）。checkpoint92（⑤CPUハード上限（Job Object）がアイドル時間まで浪費し「最高品質が2時間かけても終わらない」原因になっていた不具合の修正。プロセス優先度の引き下げ方式へ置き換え）。checkpoint91（⑤延長フェーズ中に進捗パーセンテージが100%で止まる不具合の修正）。checkpoint39でユーザー実機のLocalMachine\TrustedPeople証明書信頼を確認済み。checkpoint51のproject open crash修正、checkpoint54の新Picker API（開始folderが`Workspace\Projects`等へ固定されていること）はユーザー実機で確認済み。checkpoint48の⑤新機能2件（sticky header表示・一括設定UI）は実機での視覚確認待ち。checkpoint79の「デザイン設定」はcheckpoint83でユーザーの実機評価を経て正式採用され、「実験的機能」の表記を削除済み。checkpoint80のSetup.exeは`PrivilegesRequired=lowest`で実機インストール・起動・アンインストールまで確認済みだが、この証明書を一度も信頼したことが無い別PCでも同様に動くかは未確認（ADR 0005のAmendment参照）。checkpoint81・82の変更は、この開発機でscratchpad上のharnessから生成したPDFを画像として目視確認したもの以外（①設定新規tabのUI操作感等）は実機での視覚確認待ち。checkpoint83で削除した設定画面「プロジェクト」タブの受講希望Excel一括編集機能は、ユーザーへ開示の上「③アンケート取込みで十分」との回答を得て復活させない方針を確定した。checkpoint84〜87（時刻選択UI・3.1/3.2表示制御・科目略称バグ修正、担当講師優先度5の制限・進捗パーセンテージ・高品質帯の多重近傍探索、コマ並び替え修正・共通名簿Excelのプルダウン・残り時間推定・連続探索戦略・講師名苗字統一・全体時間割体裁、授業間隔均等化・同一科目連続抑制）は、いずれもこの環境からは実機での動作・見た目を確認できないため、実機でのユーザー確認待ち。
+Latest Draft Release: `v0.7.3`（GitHub上にDraftとして作成予定。checkpoint94の内容はbug fixのため、Next Version Ruleに従いv0.7.3とした（ユーザーから具体的な番号指定は無く、既定ルールを適用）。詳細は[docs/releases/v0.7.3.md](releases/v0.7.3.md)）。1つ前のDraft Releaseは`v0.7.2`（checkpoint93、詳細は[docs/releases/v0.7.2.md](releases/v0.7.2.md)）、その前は`v0.7.1`（checkpoint92、詳細は[docs/releases/v0.7.1.md](releases/v0.7.1.md)）。
 Tooling note: 本プロジェクトはCodex CLIからClaude Code CLIへ運用を切り替えた（2026-09-17）。バージョン管理・push・Draft Releaseの運用ルールは変更なし。Claudeが行ったcheckpointは見出しに明記する。
 Next Version Rule:
 
-- v0.7.2 Draft Release後のbug fix / minor change -> `v0.7.3`
-- v0.7.2 Draft Release後のnew feature -> `v0.8.0`
+- v0.7.3 Draft Release後のbug fix / minor change -> `v0.7.4`
+- v0.7.3 Draft Release後のnew feature -> `v0.8.0`
 - `v1.0.0` -> ユーザーの明示指示がある場合のみ
-- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2がその例）。checkpoint83のv0.4.0・checkpoint84〜85のv0.5.0・checkpoint86〜87のv0.6.0・checkpoint88のv0.6.1・checkpoint89〜90のv0.7.0・checkpoint92のv0.7.1・checkpoint93のv0.7.2は、いずれもユーザーが番号を指定しなかったため、この既定ルールをそのまま適用した例。
+- 上記はユーザーが具体的なversion番号を明示しなかった場合の既定ルール。ユーザーが番号を名指しした場合は常にそれに従う（checkpoint82のv0.3.2がその例）。checkpoint83のv0.4.0・checkpoint84〜85のv0.5.0・checkpoint86〜87のv0.6.0・checkpoint88のv0.6.1・checkpoint89〜90のv0.7.0・checkpoint92のv0.7.1・checkpoint93のv0.7.2・checkpoint94のv0.7.3は、いずれもユーザーが番号を指定しなかったため、この既定ルールをそのまま適用した例。
 
 ### 実装済み
 
@@ -1369,7 +1369,28 @@ v0.7.1公開後もユーザーから「2時間経過しても最高品質のも�
 
 **動作確認:** Debug構成でビルド警告0・エラー0。実機でのCPU負荷・最高品質での完了時間の改善（特に今回のワーカー数制限が実際に効くようになったことの効果）は、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
 
-v0.7.2としてDraft Release作成予定（bug fixのためNext Version Ruleの既定を適用。詳細は[docs/releases/v0.7.2.md](releases/v0.7.2.md)）。
+v0.7.2としてDraft Release作成済み（bug fixのためNext Version Ruleの既定を適用。詳細は[docs/releases/v0.7.2.md](releases/v0.7.2.md)）。
+
+### v0.7.3 checkpoint 94 (Claude) — 未配置を警告として明示、原因診断（優先度5等）、grinding試行持ち時間の自動延伸
+
+v0.7.2公開後もユーザーから「やはり既定の倍の時間をかけても無理でした。また、2倍の時間をかけてしまうと、時間割が生成されないので、何も生み出していないことになります。その場合、警告を出して、無理やり作ったことを明示する。また、アルゴリズムについても停止しない原因が他にもあるのではないか。また、配置できない原因がある場合はその警告を出す。例えば、優先度5になっていることでハード条件が加えられ、それにより実装できない場合はその旨を伝えるなどです」との報告。3点に分けて対応した。
+
+**①未配置が残った結果を警告として明示:** `OptimizationPage.xaml.cs`の完了メッセージは、従来`UnassignedLessons`の値に関わらず常に緑色（`InfoBarSeverity.Success`）「時間割を作成しました」だった。件数自体はメッセージ文中にあったが、色・タイトルが常に成功表示のため、無理やり作った不完全な結果が「うまくいった」ように見えてしまっていた。`UnassignedLessons > 0`のとき`InfoBarSeverity.Warning`・タイトル「未配置がN件残ったまま作成しました（要確認）」に分岐するよう変更した。
+
+**②未配置の原因診断（担当講師優先度5・対応可能講師なし）:** `SqliteScheduleRunService`に、未配置のまま残った受講希望ごとにベストエフォートで原因を分類する`DiagnoseUnassignedDemands`を追加した。
+- 候補コマが1件も無い受講希望（講師の資格・出勤可否の時点で構造的に配置不可能。どれだけ時間をかけても解決しない）→`UnassignedWithNoQualifiedTeacher`としてカウント。
+- 担当講師優先度5により候補が通常担当講師（＋希望講師）へ絞り込まれ（`RestrictPriorityFiveCandidatesToPreferredTeachers`が実際に絞り込みを適用した受講希望のID集合を新たに返すようにした）、絞り込み後も未配置が残った受講希望→`UnassignedDueToRegularTeacherPriority`としてカウント（ユーザー自身が挙げた例そのもの: 2名の生徒が同じ通常担当講師をOneToOneRequiredで指定し、その講師の総コマ数が2名分の合計必要回数に満たない場合など。各受講希望を個別に見る既存の絞り込み判定は「単独では足りている」ため素通りしてしまうが、複数の受講希望が同じ講師の同じ枠を取り合うと合計では不足する、というケース）。
+- `ScheduleRunSummary`にこの2つのカウントを追加し、⑤画面の完了メッセージへ該当する案内文（優先度5の設定見直しを促す、または講師の資格・出勤可否の確認を促す）を自動的に追加するようにした。どちらにも当てはまらない残りは、他の生徒・講師との競合など単一の原因に帰属させられないケースとして区別していない（`UnassignedLessons`との差分で分かる）。
+
+**③grinding戦略の試行持ち時間の自動延伸:** `GrindingStrategyBase`（`GrindingNeighborhoodRepairStrategy`/`GrindingFinalPolishingStrategy`が使う、持ち時間を使い切るまで独立した試行を繰り返す仕組み）の1回あたりの試行持ち時間は、従来最短10秒・最大60秒の固定範囲だった。ユーザーの「アルゴリズムについても停止しない原因が他にもあるのではないか」という指摘を受けて調査した結果、大きな問題規模ではモデル構築・presolveのオーバーヘッドがこの60秒という上限に対して無視できない割合を占める可能性があり、その場合は同じ短い持ち時間のまま何百回失敗を繰り返しても前進しない、という仮説に至った（実データでの直接確認はできていないため、あくまで妥当性のある仮説への対応）。試行が`InvalidOperationException`（feasible解にすら届かなかった）で失敗するたびに、次回以降の試行持ち時間を倍にするようにした（このステージの持ち時間全体は超えない）。
+
+**新規/更新テスト:** `SqliteScheduleRunServiceTests`に2件追加（`RunAsync_ReportsUnassignedDueToRegularTeacherPriorityWhenSharedRegularTeacherCapacityIsInsufficient`・`RunAsync_ReportsUnassignedWithNoQualifiedTeacherWhenNoTeacherCanTeachTheSubject`）。③のgrinding試行持ち時間延伸は、CP-SATが確実にUnknown/Infeasibleを返す状況を決定的に再現するテストが組みにくい（大きなモデルを用意すれば再現できるが遅いテストになる）ため、専用テストは追加していない。`dotnet test`全194 tests passed。
+
+**動作確認:** Debug構成でビルド警告0・エラー0。①②の実機での見た目、③による実際の完了時間の改善は、いずれもこの環境からは確認できないため、実機でユーザーに確認をお願いしたい。
+
+v0.7.3としてDraft Release作成予定（bug fixのためNext Version Ruleの既定を適用。詳細は[docs/releases/v0.7.3.md](releases/v0.7.3.md)）。
+
+**保留事項（ユーザーへの案内継続中）:** 品質プロファイル（`OptimizationProfileCatalog`）自体のさらなる見直しは、ユーザーから「品質プロファイルを変えるのはまた後でで良いですが、忘れそうなので、実装するまでは毎回お知らせしてください」との明示指示があり保留中。実装するまで、CODEXへの引き継ぎ・ユーザーへの応答の両方で毎回言及すること。
 
 ### 次回最初に確認するファイル
 
