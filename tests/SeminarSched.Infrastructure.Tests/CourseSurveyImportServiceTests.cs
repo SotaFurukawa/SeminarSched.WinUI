@@ -43,6 +43,35 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
         Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM TeacherUnavailability"));
     }
 
+    // ユーザー報告「アンケート取込時にこの優先度などの引継ぎが行われていない。設定にて、優先度が5に
+    // なっているマッチングが、アンケート取り込み後に受講希望から生徒の優先度を見てみると変わって
+    // いないことがわかる」を再現・検証する。「通常授業担当設定」（RegularLessonProfile）で
+    // 生徒・科目の組み合わせに優先度5・通常担当講師を設定した状態でアンケート取込みを実行し、
+    // 生成されるLessonRequestがこの設定を正しく引き継ぐことを確認する。
+    [Fact]
+    public async Task ApplyAsync_CarriesOverRegularTeacherPriorityFromExistingRegularLessonProfile()
+    {
+        var state = await CreateStateAsync();
+        var master = new SqliteMasterDataRepository();
+        await master.SaveRegularLessonAsync(state.Path, new RegularLessonProfile(0, state.StudentId, state.SubjectId, state.TeacherId, 5, false, ""));
+
+        var studentPath = Path.Combine(_directory, "student.csv");
+        var teacherPath = Path.Combine(_directory, "teacher.csv");
+        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "在籍生", "中学校", "英語", "2", "",
+            [(state.Date1, ""), (state.Date2, "")]);
+        WriteTeacherCsv(teacherPath, "架空", "花子", "", [(state.Date1, ""), (state.Date2, "")]);
+
+        var service = new CourseSurveyImportService();
+        var preview = await service.PreviewAsync(state.Path, studentPath, teacherPath);
+        Assert.False(preview.HasErrors, string.Join(Environment.NewLine, preview.Issues.Select(issue => issue.Message)));
+        await service.ApplyAsync(state.Path, preview);
+
+        await using var connection = new SqliteConnection($"Data Source={state.Path};Pooling=False");
+        await connection.OpenAsync();
+        Assert.Equal(1L, await ScalarAsync(connection,
+            $"SELECT COUNT(*) FROM LessonRequest WHERE StudentId={state.StudentId} AND SubjectId={state.SubjectId} AND RegularTeacherPriority=5 AND RegularTeacherId={state.TeacherId}"));
+    }
+
     [Fact]
     public async Task Apply_TrialStudentNotInRoster_CreatesTrialStudentWithWarning()
     {

@@ -69,6 +69,13 @@ public sealed partial class ImportPage : WorkflowPageBase
         {
             IsEnabled=false;
             var result=await App.CourseSurveyImport.ApplyAsync(App.ProjectService.Current!.Path,_surveyPreview);
+            // ユーザー報告「アンケート取込時にこの優先度などの引継ぎが行われていない...受講希望から
+            // 生徒の優先度を見てみると変わっていない」の調査で発覚：反映処理自体は「通常授業担当設定」
+            // の優先度を正しくLessonRequestへ書き込んでいた（DBは正しい）が、この画面の「受講希望」
+            // 一覧（LessonRequests、SaveLessonRequest_Click等では保存後に呼んでいる
+            // ReloadLessonRequestsAsync）をここでは呼んでいなかったため、反映直後に同じ画面上で
+            // 見ると古い表示のまま（別画面へ移動して戻れば正しい値が見える）だった。
+            await ReloadLessonRequestsAsync();
             Status.Severity=InfoBarSeverity.Success;
             Status.Title="アンケート回答を反映しました";
             Status.Message=$"生徒{result.Students}件（体験生{result.TrialStudents}件を新規登録）・講師{result.Teachers}件・受講希望{result.LessonRequests}件";
