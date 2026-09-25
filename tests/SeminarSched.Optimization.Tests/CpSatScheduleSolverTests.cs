@@ -238,6 +238,33 @@ public sealed class CpSatScheduleSolverTests
         Assert.Equal(2, solution.Placements.Select(p => p.OpenDateId).Distinct().Count());
     }
 
+    // ユーザー要望（checkpoint104）「講師の出勤日について、考慮しない・できるだけ減らす・分散する、
+    // を追加してほしい」を検証する。既存の`SolveAsync_ConcentratesATeachersSessionsIntoFewerDays
+    // WhenOtherwiseTied`（①TeacherCountPerDayPreference、学校全体で1日あたりに登場する講師の
+    // "人数"を絞る仕組み）とは異なる、この新設トグル（④TeacherAttendanceDaysPreference、講師
+    // 1人あたりの出勤日数を絞る仕組み）専用の検証。①をNone（既定）のままにし、同じ講師が2件の
+    // 受講希望（別々の生徒）のどちらも2日のいずれの候補コマにも配置可能（他の条件は全く同じ）な
+    // とき、④にConcentrateを指定すると講師の出勤日数が少ない方（両方とも同じ日）へまとめられる
+    // はず。
+    [Fact]
+    public async Task SolveAsync_PrefersFewerDistinctAttendanceDaysForATeacherWhenOtherwiseTied()
+    {
+        var demands = new[] { new LessonDemand(1, 10, 1, 0), new LessonDemand(2, 20, 1, 0) };
+        var candidates = new[]
+        {
+            new PlacementCandidate(1, 10, 100, 1, 1, 1, 1),
+            new PlacementCandidate(1, 10, 100, 2, 1, 2, 1),
+            new PlacementCandidate(2, 20, 100, 1, 2, 1, 2),
+            new PlacementCandidate(2, 20, 100, 2, 2, 2, 2),
+        };
+        var policy = new SchedulingPolicy(teacherAttendanceDaysPreference: TeacherAttendanceDaysPreference.Concentrate);
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, Policy: policy), TimeSpan.FromSeconds(5));
+
+        Assert.Equal(2, solution.Placements.Count);
+        Assert.Single(solution.Placements.Select(p => p.OpenDateId).Distinct());
+    }
+
     // ユーザー要望「1対1が多いように見える。絶対ダメではないが1対2の方がいい」を検証する。2名の
     // 生徒が同じ講師・同じ日の2コマのどちらにも配置可能（1対1必須ではない）とき、他の条件が同じなら
     // 片方のコマへ2名ともまとめて配置（1対2）し、もう片方のコマは空けたままにするはず。

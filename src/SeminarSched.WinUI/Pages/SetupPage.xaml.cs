@@ -93,6 +93,10 @@ public sealed partial class SetupPage : WorkflowPageBase
         PolicyStudentAttendanceDaysSpread.IsChecked = policy.StudentAttendanceDaysPreference == StudentAttendanceDaysPreference.Spread;
         PolicyStudentAttendanceDaysNone.IsChecked = policy.StudentAttendanceDaysPreference == StudentAttendanceDaysPreference.None;
 
+        PolicyTeacherAttendanceDaysConcentrate.IsChecked = policy.TeacherAttendanceDaysPreference == TeacherAttendanceDaysPreference.Concentrate;
+        PolicyTeacherAttendanceDaysSpread.IsChecked = policy.TeacherAttendanceDaysPreference == TeacherAttendanceDaysPreference.Spread;
+        PolicyTeacherAttendanceDaysNone.IsChecked = policy.TeacherAttendanceDaysPreference == TeacherAttendanceDaysPreference.None;
+
         PolicyPairingSizeMaximize.IsChecked = policy.PairingSizePreference == PairingSizePreference.Maximize;
         PolicyPairingSizeMinimize.IsChecked = policy.PairingSizePreference == PairingSizePreference.Minimize;
         PolicyPairingSizeNone.IsChecked = policy.PairingSizePreference == PairingSizePreference.None;
@@ -114,6 +118,9 @@ public sealed partial class SetupPage : WorkflowPageBase
         PolicyStudentAttendanceDaysConcentrate.IsChecked == true ? StudentAttendanceDaysPreference.Concentrate
             : PolicyStudentAttendanceDaysSpread.IsChecked == true ? StudentAttendanceDaysPreference.Spread
             : StudentAttendanceDaysPreference.None,
+        PolicyTeacherAttendanceDaysConcentrate.IsChecked == true ? TeacherAttendanceDaysPreference.Concentrate
+            : PolicyTeacherAttendanceDaysSpread.IsChecked == true ? TeacherAttendanceDaysPreference.Spread
+            : TeacherAttendanceDaysPreference.None,
         PolicyPairingSizeMaximize.IsChecked == true ? PairingSizePreference.Maximize
             : PolicyPairingSizeMinimize.IsChecked == true ? PairingSizePreference.Minimize
             : PairingSizePreference.None,

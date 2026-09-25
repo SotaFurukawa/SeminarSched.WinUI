@@ -170,21 +170,28 @@
                         <RadioButton x:Name="PolicyStudentAttendanceDaysSpread" Content="分散する" GroupName="PolicyStudentAttendanceDays"/>
                     </StackPanel>
 
-                    <TextBlock FontWeight="SemiBold" Text="④1コマあたりの生徒の対応人数"/>
+                    <TextBlock FontWeight="SemiBold" Text="④講師の出勤日"/>
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <RadioButton x:Name="PolicyTeacherAttendanceDaysNone" Content="考慮しない" GroupName="PolicyTeacherAttendanceDays" IsChecked="True"/>
+                        <RadioButton x:Name="PolicyTeacherAttendanceDaysConcentrate" Content="できるだけ減らす（同じ日にまとめる）" GroupName="PolicyTeacherAttendanceDays"/>
+                        <RadioButton x:Name="PolicyTeacherAttendanceDaysSpread" Content="分散する" GroupName="PolicyTeacherAttendanceDays"/>
+                    </StackPanel>
+
+                    <TextBlock FontWeight="SemiBold" Text="⑤1コマあたりの生徒の対応人数"/>
                     <StackPanel Orientation="Horizontal" Spacing="16">
                         <RadioButton x:Name="PolicyPairingSizeNone" Content="考慮しない" GroupName="PolicyPairingSize" IsChecked="True"/>
                         <RadioButton x:Name="PolicyPairingSizeMaximize" Content="できるだけ多くする" GroupName="PolicyPairingSize"/>
                         <RadioButton x:Name="PolicyPairingSizeMinimize" Content="できるだけ少なくする" GroupName="PolicyPairingSize"/>
                     </StackPanel>
 
-                    <TextBlock FontWeight="SemiBold" Text="⑤時間帯"/>
+                    <TextBlock FontWeight="SemiBold" Text="⑥時間帯"/>
                     <StackPanel Orientation="Horizontal" Spacing="16">
                         <RadioButton x:Name="PolicyTimeOfDayNone" Content="考慮しない" GroupName="PolicyTimeOfDay" IsChecked="True"/>
                         <RadioButton x:Name="PolicyTimeOfDayLate" Content="できるだけ遅くする" GroupName="PolicyTimeOfDay"/>
                         <RadioButton x:Name="PolicyTimeOfDayEarly" Content="できるだけ早くする" GroupName="PolicyTimeOfDay"/>
                     </StackPanel>
 
-                    <NumberBox x:Name="PolicyMaxConcurrentSeats" Header="⑥同時に使える座席数（0=考慮しない）" Minimum="0" SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" Width="280"/>
+                    <NumberBox x:Name="PolicyMaxConcurrentSeats" Header="⑦同時に使える座席数（0=考慮しない）" Minimum="0" SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" Width="280"/>
 
                     <TextBlock FontWeight="SemiBold" Margin="0,8,0,0" Text="既定の時間（名目時間の2倍）になっても未配置が残っている場合"/>
                     <StackPanel Orientation="Horizontal" Spacing="16">

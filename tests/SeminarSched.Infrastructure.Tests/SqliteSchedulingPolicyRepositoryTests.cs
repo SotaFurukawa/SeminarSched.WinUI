@@ -34,6 +34,7 @@ public sealed class SqliteSchedulingPolicyRepositoryTests : IDisposable
             teacherCountPerDayPreference: TeacherCountPerDayPreference.Minimize,
             teacherLoadBalancePreference: TeacherLoadBalancePreference.Balance,
             studentAttendanceDaysPreference: StudentAttendanceDaysPreference.Concentrate,
+            teacherAttendanceDaysPreference: TeacherAttendanceDaysPreference.Spread,
             pairingSizePreference: PairingSizePreference.Minimize,
             timeOfDayPreference: TimeOfDayPreference.Late,
             maxConcurrentSeats: 12);
@@ -48,6 +49,7 @@ public sealed class SqliteSchedulingPolicyRepositoryTests : IDisposable
             teacherCountPerDayPreference: custom.TeacherCountPerDayPreference,
             teacherLoadBalancePreference: custom.TeacherLoadBalancePreference,
             studentAttendanceDaysPreference: custom.StudentAttendanceDaysPreference,
+            teacherAttendanceDaysPreference: custom.TeacherAttendanceDaysPreference,
             pairingSizePreference: custom.PairingSizePreference,
             timeOfDayPreference: TimeOfDayPreference.Early,
             maxConcurrentSeats: custom.MaxConcurrentSeats);

@@ -14,6 +14,13 @@ public enum TeacherLoadBalancePreference { None = 0, Balance = 1 }
 /// ことをユーザーへ確認済み。</summary>
 public enum StudentAttendanceDaysPreference { None = 0, Spread = 1, Concentrate = 2 }
 
+/// <summary>個々の講師の出勤日数を、できるだけ少ない日数へ集中させるか、逆に分散させるかの方針。
+/// ユーザー要望（checkpoint104）「講師の出勤日について、考慮しない・できるだけ減らす・分散する、
+/// を追加してほしい」への対応。<see cref="TeacherCountPerDayPreference"/>（1日あたりに登場する
+/// 講師の"人数"、日ごとの視点）とは異なり、こちらは講師1人あたりが何日出勤することになるか
+/// （講師ごとの視点）。<see cref="StudentAttendanceDaysPreference"/>の講師版に相当する。</summary>
+public enum TeacherAttendanceDaysPreference { None = 0, Spread = 1, Concentrate = 2 }
+
 /// <summary>1コマ（同じ講師・日付・時間帯）あたりの生徒対応人数を、できるだけ多くする
 /// （<see cref="SchedulingPolicy.MaxStudentsPerTeacher"/>まで詰める）か、少なくする
 /// （1対1に近づける）かの方針。checkpoint93までは常時「多くする」で固定（weight 3,000、
@@ -45,6 +52,7 @@ public sealed record SchedulingPolicy
         TeacherCountPerDayPreference teacherCountPerDayPreference = TeacherCountPerDayPreference.None,
         TeacherLoadBalancePreference teacherLoadBalancePreference = TeacherLoadBalancePreference.None,
         StudentAttendanceDaysPreference studentAttendanceDaysPreference = StudentAttendanceDaysPreference.None,
+        TeacherAttendanceDaysPreference teacherAttendanceDaysPreference = TeacherAttendanceDaysPreference.None,
         PairingSizePreference pairingSizePreference = PairingSizePreference.None,
         TimeOfDayPreference timeOfDayPreference = TimeOfDayPreference.None,
         int maxConcurrentSeats = 0,
@@ -59,6 +67,7 @@ public sealed record SchedulingPolicy
         TeacherCountPerDayPreference = teacherCountPerDayPreference;
         TeacherLoadBalancePreference = teacherLoadBalancePreference;
         StudentAttendanceDaysPreference = studentAttendanceDaysPreference;
+        TeacherAttendanceDaysPreference = teacherAttendanceDaysPreference;
         PairingSizePreference = pairingSizePreference;
         TimeOfDayPreference = timeOfDayPreference;
         MaxConcurrentSeats = maxConcurrentSeats;
@@ -71,6 +80,7 @@ public sealed record SchedulingPolicy
     public TeacherCountPerDayPreference TeacherCountPerDayPreference { get; }
     public TeacherLoadBalancePreference TeacherLoadBalancePreference { get; }
     public StudentAttendanceDaysPreference StudentAttendanceDaysPreference { get; }
+    public TeacherAttendanceDaysPreference TeacherAttendanceDaysPreference { get; }
     public PairingSizePreference PairingSizePreference { get; }
     public TimeOfDayPreference TimeOfDayPreference { get; }
     /// <summary>学校（プロジェクト）全体で同時刻に授業を受けられる生徒の合計人数の上限。0は考慮しない。</summary>

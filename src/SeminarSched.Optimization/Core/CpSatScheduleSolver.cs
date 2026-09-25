@@ -141,6 +141,7 @@ public sealed class CpSatScheduleSolver
         var objectiveTerms = variables.Select(item =>
             LinearExpr.Term(item.variable, 1_000_000L - (item.candidate.PreferencePenalty * 100L) + item.candidate.AvailabilityPreference))
             .Concat(BuildDayDispersionTerms(model, variables, problem.Policy.StudentAttendanceDaysPreference))
+            .Concat(BuildTeacherDayDispersionTerms(model, variables, problem.Policy.TeacherAttendanceDaysPreference))
             .Concat(BuildEvenSpacingTerms(model, problem, variables))
             .Concat(BuildPairingSizeTerms(model, variables, problem.Policy.PairingSizePreference, problem.Policy.MaxStudentsPerTeacher))
             .Concat(BuildSubjectSpacingTerms(model, problem, variables))
@@ -251,6 +252,36 @@ public sealed class CpSatScheduleSolver
                 continue;
             }
             var dayUsed = model.NewBoolVar($"day_used_{index++}");
+            model.AddMaxEquality(dayUsed, dayVariables);
+            yield return LinearExpr.Term(dayUsed, sign * DayDispersionWeight);
+        }
+    }
+
+    /// <summary>
+    /// ユーザー要望（checkpoint104）「講師の出勤日について、考慮しない・できるだけ減らす・分散する、
+    /// を追加してほしい」への対応。<see cref="BuildDayDispersionTerms"/>（生徒版）の講師版。
+    /// <see cref="TeacherCountPerDayPreference"/>（1日あたりに登場する講師の"人数"、日ごとの視点）
+    /// とは異なる軸で、こちらは講師1人あたりが何日出勤することになるか（講師ごとの視点）を扱う。
+    /// Concentrate: 講師の出勤日数が多いほど減点（できるだけ少ない日数へ集約）。Spread: 出勤日数が
+    /// 多いほど加点（分散する）。None（既定）: このteacher×dayごとの項自体を一切生成しない。
+    /// </summary>
+    private static IEnumerable<LinearExpr> BuildTeacherDayDispersionTerms(
+        CpModel model,
+        IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables,
+        TeacherAttendanceDaysPreference preference)
+    {
+        if (preference == TeacherAttendanceDaysPreference.None) yield break;
+        var sign = preference == TeacherAttendanceDaysPreference.Concentrate ? -1L : 1L;
+        var index = 0;
+        foreach (var group in variables.GroupBy(item => (item.candidate.TeacherId, item.candidate.OpenDateId)))
+        {
+            var dayVariables = group.Select(item => item.variable).ToArray();
+            if (dayVariables.Length <= 1)
+            {
+                yield return LinearExpr.Term(dayVariables[0], sign * DayDispersionWeight);
+                continue;
+            }
+            var dayUsed = model.NewBoolVar($"teacher_day_used_{index++}");
             model.AddMaxEquality(dayUsed, dayVariables);
             yield return LinearExpr.Term(dayUsed, sign * DayDispersionWeight);
         }

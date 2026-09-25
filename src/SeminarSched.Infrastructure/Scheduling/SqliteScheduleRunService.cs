@@ -94,8 +94,8 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT MaxStudentsPerTeacher,TeacherCountPerDayPreference,TeacherLoadBalancePreference,
-                   StudentAttendanceDaysPreference,PairingSizePreference,TimeOfDayPreference,MaxConcurrentSeats,
-                   ContinueBeyondNominalTimeIfIncomplete
+                   StudentAttendanceDaysPreference,TeacherAttendanceDaysPreference,PairingSizePreference,
+                   TimeOfDayPreference,MaxConcurrentSeats,ContinueBeyondNominalTimeIfIncomplete
             FROM SchedulingPolicy WHERE ProjectId=1;
             """;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -106,10 +106,11 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
             (TeacherCountPerDayPreference)reader.GetInt32(1),
             (TeacherLoadBalancePreference)reader.GetInt32(2),
             (StudentAttendanceDaysPreference)reader.GetInt32(3),
-            (PairingSizePreference)reader.GetInt32(4),
-            (TimeOfDayPreference)reader.GetInt32(5),
-            reader.GetInt32(6),
-            reader.GetBoolean(7));
+            (TeacherAttendanceDaysPreference)reader.GetInt32(4),
+            (PairingSizePreference)reader.GetInt32(5),
+            (TimeOfDayPreference)reader.GetInt32(6),
+            reader.GetInt32(7),
+            reader.GetBoolean(8));
     }
 
     private static async Task<(ScheduleProblem Problem, HashSet<long> RegularTeacherRestrictedRequestIds)> BuildProblemAsync(SqliteConnection connection, SchedulingPolicy policy, CancellationToken cancellationToken)

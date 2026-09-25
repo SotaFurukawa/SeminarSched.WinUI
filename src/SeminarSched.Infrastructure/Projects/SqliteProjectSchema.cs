@@ -183,6 +183,10 @@ internal static class SqliteProjectSchema
         // にしか列を追加しないため、v0.7.4〜v0.7.5時点で既にプロジェクトを作成済みのユーザーにも
         // この新しい列が届くよう、既存テーブルへのALTER TABLEでも追加する）。
         await AddColumnIfMissingAsync(connection, transaction, "SchedulingPolicy", "ContinueBeyondNominalTimeIfIncomplete", "INTEGER NOT NULL DEFAULT 1 CHECK(ContinueBeyondNominalTimeIfIncomplete IN(0,1))", cancellationToken);
+
+        // ユーザー要望（checkpoint104）「講師の出勤日について、考慮しない・できるだけ減らす・分散する、
+        // を追加してほしい」。既存プロジェクトにも同じ理由でALTER TABLEで届ける。
+        await AddColumnIfMissingAsync(connection, transaction, "SchedulingPolicy", "TeacherAttendanceDaysPreference", "INTEGER NOT NULL DEFAULT 0 CHECK(TeacherAttendanceDaysPreference BETWEEN 0 AND 2)", cancellationToken);
     }
 
     private static async Task AddColumnIfMissingAsync(
@@ -379,6 +383,7 @@ internal static class SqliteProjectSchema
             TeacherCountPerDayPreference INTEGER NOT NULL DEFAULT 0 CHECK(TeacherCountPerDayPreference BETWEEN 0 AND 2),
             TeacherLoadBalancePreference INTEGER NOT NULL DEFAULT 0 CHECK(TeacherLoadBalancePreference BETWEEN 0 AND 1),
             StudentAttendanceDaysPreference INTEGER NOT NULL DEFAULT 0 CHECK(StudentAttendanceDaysPreference BETWEEN 0 AND 2),
+            TeacherAttendanceDaysPreference INTEGER NOT NULL DEFAULT 0 CHECK(TeacherAttendanceDaysPreference BETWEEN 0 AND 2),
             PairingSizePreference INTEGER NOT NULL DEFAULT 0 CHECK(PairingSizePreference BETWEEN 0 AND 2),
             TimeOfDayPreference INTEGER NOT NULL DEFAULT 0 CHECK(TimeOfDayPreference BETWEEN 0 AND 2),
             MaxConcurrentSeats INTEGER NOT NULL DEFAULT 0 CHECK(MaxConcurrentSeats >= 0),
