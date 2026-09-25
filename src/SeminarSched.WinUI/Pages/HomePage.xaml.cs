@@ -94,15 +94,38 @@ public sealed partial class HomePage : Page
 
     private async void ImportSharedRoster_Click(object sender, RoutedEventArgs e)
     {
+        var picker = new FileOpenPicker(GetWindowId()) { SuggestedFolder = ProjectService.DefaultProjectsDirectory };
+        picker.FileTypeFilter.Add(".xlsx");
+        var file = await picker.PickSingleFileAsync();
+        if (file is null) return;
+        await ReflectSharedRosterSourceAsync(file.Path);
+    }
+
+    // ユーザー報告「基本情報.xlsxを変更しましたが、①設定で生徒の項目を見ると反映されていないのです」
+    // への対応。原因を調査したところ、「Excelで基本情報を編集」は共通正本のExcelファイルを直接開いて
+    // 編集させるだけで、そこへの直接編集はどこにも読み戻されない（共通正本の実体は`roster.db`という
+    // 別のSQLiteで、Excelファイルはそこから書き出された一方向のスナップショットに過ぎない）ことが
+    // 判明した。既存の「作成した基本情報を反映」は、ファイル選択ダイアログで別のExcelファイルを
+    // 選び直す（＝「新規で基本情報を作成」した別ファイルを取り込む）ための機能で、「直接編集した
+    // 同じファイルを反映する」という用途には向いていなかった（ファイルを選び直す必要があり、
+    // 見つけにくい）。「Excelで基本情報を編集」のすぐ隣に、ファイル選択なしで共通正本のExcelファイル
+    // （このボタンで開いたのと同じファイル）をそのまま取り込むボタンを追加した。
+    private async void ReflectSharedRosterEdits_Click(object sender, RoutedEventArgs e)
+    {
+        if (!File.Exists(App.SharedRosterStore.WorkbookPath))
+        {
+            ShowStatus(InfoBarSeverity.Warning, "反映できませんでした", "先に「Excelで基本情報を編集」でファイルを開いて保存してください。");
+            return;
+        }
+        await ReflectSharedRosterSourceAsync(App.SharedRosterStore.WorkbookPath);
+    }
+
+    private async Task ReflectSharedRosterSourceAsync(string sourcePath)
+    {
         try
         {
-            var picker = new FileOpenPicker(GetWindowId()) { SuggestedFolder = ProjectService.DefaultProjectsDirectory };
-            picker.FileTypeFilter.Add(".xlsx");
-            var file = await picker.PickSingleFileAsync();
-            if (file is null) return;
-
             SetBusy(true);
-            var preview = await App.SharedRosterStore.PreviewImportAsync(file.Path);
+            var preview = await App.SharedRosterStore.PreviewImportAsync(sourcePath);
             var dialog = new ContentDialog
             {
                 XamlRoot = XamlRoot,

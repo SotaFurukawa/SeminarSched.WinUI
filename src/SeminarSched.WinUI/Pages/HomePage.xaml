@@ -20,10 +20,12 @@
                     <TextBlock Text="生徒と講師の基本的な情報と、通常授業の担当をまとめたものです。プロジェクトごとの管理ではなく、一括した情報で、新規プロジェクト作成時に自動で反映されます。" TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Click="EditSharedRoster_Click" Content="Excelで基本情報を編集" Style="{StaticResource AccentButtonStyle}" />
+                        <Button Click="ReflectSharedRosterEdits_Click" Content="編集した内容を反映" />
                         <Button Click="NewSharedRosterTemplate_Click" Content="新規で基本情報を作成" />
-                        <Button Click="ImportSharedRoster_Click" Content="作成した基本情報を反映" />
+                        <Button Click="ImportSharedRoster_Click" Content="別ファイルの基本情報を反映" />
                         <Button Click="AdvanceGrades_Click" Content="学年を一括で繰り上げる" />
                     </StackPanel>
+                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="「Excelで基本情報を編集」で開いたファイルを上書き保存した後、「編集した内容を反映」を押すと、共通の基本情報および現在開いているプロジェクトへ反映されます（保存しただけでは自動的には反映されません）。" TextWrapping="Wrap" />
                     <TextBlock x:Name="SharedRosterPathText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                     <TextBlock x:Name="SharedRosterLastModifiedText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                 </StackPanel>
