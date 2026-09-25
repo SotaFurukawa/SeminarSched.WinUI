@@ -1,5 +1,7 @@
 using Microsoft.Data.Sqlite;
+using SeminarSched.Domain.MasterData;
 using SeminarSched.Domain.Projects;
+using SeminarSched.Infrastructure.MasterData;
 using SeminarSched.Infrastructure.Projects;
 
 namespace SeminarSched.Infrastructure.Tests;
@@ -34,6 +36,30 @@ public sealed class SqliteProjectRepositoryTests : IDisposable
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT COUNT(*) FROM OpenDate;";
         Assert.Equal(3L, (long)(await command.ExecuteScalarAsync())!);
+    }
+
+    [Fact]
+    public async Task RepeatedRepositoryCalls_OnTheSameUnchangedFile_StillPersistDataCorrectly()
+    {
+        // 性能対策（低速PC向け）: SqliteProjectSchema.EnsureCurrentAsyncは同一ファイルパス・
+        // 未変更（mtime/サイズ一致）であればschema検証・migration一式を省略するようキャッシュ化した。
+        // この回帰テストは、同じprojectファイルへ複数の独立したconnection経由で繰り返しアクセスしても
+        // （＝キャッシュのhit/missどちらの経路でも）データが正しく読み書きできることを確認する。
+        var path = Path.Combine(_directory, "repeated-access.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(
+            2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 22)));
+        var masterData = new SqliteMasterDataRepository();
+
+        var student = await masterData.SaveStudentAsync(path, new Student(0, "S-001", "架空 生徒", "中2"));
+        var teacher = await masterData.SaveTeacherAsync(path, new Teacher(0, "T-001", "架空 講師"));
+        var subject = await masterData.SaveSubjectAsync(path, new Subject(0, "MATH", "数学", "数", "中学", 1));
+
+        var students = await masterData.GetStudentsAsync(path);
+        var teachers = await masterData.GetTeachersAsync(path);
+        var subjects = await masterData.GetSubjectsAsync(path);
+        Assert.Contains(students, s => s.Id == student.Id && s.Name == "架空 生徒");
+        Assert.Contains(teachers, t => t.Id == teacher.Id && t.Name == "架空 講師");
+        Assert.Contains(subjects, s => s.Id == subject.Id && s.DisplayName == "数学");
     }
 
     [Fact]

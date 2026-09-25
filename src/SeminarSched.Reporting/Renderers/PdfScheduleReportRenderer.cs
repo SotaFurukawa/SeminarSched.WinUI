@@ -415,7 +415,9 @@ public sealed class PdfScheduleReportRenderer
 
     private static void Save(Document document, string path)
     {
-        var renderer = new PdfDocumentRenderer { Document = document }; renderer.RenderDocument(); renderer.PdfDocument.Save(path);
+        var renderer = new PdfDocumentRenderer { Document = document }; renderer.RenderDocument();
+        using var pdfDocument = renderer.PdfDocument;
+        pdfDocument.Save(path);
     }
 
     private static void EnsureFont() { lock (FontGate) { if (GlobalFontSettings.FontResolver is null) GlobalFontSettings.FontResolver = new WindowsJapaneseFontResolver(); } }

@@ -56,8 +56,6 @@ public partial class App : Application
 
     public static IMasterDataRepository MasterData { get; } = new SqliteMasterDataRepository();
 
-    public static IMasterDataWorkbookService MasterDataWorkbook { get; } = new MasterDataWorkbookService();
-
     public static ISharedRosterImportService SharedRosterImport { get; } = new SharedRosterImportService();
 
     public static ISharedRosterStore SharedRosterStore { get; } = new SharedRosterStore(SharedRosterImport, MasterData);
@@ -65,8 +63,6 @@ public partial class App : Application
     public static ICourseSettingsRepository CourseSettings { get; } = new SqliteCourseSettingsRepository();
 
     public static QuestionnaireKitService QuestionnaireKit { get; } = new(CourseSettings, MasterData);
-
-    public static IResponseImportService ResponseImport { get; } = new CsvResponseImportService();
 
     public static ICourseSurveyImportService CourseSurveyImport { get; } = new CourseSurveyImportService();
 

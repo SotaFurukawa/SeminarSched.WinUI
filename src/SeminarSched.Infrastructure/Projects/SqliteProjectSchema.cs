@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Data.Sqlite;
 using SeminarSched.Domain.MasterData;
 
@@ -8,10 +9,24 @@ internal static class SqliteProjectSchema
     internal const string ProductMarker = "SeminarSched.WinUI";
     internal const int CurrentVersion = 2;
 
+    // 性能対策: EnsureCurrentAsyncは呼び出し側（15箇所超）のほぼ全てが「projectを開く→都度新しい
+    // connectionでこれを呼ぶ」構成のため、1画面の表示だけでも同じ未変更ファイルに対して何度も
+    // PRAGMA table_info・CREATE TABLE・ALTER TABLE一式を繰り返し実行していた（低速なPCで体感できる
+    // 遅延の原因）。同一ファイルパス・同一の最終更新日時＋サイズであれば「このprocess内では検証済み」
+    // とみなして丸ごと省略する。ファイルが外部から置き換えられた場合（バックアップ復元等）はmtime/サイズ
+    // が変わるため自動的に再検証される。呼び出し側の接続管理・トランザクション境界は一切変更しない。
+    private static readonly ConcurrentDictionary<string, (DateTime WriteTimeUtc, long Length)> VerifiedFingerprints = new(StringComparer.OrdinalIgnoreCase);
+
     internal static async Task EnsureCurrentAsync(
         SqliteConnection connection,
         CancellationToken cancellationToken = default)
     {
+        var path = connection.DataSource;
+        if (TryGetFingerprint(path) is { } current && VerifiedFingerprints.TryGetValue(path, out var cached) && cached == current)
+        {
+            return;
+        }
+
         var version = await ReadVersionAsync(connection, cancellationToken).ConfigureAwait(false);
         if (version != CurrentVersion)
         {
@@ -19,10 +34,6 @@ internal static class SqliteProjectSchema
         }
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
-        // GroupLessonSessionは同日中に「TimeSlot参照」から「自由入力のStartTime/EndTime」へ設計変更した
-        // （集団授業のクラス管理機能自体が同一開発サイクル内の未リリース機能で実データが無いため、
-        // 通常のAddColumnIfMissingAsyncによる追加ではなく一度DROPして作り直す一回限りの対応）。
-        await DropTableIfHasColumnAsync(connection, (SqliteTransaction)transaction, "GroupLessonSession", "TimeSlotId", cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.Transaction = (SqliteTransaction)transaction;
         command.CommandText = CompleteSchemaSql;
@@ -30,6 +41,18 @@ internal static class SqliteProjectSchema
         await EnsureColumnsAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await BackfillInvalidSubjectShortNamesAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+        if (TryGetFingerprint(path) is { } verified)
+        {
+            VerifiedFingerprints[path] = verified;
+        }
+    }
+
+    private static (DateTime WriteTimeUtc, long Length)? TryGetFingerprint(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return null;
+        var info = new FileInfo(path);
+        return info.Exists ? (info.LastWriteTimeUtc, info.Length) : null;
     }
 
     // 過去のバグ（共通名簿Excel取込みが略称列を「表示名をそのまま（10文字まで）切り詰めた値」で
@@ -63,36 +86,6 @@ internal static class SqliteProjectSchema
             shortParameter.Value = SubjectAbbreviation.Resolve(displayName, null, code);
             await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
-    }
-
-    private static async Task DropTableIfHasColumnAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        string table,
-        string obsoleteColumn,
-        CancellationToken cancellationToken)
-    {
-        await using var info = connection.CreateCommand();
-        info.Transaction = transaction;
-        info.CommandText = $"PRAGMA table_info({table});";
-        var hasObsoleteColumn = false;
-        await using (var reader = await info.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
-        {
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                if (string.Equals(reader.GetString(1), obsoleteColumn, StringComparison.OrdinalIgnoreCase))
-                {
-                    hasObsoleteColumn = true;
-                    break;
-                }
-            }
-        }
-        if (!hasObsoleteColumn) return;
-
-        await using var drop = connection.CreateCommand();
-        drop.Transaction = transaction;
-        drop.CommandText = $"DROP TABLE {table};";
-        await drop.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     internal static async Task<int> ReadVersionAsync(

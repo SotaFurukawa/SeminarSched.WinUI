@@ -20,9 +20,15 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
     private readonly TranslateTransform _cornerTransform = new();
     private sealed record CellTag(long TimeSlotId, long TeacherId, bool Blocked);
 
+    // 性能対策: 氏名検索欄は1文字ごとにgrid全体（講師列数×コマ数のBorder/StackPanel/Button一式）を
+    // Children.Clear()から作り直すため、無変更でRenderBoard()を都度呼ぶと低速なPCで入力ごとに
+    // 目に見えるカクつきが生じる。入力が一瞬止まってからまとめて1回だけ再描画する。
+    private readonly DispatcherTimer _boardSearchDebounce = new() { Interval = TimeSpan.FromMilliseconds(250) };
+
     public ScheduleEditorPage()
     {
         InitializeComponent();
+        _boardSearchDebounce.Tick += (_, _) => { _boardSearchDebounce.Stop(); RenderBoard(); };
     }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
@@ -188,7 +194,13 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         RenderBoard();
     }
 
-    private void BoardSearch_TextChanged(object sender, TextChangedEventArgs e) => RenderBoard();
+    private void BoardSearch_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _boardSearchDebounce.Stop();
+        _boardSearchDebounce.Start();
+    }
+
+    private void Page_Unloaded(object sender, RoutedEventArgs e) => _boardSearchDebounce.Stop();
 
     private void RenderBoard()
     {

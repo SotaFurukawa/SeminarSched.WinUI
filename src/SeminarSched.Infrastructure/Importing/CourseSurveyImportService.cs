@@ -572,7 +572,7 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
     private static async Task<SqliteConnection> OpenAsync(string path, CancellationToken cancellationToken) { var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Path.GetFullPath(path), Mode = SqliteOpenMode.ReadWrite, ForeignKeys = true, Pooling = false }.ToString()); await connection.OpenAsync(cancellationToken).ConfigureAwait(false); return connection; }
     private static string Hash(string path) { using var stream = File.OpenRead(path); return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant(); }
 
-    // --- 生CSV/XLSX読み取り（重複ヘッダーを許容する点がMasterDataWorkbookServiceと異なる） ---
+    // --- 生CSV/XLSX読み取り（重複ヘッダーを許容する） ---
 
     private static RawTable ReadTable(string path) => Path.GetExtension(path).ToLowerInvariant() switch
     {
@@ -624,8 +624,8 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
         return map;
     }
 
-    // Google Formsは複数の分岐ページで同一の質問文を出力することがあるため、MasterDataWorkbookService等の
-    // 固定形式importerと異なりヘッダー重複をエラーにせず、Python版のreaders.pyと同じ命名規則で区別する。
+    // Google Formsは複数の分岐ページで同一の質問文を出力することがあるため、固定形式importerと
+    // 異なりヘッダー重複をエラーにせず、Python版のreaders.pyと同じ命名規則で区別する。
     private static string[] DedupeHeaders(string[] rawHeaders)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);

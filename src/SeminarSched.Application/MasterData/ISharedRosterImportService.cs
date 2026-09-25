@@ -22,8 +22,7 @@ public sealed record SharedRosterImportResult(int ImportedRows, int WarningCount
 
 /// <summary>
 /// Imports the Python reference app's "生徒・講師_基本情報.xlsx" (年度をまたいで利用する共通名簿) format:
-/// 生徒/講師/科目/講師対応科目/通常授業 sheets carried over between course periods, distinct from the
-/// per-period 共通基本情報Excel (<see cref="IMasterDataWorkbookService"/>) which also includes 受講希望.
+/// 生徒/講師/科目/講師対応科目/通常授業 sheets carried over between course periods.
 /// </summary>
 public interface ISharedRosterImportService
 {

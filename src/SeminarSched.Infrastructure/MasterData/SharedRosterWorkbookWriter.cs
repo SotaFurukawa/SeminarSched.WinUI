@@ -9,8 +9,7 @@ namespace SeminarSched.Infrastructure.MasterData;
 /// 書き出す。ID列は既存のExternalIdをそのまま値として書き込む（既存行は今まで通り）。
 /// ユーザー指示（Python版同様の仕様）により、講師対応科目・通常授業シートの「…名から選択」列に
 /// 生徒/講師/科目シートを参照するドロップダウン入力規則を設定し、対応する「…ID（自動・入力不要）」
-/// 列には、まだ値の無い新規行に限り選んだ名前からIDを自動算出する数式を入れる
-/// （<see cref="MasterDataWorkbookService"/>の受講希望シートと同じ仕組み）。既存行のID値は
+/// 列には、まだ値の無い新規行に限り選んだ名前からIDを自動算出する数式を入れる。既存行のID値は
 /// 従来通りの直接値のまま変更しない（既に動いているimportとの互換性・テストへの影響を避けるため）。
 /// </summary>
 internal static class SharedRosterWorkbookWriter
@@ -94,9 +93,8 @@ internal static class SharedRosterWorkbookWriter
         File.Move(temporary, path, overwrite: true);
     }
 
-    // MasterDataWorkbookService.AddReferenceHelperColumnsと同じ仕組み（ドロップダウン選択＋新規行の
-    // ID自動算出数式）を、生徒・講師シートに例示行が無くヘッダー直後（2行目）からデータが始まる
-    // このワークブックのレイアウトに合わせて移植したもの。選択列（名前）には参照先シートの氏名/
+    // ドロップダウン選択＋新規行のID自動算出数式の仕組みを、生徒・講師シートに例示行が無くヘッダー
+    // 直後（2行目）からデータが始まるこのワークブックのレイアウトに合わせて実装したもの。選択列（名前）には参照先シートの氏名/
     // 表示名列を参照するリスト入力規則を設定し、まだデータの無い行のID列にだけ、選んだ名前から
     // IDを自動算出する数式を入れる。既存行のID値は直接の文字列のまま変更しない
     // （SharedRosterImportServiceは選択列を読まずID/コード列だけを読むため、既存の取込み処理は無修正で動く）。
