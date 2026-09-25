@@ -255,14 +255,15 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         return (new ScheduleProblem(demands, restrictedCandidates, slots, fixedPlacements, policy), regularTeacherRestrictedRequestIds);
     }
 
-    // ユーザー指示: 担当講師優先度5は通常担当講師に限る（他の講師が候補として残らないようにする）。
-    // ただし通常担当講師の出勤可能コマ数（＝この受講希望に対する候補コマ数）が必要回数に満たない
-    // 場合は、全回数を通常担当講師だけで満たすこと自体が不可能なため、この絞り込みを適用しない
-    // （元の全候補のまま残す）。第2希望・第3希望が設定されている場合はそれらも候補として残す
-    // （通常担当＝第1希望が優先されるべきという前提は、PreferencePenaltyの得点差で維持される）。
-    // 戻り値のRestrictedRequestIdsは、実際にこの絞り込みが適用された受講希望のID集合
-    // （DiagnoseUnassignedDemandsが、未配置のまま残った理由を「優先度5の講師の空き不足」と
-    // 説明してよいかどうかの判定に使う）。
+    // ユーザー指示（checkpoint102）「優先度5について、これは必須です。通常授業講師と第一から第三
+    // 希望講師以外からは絶対に選ばないようにしてください」への対応。担当講師優先度5は、通常担当講師
+    // ＋第1〜3希望講師の合計最大4名に候補を無条件で限定する（この4名の空きコマだけでは必要回数を
+    // 満たせない場合でも、他の講師を候補に戻すことは絶対にしない。満たせない分はそのまま未配置として
+    // 残す）。以前は「通常担当講師の空きコマ数が必要回数に満たない場合はこの絞り込み自体を適用しない
+    // （元の全候補へ戻す）」という救済処理があったが、ユーザーが明示的にこれを禁止したため削除した。
+    // 戻り値のRestrictedRequestIdsは、この絞り込みが適用された受講希望のID集合（優先度5＋通常担当
+    // 講師が設定されている受講希望は常にここへ含まれる。DiagnoseUnassignedDemandsが、未配置のまま
+    // 残った理由を「優先度5の講師の空き不足」と説明してよいかどうかの判定に使う）。
     private static (List<PlacementCandidate> Candidates, HashSet<long> RestrictedRequestIds) RestrictPriorityFiveCandidatesToPreferredTeachers(
         List<PlacementCandidate> candidates,
         List<LessonDemand> demands,
@@ -276,19 +277,14 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
             var demand = demandsById[group.Key];
             if (demand.RegularTeacherPriority == 5 && demand.RegularTeacherId is long regularTeacherId)
             {
-                var remainingNeeded = Math.Max(0, demand.RequiredSessions - demand.AlreadyFixedSessions);
-                var regularTeacherCandidateCount = group.Count(candidate => candidate.TeacherId == regularTeacherId);
-                if (regularTeacherCandidateCount >= remainingNeeded)
-                {
-                    var meta = metadata[group.Key];
-                    var allowedTeacherIds = new HashSet<long> { regularTeacherId };
-                    if (meta.PreferredTeacher1Id is long preferred1) allowedTeacherIds.Add(preferred1);
-                    if (meta.PreferredTeacher2Id is long preferred2) allowedTeacherIds.Add(preferred2);
-                    if (meta.PreferredTeacher3Id is long preferred3) allowedTeacherIds.Add(preferred3);
-                    restricted.AddRange(group.Where(candidate => allowedTeacherIds.Contains(candidate.TeacherId)));
-                    restrictedRequestIds.Add(group.Key);
-                    continue;
-                }
+                var meta = metadata[group.Key];
+                var allowedTeacherIds = new HashSet<long> { regularTeacherId };
+                if (meta.PreferredTeacher1Id is long preferred1) allowedTeacherIds.Add(preferred1);
+                if (meta.PreferredTeacher2Id is long preferred2) allowedTeacherIds.Add(preferred2);
+                if (meta.PreferredTeacher3Id is long preferred3) allowedTeacherIds.Add(preferred3);
+                restricted.AddRange(group.Where(candidate => allowedTeacherIds.Contains(candidate.TeacherId)));
+                restrictedRequestIds.Add(group.Key);
+                continue;
             }
             restricted.AddRange(group);
         }

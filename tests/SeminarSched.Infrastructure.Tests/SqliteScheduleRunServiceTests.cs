@@ -36,8 +36,8 @@ public sealed class SqliteScheduleRunServiceTests : IDisposable
         var result=await new SqliteScheduleRunService().RunAsync(path,TimeSpan.FromSeconds(5));Assert.Equal(0,result.PlacedLessons);Assert.Equal(0,result.UnassignedLessons);
         await using var verify=new SqliteConnection($"Data Source={path};Mode=ReadOnly;Pooling=False");await verify.OpenAsync();await using var count=verify.CreateCommand();count.CommandText="SELECT COUNT(*) FROM Assignment WHERE IsManual=1 AND IsLocked=0 AND Source='manual';";Assert.Equal(1L,Convert.ToInt64(await count.ExecuteScalarAsync()));
     }
-    // ユーザー指示: 担当講師優先度5は、通常担当講師の出勤可能コマ数が必要回数以上ある限り、
-    // 他の講師が候補に残らないようにする（第1〜3希望が未設定ならそれ以外は一切使わせない）。
+    // ユーザー指示: 担当講師優先度5は、通常担当講師（第1〜3希望が未設定ならそれ以外は一切使わせない）
+    // に他の講師が候補として残らないようにする。
     // 制限が無い場合、別講師を使うと生徒の日程分散スコア（1日あたり10,000点）が
     // 講師優先度スコア（100点単位のPreferencePenalty）を上回るため、あえて別講師・別日へ
     // 分散させてしまう状況を作り、制限が実際に効いていることを確認する。
@@ -147,10 +147,13 @@ public sealed class SqliteScheduleRunServiceTests : IDisposable
         Assert.Equal(0L, Convert.ToInt64(await count.ExecuteScalarAsync()));
     }
 
-    // 通常担当講師の出勤可能コマ数(2)が必要回数(3)に満たない場合は、制限を適用せず他の講師も
-    // 候補に残す（さもなければ1コマ未配置のまま終わってしまう）。
+    // ユーザー指示（checkpoint102）「優先度5について、これは必須です。通常授業講師と第一から第三
+    // 希望講師以外からは絶対に選ばないようにしてください」を検証する。通常担当講師の出勤可能コマ数
+    // (2)が必要回数(3)に満たない場合でも、絞り込みは適用したままにし（以前は他の講師も候補へ戻す
+    // 救済処理があったが、ユーザー指示により廃止）、満たせない1コマは他の講師を使わず未配置のまま
+    // 残ることを確認する。
     [Fact]
-    public async Task RunAsync_PriorityFiveAllowsOtherTeachersWhenRegularTeacherSlotsAreInsufficient()
+    public async Task RunAsync_PriorityFiveNeverUsesOtherTeachersEvenWhenRegularTeacherSlotsAreInsufficient()
     {
         Directory.CreateDirectory(_directory);
         var path = Path.Combine(_directory, "priority5-insufficient.jukuschedule");
@@ -190,14 +193,14 @@ public sealed class SqliteScheduleRunServiceTests : IDisposable
         }
 
         var result = await new SqliteScheduleRunService().RunAsync(path, TimeSpan.FromSeconds(5));
-        Assert.Equal(3, result.PlacedLessons); Assert.Equal(0, result.UnassignedLessons);
+        Assert.Equal(2, result.PlacedLessons); Assert.Equal(1, result.UnassignedLessons);
 
         await using var verify = new SqliteConnection($"Data Source={path};Mode=ReadOnly;Pooling=False");
         await verify.OpenAsync();
         await using var countOther = verify.CreateCommand();
         countOther.CommandText = "SELECT COUNT(*) FROM Assignment WHERE TeacherId=$other;";
         countOther.Parameters.AddWithValue("$other", otherTeacher.Id);
-        Assert.Equal(1L, Convert.ToInt64(await countOther.ExecuteScalarAsync()));
+        Assert.Equal(0L, Convert.ToInt64(await countOther.ExecuteScalarAsync()));
     }
 
     // ユーザー報告「配置できない原因がある場合はその警告を出す。例えば、優先度5になっていることで
