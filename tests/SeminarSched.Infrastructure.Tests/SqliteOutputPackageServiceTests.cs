@@ -222,10 +222,11 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         // The project also carries the default A/B/C slots seeded by SqliteProjectRepository.CreateAsync
         // alongside this test's own "1限"/"2限" slots, so slot rows must be located by label text rather
         // than by an assumed row offset from one another. The overview grid's slot label cell is
-        // "{code}\n{start}–{end}" (code = TimeSlot.Code, here "1"/"2", not the DisplayName "1限"/"2限").
+        // "{code}\n{start}\n∼\n{end}" (code = TimeSlot.Code, here "1"/"2", not the DisplayName "1限"/"2限").
+        // The label's top row (checkpoint105) coincides with the grade row of that slot's block.
         var unavailableFill=XLColor.FromHtml("#D9D9D9");
-        var slot1Row=overview.CellsUsed().First(cell=>cell.GetString()=="1\n09:00–10:00").Address.RowNumber;
-        var slot2Row=overview.CellsUsed().First(cell=>cell.GetString()=="2\n10:00–11:00").Address.RowNumber;
+        var slot1Row=overview.CellsUsed().First(cell=>cell.GetString()=="1\n09:00\n∼\n10:00").Address.RowNumber;
+        var slot2Row=overview.CellsUsed().First(cell=>cell.GetString()=="2\n10:00\n∼\n11:00").Address.RowNumber;
         var teacherCol=overview.CellsUsed().First(cell=>cell.GetString()=="架空").Address.ColumnNumber;
         Assert.Equal("中2",overview.Cell(slot1Row,teacherCol).GetString());
         Assert.Equal(string.Empty,overview.Cell(slot2Row,teacherCol).GetString());
@@ -298,7 +299,7 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         var result=await new SqliteOutputPackageService().GenerateAsync(path,_directory);
         using var overall=new XLWorkbook(result.OverallExcelPath);
         var week=overall.Worksheets.First(ws=>ws.Name.StartsWith("週_",StringComparison.Ordinal));
-        var labelCells=week.CellsUsed().Where(cell=>cell.GetString()=="1\n09:00–10:00").ToArray();
+        var labelCells=week.CellsUsed().Where(cell=>cell.GetString()=="1\n09:00\n∼\n10:00").ToArray();
         var labelCell=Assert.Single(labelCells);
         Assert.Equal(1,labelCell.Address.ColumnNumber);
         Assert.Equal(XLAlignmentHorizontalValues.Center,labelCell.Style.Alignment.Horizontal);
@@ -308,6 +309,44 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         Assert.Equal(2,week.Row(3).CellsUsed().Count(cell=>cell.GetString()=="架空"));
         Assert.Equal(Math.Round((45-5)/7.0,2),week.Column(1).Width);
         Assert.Equal(Math.Round((30-5)/7.0,2),week.Column(2).Width);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_OverviewGrid_RendersDedicatedClosedDayColumnBetweenOpenDays()
+    {
+        // ユーザー指示（checkpoint105）: 講習期間内の休校日には専用の列を1つ挟み、時間割データが
+        // 入っている行をセル結合・黒塗り・白文字・縦書きで「M/d(曜) 休校日」と表示、列幅は25pxにする。
+        Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"closed-day-column.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,22)));
+        var m=new SqliteMasterDataRepository();
+        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));
+        var teacher=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 講師"));
+        var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));
+        var course=new SqliteCourseSettingsRepository();
+        var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));
+        await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
+        await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,21),false,"",[]));
+        await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,22),true,"",[slot.Id]));
+        await using(var c=new SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            await c.OpenAsync();await using var q=c.CreateCommand();
+            q.CommandText=$"""
+                INSERT INTO LessonRequest(Id,ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,1,{student.Id},{sub.Id},1);
+                INSERT INTO Assignment(LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source)
+                  SELECT 1,{teacher.Id},d.Id,{slot.Id},0,'test' FROM OpenDate d WHERE d.Date='2026-07-20';
+                """;
+            await q.ExecuteNonQueryAsync();
+        }
+
+        var result=await new SqliteOutputPackageService().GenerateAsync(path,_directory);
+        using var overall=new XLWorkbook(result.OverallExcelPath);
+        var week=overall.Worksheets.First(ws=>ws.Name.StartsWith("週_",StringComparison.Ordinal));
+        var closedCell=week.CellsUsed().Single(cell=>cell.GetString().Contains("休校日"));
+        Assert.Contains("7/21",closedCell.GetString());
+        Assert.Equal(XLColor.Black,closedCell.Style.Fill.BackgroundColor);
+        Assert.Equal(XLColor.White,closedCell.Style.Font.FontColor);
+        Assert.True(closedCell.IsMerged());
+        Assert.Equal(Math.Round((25-5)/7.0,2),week.Column(closedCell.Address.ColumnNumber).Width,2);
     }
 
     [Fact]

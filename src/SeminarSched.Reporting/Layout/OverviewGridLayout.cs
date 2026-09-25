@@ -6,7 +6,10 @@ public sealed record OverviewCell(string SlotLabel, IReadOnlyList<OverviewCard> 
 
 public sealed record OverviewTeacherColumn(string TeacherName, IReadOnlyList<OverviewCell> Cells);
 
-public sealed record OverviewDay(DateOnly Date, IReadOnlyList<OverviewTeacherColumn> Teachers);
+/// <summary>IsClosed=trueの場合、Teachersは空でありレンダラー側は休校日専用の列（縦書きラベル・黒塗り）
+/// として扱う。ユーザー要望（checkpoint105）「休校日の列を追加。例えば、7月27日、7月29日の間に
+/// 7月28日の休校日があった場合、その間に列を追加」への対応。</summary>
+public sealed record OverviewDay(DateOnly Date, IReadOnlyList<OverviewTeacherColumn> Teachers, bool IsClosed = false);
 
 public sealed record OverviewWeek(DateOnly SundayStart, IReadOnlyList<OverviewDay> Days);
 
@@ -40,7 +43,14 @@ public static class OverviewGridLayout
             for (var offset = 0; offset < 7; offset++)
             {
                 var date = weekStart.AddDays(offset);
-                if (date < start || date > end || !openDates.Contains(date)) continue;
+                if (date < start || date > end) continue;
+                if (!openDates.Contains(date))
+                {
+                    // 講習期間内([start,end])だが開講日ではない日＝休校日として、通常の講師列の
+                    // 代わりに専用の休校日列を1つ挟む（IsClosed=true、Teachersは空）。
+                    days.Add(new OverviewDay(date, [], IsClosed: true));
+                    continue;
+                }
                 var dayAssignments = byDate[date].ToArray();
                 var teachers = dayAssignments.Select(a => a.Teacher).Distinct().OrderBy(t => t, StringComparer.Ordinal)
                     .Select(teacherName =>

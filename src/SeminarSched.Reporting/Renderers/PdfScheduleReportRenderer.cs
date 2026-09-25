@@ -303,6 +303,7 @@ public sealed class PdfScheduleReportRenderer
                 dayPara.Format.Font.Bold = true; dayPara.Format.Font.Color = Colors.White; dayPara.Format.Alignment = ParagraphAlignment.Center;
                 if (teacherCount * 2 > 1) dayCell.MergeRight = teacherCount * 2 - 1;
 
+                if (day.IsClosed) { var closedCell = teacherHeaderRow.Cells[startCol]; var closedPara = closedCell.AddParagraph("休校日"); closedPara.Format.Font.Size = 9; closedPara.Format.Font.Color = Colors.White; closedPara.Format.Alignment = ParagraphAlignment.Center; closedCell.MergeRight = 1; closedCell.Shading.Color = Colors.Black; col += 2; continue; }
                 if (day.Teachers.Count == 0) { var noneCell = teacherHeaderRow.Cells[startCol]; noneCell.AddParagraph("出勤予定なし").Format.Font.Size = 9; noneCell.MergeRight = 1; noneCell.Shading.Color = unavailableFill; col += 2; continue; }
                 foreach (var teacher in day.Teachers)
                 {
