@@ -197,7 +197,9 @@ public sealed partial class OptimizationPage : WorkflowPageBase
     {
         var running = OptimizationRunState.IsRunning;
         var pauseRequested = OptimizationRunState.IsPauseRequested;
-        RunButton.IsEnabled = !running && App.ProjectService.Current is not null;
+        var benchmarking = OptimizationRunState.IsBenchmarking;
+        BenchmarkingInfoBar.IsOpen = benchmarking;
+        RunButton.IsEnabled = !running && !benchmarking && App.ProjectService.Current is not null;
         PauseButton.IsEnabled = running;
         PauseButton.Content = pauseRequested ? "再開" : "一時停止";
         AcceptBestButton.IsEnabled = running;

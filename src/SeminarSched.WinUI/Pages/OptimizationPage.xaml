@@ -143,6 +143,13 @@
                             </StackPanel>
                         </StackPanel>
                     </Expander>
+                    <InfoBar
+                        x:Name="BenchmarkingInfoBar"
+                        IsClosable="False"
+                        IsOpen="False"
+                        Severity="Informational"
+                        Title="このパソコンの性能を測定しています"
+                        Message="初回のみ、時間割自動作成の前にごく短い測定（最大20秒程度）を行います。次回以降はこの測定を省略します。" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button x:Name="RunButton" Content="時間割を自動作成" Click="Run_Click" Style="{StaticResource AccentButtonStyle}"/>
                         <Button x:Name="PauseButton" Content="一時停止" Click="Pause_Click" IsEnabled="False"/>

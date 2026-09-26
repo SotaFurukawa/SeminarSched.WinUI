@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using SeminarSched.Application.Scheduling;
 using SeminarSched.Domain.Scheduling;
+using SeminarSched.Optimization.Diagnostics;
 using SeminarSched.Optimization.Execution;
 using SeminarSched.Optimization.Profiles;
 using WinRT.Interop;
@@ -32,6 +33,12 @@ internal static class OptimizationRunState
     // 実行中の1戦略・1延長パス分のタイムラグがありうる（画面側はこの2つを区別して案内文を出す）。
     public static bool IsPauseRequested { get; private set; }
     public static bool IsPaused { get; private set; }
+
+    // ユーザー要望（checkpoint108）「品質プロファイルのリバランス...このスコアはアプリ内のテストを
+    // する場合、毎回やるものではなくて、初めて自動作成する際に、一度だけ調べることにする」への対応。
+    // ベンチマーク実行中はIsRunningとは別にこのフラグを立て、画面側は「時間割を作成中」ではなく
+    // 「PCの性能を測定中」だと分かる表示に切り替える。
+    public static bool IsBenchmarking { get; private set; }
 
     private static OptimizationRunControl? _control;
     private static TimeSpan _lastReportedElapsed;
@@ -121,6 +128,7 @@ internal static class OptimizationRunState
     public static async Task StartAsync(string projectPath, OptimizationProfile profile, bool unrestrictedResourceUsage = false, SchedulingPolicy? policyOverride = null)
     {
         if (IsRunning) throw new InvalidOperationException("既に時間割自動作成が実行中です。");
+        await EnsureHardwareTierMeasuredAsync();
         var beforeRun = await App.ScheduleEditor.CaptureSnapshotAsync(projectPath);
         ScheduleUndoState.Push(beforeRun);
         ScheduleUndoState.ReoptimizationBaseline = beforeRun;
@@ -149,6 +157,41 @@ internal static class OptimizationRunState
         _timer.Start();
         Changed?.Invoke();
         _ = RunCoreAsync(projectPath, profile, policyOverride);
+    }
+
+    /// <summary>ユーザー要望（checkpoint108）「このスコアは...初めて自動作成する際に、一度だけ調べる
+    /// ことにする」への対応。この機体でまだ計測していない場合だけ<see cref="HardwareBenchmark"/>を
+    /// 実行し、結果を設定ファイル（機体・インストールごと、プロジェクトとは無関係）へ永続化して以降の
+    /// すべての自動作成実行で再利用する。ベンチマーク自体は機体の生の実力を測るのが目的のため、
+    /// 通常実行時のCPU使用率抑制（<see cref="ProcessResourceLimiter"/>・<see cref="CpSatScheduleSolver.WorkerLimitEnabled"/>）
+    /// は適用しない（抑制した状態で測ると「他の作業との競合の有無」まで測定値に混ざってしまうため）。</summary>
+    private static async Task EnsureHardwareTierMeasuredAsync()
+    {
+        var settings = await App.SettingsStore.LoadAsync();
+        if (settings.HardwareTier is { } cached && Enum.IsDefined(cached))
+        {
+            SeminarSched.Optimization.Core.CpSatScheduleSolver.HardwareTier = cached;
+            return;
+        }
+
+        IsBenchmarking = true;
+        Changed?.Invoke();
+        try
+        {
+            var result = await HardwareBenchmark.RunAsync();
+            SeminarSched.Optimization.Core.CpSatScheduleSolver.HardwareTier = result.Tier;
+            await App.SettingsStore.SaveAsync(settings with
+            {
+                HardwareTier = result.Tier,
+                HardwareBenchmarkElapsedSeconds = result.Elapsed.TotalSeconds,
+            });
+            App.Logger.Info($"Hardware benchmark: tier={result.Tier} elapsedSec={result.Elapsed.TotalSeconds:F2} reachedOptimal={result.ReachedOptimal}");
+        }
+        finally
+        {
+            IsBenchmarking = false;
+            Changed?.Invoke();
+        }
     }
 
     public static void AcceptCurrentBest() => _control?.AcceptCurrentBest();

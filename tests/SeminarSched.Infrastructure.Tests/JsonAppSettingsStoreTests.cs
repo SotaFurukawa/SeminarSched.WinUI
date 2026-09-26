@@ -1,5 +1,6 @@
 using SeminarSched.Application.Settings;
 using SeminarSched.Infrastructure.Settings;
+using SeminarSched.Optimization.Diagnostics;
 using SeminarSched.Optimization.Profiles;
 
 namespace SeminarSched.Infrastructure.Tests;
@@ -58,6 +59,32 @@ public sealed class JsonAppSettingsStoreTests : IDisposable
         var settings = await store.LoadAsync();
 
         Assert.False(settings.UnrestrictedResourceUsage);
+    }
+
+    // ユーザー要望（checkpoint108）「品質プロファイルのリバランス...初めて自動作成する際に、一度だけ
+    // 調べることにする」への対応。計測結果（tier・実測秒数）が正しく往復し、未計測（null）が既定の
+    // ままであることを確認する。
+    [Fact]
+    public async Task LoadAsync_WithoutPriorBenchmark_HardwareTierIsNull()
+    {
+        using var store = CreateStore();
+
+        var settings = await store.LoadAsync();
+
+        Assert.Null(settings.HardwareTier);
+        Assert.Null(settings.HardwareBenchmarkElapsedSeconds);
+    }
+
+    [Fact]
+    public async Task SaveAsync_RoundTripsHardwareTier()
+    {
+        using var store = CreateStore();
+        await store.SaveAsync(new AppSettings(OptimizationQualityLevel.Standard, HardwareTier: HardwareTier.High, HardwareBenchmarkElapsedSeconds: 1.23));
+
+        var settings = await store.LoadAsync();
+
+        Assert.Equal(HardwareTier.High, settings.HardwareTier);
+        Assert.Equal(1.23, settings.HardwareBenchmarkElapsedSeconds);
     }
 
     [Fact]

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using Google.OrTools.Sat;
 using SeminarSched.Domain.Scheduling;
+using SeminarSched.Optimization.Diagnostics;
 
 namespace SeminarSched.Optimization.Core;
 
@@ -49,11 +50,28 @@ public sealed class CpSatScheduleSolver
     /// concurrent-run race to worry about. Defaults to true (limited).</summary>
     public static bool WorkerLimitEnabled { get; set; } = true;
 
+    /// <summary>ユーザー要望（checkpoint108）「品質プロファイルのリバランス...スコアを上回っていたら
+    /// 多めの負荷、下回っていたらあまり負荷はかけないようにする」への対応。<see cref="HardwareBenchmark"/>
+    /// が実測した機体の性能tier（<c>OptimizationRunState</c>が初回自動作成時に一度だけ計測し、以降は
+    /// 設定へ永続化して再利用する）。ベンチマーク未実施・呼び出し元が特に指定しない場合は、従来からの
+    /// 既定動作（論理コアの半分）と一致する<see cref="HardwareTier.Standard"/>を既定値とする。</summary>
+    public static HardwareTier HardwareTier { get; set; } = HardwareTier.Standard;
+
+    private static readonly IReadOnlyDictionary<HardwareTier, double> WorkerFractionByTier = new Dictionary<HardwareTier, double>
+    {
+        [HardwareTier.VeryLow] = 0.25,
+        [HardwareTier.Low] = 0.35,
+        [HardwareTier.Standard] = 0.5,
+        [HardwareTier.High] = 0.65,
+        [HardwareTier.VeryHigh] = 0.85,
+    };
+
     /// <summary>Worker count used in place of a caller's <c>NumSearchWorkers: 0</c> ("auto") while
-    /// <see cref="WorkerLimitEnabled"/> is true. Half the logical processors (floor 2, matching the
-    /// smallest count actually measured as safe - see <see cref="CpSatSolveOptions"/>) keeps CP-SAT's
-    /// parallel search meaningfully faster than a single thread while leaving room for everything else
-    /// on the machine during a long grinding run. Briefly lowered to a third of the processors alongside
+    /// <see cref="WorkerLimitEnabled"/> is true. <see cref="HardwareTier.Standard"/>（既定）は論理コアの
+    /// 半分（floor 2、従来からの固定値と同じ）で、<see cref="HardwareTier"/>が高性能側/非力側に判定
+    /// されるほど、この割合を段階的に増減する（<see cref="WorkerFractionByTier"/>）。この半分という
+    /// 値は、CP-SATの並列探索を単一スレッドより意味のある速さに保ちつつ、長時間のgrinding実行中も
+    /// 機体の他の作業に余地を残すためのものだった。Briefly lowered to a third of the processors alongside
     /// a hard OS-level CPU rate cap (ProcessResourceLimiter, a separate project this one does not
     /// reference), but that cap turned out to throttle the search even while the machine was otherwise
     /// idle, and a user reported Highest-quality runs no longer finishing even after 2 hours as a direct
@@ -61,7 +79,7 @@ public sealed class CpSatScheduleSolver
     /// time under real contention), so this worker count was restored to half the processors - it alone
     /// is enough to keep CP-SAT from pinning every core, without also starving the search on an idle
     /// machine. When disabled, returns 0 so the caller's "auto" passes straight through to CP-SAT.</summary>
-    public static int ResolvedAutoSearchWorkers => WorkerLimitEnabled ? Math.Max(2, Environment.ProcessorCount / 2) : 0;
+    public static int ResolvedAutoSearchWorkers => WorkerLimitEnabled ? Math.Max(2, (int)Math.Round(Environment.ProcessorCount * WorkerFractionByTier[HardwareTier])) : 0;
 
     public Task<ScheduleSolution> SolveAsync(
         ScheduleProblem problem,

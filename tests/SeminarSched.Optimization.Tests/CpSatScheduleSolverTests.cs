@@ -1,5 +1,6 @@
 using SeminarSched.Domain.Scheduling;
 using SeminarSched.Optimization.Core;
+using SeminarSched.Optimization.Diagnostics;
 
 namespace SeminarSched.Optimization.Tests;
 
@@ -32,6 +33,36 @@ public sealed class CpSatScheduleSolverTests
         finally
         {
             CpSatScheduleSolver.WorkerLimitEnabled = original;
+        }
+    }
+
+    // ユーザー要望（checkpoint108）「品質プロファイルのリバランス...スコアを上回っていたら多めの
+    // 負荷、下回っていたらあまり負荷はかけないようにする」を検証する。HardwareTierが高いほど、
+    // 同じ論理プロセッサ数に対して割り当てられるワーカー数が単調に増える（少なくとも減らない）こと、
+    // 既定のStandardが従来からの固定値（論理コアの半分）と一致することを確認する。他のテストへ
+    // 影響しないよう、必ず元の値へ戻す。
+    [Fact]
+    public void ResolvedAutoSearchWorkers_IncreasesMonotonicallyWithHardwareTier()
+    {
+        var original = CpSatScheduleSolver.HardwareTier;
+        try
+        {
+            var byTier = new Dictionary<HardwareTier, int>();
+            foreach (var tier in new[] { HardwareTier.VeryLow, HardwareTier.Low, HardwareTier.Standard, HardwareTier.High, HardwareTier.VeryHigh })
+            {
+                CpSatScheduleSolver.HardwareTier = tier;
+                byTier[tier] = CpSatScheduleSolver.ResolvedAutoSearchWorkers;
+            }
+
+            Assert.True(byTier[HardwareTier.VeryLow] <= byTier[HardwareTier.Low]);
+            Assert.True(byTier[HardwareTier.Low] <= byTier[HardwareTier.Standard]);
+            Assert.True(byTier[HardwareTier.Standard] <= byTier[HardwareTier.High]);
+            Assert.True(byTier[HardwareTier.High] <= byTier[HardwareTier.VeryHigh]);
+            Assert.Equal(Math.Max(2, Environment.ProcessorCount / 2), byTier[HardwareTier.Standard]);
+        }
+        finally
+        {
+            CpSatScheduleSolver.HardwareTier = original;
         }
     }
 
