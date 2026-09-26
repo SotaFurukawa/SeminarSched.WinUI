@@ -105,6 +105,9 @@ public sealed partial class SetupPage : WorkflowPageBase
         PolicyTimeOfDayEarly.IsChecked = policy.TimeOfDayPreference == TimeOfDayPreference.Early;
         PolicyTimeOfDayNone.IsChecked = policy.TimeOfDayPreference == TimeOfDayPreference.None;
 
+        PolicyTeacherStudentConsecutivePreferConsecutive.IsChecked = policy.TeacherStudentConsecutivePreference == TeacherStudentConsecutivePreference.PreferConsecutive;
+        PolicyTeacherStudentConsecutiveNone.IsChecked = policy.TeacherStudentConsecutivePreference == TeacherStudentConsecutivePreference.None;
+
         PolicyContinueBeyondNominalTimeYes.IsChecked = policy.ContinueBeyondNominalTimeIfIncomplete;
         PolicyContinueBeyondNominalTimeNo.IsChecked = !policy.ContinueBeyondNominalTimeIfIncomplete;
     }
@@ -127,6 +130,8 @@ public sealed partial class SetupPage : WorkflowPageBase
         PolicyTimeOfDayLate.IsChecked == true ? TimeOfDayPreference.Late
             : PolicyTimeOfDayEarly.IsChecked == true ? TimeOfDayPreference.Early
             : TimeOfDayPreference.None,
+        PolicyTeacherStudentConsecutivePreferConsecutive.IsChecked == true ? TeacherStudentConsecutivePreference.PreferConsecutive
+            : TeacherStudentConsecutivePreference.None,
         checked((int)PolicyMaxConcurrentSeats.Value),
         PolicyContinueBeyondNominalTimeNo.IsChecked != true);
 

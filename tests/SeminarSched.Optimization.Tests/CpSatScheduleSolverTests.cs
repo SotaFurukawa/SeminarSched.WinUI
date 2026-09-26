@@ -265,6 +265,31 @@ public sealed class CpSatScheduleSolverTests
         Assert.Single(solution.Placements.Select(p => p.OpenDateId).Distinct());
     }
 
+    // ユーザー要望（checkpoint107）「同一講師が同一生徒を連続コマで担当するのを避ける/優遇するに
+    // ついて、避ける意味はあまりないと思うので、『考慮しない』と『できるだけ連続にする』にして、
+    // 新たな探索方針としてください」を検証する。生徒10の受講希望1件目は講師100・1限に固定。
+    // 2件目は同じ2限だが、担当講師が講師100（1件目と同じ、隣り合うコマで同一講師×同一生徒になる）
+    // か講師200（別講師）かのどちらでも他の条件は全く同じ（tie）。PreferConsecutiveを指定すると、
+    // 同一講師（100）の方が選ばれるはず。
+    [Fact]
+    public async Task SolveAsync_PrefersSameTeacherForAdjacentSlotOfTheSameStudentWhenOtherwiseTied()
+    {
+        var demands = new[] { new LessonDemand(1, 10, 1, 0), new LessonDemand(2, 10, 1, 0) };
+        var candidates = new[]
+        {
+            new PlacementCandidate(1, 10, 100, 1, 1, 1, 1),
+            new PlacementCandidate(2, 10, 100, 1, 2, 1, 2),
+            new PlacementCandidate(2, 10, 200, 1, 2, 1, 2),
+        };
+        var policy = new SchedulingPolicy(teacherStudentConsecutivePreference: TeacherStudentConsecutivePreference.PreferConsecutive);
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, Policy: policy), TimeSpan.FromSeconds(5));
+
+        Assert.Equal(2, solution.Placements.Count);
+        var demand2Placement = solution.Placements.Single(p => p.RequestId == 2);
+        Assert.Equal(100L, demand2Placement.TeacherId);
+    }
+
     // ユーザー要望「1対1が多いように見える。絶対ダメではないが1対2の方がいい」を検証する。2名の
     // 生徒が同じ講師・同じ日の2コマのどちらにも配置可能（1対1必須ではない）とき、他の条件が同じなら
     // 片方のコマへ2名ともまとめて配置（1対2）し、もう片方のコマは空けたままにするはず。

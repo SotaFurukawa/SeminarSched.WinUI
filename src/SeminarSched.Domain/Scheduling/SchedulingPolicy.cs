@@ -30,6 +30,13 @@ public enum PairingSizePreference { None = 0, Maximize = 1, Minimize = 2 }
 /// <summary>コマの時間帯（1日の中での時限順）を、できるだけ遅く/早くする方針。</summary>
 public enum TimeOfDayPreference { None = 0, Late = 1, Early = 2 }
 
+/// <summary>同一の生徒×講師の組み合わせが、同じ日の隣り合うコマへ続けて配置されることを
+/// 優遇するかどうかの方針。ユーザー要望（checkpoint107）「同一講師が同一生徒を連続コマで担当する
+/// のを避ける/優遇するについて、避ける意味はあまりないと思うので、『考慮しない』と『できるだけ
+/// 連続にする』にして、新たな探索方針としてください」への対応。「避ける」選択肢は意図的に設けて
+/// いない（他のPreference系enumと異なり2択）。</summary>
+public enum TeacherStudentConsecutivePreference { None = 0, PreferConsecutive = 1 }
+
 /// <summary>
 /// プロジェクトごとの最適化探索の方針設定。ユーザー要望「担当する生徒の人数の既定値（1対2）を
 /// 変更できるようにしたい（他校舎の1対3・1対4にも対応）」「一日当たりの講師人数・講師ごとのコマ数の
@@ -55,6 +62,7 @@ public sealed record SchedulingPolicy
         TeacherAttendanceDaysPreference teacherAttendanceDaysPreference = TeacherAttendanceDaysPreference.None,
         PairingSizePreference pairingSizePreference = PairingSizePreference.None,
         TimeOfDayPreference timeOfDayPreference = TimeOfDayPreference.None,
+        TeacherStudentConsecutivePreference teacherStudentConsecutivePreference = TeacherStudentConsecutivePreference.None,
         int maxConcurrentSeats = 0,
         bool continueBeyondNominalTimeIfIncomplete = true)
     {
@@ -70,6 +78,7 @@ public sealed record SchedulingPolicy
         TeacherAttendanceDaysPreference = teacherAttendanceDaysPreference;
         PairingSizePreference = pairingSizePreference;
         TimeOfDayPreference = timeOfDayPreference;
+        TeacherStudentConsecutivePreference = teacherStudentConsecutivePreference;
         MaxConcurrentSeats = maxConcurrentSeats;
         ContinueBeyondNominalTimeIfIncomplete = continueBeyondNominalTimeIfIncomplete;
     }
@@ -83,6 +92,7 @@ public sealed record SchedulingPolicy
     public TeacherAttendanceDaysPreference TeacherAttendanceDaysPreference { get; }
     public PairingSizePreference PairingSizePreference { get; }
     public TimeOfDayPreference TimeOfDayPreference { get; }
+    public TeacherStudentConsecutivePreference TeacherStudentConsecutivePreference { get; }
     /// <summary>学校（プロジェクト）全体で同時刻に授業を受けられる生徒の合計人数の上限。0は考慮しない。</summary>
     public int MaxConcurrentSeats { get; }
     /// <summary>ユーザー要望「一応2倍の時間まで待つのは目安ではあるが、2倍以上の時間を待っても

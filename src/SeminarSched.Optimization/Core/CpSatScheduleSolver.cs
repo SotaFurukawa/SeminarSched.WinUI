@@ -149,6 +149,7 @@ public sealed class CpSatScheduleSolver
             .Concat(BuildTeacherCountPerDayTerms(model, variables, problem.Policy.TeacherCountPerDayPreference))
             .Concat(BuildTeacherLoadBalanceTerms(model, problem, variables, problem.Policy.TeacherLoadBalancePreference))
             .Concat(BuildTimeOfDayTerms(variables, problem.Policy.TimeOfDayPreference))
+            .Concat(BuildTeacherStudentConsecutiveTerms(model, problem, variables, problem.Policy.TeacherStudentConsecutivePreference))
             .Concat(regularTeacherShortfallTerms);
         model.Maximize(LinearExpr.Sum(objectiveTerms));
 
@@ -430,6 +431,56 @@ public sealed class CpSatScheduleSolver
                 var slack = model.NewIntVar(0, 3, $"teacher_gap_slack_{index++}");
                 model.Add(firstExpr + lastExpr - middleExpr <= 1 + slack);
                 yield return LinearExpr.Term(slack, -TeacherGapWeight);
+            }
+        }
+    }
+
+    private const long TeacherStudentConsecutiveWeight = 2_000L;
+
+    /// <summary>
+    /// ユーザー要望（checkpoint107）「同一講師が同一生徒を連続コマで担当するのを避ける/優遇するに
+    /// ついて、避ける意味はあまりないと思うので、『考慮しない』と『できるだけ連続にする』にして、
+    /// 新たな探索方針としてください」への対応。同じ（生徒・講師・日付）の組について、隣り合う
+    /// コマ（間に他のコマを挟まない、その日実際に開いている枠同士）の両方に候補が選ばれた場合へ
+    /// 加点する。<see cref="BuildTeacherGapAvoidanceTerms"/>と同じ「その日の開講コマ順に並べて
+    /// 配列添字で隣接判定する」手法を流用し、既に確定済みの配置（<see cref="ScheduleProblem.ExistingPlacements"/>、
+    /// 同じ生徒・講師の組のものに限る）も「隣にある実際の在籍」として扱う（片方が確定済みでも
+    /// もう片方の新規配置が隣接すれば加点される）。None（既定）は項自体を生成しない。「避ける」は
+    /// 意図的に設けていない（2択）。
+    /// </summary>
+    private static IEnumerable<LinearExpr> BuildTeacherStudentConsecutiveTerms(
+        CpModel model,
+        ScheduleProblem problem,
+        IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables,
+        TeacherStudentConsecutivePreference preference)
+    {
+        if (preference == TeacherStudentConsecutivePreference.None) yield break;
+
+        var groups = variables.Select(item => (item.candidate.StudentId, item.candidate.TeacherId, item.candidate.OpenDateId))
+            .Concat(problem.ExistingPlacements.Select(item => (item.StudentId, item.TeacherId, item.OpenDateId)))
+            .Distinct();
+        var index = 0;
+        foreach (var (studentId, teacherId, openDateId) in groups)
+        {
+            var pairDay = variables.Where(item => item.candidate.StudentId == studentId && item.candidate.TeacherId == teacherId && item.candidate.OpenDateId == openDateId).ToArray();
+            var fixedForDay = problem.ExistingPlacements.Where(item => item.StudentId == studentId && item.TeacherId == teacherId && item.OpenDateId == openDateId).ToArray();
+            var slotOrders = problem.AvailableSlots.Where(slot => slot.OpenDateId == openDateId).Select(slot => slot.SlotOrder).Distinct().Order().ToArray();
+            var occupancy = slotOrders.Select(slotOrder => new
+            {
+                Variables = pairDay.Where(item => item.candidate.SlotOrder == slotOrder).Select(item => item.variable).ToArray(),
+                Fixed = fixedForDay.Count(item => item.SlotOrder == slotOrder),
+            }).ToArray();
+
+            for (var i = 0; i + 1 < occupancy.Length; i++)
+            {
+                if (occupancy[i].Variables.Length == 0 && occupancy[i].Fixed == 0) continue;
+                if (occupancy[i + 1].Variables.Length == 0 && occupancy[i + 1].Fixed == 0) continue;
+                var current = LinearExpr.Sum(occupancy[i].Variables) + occupancy[i].Fixed;
+                var next = LinearExpr.Sum(occupancy[i + 1].Variables) + occupancy[i + 1].Fixed;
+                var both = model.NewBoolVar($"teacher_student_consecutive_{index++}");
+                model.Add(both <= current);
+                model.Add(both <= next);
+                yield return LinearExpr.Term(both, TeacherStudentConsecutiveWeight);
             }
         }
     }

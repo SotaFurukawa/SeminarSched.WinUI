@@ -37,6 +37,7 @@ public sealed class SqliteSchedulingPolicyRepositoryTests : IDisposable
             teacherAttendanceDaysPreference: TeacherAttendanceDaysPreference.Spread,
             pairingSizePreference: PairingSizePreference.Minimize,
             timeOfDayPreference: TimeOfDayPreference.Late,
+            teacherStudentConsecutivePreference: TeacherStudentConsecutivePreference.PreferConsecutive,
             maxConcurrentSeats: 12);
         await repository.SaveAsync(path, custom);
         var reloaded = await repository.GetAsync(path);
@@ -52,6 +53,7 @@ public sealed class SqliteSchedulingPolicyRepositoryTests : IDisposable
             teacherAttendanceDaysPreference: custom.TeacherAttendanceDaysPreference,
             pairingSizePreference: custom.PairingSizePreference,
             timeOfDayPreference: TimeOfDayPreference.Early,
+            teacherStudentConsecutivePreference: custom.TeacherStudentConsecutivePreference,
             maxConcurrentSeats: custom.MaxConcurrentSeats);
         await repository.SaveAsync(path, updated);
         var reReloaded = await repository.GetAsync(path);
