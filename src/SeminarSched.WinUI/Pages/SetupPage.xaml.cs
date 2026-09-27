@@ -38,6 +38,11 @@ public sealed partial class SetupPage : WorkflowPageBase
     {
         var current = App.ProjectService.Current;
         if (!EnsureProject(ProjectRequired) || current is null) { Tabs.IsEnabled = false; return; }
+        // 不具合修正: このPageはNavigationCacheMode="Required"で使い回されるため、プロジェクトが
+        // 無い状態で一度でもここへ来てTabs.IsEnabled=falseになると、以降プロジェクトを開いて
+        // 再訪しても誰も戻していなかった（ユーザー報告「設定だけ全部グレー表示で入力できない。
+        // 再起動しても治らない」）。成功時は必ず再度trueへ戻す。
+        Tabs.IsEnabled = true;
         CourseDayPeriodLabel.Text = $"{current.StartDate:yyyy年M月d日} ～ {current.EndDate:yyyy年M月d日}（変更はすぐに保存されます）";
         await ReloadAsync();
         ResetStudent();

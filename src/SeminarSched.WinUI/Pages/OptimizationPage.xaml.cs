@@ -13,15 +13,6 @@ public sealed partial class OptimizationPage : WorkflowPageBase
     private CancellationTokenSource? _saveDebounce;
     private bool _isLoaded;
 
-    private static readonly Dictionary<OptimizationStageKind, string> StageLabels = new()
-    {
-        [OptimizationStageKind.InitialExploration] = "初期探索",
-        [OptimizationStageKind.CandidateAdvancement] = "候補改善",
-        [OptimizationStageKind.NeighborhoodRepair] = "近傍再探索",
-        [OptimizationStageKind.FinalPolishing] = "仕上げ探索",
-        [OptimizationStageKind.Extension] = "延長探索",
-    };
-
     private static readonly Dictionary<OptimizationStrategyKind, string> StrategyLabels = new()
     {
         [OptimizationStrategyKind.StandardCpSat] = "標準探索",
@@ -176,7 +167,6 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         OptimizationRunState.AcceptCurrentBest();
         AcceptBestButton.IsEnabled = false;
         PauseButton.IsEnabled = false;
-        RunStageText.Text = "現在の結果を採用しています…";
     }
 
     // ユーザー要望「一時停止ボタンを作ってほしい」（checkpoint99）。CP-SATの探索そのものは途中で
@@ -211,19 +201,15 @@ public sealed partial class OptimizationPage : WorkflowPageBase
             ? "「再開」を押すまで、次の探索を開始しません。"
             : "現在の探索が終わり次第、一時停止します（多少お待ちください）。";
 
-        var (percent, elapsed, remaining) = OptimizationRunState.Estimate();
-        RunProgressBar.Value = percent;
+        // ユーザー要望（checkpoint109）「円形のゲージにして、円の真ん中に進行パーセンテージを表示、
+        // 他の文字はなくすようにしてください」への対応。段階・戦略名や経過/残り時間のテキストは
+        // 表示しなくなったため、Estimate()が返す経過・残り時間はここでは使わない。
+        var (percent, _, _) = OptimizationRunState.Estimate();
+        RunProgress.Value = percent;
         RunPercentText.Text = $"{percent:F0}%";
-        var remainingText = remaining is { } remainingValue ? FormatDuration(remainingValue) : "計算中…";
-        RunEtaText.Text = OptimizationRunState.LatestProgress is null ? "" : $"経過 {FormatDuration(elapsed)} / 残り目安 {remainingText}";
 
         if (OptimizationRunState.LatestProgress is { } progress)
         {
-            var stageLabel = StageLabels.GetValueOrDefault(progress.Stage, progress.Stage.ToString());
-            var strategyLabel = StrategyLabels.GetValueOrDefault(progress.Strategy, progress.Strategy.ToString());
-            RunStageText.Text = !running ? "完了しました。"
-                : OptimizationRunState.IsPaused ? $"一時停止中（{stageLabel}：{strategyLabel}）"
-                : $"{stageLabel}：{strategyLabel}（{progress.StrategiesCompleted}/{progress.StrategiesTotal}戦略）";
             ExtendingInfoBar.IsOpen = running && progress.IsExtending;
         }
 
@@ -261,8 +247,6 @@ public sealed partial class OptimizationPage : WorkflowPageBase
             RunStatus.Severity = InfoBarSeverity.Error; RunStatus.Title = "時間割を作成できませんでした"; RunStatus.Message = outcome.ErrorMessage ?? ""; RunStatus.IsOpen = true;
         }
     }
-
-    private static string FormatDuration(TimeSpan span) => span.TotalMinutes>=1?$"{(int)span.TotalMinutes}分{span.Seconds}秒":$"{span.TotalSeconds:F0}秒";
 
     private string StrategyDisplayName(string strategyLabel) =>
         Enum.TryParse<OptimizationStrategyKind>(strategyLabel, out var kind) ? StrategyLabels.GetValueOrDefault(kind,strategyLabel) : strategyLabel;
