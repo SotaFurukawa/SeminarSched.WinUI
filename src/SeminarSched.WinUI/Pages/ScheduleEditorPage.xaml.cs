@@ -286,7 +286,10 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         {
             Padding = new Thickness(4),
             MinHeight = 56,
-            Background = blocked ? ResourceBrush("ControlFillColorDisabledBrush", Color.FromArgb(255, 232, 232, 232)) : ResourceBrush("CardBackgroundFillColorDefaultBrush", Color.FromArgb(255, 250, 250, 250)),
+            // ユーザー指示「出勤不可コマは、もう少し黒目のグレーにしてください」への対応。テーマ資源
+            // ControlFillColorDisabledBrush（既定では非常に薄いグレー）に頼らず、はっきり判別できる
+            // 濃いめのグレーを明示的に指定する。
+            Background = blocked ? new SolidColorBrush(Color.FromArgb(255, 176, 176, 176)) : ResourceBrush("CardBackgroundFillColorDefaultBrush", Color.FromArgb(255, 250, 250, 250)),
             BorderBrush = ResourceBrush("CardStrokeColorDefaultBrush", Color.FromArgb(255, 210, 210, 210)),
             BorderThickness = new Thickness(1),
             AllowDrop = !blocked,

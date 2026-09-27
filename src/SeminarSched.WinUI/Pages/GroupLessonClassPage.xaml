@@ -10,7 +10,7 @@
         <ScrollViewer Grid.Row="1" x:Name="ContentPanel">
             <StackPanel MaxWidth="1040" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="16">
                 <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="3.1 集団授業クラス" />
-                <TextBlock Text="個別指導以外に受講する集団授業のクラスを登録し、その開講日程・時刻をカレンダーで指定します。" TextWrapping="Wrap" />
+                <TextBlock Text="集団授業などのクラスを登録し、その開講日程をカレンダーで指定します。生徒と併せて登録しておくことで、その日時に個別指導が入ることを防ぎます。" TextWrapping="Wrap" />
                 <InfoBar x:Name="Status" IsClosable="True" />
 
                 <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
@@ -41,7 +41,7 @@
                 <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                     <StackPanel Spacing="12">
                         <TextBlock FontSize="18" FontWeight="SemiBold" Text="開講日程の追加" />
-                        <TextBlock Text="クラス・開始時刻・終了時刻を指定し、下のカレンダーで日付にチェックを入れてから「選択した日に追加」を押してください。同じ日に複数のクラスを追加すると、その日のマスに積み重なって表示されます。" TextWrapping="Wrap" />
+                        <TextBlock Text="クラス・開始時刻・終了時刻を指定し、下のカレンダーで日付にチェックを入れてから「選択した日に追加」を押してください。" TextWrapping="Wrap" />
                         <Grid ColumnSpacing="8">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />

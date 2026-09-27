@@ -10,7 +10,7 @@
         <ScrollViewer Grid.Row="1" x:Name="ContentPanel">
             <StackPanel MaxWidth="720" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="16">
                 <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="3.2 集団授業の受講登録" />
-                <TextBlock Text="クラスを選び、そのクラスを受講する生徒にチェックを入れます。既定では対象学年の生徒だけを表示します（クラスの「他学年の受講を許可」がオンの場合は全学年を表示）。" TextWrapping="Wrap" />
+                <TextBlock Text="クラスとそのクラスを受講する生徒にチェックを入れます。既定では対象学年の生徒だけを表示します。他学年も含めて表示したい場合は、「他学年の受講を許可」にチェックを入れてください。" TextWrapping="Wrap" />
                 <InfoBar x:Name="Status" IsClosable="True" />
 
                 <ComboBox x:Name="EnrollmentClass" Header="クラス" SelectionChanged="EnrollmentClass_SelectionChanged" MinWidth="280" />

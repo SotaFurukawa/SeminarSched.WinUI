@@ -48,13 +48,6 @@ public sealed partial class HomePage : Page
     // 入っていない限り変更できないようにする。チェックが外れたら2（既定）に戻す」への対応。
     // 個別指導の既定運用（1対2）から外れた人数（集団授業相当）は、集団授業を行うプロジェクトでのみ
     // 意味を持つため、このチェックボックスと連動させる。
-    private void ConsiderGroupLessonsCheck_CheckedChanged(object sender, RoutedEventArgs e)
-    {
-        var considerGroupLessons = ConsiderGroupLessonsCheck.IsChecked == true;
-        MaxStudentsPerTeacherBox.IsEnabled = considerGroupLessons;
-        if (!considerGroupLessons) MaxStudentsPerTeacherBox.Value = 2;
-    }
-
     private async void EditSharedRoster_Click(object sender, RoutedEventArgs e)
     {
         try

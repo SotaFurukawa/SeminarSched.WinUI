@@ -14,9 +14,13 @@ using Windows.UI;
 
 namespace SeminarSched_WinUI;
 
-// Python版GoogleFormsGuideDialog.qmlの内容（10手順・画像13枚）をそのまま移植した
-// 「Googleフォーム作成手順」ポップアップ。画像はPython版のassets/google_forms_guide配下の
-// スクリーンショットをそのまま流用している（Windows/Google側の汎用UI画面のみで個人情報は含まない）。
+// Python版GoogleFormsGuideDialog.qmlの内容（10手順）をそのまま移植した
+// 「Googleフォーム作成手順」ポップアップ。手順1の画像2枚はPython版のUIではなく、この
+// WinUI版②アンケート作成画面自体のスクリーンショットへ差し替えた（ユーザー指摘「作成手順の画像が
+// 以前のpython版を用いたものになっています」checkpoint109）。保存後の画面に写り込む保存先パスは
+// 実在するWindowsユーザー名を含むため、Python版と同様に黒塗り処理をしてから同梱している。
+// 手順2以降の画像は、Windows/Google側の汎用UI画面（Explorer・Apps Script等）のみで
+// 個人情報を含まないため、そのまま流用している。
 internal static class GoogleFormsGuide
 {
     private static readonly Regex UrlPattern = new(@"https?://\S+", RegexOptions.Compiled);
@@ -27,11 +31,11 @@ internal static class GoogleFormsGuide
     private static readonly IReadOnlyList<GuideStep> Steps =
     [
         new(1, "アプリで作成キットを保存",
-            "生徒用・講師用のフォーム名、回答締切、問い合わせ先を確認し、「フォーム作成キットを保存…」を押して保存先を選びます。",
-            [new("01_save_kit.png", "アプリの作成キット保存画面", 220)],
+            "生徒用・講師用のフォーム名、回答締切、問い合わせ先を確認し、「作成キットを保存」を押します。保存が完了すると「保存先を開く」ボタンが表示されます。",
+            [new("01_save_kit_a.png", "②アンケート作成画面（保存前）", 340), new("01_save_kit_b.png", "②アンケート作成画面（保存後、保存先パスは伏せています）", 340)],
             "開校日と有効コマが未設定の場合は保存できません。先に①設定で授業日とコマを確定してください。"),
         new(2, "保存先を開く",
-            "保存が完了すると「保存先を開く」ボタンが表示されます。押すと、作成された2つの.gsと手順書が入ったフォルダーを開けます。",
+            "「保存先を開く」を押すと、作成された2つの.gsと手順書が入ったフォルダーを開けます。",
             [new("02_open_saved_folder.png", "保存先フォルダーの中身", 220)],
             "生徒用は create_student_questionnaire.gs、講師勤務日時用は create_teacher_questionnaire.gs です。"),
         new(3, "create_student_questionnaire.gsをメモ帳で開く",

@@ -582,13 +582,13 @@ public sealed partial class SetupPage : WorkflowPageBase
         try
         {
             var studentValues=await App.MasterData.GetStudentsAsync(path);var teacherValues=await App.MasterData.GetTeachersAsync(path);var subjectValues=await App.MasterData.GetSubjectsAsync(path);
-            var studentItems=studentValues.Select(x => new MasterItem<Student>(x,$"{(x.Active?"":"[停止] ")}{x.ExternalId}　{x.Name}　{x.Grade}",x.Active)).ToArray();
-            var teacherItems=teacherValues.Select(x => new MasterItem<Teacher>(x,$"{(x.Active?"":"[停止] ")}{x.ExternalId}　{x.Name}")).ToArray();
+            var studentItems=studentValues.Select(x => new MasterItem<Student>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.Name}　{x.Grade}",x.Active,"在籍中","卒業・無効")).ToArray();
+            var teacherItems=teacherValues.Select(x => new MasterItem<Teacher>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.Name}",x.Active,"在籍中","卒業・無効")).ToArray();
             var subjectItems=subjectValues.Select(x => new MasterItem<Subject>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}")).ToArray();
             _studentItems=studentItems;_teacherItems=teacherItems;_subjectItems=subjectItems;
             ApplyStudentFilter();ApplyTeacherFilter();ApplySubjectFilter();
             QualificationTeacher.ItemsSource=teacherItems;QualificationSubject.ItemsSource=subjectItems;RegularStudent.ItemsSource=studentItems;RegularSubject.ItemsSource=subjectItems;
-            _nullableTeacherItems=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[停止] ")}{x.ExternalId}　{x.Name}"))).ToArray();
+            _nullableTeacherItems=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.Name}"))).ToArray();
             RegularTeacher.ItemsSource=_nullableTeacherItems;if(RegularTeacher.SelectedIndex<0)RegularTeacher.SelectedIndex=0;
             var qualifications=await App.MasterData.GetQualificationsAsync(path);_qualifications=qualifications.ToDictionary(value=>(value.TeacherId,value.SubjectId));RenderQualificationMatrix();
             // ユーザー要望「生徒IDや講師IDは基本的に用いず、内部の処理にのみ使いたいので、ここでの
@@ -623,9 +623,13 @@ public sealed partial class SetupPage : WorkflowPageBase
 
     private void Show(InfoBarSeverity severity, string title, string message) { Status.Severity = severity; Status.Title = title; Status.Message = message; Status.IsOpen = true; }
 
-    private sealed record MasterItem<T>(T Value,string Display,bool Active=true)
+    // ユーザー指示「状態を『有効』『無効』ではなくて、『在籍中』『卒業・無効』にしてください」への対応。
+    // 生徒・講師は人（在籍/卒業という概念が成り立つ）だが、科目・コマは物なので「在籍中」は意味が
+    // 通らない。ActiveLabel/InactiveLabelを生徒・講師の構築箇所だけ上書きし、科目・コマは既定の
+    // 「有効」「停止」のまま維持する。
+    private sealed record MasterItem<T>(T Value,string Display,bool Active=true,string ActiveLabel="有効",string InactiveLabel="停止")
     {
-        public string StatusText=>Active?"有効":"停止";
+        public string StatusText=>Active?ActiveLabel:InactiveLabel;
         public override string ToString()=>Display;
     }
 

@@ -1,9 +1,9 @@
-<local:WorkflowPageBase x:Class="SeminarSched_WinUI.Pages.ImportPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:SeminarSched_WinUI.Pages" NavigationCacheMode="Required" Loaded="Page_Loaded"><ScrollViewer><StackPanel MaxWidth="960" Padding="24" Spacing="16" HorizontalAlignment="Left"><TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="③ アンケート取込み"/><InfoBar x:Name="ProjectRequired"/><InfoBar x:Name="Status" IsClosable="True"/>
+<local:WorkflowPageBase x:Class="SeminarSched_WinUI.Pages.ImportPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:SeminarSched_WinUI.Pages" NavigationCacheMode="Required" Loaded="Page_Loaded"><ScrollViewer><StackPanel MaxWidth="960" Padding="24" Spacing="16" HorizontalAlignment="Left"><TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="③ アンケート取込"/><InfoBar x:Name="ProjectRequired"/><InfoBar x:Name="Status" IsClosable="True"/>
 <Border Padding="24" BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
     <StackPanel Spacing="12">
-        <TextBlock FontSize="20" FontWeight="Bold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="🟦 Googleフォーム回答の取込み（通常はこちらを使う）"/>
-        <TextBlock Text="Googleフォームからそのままダウンロードした生徒・講師の回答CSV/XLSX（質問文そのままの列名）を検証し、生徒・講師ごとに受講希望・可用性を全置換で反映します。時間割配置後は使用できません。" TextWrapping="Wrap"/>
-        <StackPanel Orientation="Horizontal" Spacing="8"><Button x:Name="SurveySelectStudentButton" Content="① 生徒フォームの回答ファイルを選ぶ" Click="SurveySelectStudent_Click" Style="{StaticResource AccentButtonStyle}"/><Button x:Name="SurveySelectTeacherButton" Content="② 講師フォームの回答ファイルを選ぶ" Click="SurveySelectTeacher_Click" Style="{StaticResource AccentButtonStyle}"/><Button x:Name="SurveyVerifyButton" Content="③ 検証する" IsEnabled="False" Click="SurveyVerify_Click"/><Button x:Name="SurveyApplyButton" Content="④ 反映する" IsEnabled="False" Click="SurveyApply_Click" Style="{StaticResource AccentButtonStyle}"/></StackPanel>
+        <TextBlock FontSize="20" FontWeight="Bold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="🟦 Googleフォーム回答の取込"/>
+        <TextBlock Text="Googleフォームからダウンロードしたアンケート回答を検証し、受講希望や出席出勤可能日をそのまま反映します。時間割配置後にアンケートを取り込み直す場合には、時間割のリセットを行ってください。" TextWrapping="Wrap"/>
+        <StackPanel Orientation="Horizontal" Spacing="8"><Button x:Name="SurveySelectStudentButton" Content="① 生徒のアンケート回答ファイルを選ぶ" Click="SurveySelectStudent_Click" Style="{StaticResource AccentButtonStyle}"/><Button x:Name="SurveySelectTeacherButton" Content="② 講師のアンケート回答ファイルを選ぶ" Click="SurveySelectTeacher_Click" Style="{StaticResource AccentButtonStyle}"/><Button x:Name="SurveyVerifyButton" Content="③ 検証する" IsEnabled="False" Click="SurveyVerify_Click"/><Button x:Name="SurveyApplyButton" Content="④ 反映する" IsEnabled="False" Click="SurveyApply_Click" Style="{StaticResource AccentButtonStyle}"/></StackPanel>
         <TextBlock x:Name="SurveySelectedFilesText" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
         <TextBlock x:Name="SurveySummary" TextWrapping="Wrap" Visibility="Collapsed"/>
         <ListView x:Name="SurveyIssues" MaxHeight="240"/>
@@ -12,7 +12,7 @@
 <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
     <StackPanel Spacing="10">
         <TextBlock FontSize="18" FontWeight="SemiBold" Text="受講希望"/>
-        <TextBlock Text="生徒ごとの受講希望（必要授業回数・希望講師）を個別に登録・編集します。通常はアンケート取込みで自動反映されますが、ここで個別に追加・修正できます。一覧から選ぶと編集できます。" TextWrapping="Wrap"/>
+        <TextBlock Text="必要な授業回数や希望の担当講師などを、生徒ごとに編集できます。マッチング優先度はホームの基本情報に対応しています。今回の講習限定で変更したい場合や、アンケート回答とは別で追加・修正したい場合は、一覧から選ぶと編集できます。" TextWrapping="Wrap"/>
         <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/><ColumnDefinition Width="120"/></Grid.ColumnDefinitions>
             <ComboBox x:Name="RequestStudent" Header="生徒"/><ComboBox x:Name="RequestSubject" Grid.Column="1" Header="科目"/><NumberBox x:Name="RequestRequiredSessions" Grid.Column="2" Header="必要授業回数" Minimum="1" Value="1"/><ComboBox x:Name="RequestRegularTeacher" Grid.Column="3" Header="通常担当講師（任意）" SelectionChanged="RequestRegularTeacher_SelectionChanged"/><NumberBox x:Name="RequestRegularPriority" Grid.Column="4" Header="優先度 1～5" Minimum="1" Maximum="5" Value="3"/>
         </Grid>
@@ -20,7 +20,7 @@
             <ComboBox x:Name="RequestPreferred1" Header="第1希望講師（任意）"/><ComboBox x:Name="RequestPreferred2" Grid.Column="1" Header="第2希望講師（任意）"/><ComboBox x:Name="RequestPreferred3" Grid.Column="2" Header="第3希望講師（任意）"/>
         </Grid>
         <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="260"/><ColumnDefinition Width="200"/></Grid.ColumnDefinitions>
-            <CheckBox x:Name="RequestOneToOne" Content="1対1必須" VerticalAlignment="Bottom"/><NumberBox x:Name="RequestMaxConsecutiveOverride" Grid.Column="1" Header="最大連続コマ数上書き（0=既定値）" Minimum="0" Value="0"/><ComboBox x:Name="RequestAllowGapOverride" Grid.Column="2" Header="空きコマ許可上書き" SelectedIndex="0"><ComboBoxItem Content="指定なし"/><ComboBoxItem Content="許可"/><ComboBoxItem Content="不許可"/></ComboBox>
+            <ComboBox x:Name="RequestOneToOne" Header="1対1必須" SelectedIndex="0"><ComboBoxItem Content="いいえ"/><ComboBoxItem Content="はい"/></ComboBox><NumberBox x:Name="RequestMaxConsecutiveOverride" Grid.Column="1" Header="最大連続コマ数上書き（0=既定値）" Minimum="0" Value="0"/><ComboBox x:Name="RequestAllowGapOverride" Grid.Column="2" Header="空きコマ許可上書き" SelectedIndex="0"><ComboBoxItem Content="指定なし"/><ComboBoxItem Content="許可"/><ComboBoxItem Content="不許可"/></ComboBox>
         </Grid>
         <TextBox x:Name="RequestNote" Header="備考"/>
         <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="保存" Click="SaveLessonRequest_Click" Style="{StaticResource AccentButtonStyle}"/><Button Content="新規入力" Click="NewLessonRequest_Click"/><Button Content="選択した行を削除" Click="DeleteLessonRequest_Click"/></StackPanel>

@@ -18,14 +18,21 @@
                 <StackPanel Spacing="14">
                     <TextBlock FontSize="20" FontWeight="SemiBold" Text="生徒講師基本情報・通常授業担当情報" />
                     <TextBlock Text="生徒と講師の基本的な情報と、通常授業の担当をまとめたものです。プロジェクトごとの管理ではなく、一括した情報で、新規プロジェクト作成時に自動で反映されます。" TextWrapping="Wrap" />
+                    <!-- ユーザー指示「『Excelで基本情報を編集』のあとに『編集した内容を反映』を押さないと
+                         いけないということがわかるような導線にしてください」への対応。矢印で2つのボタンを
+                         視覚的につなげ、この2つが一連の操作であることを示す。次の3つのボタンは別の操作
+                         （新規作成・別ファイルからの反映・学年繰り上げ）のため、もう一段下へ分けた。 -->
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Click="EditSharedRoster_Click" Content="Excelで基本情報を編集" Style="{StaticResource AccentButtonStyle}" />
-                        <Button Click="ReflectSharedRosterEdits_Click" Content="編集した内容を反映" />
+                        <TextBlock Text="→" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <Button Click="ReflectSharedRosterEdits_Click" Content="編集した内容を反映" Style="{StaticResource AccentButtonStyle}" />
+                    </StackPanel>
+                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="「Excelで基本情報を編集」で開いたファイルを上書き保存した後、「編集した内容を反映」を押すと、共通の基本情報および現在開いているプロジェクトへ反映されます（保存しただけでは自動的には反映されません）。" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Click="NewSharedRosterTemplate_Click" Content="新規で基本情報を作成" />
                         <Button Click="ImportSharedRoster_Click" Content="別ファイルの基本情報を反映" />
                         <Button Click="AdvanceGrades_Click" Content="学年を一括で繰り上げる" />
                     </StackPanel>
-                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="「Excelで基本情報を編集」で開いたファイルを上書き保存した後、「編集した内容を反映」を押すと、共通の基本情報および現在開いているプロジェクトへ反映されます（保存しただけでは自動的には反映されません）。" TextWrapping="Wrap" />
                     <TextBlock x:Name="SharedRosterPathText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                     <TextBlock x:Name="SharedRosterLastModifiedText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                 </StackPanel>
@@ -83,19 +90,25 @@
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Spacing="14">
                     <TextBlock FontSize="20" FontWeight="SemiBold" Text="新しい講習プロジェクト" />
+                    <!-- 不具合修正: 列幅を160/220/220の固定pxにしていたため、実際のコントロール幅より
+                         列のほうがずっと広く、「年度」の年（DatePickerは非表示のDay/Month分の余白を
+                         保持したまま全体幅が縮まらない）が列内で右寄りに表示されたり、「講習区分」と
+                         「として保存」のプレビューの間に不要な余白ができたりしていた。各列をAutoにし、
+                         代わりに各コントロール自身へ実測に合わせた明示的なWidthを与えることで、列が
+                         コントロールの実際のサイズにぴったり沿うようにした。 -->
                     <Grid ColumnSpacing="16" RowSpacing="12">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="160" />
-                            <ColumnDefinition Width="220" />
-                            <ColumnDefinition Width="220" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <DatePicker x:Name="AcademicYearPicker" Header="年度" DayVisible="False" MonthVisible="False" YearVisible="True" />
-                        <ComboBox x:Name="SeasonBox" Grid.Column="1" Header="講習区分" SelectedIndex="1">
+                        <DatePicker x:Name="AcademicYearPicker" Header="年度" DayVisible="False" MonthVisible="False" YearVisible="True" Width="140" />
+                        <ComboBox x:Name="SeasonBox" Grid.Column="1" Header="講習区分" SelectedIndex="1" Width="140">
                             <ComboBoxItem Content="春期講習" Tag="1" />
                             <ComboBoxItem Content="夏期講習" Tag="2" />
                             <ComboBoxItem Content="冬期講習" Tag="3" />
@@ -105,7 +118,7 @@
                             <TextBox x:Name="GeneratedTitleBox" Width="160" IsReadOnly="True" />
                             <TextBlock Text="として保存" VerticalAlignment="Center" />
                         </StackPanel>
-                        <TextBox x:Name="OtherSeasonNameBox" Grid.Row="1" Grid.Column="1" Header="講習区分の名称（その他を選択した場合）" Visibility="Collapsed" TextChanged="ProjectDefinition_Changed" />
+                        <TextBox x:Name="OtherSeasonNameBox" Grid.Row="1" Grid.Column="1" Header="講習区分の名称（その他を選択した場合）" Visibility="Collapsed" TextChanged="ProjectDefinition_Changed" Width="280" />
                         <CalendarDatePicker x:Name="StartDatePicker" Grid.Row="2" Header="開始日" DateChanged="ProjectDefinition_Changed" />
                         <CalendarDatePicker x:Name="EndDatePicker" Grid.Row="2" Grid.Column="1" Header="終了日" DateChanged="ProjectDefinition_Changed" />
                     </Grid>
@@ -114,11 +127,13 @@
                         Text="整合性が確認できない場合には保存できない場合があります。また、同名のファイルが存在する場合は、末尾に番号をつけて保存します。"
                         TextWrapping="Wrap" />
                     <TextBlock FontWeight="SemiBold" Text="オプション機能" />
-                    <CheckBox x:Name="ConsiderGroupLessonsCheck" Content="集団授業の日程を考慮する" Checked="ConsiderGroupLessonsCheck_CheckedChanged" Unchecked="ConsiderGroupLessonsCheck_CheckedChanged" />
+                    <CheckBox x:Name="ConsiderGroupLessonsCheck" Content="集団授業の日程を考慮する" />
                     <TextBlock
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="オンにすると③アンケート取込みに「集団授業クラスの登録」・「受講登録」の項目が追加されます。個別指導以外に集団授業も受講する生徒がいる場合に、選択してください。このオプションを選択すると、後から変更できません。"
+                        Text="オンにすると③アンケート取込に「集団授業クラスの登録」・「受講登録」の項目が追加されます。個別指導以外に集団授業も受講する生徒がいる場合に、選択してください。このオプションを選択すると、後から変更できません。"
                         TextWrapping="Wrap" />
+                    <!-- 不具合修正: 「集団授業の日程を考慮する」とは無関係の設定のため連動を解除し、
+                         常に編集可能にした。あわせて、Headerの文言が折り返さず1行で収まる幅へ広げた。 -->
                     <NumberBox
                         x:Name="MaxStudentsPerTeacherBox"
                         Header="一人の講師が同時に担当できる生徒数（既定は2人）"
@@ -127,9 +142,8 @@
                         SmallChange="1"
                         SpinButtonPlacementMode="Inline"
                         Value="2"
-                        IsEnabled="False"
                         HorizontalAlignment="Left"
-                        Width="220" />
+                        Width="420" />
                     <TextBlock
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="一人の講師が担当する生徒の人数を設定できます。後から「①設定」の「スケジュール設定」タブでも変更できます。"

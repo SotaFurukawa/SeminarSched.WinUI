@@ -91,10 +91,10 @@ public sealed partial class ImportPage : WorkflowPageBase
     {
         var path=App.ProjectService.Current?.Path;if(path is null)return;
         var studentValues=await App.MasterData.GetStudentsAsync(path);var teacherValues=await App.MasterData.GetTeachersAsync(path);var subjectValues=await App.MasterData.GetSubjectsAsync(path);
-        var studentItems=studentValues.Select(x=>new MasterItem<Student>(x,$"{(x.Active?"":"[停止] ")}{x.ExternalId}　{x.Name}　{x.Grade}")).ToArray();
+        var studentItems=studentValues.Select(x=>new MasterItem<Student>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.Name}　{x.Grade}")).ToArray();
         var subjectItems=subjectValues.Select(x=>new MasterItem<Subject>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}")).ToArray();
         _studentItems=studentItems;_subjectItems=subjectItems;
-        _nullableTeacherItems=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[停止] ")}{x.ExternalId}　{x.Name}"))).ToArray();
+        _nullableTeacherItems=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.Name}"))).ToArray();
         RequestStudent.ItemsSource=studentItems;RequestSubject.ItemsSource=subjectItems;
         RequestRegularTeacher.ItemsSource=_nullableTeacherItems;RequestPreferred1.ItemsSource=_nullableTeacherItems;RequestPreferred2.ItemsSource=_nullableTeacherItems;RequestPreferred3.ItemsSource=_nullableTeacherItems;
         if(RequestRegularTeacher.SelectedIndex<0)RequestRegularTeacher.SelectedIndex=0;if(RequestPreferred1.SelectedIndex<0)RequestPreferred1.SelectedIndex=0;if(RequestPreferred2.SelectedIndex<0)RequestPreferred2.SelectedIndex=0;if(RequestPreferred3.SelectedIndex<0)RequestPreferred3.SelectedIndex=0;
@@ -121,7 +121,7 @@ public sealed partial class ImportPage : WorkflowPageBase
             IsEnabled=false;
             var path=App.ProjectService.Current?.Path??throw new InvalidOperationException("プロジェクトが開かれていません。");
             await App.MasterData.SaveLessonRequestAsync(path,new LessonRequest(0,student.Value.Id,subject.Value.Id,checked((int)RequestRequiredSessions.Value),
-                regularTeacher?.Id,priority,preferred1?.Id,preferred2?.Id,preferred3?.Id,RequestOneToOne.IsChecked==true,maxOverride,gapOverride,RequestNote.Text));
+                regularTeacher?.Id,priority,preferred1?.Id,preferred2?.Id,preferred3?.Id,RequestOneToOne.SelectedIndex==1,maxOverride,gapOverride,RequestNote.Text));
             ResetLessonRequest();
             await ReloadLessonRequestsAsync();
             Status.Severity=InfoBarSeverity.Success;Status.Title="受講希望を保存しました";Status.Message="";Status.IsOpen=true;
@@ -156,7 +156,7 @@ public sealed partial class ImportPage : WorkflowPageBase
         RequestPreferred1.SelectedItem=_nullableTeacherItems.FirstOrDefault(item=>item.Value?.Id==value.PreferredTeacher1Id);
         RequestPreferred2.SelectedItem=_nullableTeacherItems.FirstOrDefault(item=>item.Value?.Id==value.PreferredTeacher2Id);
         RequestPreferred3.SelectedItem=_nullableTeacherItems.FirstOrDefault(item=>item.Value?.Id==value.PreferredTeacher3Id);
-        RequestOneToOne.IsChecked=value.OneToOneRequired;
+        RequestOneToOne.SelectedIndex=value.OneToOneRequired?1:0;
         RequestMaxConsecutiveOverride.Value=value.MaxConsecutiveSlotsOverride??0;
         RequestAllowGapOverride.SelectedIndex=value.AllowGapOverride switch{true=>1,false=>2,_=>0};
         RequestNote.Text=value.Note;
@@ -187,7 +187,7 @@ public sealed partial class ImportPage : WorkflowPageBase
         RequestStudent.SelectedItem=null;RequestSubject.SelectedItem=null;RequestRequiredSessions.Value=1;
         RequestRegularTeacher.SelectedIndex=0;RequestRegularPriority.Value=3;
         RequestPreferred1.SelectedIndex=0;RequestPreferred2.SelectedIndex=0;RequestPreferred3.SelectedIndex=0;
-        RequestOneToOne.IsChecked=false;RequestMaxConsecutiveOverride.Value=0;RequestAllowGapOverride.SelectedIndex=0;RequestNote.Text="";
+        RequestOneToOne.SelectedIndex=0;RequestMaxConsecutiveOverride.Value=0;RequestAllowGapOverride.SelectedIndex=0;RequestNote.Text="";
     }
 
     private void Show(InfoBarSeverity severity,string title){Status.Severity=severity;Status.Title=title;Status.Message="";Status.IsOpen=true;}

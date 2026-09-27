@@ -253,6 +253,8 @@ public sealed partial class OptimizationPage : WorkflowPageBase
 
     private void GoToEditor_Click(object sender, RoutedEventArgs e) => Frame.Navigate(typeof(ScheduleEditorPage));
 
+    private void GoToOutput_Click(object sender, RoutedEventArgs e) => Frame.Navigate(typeof(OutputPage));
+
     private void QualitySlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
         ViewModel.Select(e.NewValue);

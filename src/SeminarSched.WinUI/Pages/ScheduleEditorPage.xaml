@@ -18,24 +18,29 @@
             <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="時間割編集" />
             <TextBlock
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="あらかじめ指定したいコマをドラッグ・ドロップで指定してください。未配置一覧からセルへドラッグして配置、配置済みカードはセル間や右クリックメニューで移動・ロック・削除できます。"
+                Text="時間割の自動作成前に、あらかじめ指定しておきたいコマをドラッグ・ドロップで指定できます。未配置一覧からセルへドラッグして配置してください。配置済みカードを未配置の状態にしたい場合は右クリックから選択してください。"
                 TextWrapping="Wrap" />
             <InfoBar x:Name="EditorStatus" IsClosable="True" />
 
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Spacing="12">
                     <TextBlock FontSize="20" FontWeight="SemiBold" Text="日別グリッド編集"/>
-                    <TextBlock Text="カードをドラッグしてセル間を移動、未配置一覧からはセルへドラッグして配置できます。右クリックでロック切替・削除、セル右上の丸印/バツ印で講師の出勤可否を切り替えられます。「元に戻す」「やり直す」で自動作成を含む直前の変更を取り消し・再適用できます（アプリを終了すると履歴は失われます）。" TextWrapping="Wrap"/>
+                    <TextBlock Text="講師の出勤可否をここでも変更できます。セル右上のバツ印/丸印から出勤可能日を変更できます。アンケートで出勤不可と回答した講師を追加したい場合は、「+講師を表示」から追加してください。" TextWrapping="Wrap"/>
+                    <!-- 不具合修正: 日付・検索・ボタン5個をすべて1行に並べていたため、ウィンドウを
+                         縦長（狭幅）にすると*幅の生徒名検索がボタンに押し出されて潰れていた。日付・検索は
+                         そのままの1行に収まる専用行とし、ボタン一式は別の行へ分けた。 -->
                     <Grid ColumnSpacing="12">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <ComboBox x:Name="BoardDate" Header="日付" DisplayMemberPath="Label" MinWidth="200" SelectionChanged="BoardDate_SelectionChanged"/>
                         <TextBox x:Name="BoardSearch" Grid.Column="1" Header="生徒名検索" TextChanged="BoardSearch_TextChanged"/>
-                        <Button x:Name="UndoButton" Grid.Column="2" VerticalAlignment="Bottom" Content="元に戻す" IsEnabled="False" Click="Undo_Click"/>
-                        <Button x:Name="RedoButton" Grid.Column="3" VerticalAlignment="Bottom" Content="やり直す" IsEnabled="False" Click="Redo_Click"/>
-                        <Button x:Name="AddTeacherButton" Grid.Column="4" VerticalAlignment="Bottom" Content="+ 講師を表示" Click="AddTeacher_Click"/>
-                        <Button Grid.Column="5" VerticalAlignment="Bottom" Content="すべてリセット" Click="ResetAll_Click"/>
-                        <Button x:Name="GoToOptimizationButton" Grid.Column="6" VerticalAlignment="Bottom" Content="⑤ 時間割自動作成へ" Click="GoToOptimization_Click"/>
                     </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button x:Name="UndoButton" VerticalAlignment="Bottom" Content="元に戻す" IsEnabled="False" Click="Undo_Click"/>
+                        <Button x:Name="RedoButton" VerticalAlignment="Bottom" Content="やり直す" IsEnabled="False" Click="Redo_Click"/>
+                        <Button x:Name="AddTeacherButton" VerticalAlignment="Bottom" Content="+ 講師を表示" Click="AddTeacher_Click"/>
+                        <Button VerticalAlignment="Bottom" Content="すべてリセット" Click="ResetAll_Click"/>
+                        <Button x:Name="GoToOptimizationButton" VerticalAlignment="Bottom" Content="⑤ 時間割自動作成へ" Click="GoToOptimization_Click"/>
+                    </StackPanel>
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="*"/><ColumnDefinition Width="280"/></Grid.ColumnDefinitions>
                         <StackPanel Spacing="8">

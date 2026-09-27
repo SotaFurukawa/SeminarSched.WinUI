@@ -51,7 +51,7 @@
                 <NavigationViewItem Content="② アンケート作成" Tag="questionnaire">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE8A5;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="③ アンケート取込み" Tag="import">
+                <NavigationViewItem Content="③ アンケート取込" Tag="import">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE8B5;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="3.1 集団授業クラス" Tag="groupLessonClass" Visibility="Collapsed">

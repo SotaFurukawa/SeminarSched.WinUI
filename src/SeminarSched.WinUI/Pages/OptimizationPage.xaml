@@ -17,8 +17,7 @@
             <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="時間割自動作成" />
             <TextBlock
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="④時間割編集で指定されていない授業を、固定授業を保持したまま指導可能な講師と開校コマからCP-SATで自動的に配置します。"
-                TextWrapping="Wrap" />
+                TextWrapping="Wrap">これまでの情報を基に、講師と生徒をマッチングし、自動的に時間割を作成します。できるだけ良いマッチングになるように、CP-SATと呼ばれる計算方式で、PC内部で計算を行うため、少し動作が重くなることがあります。他の作業とできるだけ併用しないで下さい。<LineBreak/>あらかじめマッチングを指定したい場合は、「アンケート取込」で優先度を変更するか、「時間割編集」であらかじめ授業を固定してください。</TextBlock>
 
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Spacing="12">
@@ -43,20 +42,24 @@
                         <!-- Sliderのtickは、thumb本体の半径ぶんだけ左右へ内側寄せされた位置に描画される
                              （WinUI既定テーマのSliderHorizontalThumbWidthが実際のinset量）。固定pxを
                              決め打ちすると理論値とズレるため、コードビハインド側でテーマリソースの値から
-                             実際のinsetを計算してこのGridのMarginへ反映する（Page_LoadedのAlignQualityTickLabels）。 -->
+                             実際のinsetを計算してこのGridのMarginへ反映する（Page_LoadedのAlignQualityTickLabels）。
+                             不具合修正: 値1〜5（5点）は4等分の区切り位置に並ぶのであって5等分した各列の
+                             中央には並ばない。5等分の列を使い2,3,4を各列の中央に置いていた以前の実装は
+                             実際のtick位置とズレていた。4等分の列にした上で、2,3,4は隣り合う2列にまたがる
+                             ColumnSpan="2"のCenter揃えにすることで、列の境界線（＝25%/50%/75%位置）へ
+                             常に正しく揃える。 -->
                         <Grid x:Name="QualityTickLabels" Margin="9,4,9,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock HorizontalAlignment="Left" Text="1" />
-                            <TextBlock Grid.Column="1" HorizontalAlignment="Center" Text="2" />
-                            <TextBlock Grid.Column="2" HorizontalAlignment="Center" Text="3" />
-                            <TextBlock Grid.Column="3" HorizontalAlignment="Center" Text="4" />
-                            <TextBlock Grid.Column="4" HorizontalAlignment="Right" Text="5" />
+                            <TextBlock Grid.Column="0" HorizontalAlignment="Left" Text="1" />
+                            <TextBlock Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Center" Text="2" />
+                            <TextBlock Grid.Column="1" Grid.ColumnSpan="2" HorizontalAlignment="Center" Text="3" />
+                            <TextBlock Grid.Column="2" Grid.ColumnSpan="2" HorizontalAlignment="Center" Text="4" />
+                            <TextBlock Grid.Column="3" HorizontalAlignment="Right" Text="5" />
                         </Grid>
                     </StackPanel>
 
@@ -175,8 +178,11 @@
                             Title="少し時間を要しています"
                             Message="指定した品質の持ち時間内に完成しなかったため、途中で打ち切らずそのまま続けて探索しています。しばらくお待ちください。" />
                     </StackPanel>
-                    <TextBlock Text="品質設定に応じて複数のCP-SAT探索戦略（複数の乱数シード・ポートフォリオ探索・近傍再探索・仕上げ探索など）を順に実行し、最も良い結果を採用します。進行中に「中断して現在の結果を採用」を押すと、その時点までに見つかった最良の結果をすぐに使用します。「一時停止」を押すと、現在の探索が終わり次第、次の探索を開始せずに待機します（実行中の探索そのものを瞬時に止めることはできないため、多少お待ちいただく場合があります）。「再開」を押すとそこから続きます。" TextWrapping="Wrap"/>
-                    <Button Content="④ 時間割編集で結果を確認" Click="GoToEditor_Click"/>
+                    <TextBlock Text="品質設定に応じて、複数の戦略を順番に実行し、最も良い結果を採用します。進行中に「中断して現在の結果を採用」を押すと、その時点までに見つかった最良の結果を即座に提示します。「一時停止」を押すと、現在の探索が終わり次第、次の探索を始める前に停止します。「再開」を押すと、次の戦略から探索を開始します。" TextWrapping="Wrap"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="④ 時間割編集で結果を確認" Click="GoToEditor_Click"/>
+                        <Button Content="⑥ 出力でExcel、PDFで結果を確認" Click="GoToOutput_Click"/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </StackPanel>
