@@ -1,6 +1,7 @@
 # ADR 0005: Windows配布方式
 
-- Status: Accepted for v0.1.0。v0.3.1でSetup.exeラッパー方式を追記（Amended 2026-09-20）
+- Status: Accepted for v0.1.0。v0.3.1でSetup.exeラッパー方式を追記（Amended 2026-09-20）。
+  v0.13.2でPackage.appxmanifestのバージョン同期漏れを追記（Amended 2026-09-28）
 - Date: 2026-09-17
 
 ## Decision
@@ -44,3 +45,36 @@
 - **未解決の疑問（上記「検証状況」との矛盾）:** 本ADR冒頭の検証状況には「`CurrentUser\TrustedPeople`だけでは`Add-AppxPackage`の信頼として不足することを実機で確認した」との記載があるが、今回の検証は`LocalMachine\TrustedPeople`にも同じ証明書が既に登録済みの状態で行っており、`CurrentUser\TrustedPeople`単独で十分かどうかを完全には切り分けられていない（`LocalMachine`側の証明書を管理者権限なしで一時的に削除できず、切り分け検証ができなかった）。Microsoft公式のsideloadガイドでは`CurrentUser\TrustedPeople`のみで per-user の`Add-AppxPackage`は成立するはずだが、本ADR記載時点の過去の失敗がDeveloper Mode未有効化など別要因だった可能性も残る。
 - **推奨される次の検証:** 一度もこの証明書を信頼していない別のWindows PC（またはこの証明書をLocalMachineから削除できる管理者環境）でSetup.exeを実行し、`PrivilegesRequired=lowest`のままで実際にインストールが成功するかを確認する。失敗する場合は、`installer\SeminarSched.WinUI.iss`の`PrivilegesRequired`を`admin`に変更し、`Install-Package.ps1`の登録先を`Cert:\LocalMachine\TrustedPeople`（`Import-Certificate -CertStoreLocation Cert:\LocalMachine\TrustedPeople`、要管理者権限）へ切り替える。
 - Draft Releaseへの`.msix`/`.cer`/Setup.exeの添付は、上記の実機インストール確認が取れたため開始した（v0.3.1から）。
+
+## Amendment（v0.13.2、2026-09-28）: Package.appxmanifestのバージョン同期漏れ
+
+ユーザー報告「0.13.1をGitHubからインストールしようとしたら、失敗してしまい、エラーコード1がでる」を
+実機（開発機）で調査した。
+
+- **直接の原因（開発機固有、コード上のバグではない）:** この開発機で`dotnet run`を多数回実行していた
+  ため、Windowsが同じPackage Identity（`F70149DC-0D08-4E3F-B67F-189A3A5E1C51`）を
+  「パッケージ化されていない開発モードのアプリ」として登録済みだった（`Get-AppxPackage`で
+  `IsDevelopmentMode: True`、`SignatureKind: None`、`Version: 0.9.0.0`）。この状態へ署名済みの
+  `.msix`を`Add-AppxPackage`しようとすると、Windowsは「現在のユーザーが、このアプリの
+  パッケージ化されていないバージョンを既にインストールしています。これをパッケージ化された
+  バージョンに置き換えることはできません」（HRESULT 0x80073CFB）を返し拒否する。この登録を
+  `Remove-AppxPackage`で削除すれば解消する。エンドユーザー（`dotnet run`を実行しない）には
+  発生しない、この開発機だけの事象。
+- **副次的に発見したコード上の実バグ:** 上の調査中に、ビルド済み`.msix`のAppxManifest.xmlを直接
+  展開して確認したところ、ファイル名は`SeminarSched.WinUI-0.13.1-x64.msix`なのに、埋め込まれた
+  `Identity/@Version`は`0.9.0.0`のままだった。`src\SeminarSched.WinUI\Package.appxmanifest`の
+  `Identity/Version`は単なる静的なXML属性であり、`GenerateAppxPackageOnBuild`（single-project
+  MSIX packaging）はこれをそのままパッケージ化するだけで、`Directory.Build.props`の
+  `AppxPackageVersion`プロパティからは一切反映されない。つまりv0.9.1からv0.13.1までのすべての
+  Draft Releaseの`.msix`が、ファイル名・About画面の表示こそ正しいバージョンを示していたものの、
+  Windowsパッケージマネージャーが実際に識別するIdentity Versionは一貫して`0.9.0.0`のまま出荷され
+  続けていた（`Directory.Build.props`をversionの正本とする方針が、このファイルにだけ届いて
+  いなかった）。
+- **修正:** `scripts\New-MsixPackage.ps1`に、`dotnet build`実行前に`Directory.Build.props`の
+  `VersionPrefix`を読み取り`Package.appxmanifest`の`Identity/Version`（`{version}.0`）へ同期する
+  処理を追加した。あわせて`Package.appxmanifest`自体も`0.13.2.0`へ更新し、
+  `RepositoryPolicyTests.PackageAppxManifest_IdentityVersionMatchesCentralVersion`という回帰
+  テストを新設して、以降このズレが起きても即座にテストで検知できるようにした。
+- **実機確認:** 開発機の`dotnet run`由来の開発モード登録を削除した上で、修正後にビルドした
+  v0.13.2の`.msix`を`Add-AppxPackage`し、`Get-AppxPackage`でVersionが正しく`0.13.2.0`になって
+  いることを確認した。

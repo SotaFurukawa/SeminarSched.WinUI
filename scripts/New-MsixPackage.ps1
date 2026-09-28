@@ -31,6 +31,22 @@ $thumbprint = $storeCert.Thumbprint
 $distDir = Join-Path $repoRoot "dist"
 New-Item -ItemType Directory -Force -Path $distDir | Out-Null
 
+# Package.appxmanifest's Identity/Version is a plain static XML attribute; the single-project
+# MSIX packaging tooling used here (GenerateAppxPackageOnBuild) packages it as-is and does not
+# substitute it from any MSBuild property (confirmed by inspecting a built .msix's manifest,
+# which still read "0.9.0.0" across v0.9.1 through v0.13.1 despite Directory.Build.props moving
+# on). Keep it in sync with Directory.Build.props here so every packaged .msix's actual identity
+# version matches what ships (checkpoint113).
+$version = (Select-Xml -Path (Join-Path $repoRoot "Directory.Build.props") -XPath "//*[local-name()='VersionPrefix']").Node.InnerText
+$manifestPath = Join-Path $repoRoot "src\SeminarSched.WinUI\Package.appxmanifest"
+$manifestVersion = "$version.0"
+[xml]$manifestXml = Get-Content $manifestPath -Raw
+if ($manifestXml.Package.Identity.Version -ne $manifestVersion) {
+    $manifestXml.Package.Identity.Version = $manifestVersion
+    $manifestXml.Save($manifestPath)
+    Write-Output "Synced Package.appxmanifest Identity/Version to $manifestVersion"
+}
+
 Write-Output "Building and signing the $Platform sideload MSIX package (cert thumbprint $thumbprint) ..."
 & $dotnet build $csproj `
     -c Release -p:Platform=$Platform `
@@ -47,7 +63,6 @@ $msix = Get-ChildItem -Path $appPackagesRoot -Filter "*.msix" -Recurse |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $msix) { throw "No .msix file was produced under $appPackagesRoot. Check the build output above." }
 
-$version = (Select-Xml -Path (Join-Path $repoRoot "Directory.Build.props") -XPath "//*[local-name()='VersionPrefix']").Node.InnerText
 $destination = Join-Path $distDir "SeminarSched.WinUI-$version-$Platform.msix"
 Copy-Item -Path $msix.FullName -Destination $destination -Force
 
