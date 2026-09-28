@@ -26,6 +26,10 @@ public sealed record WarningRow(string Severity,string IssueType,string? Date,st
 /// 生徒配布ページ上で、この時間帯を黒塗り「集団」表示にするために使う。</summary>
 public sealed record GroupLessonAttendance(string Student,DateOnly Date,TimeOnly StartTime,TimeOnly EndTime);
 
+/// <summary>集団授業のクラスへ任意で割り当てられた担当講師が、その授業を担当する日時（開始・終了は
+/// 自由入力でコマに縛られない）。全体時間割上で、この時間帯を黒塗り「集団」表示にするために使う。</summary>
+public sealed record GroupLessonTeacherAttendance(string Teacher,DateOnly Date,TimeOnly StartTime,TimeOnly EndTime);
+
 public sealed record ScheduleReport(
     string ProjectTitle,
     int AcademicYear,
@@ -40,7 +44,8 @@ public sealed record ScheduleReport(
     IReadOnlyList<AbsentStudent> AbsentStudents,
     IReadOnlyList<WarningRow> Warnings,
     IReadOnlyList<TeacherUnavailabilityCell> TeacherUnavailabilities,
-    IReadOnlyList<GroupLessonAttendance> GroupLessonAttendances)
+    IReadOnlyList<GroupLessonAttendance> GroupLessonAttendances,
+    IReadOnlyList<GroupLessonTeacherAttendance> GroupLessonTeacherAttendances)
 {
     public IReadOnlyList<string> SlotLabels { get; } = SlotDefinitions.Select(s => s.Label).ToArray();
 }

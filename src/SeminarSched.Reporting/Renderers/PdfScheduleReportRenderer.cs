@@ -45,11 +45,12 @@ public sealed class PdfScheduleReportRenderer
         var section = document.AddSection(); ApplyPageSetup(section, settings);
         AddFullWidthBar(section, settings, $"{report.ProjectTitle}／{report.GeneratedAtText}", OverviewSubtitleFill, Colors.Black, 9, bold: false);
 
-        var teacherLabels = WeeklyCalendarLayout.BuildTeacherLabels(report.Rows.Select(x => x.Teacher).Concat(report.TeacherUnavailabilities.Select(u => u.Teacher)));
+        var teacherLabels = WeeklyCalendarLayout.BuildTeacherLabels(report.Rows.Select(x => x.Teacher).Concat(report.TeacherUnavailabilities.Select(u => u.Teacher)).Concat(report.GroupLessonTeacherAttendances.Select(g => g.Teacher)));
         var studentLabels = WeeklyCalendarLayout.BuildStudentLabels(report.Rows.Select(x => x.Student));
         var overviewAssignments = report.Rows.Select(r => new OverviewAssignment(DateOnly.Parse(r.Date), teacherLabels[r.Teacher], r.TimeSlot, r.StudentGrade, r.SubjectShortName, studentLabels[r.Student], r.OneToOneRequired, r.IsLocked, r.IsManual)).ToArray();
         var overviewUnavailabilities = report.TeacherUnavailabilities.Select(u => new OverviewUnavailability(DateOnly.Parse(u.Date), teacherLabels[u.Teacher], u.TimeSlot)).ToArray();
-        var grid = OverviewGridLayout.Build(report.StartDate, report.EndDate, report.OpenDates.ToHashSet(), report.SlotLabels, overviewAssignments, overviewUnavailabilities);
+        var overviewGroupLessons = WeeklyCalendarLayout.ResolveOverviewGroupLessonCells(report, teacherLabels);
+        var grid = OverviewGridLayout.Build(report.StartDate, report.EndDate, report.OpenDates.ToHashSet(), report.SlotLabels, overviewAssignments, overviewUnavailabilities, overviewGroupLessons);
         var slotDefinitionsByLabel = report.SlotDefinitions.ToDictionary(s => s.Label);
         AddOverview(document, grid, slotDefinitionsByLabel, settings);
 
@@ -275,6 +276,9 @@ public sealed class PdfScheduleReportRenderer
     private static void AddOverview(Document document, OverviewGrid grid, IReadOnlyDictionary<string, SlotDefinition> slotDefinitionsByLabel, OutputSettings settings)
     {
         var unavailableFill = ParseColorOrDefault(settings.UnavailableFillHex, ParseColor("#D9D9D9"));
+        // ユーザー要望（checkpoint112）「割り当てられた講師の全体時間割の該当コマは『集団』と表示される」
+        // への対応。生徒配布ページの集団授業表示と同じ設定値（settings.GroupFillHex）を使う。
+        var groupFill = ParseColorOrDefault(settings.GroupFillHex, Colors.Black);
         var weeksWithDays = grid.Weeks.Where(w => w.Days.Count > 0).ToArray();
         for (var weekIndex = 0; weekIndex < weeksWithDays.Length; weekIndex++)
         {
@@ -341,6 +345,16 @@ public sealed class PdfScheduleReportRenderer
                         }
                         if (OverviewCardFill(card) is { } cardFill) { gradeCell.Shading.Color = cardFill; subjectCell.Shading.Color = cardFill; studentCell.Shading.Color = cardFill; }
                     }
+                    else if (cell.IsGroupLesson)
+                    {
+                        // ユーザー要望（checkpoint112）「割り当てられた講師の全体時間割の該当コマは
+                        // 『集団』と表示される」への対応。生徒配布ページの集団授業表示と同じ意匠
+                        // （settings.GroupFillHexの塗り色・白文字）にする。
+                        gradeRow.Cells[teacherCol].MergeRight = 1; gradeRow.Cells[teacherCol].Shading.Color = groupFill;
+                        subjectRow.Cells[teacherCol].MergeRight = 1; subjectRow.Cells[teacherCol].Shading.Color = groupFill;
+                        var groupCell = studentRow.Cells[teacherCol]; groupCell.MergeRight = 1; groupCell.Shading.Color = groupFill;
+                        var groupPara = groupCell.AddParagraph("集団"); groupPara.Format.Font.Color = Colors.White; groupPara.Format.Alignment = ParagraphAlignment.Center;
+                    }
                     else if (cell.Unavailable)
                     {
                         gradeRow.Cells[teacherCol].MergeRight = 1; gradeRow.Cells[teacherCol].Shading.Color = unavailableFill;
@@ -350,7 +364,7 @@ public sealed class PdfScheduleReportRenderer
                 }
             }
 
-            var legendPara = section.AddParagraph("凡例　灰色: 勤務不可コマ　[1対1] 1対1　[固定] ロック　[手] 手動変更"); legendPara.Format.Font.Size = 8; legendPara.Format.SpaceBefore = Unit.FromCentimeter(0.1);
+            var legendPara = section.AddParagraph("凡例　灰色: 勤務不可コマ　黒: 集団授業　[1対1] 1対1　[固定] ロック　[手] 手動変更"); legendPara.Format.Font.Size = 8; legendPara.Format.SpaceBefore = Unit.FromCentimeter(0.1);
             var footnotePara = section.AddParagraph("日曜始まり・土曜終わりの週単位です。出勤予定の講師のみ表示します。"); footnotePara.Format.Font.Size = 8;
         }
     }

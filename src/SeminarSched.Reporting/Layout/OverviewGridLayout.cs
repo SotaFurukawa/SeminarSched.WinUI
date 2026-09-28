@@ -2,7 +2,9 @@ namespace SeminarSched.Reporting.Layout;
 
 public sealed record OverviewCard(string Grade, string SubjectShortName, string Student, bool OneToOneRequired = false, bool IsLocked = false, bool IsManual = false);
 
-public sealed record OverviewCell(string SlotLabel, IReadOnlyList<OverviewCard> Cards, bool Unavailable = false);
+/// <summary>IsGroupLesson=trueの場合、この講師はこのコマの時間帯に集団授業を担当しており、
+/// レンダラー側は個別指導のカードの代わりに黒塗り「集団」表示にする（Cardsは常に空）。</summary>
+public sealed record OverviewCell(string SlotLabel, IReadOnlyList<OverviewCard> Cards, bool Unavailable = false, bool IsGroupLesson = false);
 
 public sealed record OverviewTeacherColumn(string TeacherName, IReadOnlyList<OverviewCell> Cells);
 
@@ -17,6 +19,10 @@ public sealed record OverviewAssignment(DateOnly Date, string Teacher, string Sl
 
 public sealed record OverviewUnavailability(DateOnly Date, string Teacher, string SlotLabel);
 
+/// <summary>集団授業の担当講師が、その授業時間帯と重なるコマを担当していることを示す1件
+/// （呼び出し側が自由な開始・終了時刻とコマの時刻を突き合わせ済みで、コマ単位に解決してから渡す）。</summary>
+public sealed record OverviewGroupLessonCell(DateOnly Date, string Teacher, string SlotLabel);
+
 public sealed record OverviewGrid(IReadOnlyList<string> SlotLabels, IReadOnlyList<OverviewWeek> Weeks);
 
 public static class OverviewGridLayout
@@ -29,11 +35,12 @@ public static class OverviewGridLayout
     /// 生成される（「対象となる開校日・出勤予定講師がありません」のplaceholder表示）ため、Days.Countが
     /// 0の週もWeeksへ含める。
     /// </summary>
-    public static OverviewGrid Build(DateOnly start, DateOnly end, IReadOnlySet<DateOnly> openDates, IReadOnlyList<string> slotLabels, IReadOnlyList<OverviewAssignment> assignments, IReadOnlyList<OverviewUnavailability>? unavailabilities = null)
+    public static OverviewGrid Build(DateOnly start, DateOnly end, IReadOnlySet<DateOnly> openDates, IReadOnlyList<string> slotLabels, IReadOnlyList<OverviewAssignment> assignments, IReadOnlyList<OverviewUnavailability>? unavailabilities = null, IReadOnlyList<OverviewGroupLessonCell>? groupLessons = null)
     {
         if (end < start) throw new ArgumentOutOfRangeException(nameof(end));
         var byDate = assignments.ToLookup(a => a.Date);
         var unavailableCells = (unavailabilities ?? []).Select(u => (u.Date, u.Teacher, u.SlotLabel)).ToHashSet();
+        var groupLessonsByDate = (groupLessons ?? []).ToLookup(g => g.Date);
         var firstSunday = start.AddDays(-(int)start.DayOfWeek);
         var lastSaturday = end.AddDays(6 - (int)end.DayOfWeek);
         var weeks = new List<OverviewWeek>();
@@ -52,14 +59,16 @@ public static class OverviewGridLayout
                     continue;
                 }
                 var dayAssignments = byDate[date].ToArray();
-                var teachers = dayAssignments.Select(a => a.Teacher).Distinct().OrderBy(t => t, StringComparer.Ordinal)
+                var dayGroupLessons = groupLessonsByDate[date].ToArray();
+                var teachers = dayAssignments.Select(a => a.Teacher).Concat(dayGroupLessons.Select(g => g.Teacher)).Distinct().OrderBy(t => t, StringComparer.Ordinal)
                     .Select(teacherName =>
                     {
                         var cells = slotLabels.Select(slot =>
                         {
                             var cards = dayAssignments.Where(a => a.Teacher == teacherName && a.SlotLabel == slot)
                                 .Select(a => new OverviewCard(a.Grade, a.SubjectShortName, a.Student, a.OneToOneRequired, a.IsLocked, a.IsManual)).ToArray();
-                            return new OverviewCell(slot, cards, cards.Length == 0 && unavailableCells.Contains((date, teacherName, slot)));
+                            var isGroupLesson = cards.Length == 0 && dayGroupLessons.Any(g => g.Teacher == teacherName && g.SlotLabel == slot);
+                            return new OverviewCell(slot, cards, cards.Length == 0 && !isGroupLesson && unavailableCells.Contains((date, teacherName, slot)), isGroupLesson);
                         }).ToArray();
                         return new OverviewTeacherColumn(teacherName, cells);
                     }).ToArray();

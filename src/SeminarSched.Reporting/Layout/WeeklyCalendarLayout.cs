@@ -1,3 +1,5 @@
+using SeminarSched.Reporting.Models;
+
 namespace SeminarSched.Reporting.Layout;
 
 public sealed record CalendarCell(DateOnly Date, IReadOnlyList<string> Lines);
@@ -44,6 +46,29 @@ public static class WeeklyCalendarLayout
     {
         var spaceIndex = fullName.IndexOf(' ');
         return spaceIndex < 0 ? fullName : fullName[..spaceIndex];
+    }
+
+    /// <summary>
+    /// ユーザー要望（checkpoint112）「集団授業の担当講師のその時間を『集団』と表示してほしい」への
+    /// 対応。集団授業の担当講師の授業時間帯（コマに縛られない自由な開始・終了時刻）と、各コマの時刻
+    /// 定義を突き合わせ、時間帯が重なるコマをOverviewGroupLessonCellとして解決する。全体時間割・
+    /// 講師配布ページの両方（Excel・PDF）で同じ解決結果を使う。
+    /// </summary>
+    public static IReadOnlyList<OverviewGroupLessonCell> ResolveOverviewGroupLessonCells(ScheduleReport report, IReadOnlyDictionary<string, string> teacherLabels)
+    {
+        var result = new List<OverviewGroupLessonCell>();
+        foreach (var attendance in report.GroupLessonTeacherAttendances)
+        {
+            var teacherLabel = teacherLabels[attendance.Teacher];
+            foreach (var slot in report.SlotDefinitions)
+            {
+                var slotStart = TimeOnly.ParseExact(slot.StartTimeText, "HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+                var slotEnd = TimeOnly.ParseExact(slot.EndTimeText, "HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+                if (attendance.StartTime < slotEnd && slotStart < attendance.EndTime)
+                    result.Add(new OverviewGroupLessonCell(attendance.Date, teacherLabel, slot.Label));
+            }
+        }
+        return result;
     }
 
     private static IReadOnlyDictionary<string, string> BuildCompactNameLookup(IEnumerable<string> fullNames)

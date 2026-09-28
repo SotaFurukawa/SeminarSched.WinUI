@@ -30,6 +30,11 @@
                             <CheckBox x:Name="GroupClassAllowOtherGrades" Grid.Column="3" Content="他学年の受講を許可" VerticalAlignment="Bottom" />
                             <Button x:Name="SaveGroupClassButton" Grid.Column="4" VerticalAlignment="Bottom" Content="保存" Click="SaveGroupClass_Click" Style="{StaticResource AccentButtonStyle}" />
                         </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <CheckBox x:Name="GroupClassHasTeacher" Content="担当講師を割り当てる（任意）" Checked="GroupClassHasTeacher_Changed" Unchecked="GroupClassHasTeacher_Changed" VerticalAlignment="Center" />
+                            <ComboBox x:Name="GroupClassTeacher" Header="担当講師" DisplayMemberPath="Label" Visibility="Collapsed" MinWidth="240" />
+                        </StackPanel>
+                        <TextBlock x:Name="GroupClassTeacherHint" Text="担当講師を割り当てると、その講師はこのクラスの開講日程の時間帯に個別授業を配置できなくなり、全体時間割にはその時間が「集団」と表示されます。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button Content="新規入力" Click="NewGroupClass_Click" />
                             <Button Content="選択したクラスを削除" Click="DeleteGroupClass_Click" />

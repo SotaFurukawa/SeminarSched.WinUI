@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using SeminarSched.Application.GroupLessons;
 using SeminarSched.Domain.GroupLessons;
+using SeminarSched.Domain.MasterData;
 using Windows.UI;
 
 namespace SeminarSched_WinUI.Pages;
@@ -56,6 +57,7 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
     private void Show(InfoBarSeverity severity, string title) { Status.Severity = severity; Status.Title = title; Status.Message = ""; Status.IsOpen = true; }
 
     private sealed record GroupClassRow(GroupLessonClass Value, string Display) { public override string ToString() => Display; }
+    private sealed record TeacherOption(long Id, string Label) { public override string ToString() => Label; }
 
     private async Task ReloadClassesAsync()
     {
@@ -68,6 +70,10 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
         SessionClassBox.SelectedItem = rows.FirstOrDefault(r => r.Value.Id == previousSessionClassId) ?? rows.FirstOrDefault();
         var gradeValues = (await App.MasterData.GetStudentsAsync(path)).Select(s => s.Grade).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToArray();
         GroupClassGrade.ItemsSource = gradeValues;
+        var previousTeacherId = (GroupClassTeacher.SelectedItem as TeacherOption)?.Id;
+        var teacherOptions = (await App.MasterData.GetTeachersAsync(path)).Where(t => t.Active).Select(t => new TeacherOption(t.Id, $"{t.ExternalId} {t.Name}")).ToArray();
+        GroupClassTeacher.ItemsSource = teacherOptions;
+        GroupClassTeacher.SelectedItem = teacherOptions.FirstOrDefault(t => t.Id == previousTeacherId);
     }
 
     private void GroupClasses_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -79,6 +85,16 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
         }
         _selectedGroupClass = row.Value;
         GroupClassName.Text = row.Value.Name; GroupClassSubject.Text = row.Value.Subject; GroupClassGrade.Text = row.Value.Grade; GroupClassAllowOtherGrades.IsChecked = row.Value.AllowOtherGrades;
+        GroupClassHasTeacher.IsChecked = row.Value.TeacherId is not null;
+        GroupClassTeacher.SelectedItem = (GroupClassTeacher.ItemsSource as IEnumerable<TeacherOption>)?.FirstOrDefault(t => t.Id == row.Value.TeacherId);
+    }
+
+    private void GroupClassHasTeacher_Changed(object sender, RoutedEventArgs e)
+    {
+        var hasTeacher = GroupClassHasTeacher.IsChecked == true;
+        GroupClassTeacher.Visibility = hasTeacher ? Visibility.Visible : Visibility.Collapsed;
+        GroupClassTeacherHint.Visibility = hasTeacher ? Visibility.Visible : Visibility.Collapsed;
+        if (!hasTeacher) GroupClassTeacher.SelectedItem = null;
     }
 
     private async void SaveGroupClass_Click(object sender, RoutedEventArgs e)
@@ -87,12 +103,18 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
         var subject = GroupClassSubject.Text?.Trim() ?? "";
         var grade = (GroupClassGrade.Text ?? "").Trim();
         if (name.Length == 0 || subject.Length == 0 || grade.Length == 0) { ShowError("クラス名・科目・対象学年を入力してください。"); return; }
+        long? teacherId = null;
+        if (GroupClassHasTeacher.IsChecked == true)
+        {
+            if (GroupClassTeacher.SelectedItem is not TeacherOption teacher) { ShowError("担当講師を選択するか、チェックを外してください。"); return; }
+            teacherId = teacher.Id;
+        }
         try
         {
             IsEnabled = false;
             var path = App.ProjectService.Current?.Path ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
             var id = _selectedGroupClass?.Id ?? 0;
-            var saved = await App.GroupLessons.SaveClassAsync(path, new GroupLessonClass(id, name, grade, subject, GroupClassAllowOtherGrades.IsChecked == true));
+            var saved = await App.GroupLessons.SaveClassAsync(path, new GroupLessonClass(id, name, grade, subject, GroupClassAllowOtherGrades.IsChecked == true, teacherId: teacherId));
             _selectedGroupClass = saved;
             await ReloadClassesAsync();
             await ReloadCalendarDataAsync();
@@ -108,6 +130,7 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
     {
         GroupClasses.SelectedItem = null; _selectedGroupClass = null;
         GroupClassName.Text = ""; GroupClassSubject.Text = ""; GroupClassGrade.Text = ""; GroupClassAllowOtherGrades.IsChecked = false;
+        GroupClassHasTeacher.IsChecked = false; GroupClassTeacher.SelectedItem = null;
     }
 
     private async void DeleteGroupClass_Click(object sender, RoutedEventArgs e)

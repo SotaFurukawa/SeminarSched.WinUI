@@ -204,6 +204,15 @@ internal static class SqliteProjectSchema
         // について...『考慮しない』と『できるだけ連続にする』にして」。既存プロジェクトにも同じ理由で
         // ALTER TABLEで届ける。
         await AddColumnIfMissingAsync(connection, transaction, "SchedulingPolicy", "TeacherStudentConsecutivePreference", "INTEGER NOT NULL DEFAULT 0 CHECK(TeacherStudentConsecutivePreference BETWEEN 0 AND 1)", cancellationToken);
+
+        // ユーザー要望（checkpoint112）「集団授業のクラスに担当講師（任意）を割り当て、その日時に
+        // 個別授業を持てないようにブロックし、全体時間割にはその講師のその時間を『集団』と表示して
+        // ほしい」への対応。既存プロジェクトにも同じ理由でALTER TABLEで届ける。
+        await AddColumnIfMissingAsync(connection, transaction, "GroupLessonClass", "TeacherId", "INTEGER REFERENCES Teacher(Id) ON DELETE SET NULL", cancellationToken);
+        // TeacherUnavailabilityは④時間割編集の手動「出勤不可」指定と共有するテーブルのため、上の
+        // 担当講師割り当てから自動生成した行だけを後から正しく取り消せるよう、由来を記録する
+        // （'manual'=手動指定、'group_lesson'=集団授業の担当講師割り当てから自動生成）。
+        await AddColumnIfMissingAsync(connection, transaction, "TeacherUnavailability", "Source", "TEXT NOT NULL DEFAULT 'manual' CHECK(Source IN('manual','group_lesson'))", cancellationToken);
     }
 
     private static async Task AddColumnIfMissingAsync(
@@ -255,6 +264,7 @@ internal static class SqliteProjectSchema
             TeacherId INTEGER NOT NULL REFERENCES Teacher(Id) ON DELETE CASCADE,
             OpenDateId INTEGER NOT NULL REFERENCES OpenDate(Id) ON DELETE CASCADE,
             TimeSlotId INTEGER NOT NULL REFERENCES TimeSlot(Id) ON DELETE CASCADE,
+            Source TEXT NOT NULL DEFAULT 'manual' CHECK(Source IN('manual','group_lesson')),
             PRIMARY KEY(TeacherId,OpenDateId,TimeSlotId)
         );
         CREATE TABLE IF NOT EXISTS StudentAvailability (
@@ -374,6 +384,7 @@ internal static class SqliteProjectSchema
             Grade TEXT NOT NULL CHECK(length(trim(Grade))>0),
             AllowOtherGrades INTEGER NOT NULL DEFAULT 0 CHECK(AllowOtherGrades IN(0,1)),
             Active INTEGER NOT NULL DEFAULT 1 CHECK(Active IN(0,1)),
+            TeacherId INTEGER REFERENCES Teacher(Id) ON DELETE SET NULL,
             UNIQUE(ProjectId,Name)
         );
         CREATE TABLE IF NOT EXISTS GroupLessonSession (
@@ -393,6 +404,13 @@ internal static class SqliteProjectSchema
             ClassId INTEGER NOT NULL REFERENCES GroupLessonClass(Id) ON DELETE CASCADE,
             TeacherId INTEGER NOT NULL REFERENCES Teacher(Id) ON DELETE CASCADE,
             PRIMARY KEY(ClassId,TeacherId)
+        );
+        CREATE TABLE IF NOT EXISTS GroupLessonTeacherBlock (
+            ClassId INTEGER NOT NULL REFERENCES GroupLessonClass(Id) ON DELETE CASCADE,
+            TeacherId INTEGER NOT NULL REFERENCES Teacher(Id) ON DELETE CASCADE,
+            OpenDateId INTEGER NOT NULL REFERENCES OpenDate(Id) ON DELETE CASCADE,
+            TimeSlotId INTEGER NOT NULL REFERENCES TimeSlot(Id) ON DELETE CASCADE,
+            PRIMARY KEY(ClassId,OpenDateId,TimeSlotId)
         );
         CREATE TABLE IF NOT EXISTS SchedulingPolicy (
             ProjectId INTEGER PRIMARY KEY REFERENCES CourseProject(Id) ON DELETE CASCADE,

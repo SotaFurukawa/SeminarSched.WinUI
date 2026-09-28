@@ -8,8 +8,10 @@ namespace SeminarSched.Reporting.Renderers;
 /// Python版reporting/*_builder.pyが生成する5種の帳票（全体時間割・生徒配布時間割・講師配布時間割
 /// （学年順）・講師配布時間割（講師別、講師ごとの個別ファイル）・未配置警告一覧）を、それぞれ独立した
 /// xlsxとして出力する。Python版と異なりcampus（校舎）概念は本移植版に存在しないため、出力情報シートの
-/// 「校舎・講習」欄はProjectTitleのみを表示する。また、Python版が行う「休校日・範囲外セルの連続結合」
-/// 「補足の集団授業シート」（本移植版に集団授業の概念自体が無いため対象外）は簡略化・対象外としている。
+/// 「校舎・講習」欄はProjectTitleのみを表示する。また、Python版が行う「休校日・範囲外セルの連続結合」は
+/// 簡略化・対象外としている。集団授業（本移植版独自機能、Python版には存在しない）は、生徒配布ページの
+/// 黒塗り「集団」表示に加え、checkpoint112から全体時間割でも担当講師の割り当てに応じて同様に表示する
+/// （講師配布時間割は未対応。担当講師のその日の全体像は全体時間割で確認できる）。
 /// </summary>
 public sealed class ExcelScheduleReportRenderer
 {
@@ -18,14 +20,16 @@ public sealed class ExcelScheduleReportRenderer
         using var workbook = new XLWorkbook();
         WriteOverviewMetadataSheet(workbook.AddWorksheet("出力情報"), report);
 
-        // report.Rowsだけから作ると、配置が1件も無い（が出勤不可情報だけ提出済みの）講師がTeacherUnavailabilities
-        // 側にしか登場せずKeyNotFoundExceptionになるため、両方の集合の講師名を渡す。
-        var teacherLabels = WeeklyCalendarLayout.BuildTeacherLabels(report.Rows.Select(x => x.Teacher).Concat(report.TeacherUnavailabilities.Select(u => u.Teacher)));
+        // report.Rowsだけから作ると、配置が1件も無い（が出勤不可情報だけ提出済みの、または集団授業の
+        // 担当講師としてのみ登場する）講師がTeacherUnavailabilities/GroupLessonTeacherAttendances側
+        // にしか登場せずKeyNotFoundExceptionになるため、いずれかの集合に登場する講師名を渡す。
+        var teacherLabels = WeeklyCalendarLayout.BuildTeacherLabels(report.Rows.Select(x => x.Teacher).Concat(report.TeacherUnavailabilities.Select(u => u.Teacher)).Concat(report.GroupLessonTeacherAttendances.Select(g => g.Teacher)));
         var studentLabels = WeeklyCalendarLayout.BuildStudentLabels(report.Rows.Select(x => x.Student));
         var overviewAssignments = report.Rows.Select(r => new OverviewAssignment(DateOnly.Parse(r.Date), teacherLabels[r.Teacher], r.TimeSlot, r.StudentGrade, r.SubjectShortName, studentLabels[r.Student], r.OneToOneRequired, r.IsLocked, r.IsManual)).ToArray();
         var overviewUnavailabilities = report.TeacherUnavailabilities.Select(u => new OverviewUnavailability(DateOnly.Parse(u.Date), teacherLabels[u.Teacher], u.TimeSlot)).ToArray();
-        var grid = OverviewGridLayout.Build(report.StartDate, report.EndDate, report.OpenDates.ToHashSet(), report.SlotLabels, overviewAssignments, overviewUnavailabilities);
         var slotDefinitionsByLabel = report.SlotDefinitions.ToDictionary(s => s.Label);
+        var overviewGroupLessons = WeeklyCalendarLayout.ResolveOverviewGroupLessonCells(report, teacherLabels);
+        var grid = OverviewGridLayout.Build(report.StartDate, report.EndDate, report.OpenDates.ToHashSet(), report.SlotLabels, overviewAssignments, overviewUnavailabilities, overviewGroupLessons);
 
         var usedNames = new HashSet<string>(StringComparer.Ordinal) { "出力情報" };
         foreach (var week in grid.Weeks)
@@ -439,7 +443,7 @@ public sealed class ExcelScheduleReportRenderer
     private static readonly XLColor OverviewOneToOneFill = XLColor.FromHtml("#FFF1CC");
     private static readonly XLColor OverviewLockedFill = XLColor.FromHtml("#DCEBFF");
     private static readonly XLColor OverviewManualFill = XLColor.FromHtml("#EADFFF");
-    private const string OverviewLegendText = "凡例　灰色: 勤務不可コマ　[1対1] 1対1　[固定] ロック　[手] 手動変更";
+    private const string OverviewLegendText = "凡例　灰色: 勤務不可コマ　黒: 集団授業　[1対1] 1対1　[固定] ロック　[手] 手動変更";
     private const string OverviewFootnoteText = "日曜始まり・土曜終わりの週単位です。出勤予定の講師のみ表示します。";
     private const string OverviewDateHeaderFontName = "MS UI Gothic";
     private const string OverviewLabelFontName = "HGゴシックM";
@@ -534,29 +538,46 @@ public sealed class ExcelScheduleReportRenderer
                             ApplyOverviewLabelFont(teacherNameCell, 11);
                             sheet.Range(rowBase, teacherCol, rowBase, teacherCol + 1).Merge();
 
-                            for (var sub = 0; sub < 2; sub++)
+                            if (cell.IsGroupLesson)
                             {
-                                var cardCol = teacherCol + sub;
-                                if (sub < cell.Cards.Count)
-                                {
-                                    var card = cell.Cards[sub];
-                                    var gradeCell = sheet.Cell(rowBase + 1, cardCol); gradeCell.Value = card.Grade; ApplyOverviewLabelFont(gradeCell, 10);
-                                    var subjectCell = sheet.Cell(rowBase + 2, cardCol); subjectCell.Value = card.SubjectShortName; ApplyOverviewLabelFont(subjectCell, 11);
-                                    var nameCell = sheet.Cell(rowBase + 3, cardCol); nameCell.Value = card.Student; ApplyOverviewLabelFont(nameCell, 11);
-                                    nameCell.Style.Alignment.TextRotation = 255; nameCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                                    if (OverviewCardFill(card) is { } cardFill) sheet.Range(rowBase + 1, cardCol, rowBase + 3, cardCol).Style.Fill.BackgroundColor = cardFill;
-                                }
-                                else if (cell.Cards.Count == 0 && cell.Unavailable)
-                                {
-                                    for (var r = 1; r <= 3; r++) sheet.Cell(rowBase + r, cardCol).Style.Fill.BackgroundColor = OverviewUnavailableFill;
-                                }
+                                // ユーザー要望（checkpoint112）「割り当てられた講師の全体時間割の該当コマは
+                                // 『集団』と表示される」への対応。生徒配布ページの集団授業表示（黒塗り・白文字）
+                                // と同じ意匠にする。
+                                var groupRange = sheet.Range(rowBase + 1, teacherCol, rowBase + 3, teacherCol + 1);
+                                groupRange.Merge();
+                                groupRange.Style.Fill.BackgroundColor = XLColor.Black;
+                                var groupCell = sheet.Cell(rowBase + 1, teacherCol);
+                                groupCell.Value = "集団";
+                                groupCell.Style.Font.FontColor = XLColor.White;
+                                groupCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                                groupCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
                             }
-                            if (cell.Cards.Count > 2)
+                            else
                             {
-                                var overflow = string.Join("\n", cell.Cards.Skip(2).Select(c => $"{c.Grade} {c.SubjectShortName} {c.Student}"));
-                                var overflowCell = sheet.Cell(rowBase + 3, teacherCol + 1);
-                                overflowCell.Value = overflowCell.GetString().Length > 0 ? overflowCell.GetString() + "\n" + overflow : overflow;
-                                overflowCell.Style.Alignment.WrapText = true; overflowCell.Style.Alignment.TextRotation = 0;
+                                for (var sub = 0; sub < 2; sub++)
+                                {
+                                    var cardCol = teacherCol + sub;
+                                    if (sub < cell.Cards.Count)
+                                    {
+                                        var card = cell.Cards[sub];
+                                        var gradeCell = sheet.Cell(rowBase + 1, cardCol); gradeCell.Value = card.Grade; ApplyOverviewLabelFont(gradeCell, 10);
+                                        var subjectCell = sheet.Cell(rowBase + 2, cardCol); subjectCell.Value = card.SubjectShortName; ApplyOverviewLabelFont(subjectCell, 11);
+                                        var nameCell = sheet.Cell(rowBase + 3, cardCol); nameCell.Value = card.Student; ApplyOverviewLabelFont(nameCell, 11);
+                                        nameCell.Style.Alignment.TextRotation = 255; nameCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                                        if (OverviewCardFill(card) is { } cardFill) sheet.Range(rowBase + 1, cardCol, rowBase + 3, cardCol).Style.Fill.BackgroundColor = cardFill;
+                                    }
+                                    else if (cell.Cards.Count == 0 && cell.Unavailable)
+                                    {
+                                        for (var r = 1; r <= 3; r++) sheet.Cell(rowBase + r, cardCol).Style.Fill.BackgroundColor = OverviewUnavailableFill;
+                                    }
+                                }
+                                if (cell.Cards.Count > 2)
+                                {
+                                    var overflow = string.Join("\n", cell.Cards.Skip(2).Select(c => $"{c.Grade} {c.SubjectShortName} {c.Student}"));
+                                    var overflowCell = sheet.Cell(rowBase + 3, teacherCol + 1);
+                                    overflowCell.Value = overflowCell.GetString().Length > 0 ? overflowCell.GetString() + "\n" + overflow : overflow;
+                                    overflowCell.Style.Alignment.WrapText = true; overflowCell.Style.Alignment.TextRotation = 0;
+                                }
                             }
                         }
                         teacherCol += 2;

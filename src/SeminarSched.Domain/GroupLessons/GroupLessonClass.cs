@@ -7,7 +7,7 @@ namespace SeminarSched.Domain.GroupLessons;
 // （同じ学年で複数クラスを持てる、受講登録はクラス単位で1回で済む）。
 public sealed record GroupLessonClass
 {
-    public GroupLessonClass(long id, string name, string grade, string subject, bool allowOtherGrades = false, bool active = true)
+    public GroupLessonClass(long id, string name, string grade, string subject, bool allowOtherGrades = false, bool active = true, long? teacherId = null)
     {
         if (id < 0) throw new ArgumentOutOfRangeException(nameof(id));
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -20,6 +20,7 @@ public sealed record GroupLessonClass
         Subject = subject?.Trim() ?? "";
         AllowOtherGrades = allowOtherGrades;
         Active = active;
+        TeacherId = teacherId;
     }
 
     public long Id { get; init; }
@@ -34,4 +35,12 @@ public sealed record GroupLessonClass
     // （先取り授業などクラスの対象学年以外の生徒も受講する場合向け）。
     public bool AllowOtherGrades { get; }
     public bool Active { get; }
+
+    // ユーザー要望（checkpoint112）「集団授業のクラスに、担当講師（任意）チェックボックスを追加し、
+    // チェックした場合は講師選択欄が表示される。ここで講師を割り当てると、その講師はその日時に
+    // 個別授業を持てないようにブロックする」への対応。任意（null=未割り当て）。設定すると、この
+    // クラスの全開講セッション（GroupLessonSession）と時間帯が重なるコマについて、この講師の
+    // TeacherUnavailabilityが自動生成され、自動作成・手動配置の両方でブロックされる
+    // （SqliteGroupLessonService.RecomputeTeacherBlocksForClassAsync参照）。
+    public long? TeacherId { get; init; }
 }

@@ -163,9 +163,20 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
             JOIN Student s ON s.Id=e.StudentId
             JOIN OpenDate d ON d.Id=sess.OpenDateId;
             """;await using var r=await q.ExecuteReaderAsync(token);while(await r.ReadAsync(token))groupLessonAttendances.Add(new(r.GetString(0),DateOnly.Parse(r.GetString(1)),TimeOnly.ParseExact(r.GetString(2),"HH:mm",System.Globalization.CultureInfo.InvariantCulture),TimeOnly.ParseExact(r.GetString(3),"HH:mm",System.Globalization.CultureInfo.InvariantCulture)));}
+        // ユーザー要望（checkpoint112）「集団授業のクラスに担当講師（任意）を割り当て...全体時間割には
+        // その講師のその時間を『集団』と表示してほしい」への対応。上の生徒側と同じ形（クラスに縛られる
+        // 生徒 vs 担当講師）で、講師側も同様に取得する。
+        var groupLessonTeacherAttendances=new List<GroupLessonTeacherAttendance>();await using(var q=c.CreateCommand()){q.CommandText="""
+            SELECT t.Name,d.Date,sess.StartTime,sess.EndTime
+            FROM GroupLessonClass c2
+            JOIN GroupLessonSession sess ON sess.ClassId=c2.Id
+            JOIN Teacher t ON t.Id=c2.TeacherId
+            JOIN OpenDate d ON d.Id=sess.OpenDateId
+            WHERE c2.TeacherId IS NOT NULL;
+            """;await using var r=await q.ExecuteReaderAsync(token);while(await r.ReadAsync(token))groupLessonTeacherAttendances.Add(new(r.GetString(0),DateOnly.Parse(r.GetString(1)),TimeOnly.ParseExact(r.GetString(2),"HH:mm",System.Globalization.CultureInfo.InvariantCulture),TimeOnly.ParseExact(r.GetString(3),"HH:mm",System.Globalization.CultureInfo.InvariantCulture)));}
 
         var generatedAtText=$"{DateTime.Now:yyyy/MM/dd HH:mm}／アプリ {ApplicationVersion.FromAssembly(typeof(SqliteOutputPackageService).Assembly).DisplayVersion}";
-        return new(projectTitle,academicYear,seasonName,generatedAtText,startDate,endDate,openDates,slotDefinitions,rows,unassigned,absent,warnings,unavailabilities,groupLessonAttendances);
+        return new(projectTitle,academicYear,seasonName,generatedAtText,startDate,endDate,openDates,slotDefinitions,rows,unassigned,absent,warnings,unavailabilities,groupLessonAttendances,groupLessonTeacherAttendances);
     }
 
     /// <summary>

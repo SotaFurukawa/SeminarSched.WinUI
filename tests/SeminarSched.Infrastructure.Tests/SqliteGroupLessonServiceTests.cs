@@ -1,6 +1,8 @@
+using SeminarSched.Domain.CourseSettings;
 using SeminarSched.Domain.GroupLessons;
 using SeminarSched.Domain.MasterData;
 using SeminarSched.Domain.Projects;
+using SeminarSched.Infrastructure.CourseSettings;
 using SeminarSched.Infrastructure.GroupLessons;
 using SeminarSched.Infrastructure.MasterData;
 using SeminarSched.Infrastructure.Projects;
@@ -127,6 +129,89 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
         Assert.Empty(await service.GetClassesAsync(state.Path));
     }
 
+    // ユーザー要望（checkpoint112）「集団授業のクラスに、担当講師（任意）チェックボックスを追加し...
+    // ここで講師を割り当てると、その講師はその日時に個別授業を持てないようにブロックする」を検証する。
+    [Fact]
+    public async Task SaveClassAsync_AssigningTeacher_BlocksTheOverlappingSlotAndClearsOnUnassign()
+    {
+        var state=await CreateStateWithSlotAsync();var service=new SqliteGroupLessonService();
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学"));
+        await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(9,30),new TimeOnly(10,30));
+
+        var assigned=await service.SaveClassAsync(state.Path,cls with { TeacherId=state.Teacher1Id });
+        Assert.Equal(state.Teacher1Id,assigned.TeacherId);
+        Assert.True(await IsTeacherUnavailableAsync(state.Path,state.Teacher1Id,state.DateId,state.SlotId));
+
+        var unassigned=await service.SaveClassAsync(state.Path,assigned with { TeacherId=null });
+        Assert.Null(unassigned.TeacherId);
+        Assert.False(await IsTeacherUnavailableAsync(state.Path,state.Teacher1Id,state.DateId,state.SlotId));
+    }
+
+    [Fact]
+    public async Task SaveClassAsync_AssigningTeacher_RejectsWhenTeacherAlreadyHasAnOccupyingIndividualAssignment()
+    {
+        var state=await CreateStateWithSlotAsync();var service=new SqliteGroupLessonService();
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学"));
+        await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(9,30),new TimeOnly(10,30));
+        await OccupyIndividualAssignmentAsync(state.Path,state.Teacher1Id,state.Student1Id,state.DateId,state.SlotId);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>service.SaveClassAsync(state.Path,cls with { TeacherId=state.Teacher1Id }));
+        Assert.Null((await service.GetClassesAsync(state.Path)).Single().TeacherId);
+    }
+
+    [Fact]
+    public async Task AddSessionsAsync_WhenTeacherAlreadyAssigned_BlocksTheNewOverlappingSlotToo()
+    {
+        var state=await CreateStateWithSlotAsync();var service=new SqliteGroupLessonService();
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学",teacherId:state.Teacher1Id));
+
+        await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(9,30),new TimeOnly(10,30));
+        Assert.True(await IsTeacherUnavailableAsync(state.Path,state.Teacher1Id,state.DateId,state.SlotId));
+
+        var session=Assert.Single(await service.GetAllSessionsAsync(state.Path));
+        await service.RemoveSessionAsync(state.Path,session.Id);
+        Assert.False(await IsTeacherUnavailableAsync(state.Path,state.Teacher1Id,state.DateId,state.SlotId));
+    }
+
+    [Fact]
+    public async Task SaveClassAsync_ReassigningToADifferentTeacher_MovesTheBlockToTheNewTeacher()
+    {
+        var state=await CreateStateWithSlotAsync();var service=new SqliteGroupLessonService();
+        var master=new SqliteMasterDataRepository();
+        var teacher2=await master.SaveTeacherAsync(state.Path,new Teacher(0,"T-GROUP2","架空 集団講師二"));
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学",teacherId:state.Teacher1Id));
+        await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(9,30),new TimeOnly(10,30));
+        Assert.True(await IsTeacherUnavailableAsync(state.Path,state.Teacher1Id,state.DateId,state.SlotId));
+
+        var reassigned=await service.GetClassesAsync(state.Path);
+        var current=Assert.Single(reassigned);
+        await service.SaveClassAsync(state.Path,current with { TeacherId=teacher2.Id });
+
+        Assert.False(await IsTeacherUnavailableAsync(state.Path,state.Teacher1Id,state.DateId,state.SlotId));
+        Assert.True(await IsTeacherUnavailableAsync(state.Path,teacher2.Id,state.DateId,state.SlotId));
+    }
+
+    private static async Task<bool> IsTeacherUnavailableAsync(string path,long teacherId,long openDateId,long timeSlotId)
+    {
+        await using var connection=new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False");
+        await connection.OpenAsync();await using var command=connection.CreateCommand();
+        command.CommandText="SELECT EXISTS(SELECT 1 FROM TeacherUnavailability WHERE TeacherId=$teacher AND OpenDateId=$date AND TimeSlotId=$slot);";
+        command.Parameters.AddWithValue("$teacher",teacherId);command.Parameters.AddWithValue("$date",openDateId);command.Parameters.AddWithValue("$slot",timeSlotId);
+        return Convert.ToInt64(await command.ExecuteScalarAsync())!=0;
+    }
+
+    private static async Task OccupyIndividualAssignmentAsync(string path,long teacherId,long studentId,long openDateId,long timeSlotId)
+    {
+        await using var connection=new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False");
+        await connection.OpenAsync();await using var command=connection.CreateCommand();
+        command.CommandText="""
+            INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions) SELECT 1,$student,Id,1 FROM Subject LIMIT 1;
+            INSERT INTO Assignment(LessonRequestId,TeacherId,OpenDateId,TimeSlotId,Source) VALUES(last_insert_rowid(),$teacher,$date,$slot,'manual');
+            """;
+        command.Parameters.AddWithValue("$student",studentId);command.Parameters.AddWithValue("$teacher",teacherId);command.Parameters.AddWithValue("$date",openDateId);command.Parameters.AddWithValue("$slot",timeSlotId);
+        await command.ExecuteNonQueryAsync();
+    }
+
     private async Task<State> CreateStateAsync()
     {
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,$"{Guid.NewGuid():N}.jukuschedule");
@@ -141,6 +226,21 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
         return new State(path,student1.Id,student2.Id,teacher1.Id,date);
     }
 
+    // 担当講師の割り当てはコマ(TimeSlot)との重なりで判定するため、TimeSlot・開講コマの紐付け・
+    // 講師の指導可能科目(占有チェック用)を追加で必要とするテスト向けのfixture。
+    private async Task<StateWithSlot> CreateStateWithSlotAsync()
+    {
+        var state=await CreateStateAsync();
+        var course=new SqliteCourseSettingsRepository();
+        var slot=await course.SaveTimeSlotAsync(state.Path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));
+        await course.SaveCourseDayAsync(state.Path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
+        var master=new SqliteMasterDataRepository();
+        var subject=await master.SaveSubjectAsync(state.Path,new Subject(0,"JH_GROUP","集団科目","集","中学校",1));
+        await master.SaveQualificationAsync(state.Path,new TeacherQualification(state.Teacher1Id,subject.Id,true));
+        return new StateWithSlot(state.Path,state.Student1Id,state.Student2Id,state.Teacher1Id,state.DateId,slot.Id);
+    }
+
     public void Dispose(){if(Directory.Exists(_directory))Directory.Delete(_directory,true);}
     private sealed record State(string Path,long Student1Id,long Student2Id,long Teacher1Id,long DateId);
+    private sealed record StateWithSlot(string Path,long Student1Id,long Student2Id,long Teacher1Id,long DateId,long SlotId);
 }
