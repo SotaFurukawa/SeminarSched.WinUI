@@ -107,7 +107,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <DatePicker x:Name="AcademicYearPicker" Header="年度" DayVisible="False" MonthVisible="False" YearVisible="True" Width="140" />
+                        <DatePicker x:Name="AcademicYearPicker" Header="年度" DayVisible="False" MonthVisible="False" YearVisible="True" Width="200" />
                         <ComboBox x:Name="SeasonBox" Grid.Column="1" Header="講習区分" SelectedIndex="1" Width="140">
                             <ComboBoxItem Content="春期講習" Tag="1" />
                             <ComboBoxItem Content="夏期講習" Tag="2" />
@@ -133,17 +133,22 @@
                         Text="オンにすると③アンケート取込に「集団授業クラスの登録」・「受講登録」の項目が追加されます。個別指導以外に集団授業も受講する生徒がいる場合に、選択してください。このオプションを選択すると、後から変更できません。"
                         TextWrapping="Wrap" />
                     <!-- 不具合修正: 「集団授業の日程を考慮する」とは無関係の設定のため連動を解除し、
-                         常に編集可能にした。あわせて、Headerの文言が折り返さず1行で収まる幅へ広げた。 -->
-                    <NumberBox
-                        x:Name="MaxStudentsPerTeacherBox"
-                        Header="一人の講師が同時に担当できる生徒数（既定は2人）"
-                        Minimum="1"
-                        Maximum="10"
-                        SmallChange="1"
-                        SpinButtonPlacementMode="Inline"
-                        Value="2"
-                        HorizontalAlignment="Left"
-                        Width="420" />
+                         専用のチェックボックスでのみ編集可否を切り替えるようにした（チェックを外すと
+                         既定の2人へ戻す）。あわせて、Headerの文言が折り返さず1行で収まる幅へ広げた。 -->
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <CheckBox x:Name="MaxStudentsPerTeacherEnableCheck" Content="既定値から変更する" VerticalAlignment="Bottom" Checked="MaxStudentsPerTeacherEnableCheck_Changed" Unchecked="MaxStudentsPerTeacherEnableCheck_Changed" />
+                        <NumberBox
+                            x:Name="MaxStudentsPerTeacherBox"
+                            Header="一人の講師が同時に担当できる生徒数（既定は2人）"
+                            Minimum="1"
+                            Maximum="10"
+                            SmallChange="1"
+                            SpinButtonPlacementMode="Inline"
+                            Value="2"
+                            IsEnabled="False"
+                            HorizontalAlignment="Left"
+                            Width="420" />
+                    </StackPanel>
                     <TextBlock
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="一人の講師が担当する生徒の人数を設定できます。後から「①設定」の「スケジュール設定」タブでも変更できます。"

@@ -9,7 +9,6 @@ public sealed partial class GroupLessonEnrollmentPage : WorkflowPageBase
 {
     private long? _selectedClassId;
     private IReadOnlyList<GroupLessonEnrollmentCandidate> _candidates = [];
-    private IReadOnlyList<GroupLessonTeacherCandidate> _teacherCandidates = [];
 
     public GroupLessonEnrollmentPage() => InitializeComponent();
 
@@ -51,13 +50,12 @@ public sealed partial class GroupLessonEnrollmentPage : WorkflowPageBase
     {
         if (EnrollmentClass.SelectedItem is not GroupClassRow row)
         {
-            _selectedClassId = null; EnrollmentStudents.ItemsSource = null; EnrollmentTeachers.ItemsSource = null; EnrollmentClassInfo.Text = "";
+            _selectedClassId = null; EnrollmentStudents.ItemsSource = null; EnrollmentClassInfo.Text = "";
             return;
         }
         _selectedClassId = row.Value.Id;
         EnrollmentClassInfo.Text = $"科目: {row.Value.Subject}　対象学年: {row.Value.Grade}{(row.Value.AllowOtherGrades ? "（他学年の受講も許可）" : "")}";
         await ReloadCandidatesAsync();
-        await ReloadTeacherCandidatesAsync();
     }
 
     private async Task ReloadCandidatesAsync()
@@ -66,14 +64,6 @@ public sealed partial class GroupLessonEnrollmentPage : WorkflowPageBase
         var path = App.ProjectService.Current?.Path; if (path is null) return;
         _candidates = await App.GroupLessons.GetEnrollmentCandidatesAsync(path, classId);
         ApplyFilter();
-    }
-
-    private async Task ReloadTeacherCandidatesAsync()
-    {
-        if (_selectedClassId is not { } classId) { EnrollmentTeachers.ItemsSource = null; return; }
-        var path = App.ProjectService.Current?.Path; if (path is null) return;
-        _teacherCandidates = await App.GroupLessons.GetTeacherCandidatesAsync(path, classId);
-        EnrollmentTeachers.ItemsSource = _teacherCandidates;
     }
 
     private void ApplyFilter()
@@ -91,20 +81,6 @@ public sealed partial class GroupLessonEnrollmentPage : WorkflowPageBase
         {
             var path = App.ProjectService.Current?.Path ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
             await App.GroupLessons.SetEnrollmentAsync(path, classId, candidate.StudentId, checkBox.IsChecked == true);
-        }
-        catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
-        {
-            Status.Severity = InfoBarSeverity.Error; Status.Title = "更新できませんでした"; Status.Message = exception.Message; Status.IsOpen = true;
-        }
-    }
-
-    private async void TeacherCheck_Changed(object sender, RoutedEventArgs e)
-    {
-        if (sender is not CheckBox { DataContext: GroupLessonTeacherCandidate candidate } checkBox || _selectedClassId is not { } classId) return;
-        try
-        {
-            var path = App.ProjectService.Current?.Path ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
-            await App.GroupLessons.SetTeacherAssignmentAsync(path, classId, candidate.TeacherId, checkBox.IsChecked == true);
         }
         catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
         {

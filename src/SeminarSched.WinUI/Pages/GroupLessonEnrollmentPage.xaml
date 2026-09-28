@@ -10,21 +10,11 @@
         <ScrollViewer Grid.Row="1" x:Name="ContentPanel">
             <StackPanel MaxWidth="720" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="16">
                 <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="3.2 集団授業の受講登録" />
-                <TextBlock Text="クラスとそのクラスを受講する生徒にチェックを入れます。既定では対象学年の生徒だけを表示します。他学年も含めて表示したい場合は、「他学年の受講を許可」にチェックを入れてください。" TextWrapping="Wrap" />
+                <TextBlock Text="クラスとそのクラスを受講する生徒にチェックを入れます。既定では対象学年の生徒だけを表示します。他学年も含めて表示したい場合は、「他学年の受講を許可」にチェックを入れてください。担当講師の割り当てはこの画面では行いません。3.1集団授業クラスの「担当講師を割り当てる（任意）」で設定してください。" TextWrapping="Wrap" />
                 <InfoBar x:Name="Status" IsClosable="True" />
 
                 <ComboBox x:Name="EnrollmentClass" Header="クラス" SelectionChanged="EnrollmentClass_SelectionChanged" MinWidth="280" />
                 <TextBlock x:Name="EnrollmentClassInfo" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-
-                <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="担当講師" />
-                <TextBlock Text="このクラスを担当する講師にチェックを入れます（複数人可）。個別指導の自動作成・手動配置とは連携しません（記録のみ）。" TextWrapping="Wrap" />
-                <ListView x:Name="EnrollmentTeachers" MaxHeight="240">
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <CheckBox IsChecked="{Binding Assigned}" Checked="TeacherCheck_Changed" Unchecked="TeacherCheck_Changed" Content="{Binding Display}" />
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
 
                 <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="受講生徒" />
                 <TextBox x:Name="EnrollmentSearch" Header="生徒名検索" TextChanged="EnrollmentSearch_TextChanged" />

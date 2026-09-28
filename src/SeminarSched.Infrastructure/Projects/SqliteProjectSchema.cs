@@ -41,6 +41,7 @@ internal static class SqliteProjectSchema
         await EnsureColumnsAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await BackfillInvalidSubjectShortNamesAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await DowngradeRemovedPriorityAvailabilityLevelAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
+        await DropRemovedGroupLessonTeacherTableAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
         if (TryGetFingerprint(path) is { } verified)
@@ -105,6 +106,21 @@ internal static class SqliteProjectSchema
             update.CommandText = $"UPDATE {table} SET AvailabilityLevel=1 WHERE AvailabilityLevel=2;";
             await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    // ユーザー指示（checkpoint117）「3.2の既存機能（担当講師の複数人チェックボックス、記録のみで
+    // 自動作成・手動配置とは未連携）を廃止し、3.1の単一担当講師（任意）機能へ一元化する」への対応。
+    // GroupLessonTeacherは今後どのコードからも参照されなくなるため、テーブル自体を削除する
+    // （このversionはまだ公開前のbeta版で実データが存在しないため、削除して問題ない）。
+    private static async Task DropRemovedGroupLessonTeacherTableAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        await using var drop = connection.CreateCommand();
+        drop.Transaction = transaction;
+        drop.CommandText = "DROP TABLE IF EXISTS GroupLessonTeacher;";
+        await drop.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     internal static async Task<int> ReadVersionAsync(
@@ -399,11 +415,6 @@ internal static class SqliteProjectSchema
             ClassId INTEGER NOT NULL REFERENCES GroupLessonClass(Id) ON DELETE CASCADE,
             StudentId INTEGER NOT NULL REFERENCES Student(Id) ON DELETE CASCADE,
             PRIMARY KEY(ClassId,StudentId)
-        );
-        CREATE TABLE IF NOT EXISTS GroupLessonTeacher (
-            ClassId INTEGER NOT NULL REFERENCES GroupLessonClass(Id) ON DELETE CASCADE,
-            TeacherId INTEGER NOT NULL REFERENCES Teacher(Id) ON DELETE CASCADE,
-            PRIMARY KEY(ClassId,TeacherId)
         );
         CREATE TABLE IF NOT EXISTS GroupLessonTeacherBlock (
             ClassId INTEGER NOT NULL REFERENCES GroupLessonClass(Id) ON DELETE CASCADE,

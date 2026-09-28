@@ -193,6 +193,13 @@ public sealed partial class HomePage : Page
         return string.Join(Environment.NewLine, lines);
     }
 
+    private void MaxStudentsPerTeacherEnableCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        var enabled = MaxStudentsPerTeacherEnableCheck.IsChecked == true;
+        MaxStudentsPerTeacherBox.IsEnabled = enabled;
+        if (!enabled) MaxStudentsPerTeacherBox.Value = 2;
+    }
+
     private async void CreateProject_Click(object sender, RoutedEventArgs e)
     {
         try

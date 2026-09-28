@@ -98,37 +98,6 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
         Assert.Contains(withOtherGrades,c=>c.StudentId==state.Student2Id);
     }
 
-    // ユーザー指示「集団授業の受講登録について、講師の登録もできるようにしたい」を検証する。
-    [Fact]
-    public async Task GetTeacherCandidatesAsync_ReturnsAllActiveTeachersAndReflectsAssignment()
-    {
-        var state=await CreateStateAsync();var service=new SqliteGroupLessonService();
-        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学"));
-
-        var candidates=await service.GetTeacherCandidatesAsync(state.Path,cls.Id);
-        var candidate=Assert.Single(candidates);
-        Assert.Equal(state.Teacher1Id,candidate.TeacherId);Assert.False(candidate.Assigned);
-
-        await service.SetTeacherAssignmentAsync(state.Path,cls.Id,state.Teacher1Id,true);
-        var afterAssign=Assert.Single(await service.GetTeacherCandidatesAsync(state.Path,cls.Id));
-        Assert.True(afterAssign.Assigned);
-
-        await service.SetTeacherAssignmentAsync(state.Path,cls.Id,state.Teacher1Id,false);
-        Assert.False(Assert.Single(await service.GetTeacherCandidatesAsync(state.Path,cls.Id)).Assigned);
-    }
-
-    [Fact]
-    public async Task DeleteClassAsync_CascadesTeacherAssignments()
-    {
-        var state=await CreateStateAsync();var service=new SqliteGroupLessonService();
-        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学"));
-        await service.SetTeacherAssignmentAsync(state.Path,cls.Id,state.Teacher1Id,true);
-
-        await service.DeleteClassAsync(state.Path,cls.Id);
-
-        Assert.Empty(await service.GetClassesAsync(state.Path));
-    }
-
     // ユーザー要望（checkpoint112）「集団授業のクラスに、担当講師（任意）チェックボックスを追加し...
     // ここで講師を割り当てると、その講師はその日時に個別授業を持てないようにブロックする」を検証する。
     [Fact]
