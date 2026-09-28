@@ -55,5 +55,36 @@ public sealed class PdfScheduleReportRendererLayoutTests : IDisposable
         Assert.True(bytes.Length > 3000, $"Expected a non-trivial PDF for {paperSize}/{orientation}, got {bytes.Length} bytes.");
     }
 
+    // ユーザー報告バグ修正（checkpoint113）: 配置が1件も無い状態（自動作成前）で⑥出力を実行すると、
+    // 生徒配布・講師配布PDFがページを1枚も追加しないままPdfSharpへ渡り
+    // 「ページが1枚も無いPDFは保存できない」という例外でアプリごとクラッシュしていた。この生徒は
+    // LessonRequestを持つため欠席者（AbsentStudents）扱いにもならず、真に0ページになる条件を
+    // 再現できる。
+    [Fact]
+    public async Task GenerateAsync_WithNoAssignmentsYet_DoesNotThrowAndStillProducesAValidPdf()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "pdf-empty.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
+        var m = new SqliteMasterDataRepository();
+        var student = await m.SaveStudentAsync(path, new Student(0, "S-001", "架空 生徒", "中2"));
+        var subject = await m.SaveSubjectAsync(path, new Subject(0, "MATH", "数学", "数", "中学", 1));
+        var course = new SqliteCourseSettingsRepository();
+        var slot = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "1", "1限", new TimeOnly(9, 0), new TimeOnly(10, 0), 1));
+        await course.SaveCourseDayAsync(path, new CourseDay(new DateOnly(2026, 7, 20), true, "", [slot.Id]));
+        await using (var c = new SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            await c.OpenAsync(); await using var q = c.CreateCommand();
+            q.CommandText = $"INSERT INTO LessonRequest(Id,ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,1,{student.Id},{subject.Id},1);";
+            await q.ExecuteNonQueryAsync();
+        }
+
+        var outputDir = Path.Combine(_directory, "out-empty");
+        var result = await new SqliteOutputPackageService().GenerateAsync(path, outputDir);
+
+        var bytes = await File.ReadAllBytesAsync(result.StudentHandoutsPdfPath);
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
+    }
+
     public void Dispose() { if (Directory.Exists(_directory)) Directory.Delete(_directory, true); }
 }

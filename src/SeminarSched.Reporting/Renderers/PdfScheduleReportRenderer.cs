@@ -54,7 +54,7 @@ public sealed class PdfScheduleReportRenderer
         var slotDefinitionsByLabel = report.SlotDefinitions.ToDictionary(s => s.Label);
         AddOverview(document, grid, slotDefinitionsByLabel, settings);
 
-        Save(document, path);
+        Save(document, path, settings);
     }
 
     public void RenderStudentHandouts(ScheduleReport report, string path, OutputSettings? outputSettings = null) => RenderHandouts(report, path, includeTeacher: false, "生徒配布用生徒別時間割", outputSettings);
@@ -69,7 +69,7 @@ public sealed class PdfScheduleReportRenderer
         AddAbsenceSection(document, report, settings);
         var ordered = OrderStudentsForTeacher(report, teacherName);
         foreach (var s in ordered) AddStudentCalendarSection(document, report, s.Student, s.Grade, includeTeacher: true, teacherLabels, settings);
-        Save(document, path);
+        Save(document, path, settings);
     }
 
     /// <summary>ExcelScheduleReportRenderer.RenderTeacherPacketsCombinedのPDF版。1講師=1セクション
@@ -89,7 +89,7 @@ public sealed class PdfScheduleReportRenderer
             foreach (var s in ordered) AddStudentCalendarSection(document, report, s.Student, s.Grade, includeTeacher: true, teacherLabels, settings, teacherLabelPrefix: $"{teacherLabel}t用");
             if (ordered.Count % 2 != 0) { var blank = document.AddSection(); ApplyPageSetup(blank, settings); }
         }
-        Save(document, path);
+        Save(document, path, settings);
     }
 
     private static IReadOnlyList<(string Student, string Grade)> OrderStudentsForTeacher(ScheduleReport report, string teacherName)
@@ -141,7 +141,7 @@ public sealed class PdfScheduleReportRenderer
             row.Cells[6].AddParagraph(w.Content); row.Cells[7].AddParagraph(w.Status);
         }
 
-        Save(document, path);
+        Save(document, path, settings);
     }
 
     private static void RenderHandouts(ScheduleReport report, string path, bool includeTeacher, string title, OutputSettings? outputSettings)
@@ -152,7 +152,7 @@ public sealed class PdfScheduleReportRenderer
         AddAbsenceSection(document, report, settings);
         foreach (var group in report.Rows.GroupBy(x => new { x.Student, x.StudentGrade }).OrderBy(x => GradeOrdering.SortKey(x.Key.StudentGrade)).ThenBy(x => x.Key.Student, StringComparer.Ordinal))
             AddStudentCalendarSection(document, report, group.Key.Student, group.Key.StudentGrade, includeTeacher, teacherLabels, settings);
-        Save(document, path);
+        Save(document, path, settings);
     }
 
     private static void AddAbsenceSection(Document document, ScheduleReport report, OutputSettings settings)
@@ -427,8 +427,21 @@ public sealed class PdfScheduleReportRenderer
         return document;
     }
 
-    private static void Save(Document document, string path)
+    // ユーザー報告バグ修正（checkpoint113）: 配置が1件も無い状態（自動作成前）で生徒配布・講師配布
+    // PDFを生成すると、対象が1人も居らずページを1枚も追加しないままここへ来て、PDFsharpが
+    // 「ページが1枚も無いPDFは保存できない」という例外を投げ、アプリごとクラッシュしていた。
+    // Excel版（ExcelScheduleReportRenderer）は各シートに必ず1枚のスタイル設定用シートを無条件で
+    // 追加するため元々発生しない不具合だったが、PDF版には対応する仕組みが無かった。ここで一元的に
+    // 「ページが1枚も無ければ案内ページを追加してから保存する」よう修正し、Excel版と同じ文言
+    // 「出力対象がありません」に揃えた。
+    private static void Save(Document document, string path, OutputSettings settings)
     {
+        if (document.Sections.Count == 0)
+        {
+            var placeholder = document.AddSection();
+            ApplyPageSetup(placeholder, settings);
+            placeholder.AddParagraph("出力対象がありません").Format.Font.Size = 12;
+        }
         var renderer = new PdfDocumentRenderer { Document = document }; renderer.RenderDocument();
         using var pdfDocument = renderer.PdfDocument;
         pdfDocument.Save(path);
