@@ -93,10 +93,10 @@ public sealed partial class ImportPage : WorkflowPageBase
     {
         var path=App.ProjectService.Current?.Path;if(path is null)return;
         var studentValues=await App.MasterData.GetStudentsAsync(path);var teacherValues=await App.MasterData.GetTeachersAsync(path);var subjectValues=await App.MasterData.GetSubjectsAsync(path);
-        var studentItems=studentValues.Select(x=>new MasterItem<Student>(x,$"{(x.Active?"":"[卒業・無効] ")}{TrialLabel(x.ExternalId)}{x.ExternalId}　{x.Name}　{x.Grade}")).ToArray();
+        var studentItems=studentValues.Select(x=>new MasterItem<Student>(x,$"{(x.Active?"":"[卒業・無効] ")}{TrialLabel(x.ExternalId)}{x.Name}　{x.Grade}")).ToArray();
         var subjectItems=subjectValues.Select(x=>new MasterItem<Subject>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}")).ToArray();
         _studentItems=studentItems;_subjectItems=subjectItems;
-        _nullableTeacherItems=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.Name}"))).ToArray();
+        _nullableTeacherItems=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.Name}"))).ToArray();
         RequestStudent.ItemsSource=studentItems;RequestSubject.ItemsSource=subjectItems;
         RequestRegularTeacher.ItemsSource=_nullableTeacherItems;RequestPreferred1.ItemsSource=_nullableTeacherItems;RequestPreferred2.ItemsSource=_nullableTeacherItems;RequestPreferred3.ItemsSource=_nullableTeacherItems;
         if(RequestRegularTeacher.SelectedIndex<0)RequestRegularTeacher.SelectedIndex=0;if(RequestPreferred1.SelectedIndex<0)RequestPreferred1.SelectedIndex=0;if(RequestPreferred2.SelectedIndex<0)RequestPreferred2.SelectedIndex=0;if(RequestPreferred3.SelectedIndex<0)RequestPreferred3.SelectedIndex=0;

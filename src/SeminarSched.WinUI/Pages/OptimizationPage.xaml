@@ -165,19 +165,26 @@
                         Severity="Informational"
                         Title="一時停止中"
                         Message="「再開」を押すまで、次の探索を開始しません。" />
-                    <StackPanel x:Name="ProgressPanel" Spacing="8" HorizontalAlignment="Center" Visibility="Collapsed">
-                        <Grid Width="140" Height="140">
-                            <ProgressRing x:Name="RunProgress" IsActive="False" IsIndeterminate="False" Minimum="0" Maximum="100" Value="0" Width="140" Height="140"/>
-                            <TextBlock x:Name="RunPercentText" FontSize="28" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Grid>
-                        <InfoBar
-                            x:Name="ExtendingInfoBar"
-                            IsClosable="False"
-                            IsOpen="False"
-                            Severity="Warning"
-                            Title="少し時間を要しています"
-                            Message="指定した品質の持ち時間内に完成しなかったため、途中で打ち切らずそのまま続けて探索しています。しばらくお待ちください。" />
-                    </StackPanel>
+                    <Grid x:Name="ProgressPanel" ColumnSpacing="12" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <TextBlock x:Name="RunStageText" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="RunPercentText" Grid.Column="1" FontWeight="SemiBold" Margin="8,0,0,0"/>
+                            </Grid>
+                            <ProgressBar x:Name="RunProgressBar" Height="24" Minimum="0" Maximum="100" Value="0"/>
+                            <TextBlock x:Name="RunEtaText" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <InfoBar
+                                x:Name="ExtendingInfoBar"
+                                IsClosable="False"
+                                IsOpen="False"
+                                Severity="Warning"
+                                Title="少し時間を要しています"
+                                Message="指定した品質の持ち時間内に完成しなかったため、途中で打ち切らずそのまま続けて探索しています。しばらくお待ちください。" />
+                        </StackPanel>
+                        <ProgressRing x:Name="RunProgress" Grid.Column="1" IsActive="False" Width="36" Height="36"/>
+                    </Grid>
                     <TextBlock Text="品質設定に応じて、複数の戦略を順番に実行し、最も良い結果を採用します。進行中に「中断して現在の結果を採用」を押すと、その時点までに見つかった最良の結果を即座に提示します。「一時停止」を押すと、現在の探索が終わり次第、次の探索を始める前に停止します。「再開」を押すと、次の戦略から探索を開始します。" TextWrapping="Wrap"/>
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Content="④ 時間割編集で結果を確認" Click="GoToEditor_Click"/>

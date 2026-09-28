@@ -14,8 +14,8 @@ public sealed class SqliteAvailabilityMatrixService : IAvailabilityMatrixService
         await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = kind == AvailabilityEntityKind.Student
-            ? "SELECT Id,ExternalId||' '||Name FROM Student WHERE Active=1 ORDER BY ExternalId;"
-            : "SELECT Id,ExternalId||' '||Name FROM Teacher WHERE Active=1 ORDER BY ExternalId;";
+            ? "SELECT Id,Name FROM Student WHERE Active=1 ORDER BY ExternalId;"
+            : "SELECT Id,Name FROM Teacher WHERE Active=1 ORDER BY ExternalId;";
         var result = new List<AvailabilityEntityOption>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))

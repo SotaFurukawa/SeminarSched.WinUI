@@ -26,7 +26,7 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
         await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT Id,ExternalId||' '||Name FROM Teacher WHERE Active=1 ORDER BY ExternalId;";
+        command.CommandText = "SELECT Id,Name FROM Teacher WHERE Active=1 ORDER BY ExternalId;";
         var result = new List<TeacherOption>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))

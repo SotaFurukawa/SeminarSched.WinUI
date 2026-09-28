@@ -13,7 +13,7 @@ public sealed record GroupLessonSessionOption(long Id, long ClassId, string Clas
 
 public sealed record GroupLessonEnrollmentCandidate(long StudentId, string ExternalId, string Name, string Grade, bool Enrolled)
 {
-    public string Display => $"{ExternalId}　{Name}　（{Grade}）";
+    public string Display => $"{Name}　（{Grade}）";
     public override string ToString() => $"{(Enrolled ? "✓ " : "")}{Display}";
 }
 
@@ -22,7 +22,7 @@ public sealed record GroupLessonEnrollmentCandidate(long StudentId, string Exter
 // 学年・AllowOtherGradesに相当する絞り込みが無いため常に在籍中の全講師を返す。
 public sealed record GroupLessonTeacherCandidate(long TeacherId, string ExternalId, string Name, bool Assigned)
 {
-    public string Display => $"{ExternalId}　{Name}";
+    public string Display => Name;
     public override string ToString() => $"{(Assigned ? "✓ " : "")}{Display}";
 }
 

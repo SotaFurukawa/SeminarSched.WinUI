@@ -285,7 +285,7 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         var border = new Border
         {
             Padding = new Thickness(4),
-            MinHeight = 56,
+            MinHeight = 112,
             // ユーザー指示「出勤不可コマは、もう少し黒目のグレーにしてください」への対応。テーマ資源
             // ControlFillColorDisabledBrush（既定では非常に薄いグレー）に頼らず、はっきり判別できる
             // 濃いめのグレーを明示的に指定する。

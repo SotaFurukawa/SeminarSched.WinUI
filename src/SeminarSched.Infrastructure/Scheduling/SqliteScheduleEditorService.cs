@@ -23,12 +23,12 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
         await using var connection=await OpenAsync(projectPath,cancellationToken).ConfigureAwait(false);await SqliteProjectSchema.EnsureCurrentAsync(connection,cancellationToken).ConfigureAwait(false);
         await using var command=connection.CreateCommand();command.CommandText=(openDateId is null?"""
             SELECT a.Id,a.LessonRequestId,a.TeacherId,a.OpenDateId,a.TimeSlotId,a.IsLocked,a.IsManual,a.Source,
-                   '第'||a.SessionIndex||'回　'||d.Date||' '||ts.DisplayName||' / '||st.Name||'（'||st.Grade||'） / '||su.DisplayName||' / '||te.ExternalId||' '||te.Name
+                   '第'||a.SessionIndex||'回　'||d.Date||' '||ts.DisplayName||' / '||st.Name||'（'||st.Grade||'） / '||su.DisplayName||' / '||te.Name
             FROM Assignment a JOIN LessonRequest r ON r.Id=a.LessonRequestId JOIN Student st ON st.Id=r.StudentId JOIN Subject su ON su.Id=r.SubjectId JOIN Teacher te ON te.Id=a.TeacherId JOIN OpenDate d ON d.Id=a.OpenDateId JOIN TimeSlot ts ON ts.Id=a.TimeSlotId
             ORDER BY d.Date,ts.SortOrder,te.ExternalId,st.ExternalId;
             """:"""
             SELECT a.Id,a.LessonRequestId,a.TeacherId,a.OpenDateId,a.TimeSlotId,a.IsLocked,a.IsManual,a.Source,
-                   '第'||a.SessionIndex||'回　'||d.Date||' '||ts.DisplayName||' / '||st.Name||'（'||st.Grade||'） / '||su.DisplayName||' / '||te.ExternalId||' '||te.Name
+                   '第'||a.SessionIndex||'回　'||d.Date||' '||ts.DisplayName||' / '||st.Name||'（'||st.Grade||'） / '||su.DisplayName||' / '||te.Name
             FROM Assignment a JOIN LessonRequest r ON r.Id=a.LessonRequestId JOIN Student st ON st.Id=r.StudentId JOIN Subject su ON su.Id=r.SubjectId JOIN Teacher te ON te.Id=a.TeacherId JOIN OpenDate d ON d.Id=a.OpenDateId JOIN TimeSlot ts ON ts.Id=a.TimeSlotId
             WHERE a.OpenDateId=$date
             ORDER BY d.Date,ts.SortOrder,te.ExternalId,st.ExternalId;
@@ -108,7 +108,7 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
         var qualified=new List<BoardTeacherColumn>();
         await using(var command=connection.CreateCommand())
         {
-            command.CommandText="SELECT DISTINCT t.Id,t.ExternalId||' '||t.Name FROM Teacher t JOIN TeacherQualification q ON q.TeacherId=t.Id AND q.CanTeach=1 WHERE t.Active=1 ORDER BY t.ExternalId;";
+            command.CommandText="SELECT DISTINCT t.Id,t.Name FROM Teacher t JOIN TeacherQualification q ON q.TeacherId=t.Id AND q.CanTeach=1 WHERE t.Active=1 ORDER BY t.ExternalId;";
             await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 qualified.Add(new BoardTeacherColumn(reader.GetInt64(0),reader.GetString(1)));
@@ -374,7 +374,7 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
         var teachers=new Dictionary<long,string>();
         await using(var command=connection.CreateCommand())
         {
-            command.CommandText="SELECT Id,ExternalId||' '||Name FROM Teacher;";
+            command.CommandText="SELECT Id,Name FROM Teacher;";
             await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false))teachers[reader.GetInt64(0)]=reader.GetString(1);
         }

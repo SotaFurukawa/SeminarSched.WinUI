@@ -46,22 +46,22 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="① 設定" Tag="setup">
-                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE713;" /></NavigationViewItem.Icon>
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xEBD2;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="② アンケート作成" Tag="questionnaire">
-                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8A5;" /></NavigationViewItem.Icon>
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xF0E3;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="③ アンケート取込" Tag="import">
-                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8B5;" /></NavigationViewItem.Icon>
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE78C;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="3.1 集団授業クラス" Tag="groupLessonClass" Visibility="Collapsed">
-                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE787;" /></NavigationViewItem.Icon>
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE902;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="3.2 集団授業の受講登録" Tag="groupLessonEnrollment" Visibility="Collapsed">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE716;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="④ 時間割編集" Tag="scheduleEditor">
-                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE73E;" /></NavigationViewItem.Icon>
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE70F;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="⑤ 時間割自動作成" Tag="optimization">
                     <NavigationViewItem.Icon>
@@ -78,19 +78,22 @@
                 </NavigationViewItem>
             </NavigationView.MenuItems>
             <NavigationView.PaneFooter>
-                <StackPanel
+                <!-- ユーザー要望「アプリウィンドウを縦長にしたときに、左タブはアイコンのみになったり
+                     しますが、自動作成の文字はそのまま縦にならんでしまうので少し不格好です。そのため、
+                     円形のゲージにして、円の真ん中に進行パーセンテージを表示、他の文字はなくすように
+                     してください」への対応。ペインが狭くなってもテキストが折り返して縦に並ぶことが
+                     無いよう、パーセンテージの数字だけを円の中央に表示する。 -->
+                <Grid
                     x:Name="OptimizationStatusPanel"
+                    Width="56"
+                    Height="56"
                     Margin="12,4,12,12"
-                    Padding="8"
-                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                    CornerRadius="4"
-                    Spacing="4"
+                    HorizontalAlignment="Center"
                     Tapped="OptimizationStatusPanel_Tapped"
                     Visibility="Collapsed">
-                    <TextBlock FontSize="12" FontWeight="SemiBold" Text="⑤ 自動作成 実行中" TextWrapping="Wrap" />
-                    <ProgressBar x:Name="OptimizationStatusBar" Maximum="100" Minimum="0" Value="0" />
-                    <TextBlock x:Name="OptimizationStatusText" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                </StackPanel>
+                    <ProgressRing x:Name="OptimizationStatusRing" Width="56" Height="56" IsActive="False" IsIndeterminate="False" Maximum="100" Minimum="0" Value="0" />
+                    <TextBlock x:Name="OptimizationStatusText" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Grid>
             </NavigationView.PaneFooter>
             <Frame x:Name="NavFrame" />
         </NavigationView>

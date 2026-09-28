@@ -51,14 +51,12 @@ public sealed partial class MainWindow : Window
     {
         var running = OptimizationRunState.IsRunning;
         OptimizationStatusPanel.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
+        OptimizationStatusRing.IsActive = running;
         if (!running) return;
-        var (percent, _, remaining) = OptimizationRunState.Estimate();
-        OptimizationStatusBar.Value = percent;
-        var remainingText = remaining is { } remainingValue ? FormatDuration(remainingValue) : "計算中…";
-        OptimizationStatusText.Text = $"{percent:F0}%　残り目安 {remainingText}";
+        var (percent, _, _) = OptimizationRunState.Estimate();
+        OptimizationStatusRing.Value = percent;
+        OptimizationStatusText.Text = $"{percent:F0}%";
     }
-
-    private static string FormatDuration(TimeSpan span) => span.TotalMinutes >= 1 ? $"{(int)span.TotalMinutes}分{span.Seconds}秒" : $"{span.TotalSeconds:F0}秒";
 
     private void OptimizationStatusPanel_Tapped(object sender, TappedRoutedEventArgs e)
     {
