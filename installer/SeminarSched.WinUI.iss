@@ -104,7 +104,9 @@ begin
 
     if (not Ok) or (ResultCode <> 0) then
       MsgBox('アプリケーション本体のインストールに失敗しました。' + #13#10 +
-        'エラーコード: ' + IntToStr(ResultCode) + #13#10 +
-        'お手数ですが、開発者にご連絡ください。', mbCriticalError, MB_OK);
+        'エラーコード: ' + IntToStr(ResultCode) + #13#10#13#10 +
+        '詳しい原因は次のログファイルに記録されています。' + #13#10 +
+        ExpandConstant('{%TEMP}\SeminarSched.WinUI-install-error.log') + #13#10#13#10 +
+        'お手数ですが、このファイルの中身を添えて開発者にご連絡ください。', mbCriticalError, MB_OK);
   end;
 end;
