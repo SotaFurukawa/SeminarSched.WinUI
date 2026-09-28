@@ -40,6 +40,7 @@ internal static class SqliteProjectSchema
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         await EnsureColumnsAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await BackfillInvalidSubjectShortNamesAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
+        await DowngradeRemovedPriorityAvailabilityLevelAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
         if (TryGetFingerprint(path) is { } verified)
@@ -84,6 +85,24 @@ internal static class SqliteProjectSchema
         {
             idParameter.Value = id;
             shortParameter.Value = SubjectAbbreviation.Resolve(displayName, null, code);
+            await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    // ユーザー指示（checkpoint111）「出勤出席可能日の可能と優先がありますが...優先は削除してください」
+    // への対応。既存プロジェクトのCHECK制約はSQLiteの性質上さかのぼって0〜1へ厳格化できない（既存
+    // テーブルのCHECK制約はCREATE TABLE IF NOT EXISTSでは変更されない）が、新規に書き込まれることは
+    // 今後無くなるため、既存データだけ2（優先）を1（可能）へ格下げしておく自己修復。
+    private static async Task DowngradeRemovedPriorityAvailabilityLevelAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        foreach (var table in new[] { "StudentAvailability", "TeacherAvailability" })
+        {
+            await using var update = connection.CreateCommand();
+            update.Transaction = transaction;
+            update.CommandText = $"UPDATE {table} SET AvailabilityLevel=1 WHERE AvailabilityLevel=2;";
             await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
     }
@@ -243,7 +262,7 @@ internal static class SqliteProjectSchema
             StudentId INTEGER NOT NULL REFERENCES Student(Id) ON DELETE CASCADE,
             OpenDateId INTEGER NOT NULL REFERENCES OpenDate(Id) ON DELETE CASCADE,
             TimeSlotId INTEGER NOT NULL REFERENCES TimeSlot(Id) ON DELETE CASCADE,
-            AvailabilityLevel INTEGER NOT NULL CHECK(AvailabilityLevel BETWEEN 0 AND 2),
+            AvailabilityLevel INTEGER NOT NULL CHECK(AvailabilityLevel BETWEEN 0 AND 1),
             PRIMARY KEY(ProjectId,StudentId,OpenDateId,TimeSlotId)
         );
         CREATE TABLE IF NOT EXISTS TeacherAvailability (
@@ -251,7 +270,7 @@ internal static class SqliteProjectSchema
             TeacherId INTEGER NOT NULL REFERENCES Teacher(Id) ON DELETE CASCADE,
             OpenDateId INTEGER NOT NULL REFERENCES OpenDate(Id) ON DELETE CASCADE,
             TimeSlotId INTEGER NOT NULL REFERENCES TimeSlot(Id) ON DELETE CASCADE,
-            AvailabilityLevel INTEGER NOT NULL CHECK(AvailabilityLevel BETWEEN 0 AND 2),
+            AvailabilityLevel INTEGER NOT NULL CHECK(AvailabilityLevel BETWEEN 0 AND 1),
             PRIMARY KEY(ProjectId,TeacherId,OpenDateId,TimeSlotId)
         );
         CREATE TABLE IF NOT EXISTS ImportBatch (

@@ -2,9 +2,11 @@ using System.Globalization;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using SeminarSched.Application.Importing;
 using SeminarSched.Domain.MasterData;
 using Windows.Storage.Pickers;
+using Windows.UI;
 using WinRT.Interop;
 namespace SeminarSched_WinUI.Pages;
 public sealed partial class ImportPage : WorkflowPageBase
@@ -91,7 +93,7 @@ public sealed partial class ImportPage : WorkflowPageBase
     {
         var path=App.ProjectService.Current?.Path;if(path is null)return;
         var studentValues=await App.MasterData.GetStudentsAsync(path);var teacherValues=await App.MasterData.GetTeachersAsync(path);var subjectValues=await App.MasterData.GetSubjectsAsync(path);
-        var studentItems=studentValues.Select(x=>new MasterItem<Student>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.Name}　{x.Grade}")).ToArray();
+        var studentItems=studentValues.Select(x=>new MasterItem<Student>(x,$"{(x.Active?"":"[卒業・無効] ")}{TrialLabel(x.ExternalId)}{x.ExternalId}　{x.Name}　{x.Grade}")).ToArray();
         var subjectItems=subjectValues.Select(x=>new MasterItem<Subject>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}")).ToArray();
         _studentItems=studentItems;_subjectItems=subjectItems;
         _nullableTeacherItems=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.Name}"))).ToArray();
@@ -99,11 +101,16 @@ public sealed partial class ImportPage : WorkflowPageBase
         RequestRegularTeacher.ItemsSource=_nullableTeacherItems;RequestPreferred1.ItemsSource=_nullableTeacherItems;RequestPreferred2.ItemsSource=_nullableTeacherItems;RequestPreferred3.ItemsSource=_nullableTeacherItems;
         if(RequestRegularTeacher.SelectedIndex<0)RequestRegularTeacher.SelectedIndex=0;if(RequestPreferred1.SelectedIndex<0)RequestPreferred1.SelectedIndex=0;if(RequestPreferred2.SelectedIndex<0)RequestPreferred2.SelectedIndex=0;if(RequestPreferred3.SelectedIndex<0)RequestPreferred3.SelectedIndex=0;
         var lessonRequests=await App.MasterData.GetLessonRequestsAsync(path);
-        LessonRequests.ItemsSource=lessonRequests.Select(value=>new LessonRequestRow(value,
-            studentValues.Single(x=>x.Id==value.StudentId).Name,
+        LessonRequests.ItemsSource=lessonRequests.Select(value=>{var s=studentValues.Single(x=>x.Id==value.StudentId);return new LessonRequestRow(value,
+            $"{TrialLabel(s.ExternalId)}{s.Name}",
             subjectValues.Single(x=>x.Id==value.SubjectId).DisplayName,
-            value.RegularTeacherId is long rid?teacherValues.Single(x=>x.Id==rid).Name:"指定なし")).ToArray();
+            value.RegularTeacherId is long rid?teacherValues.Single(x=>x.Id==rid).Name:"指定なし");}).ToArray();
     }
+
+    // ユーザー要望（checkpoint111）「体験生の項目...アンケート取込でそれが見られるようにしておいて
+    // ほしい」への対応。CourseSurveyImportServiceは体験生をExternalId="TRIAL-####"で登録するため
+    // （InsertTrialStudent参照）、その命名規則をそのまま可視化に流用する。
+    private static string TrialLabel(string externalId)=>externalId.StartsWith("TRIAL-",StringComparison.OrdinalIgnoreCase)?"[体験生] ":"";
 
     private async void SaveLessonRequest_Click(object sender,RoutedEventArgs e)
     {
@@ -200,111 +207,102 @@ public sealed partial class ImportPage : WorkflowPageBase
         public override string ToString()=>$"{StudentName}　{SubjectName}　必要{Value.RequiredSessions}回　通常担当:{RegularTeacherName}　優先度{Value.RegularTeacherPriority}　{(Value.OneToOneRequired?"1対1":"通常")}";
     }
 
+    // ユーザー要望（checkpoint111）「可用性の手動編集について、これをカレンダーで変更することは
+    // できないか。...複数日付・複数コマへ一括適用というのは撤廃し、ここは一人一人入力していく形で。
+    // 集団授業のカレンダーにあるようなカレンダーを置いておき、その日ごとにコマのチェックボックスの
+    // ようなものを用意しておく。イメージでいうと、TimeTreeのように横長の長方形があって、
+    // 『チェックボックス』『コマ名』の並び。参加可能だったら緑、参加不可だったら赤...保存ボタンは
+    // なしで、即座に反映されるようにしてほしい」への対応。複数選択・一括適用のUIを廃止し、対象は
+    // 常に1名だけ選び、講習期間内の全開講日をカレンダー表示、日ごとにコマの帯（チェックボックス＋
+    // コマ名、緑=参加可能／赤=参加不可）を並べる。チェックボックスの切り替えのたびに即座にDBへ反映し、
+    // 保存ボタンは置かない。
+    private static readonly string[] AvailabilityWeekdayHeaders = ["日", "月", "火", "水", "木", "金", "土"];
+    private static readonly SolidColorBrush AvailabilityAvailableBrush = new(Color.FromArgb(255, 210, 240, 210));
+    private static readonly SolidColorBrush AvailabilityUnavailableBrush = new(Color.FromArgb(255, 246, 210, 210));
+
     private AvailabilityEntityKind CurrentMatrixKind => MatrixTeacherKind.IsChecked==true ? AvailabilityEntityKind.Teacher : AvailabilityEntityKind.Student;
 
     private async Task ReloadMatrixAsync()
     {
         var path=App.ProjectService.Current?.Path;if(path is null)return;
-        MatrixEntities.ItemsSource=await App.AvailabilityMatrix.GetEntitiesAsync(path,CurrentMatrixKind);
-        var previousDate=(MatrixDate.SelectedItem as AvailabilityDateOption)?.OpenDateId;
-        var dates=await App.AvailabilityMatrix.GetOpenDatesAsync(path);
-        MatrixDate.ItemsSource=dates;
-        MatrixDate.SelectedItem=dates.Count==0?null:dates.FirstOrDefault(d=>d.OpenDateId==previousDate)??dates[0];
-        BulkMatrixDates.ItemsSource=dates;
-        var slots=await App.CourseSettings.GetTimeSlotsAsync(path);
-        BulkMatrixSlots.ItemsSource=slots.Where(x=>x.Active).OrderBy(x=>x.SortOrder).Select(x=>new AvailabilitySlotOption(x.Id,$"{x.DisplayName} {x.StartTime:HH\\:mm}～{x.EndTime:HH\\:mm}")).ToArray();
+        var previousId=(MatrixEntity.SelectedItem as AvailabilityEntityOption)?.Id;
+        var entities=await App.AvailabilityMatrix.GetEntitiesAsync(path,CurrentMatrixKind);
+        MatrixEntity.ItemsSource=entities;
+        MatrixEntity.SelectedItem=entities.Count==0?null:entities.FirstOrDefault(x=>x.Id==previousId)??entities[0];
+        await RefreshAvailabilityCalendarAsync();
     }
 
     // MatrixStudentKindはXAMLでIsChecked="True"を指定しており、WinUIはこのプロパティ設定を
     // InitializeComponent実行中に同期的なCheckedイベントとして発火させる。その時点ではXAML中で
-    // 後に宣言された兄弟コントロール（MatrixTeacherKindやMatrixEntities等）がまだnullのため、
+    // 後に宣言された兄弟コントロール（MatrixTeacherKindやMatrixEntity等）がまだnullのため、
     // Page_Loaded以前の呼び出しは無視する（OptimizationPage._isLoadedと同じ対策パターン）。
     private async void MatrixKind_Changed(object sender,RoutedEventArgs e){if(!_loaded)return;await ReloadMatrixAsync();}
 
-    private async void MatrixDate_SelectionChanged(object sender,SelectionChangedEventArgs e)
+    private async void MatrixEntity_SelectionChanged(object sender,SelectionChangedEventArgs e)=>await RefreshAvailabilityCalendarAsync();
+
+    private async Task RefreshAvailabilityCalendarAsync()
     {
+        AvailabilityCalendarWeekdayHeader.Children.Clear();AvailabilityCalendarWeekdayHeader.ColumnDefinitions.Clear();
+        AvailabilityCalendarGrid.Children.Clear();AvailabilityCalendarGrid.RowDefinitions.Clear();AvailabilityCalendarGrid.ColumnDefinitions.Clear();
         var path=App.ProjectService.Current?.Path;
-        if(path is null||MatrixDate.SelectedItem is not AvailabilityDateOption date){MatrixSlot.ItemsSource=null;RenderMatrixGrid([]);return;}
-        var previousSlot=(MatrixSlot.SelectedItem as AvailabilitySlotOption)?.TimeSlotId;
-        var slots=await App.AvailabilityMatrix.GetSlotsForDateAsync(path,date.OpenDateId);
-        MatrixSlot.ItemsSource=slots;
-        MatrixSlot.SelectedItem=slots.Count==0?null:slots.FirstOrDefault(s=>s.TimeSlotId==previousSlot)??slots[0];
-        await RefreshMatrixGridAsync();
-    }
+        if(path is null||MatrixEntity.SelectedItem is not AvailabilityEntityOption entity)
+        {AvailabilityCalendarGrid.Children.Add(new TextBlock{Text="対象を選択してください。",Margin=new Thickness(4)});return;}
 
-    private async void MatrixEntities_SelectionChanged(object sender,SelectionChangedEventArgs e)=>await RefreshMatrixGridAsync();
+        var calendar=await App.AvailabilityMatrix.GetCalendarAsync(path,CurrentMatrixKind,entity.Id);
+        if(calendar.Days.Count==0){AvailabilityCalendarGrid.Children.Add(new TextBlock{Text="開講日が設定されていません。",Margin=new Thickness(4)});return;}
 
-    private async Task RefreshMatrixGridAsync()
-    {
-        var path=App.ProjectService.Current?.Path;
-        var selected=MatrixEntities.SelectedItems.Cast<AvailabilityEntityOption>().ToArray();
-        var slots=(MatrixSlot.ItemsSource as IReadOnlyList<AvailabilitySlotOption>)??[];
-        if(path is null||MatrixDate.SelectedItem is not AvailabilityDateOption date||selected.Length==0){RenderMatrixGrid(slots);return;}
-        var rows=await App.AvailabilityMatrix.GetDayMatrixAsync(path,CurrentMatrixKind,date.OpenDateId,selected.Select(s=>s.Id).ToArray());
-        RenderMatrixGrid(slots,rows);
-    }
-
-    private void RenderMatrixGrid(IReadOnlyList<AvailabilitySlotOption> slots,IReadOnlyList<AvailabilityMatrixRow>? rows=null)
-    {
-        rows??=[];
-        MatrixGrid.Children.Clear();MatrixGrid.RowDefinitions.Clear();MatrixGrid.ColumnDefinitions.Clear();
-        if(rows.Count==0||slots.Count==0){MatrixGrid.Children.Add(new TextBlock{Text="対象と日付を選択してください。",Margin=new Thickness(4)});return;}
-
-        MatrixGrid.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});
-        foreach(var _ in rows)MatrixGrid.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});
-        MatrixGrid.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
-        foreach(var _ in slots)MatrixGrid.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(120)});
-
-        void Place(FrameworkElement element,int row,int column){Grid.SetRow(element,row);Grid.SetColumn(element,column);MatrixGrid.Children.Add(element);}
-        Place(new TextBlock(),0,0);
-        for(var c=0;c<slots.Count;c++)Place(new TextBlock{Text=slots[c].Label,FontWeight=FontWeights.SemiBold,Margin=new Thickness(4),TextWrapping=TextWrapping.Wrap},0,c+1);
-        for(var r=0;r<rows.Count;r++)
+        for(var i=0;i<AvailabilityWeekdayHeaders.Length;i++)AvailabilityCalendarWeekdayHeader.ColumnDefinitions.Add(new ColumnDefinition());
+        for(var i=0;i<AvailabilityWeekdayHeaders.Length;i++)
         {
-            Place(new TextBlock{Text=rows[r].Label,Margin=new Thickness(4),VerticalAlignment=VerticalAlignment.Center},r+1,0);
-            for(var c=0;c<slots.Count;c++)
-            {
-                var level=rows[r].LevelsBySlot.TryGetValue(slots[c].TimeSlotId,out var value)?value:1;
-                Place(new TextBlock{Text=level.ToString(CultureInfo.InvariantCulture),Margin=new Thickness(4),HorizontalAlignment=HorizontalAlignment.Center},r+1,c+1);
-            }
+            var text=new TextBlock{Text=AvailabilityWeekdayHeaders[i],FontWeight=FontWeights.SemiBold,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(4)};
+            Grid.SetColumn(text,i);AvailabilityCalendarWeekdayHeader.Children.Add(text);
+        }
+
+        for(var i=0;i<7;i++)AvailabilityCalendarGrid.ColumnDefinitions.Add(new ColumnDefinition());
+        var leading=(int)calendar.Days[0].Date.DayOfWeek;
+        var rowCount=(int)Math.Ceiling((leading+calendar.Days.Count)/7.0);
+        for(var i=0;i<rowCount;i++)AvailabilityCalendarGrid.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});
+
+        for(var i=0;i<calendar.Days.Count;i++)
+        {
+            var day=calendar.Days[i];
+            var cellIndex=leading+i;
+            var cell=BuildAvailabilityDayCell(entity.Id,day);
+            Grid.SetRow(cell,cellIndex/7);Grid.SetColumn(cell,cellIndex%7);
+            AvailabilityCalendarGrid.Children.Add(cell);
         }
     }
 
-    private async void ApplyMatrix_Click(object sender,RoutedEventArgs e)
+    private FrameworkElement BuildAvailabilityDayCell(long entityId,AvailabilityCalendarDay day)
     {
-        var path=App.ProjectService.Current?.Path;
-        var selected=MatrixEntities.SelectedItems.Cast<AvailabilityEntityOption>().Select(x=>x.Id).ToArray();
-        if(path is null||MatrixDate.SelectedItem is not AvailabilityDateOption date||MatrixSlot.SelectedItem is not AvailabilitySlotOption slot||MatrixLevel.SelectedIndex<0)
-        {ShowError("対象・日付・コマ・値をすべて選択してください。");return;}
-        if(selected.Length==0){ShowError("対象を1件以上選択してください。");return;}
-        try
+        var stack=new StackPanel{Spacing=2,MinHeight=90};
+        stack.Children.Add(new TextBlock{Text=day.Date.ToString("M/d(ddd)",CultureInfo.GetCultureInfo("ja-JP")),FontWeight=FontWeights.SemiBold,FontSize=11});
+
+        foreach(var slot in day.Slots)
         {
-            IsEnabled=false;
-            await App.AvailabilityMatrix.SetLevelAsync(path,CurrentMatrixKind,selected,date.OpenDateId,slot.TimeSlotId,MatrixLevel.SelectedIndex);
-            await RefreshMatrixGridAsync();
-            Status.Severity=InfoBarSeverity.Success;Status.Title="可用性を更新しました";Status.Message="";Status.IsOpen=true;
+            var row=new StackPanel{Orientation=Orientation.Horizontal,Spacing=4};
+            var checkBox=new CheckBox{IsChecked=slot.Level>0,MinWidth=0,Padding=new Thickness(0),Tag=new AvailabilitySlotTag(entityId,day.OpenDateId,slot.TimeSlotId)};
+            checkBox.Checked+=AvailabilitySlotCheckBox_Changed;checkBox.Unchecked+=AvailabilitySlotCheckBox_Changed;
+            row.Children.Add(checkBox);
+            row.Children.Add(new TextBlock{Text=slot.Label,FontSize=10,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.Wrap});
+            var bar=new Border{CornerRadius=new CornerRadius(3),Padding=new Thickness(4,2,4,2),Background=slot.Level>0?AvailabilityAvailableBrush:AvailabilityUnavailableBrush,Child=row};
+            stack.Children.Add(bar);
         }
+
+        return new Border{Padding=new Thickness(4),CornerRadius=new CornerRadius(4),BorderBrush=new SolidColorBrush(Color.FromArgb(255,220,226,234)),BorderThickness=new Thickness(1),Child=stack};
+    }
+
+    private async void AvailabilitySlotCheckBox_Changed(object sender,RoutedEventArgs e)
+    {
+        if(sender is not CheckBox{Tag:AvailabilitySlotTag tag} checkBox)return;
+        var path=App.ProjectService.Current?.Path;if(path is null)return;
+        var level=checkBox.IsChecked==true?1:0;
+        try{await App.AvailabilityMatrix.SetLevelAsync(path,CurrentMatrixKind,tag.EntityId,tag.OpenDateId,tag.TimeSlotId,level);}
         catch(Exception exception)when(exception is InvalidOperationException or Microsoft.Data.Sqlite.SqliteException){ShowError(exception.Message);}
-        finally{IsEnabled=true;}
+        // 保存ボタンは無く即座に反映する仕様のため、成功・失敗どちらでもDBの実際の値をそのまま
+        // 表示へ反映し直す（失敗時はチェックを元へ戻す、隣接するコマの色ズレも同時に防ぐ）。
+        await RefreshAvailabilityCalendarAsync();
     }
 
-    private async void ApplyBulkMatrix_Click(object sender,RoutedEventArgs e)
-    {
-        var path=App.ProjectService.Current?.Path;
-        var selectedEntities=MatrixEntities.SelectedItems.Cast<AvailabilityEntityOption>().Select(x=>x.Id).ToArray();
-        var selectedDates=BulkMatrixDates.SelectedItems.Cast<AvailabilityDateOption>().ToArray();
-        var selectedSlots=BulkMatrixSlots.SelectedItems.Cast<AvailabilitySlotOption>().ToArray();
-        if(path is null||BulkMatrixLevel.SelectedIndex<0){ShowError("値を選択してください。");return;}
-        if(selectedEntities.Length==0){ShowError("対象を1件以上選択してください。");return;}
-        if(selectedDates.Length==0||selectedSlots.Length==0){ShowError("日付とコマをそれぞれ1件以上選択してください。");return;}
-        var pairs=selectedDates.SelectMany(d=>selectedSlots.Select(s=>(d.OpenDateId,s.TimeSlotId))).ToArray();
-        try
-        {
-            IsEnabled=false;
-            await App.AvailabilityMatrix.SetLevelsAsync(path,CurrentMatrixKind,selectedEntities,pairs,BulkMatrixLevel.SelectedIndex);
-            await RefreshMatrixGridAsync();
-            Status.Severity=InfoBarSeverity.Success;Status.Title="可用性を一括更新しました";Status.Message=$"{selectedEntities.Length}件×{selectedDates.Length}日×{selectedSlots.Length}コマへ適用しました";Status.IsOpen=true;
-        }
-        catch(Exception exception)when(exception is InvalidOperationException or Microsoft.Data.Sqlite.SqliteException){ShowError(exception.Message);}
-        finally{IsEnabled=true;}
-    }
+    private sealed record AvailabilitySlotTag(long EntityId, long OpenDateId, long TimeSlotId);
 }

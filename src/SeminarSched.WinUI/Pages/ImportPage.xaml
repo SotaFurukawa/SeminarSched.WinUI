@@ -46,41 +46,17 @@
 <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
     <StackPanel Spacing="12">
         <TextBlock FontSize="20" FontWeight="SemiBold" Text="可用性の手動編集"/>
-        <TextBlock Text="複数の生徒または講師を選び、特定の日付・コマへ参加可否（0:不可 / 1:可 / 2:優先）を一括で設定できます。取込済みの回答も上書きされます。" TextWrapping="Wrap"/>
+        <TextBlock Text="生徒または講師を1名選び、カレンダーで日ごとの参加可否をそのまま編集できます。チェックを入れると参加可能（緑）、外すと参加不可（赤）になり、保存操作なしですぐに反映されます。取込済みの回答も上書きされます。" TextWrapping="Wrap"/>
         <StackPanel Orientation="Horizontal" Spacing="16">
             <RadioButton x:Name="MatrixStudentKind" Content="生徒" IsChecked="True" Checked="MatrixKind_Changed"/>
             <RadioButton x:Name="MatrixTeacherKind" Content="講師" Checked="MatrixKind_Changed"/>
         </StackPanel>
-        <ListView x:Name="MatrixEntities" SelectionMode="Multiple" MaxHeight="180" DisplayMemberPath="Label" SelectionChanged="MatrixEntities_SelectionChanged"/>
-        <Grid ColumnSpacing="8">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-            <ComboBox x:Name="MatrixDate" Header="日付" DisplayMemberPath="Label" SelectionChanged="MatrixDate_SelectionChanged"/>
-            <ComboBox x:Name="MatrixSlot" Grid.Column="1" Header="コマ" DisplayMemberPath="Label"/>
-            <ComboBox x:Name="MatrixLevel" Grid.Column="2" Header="値" SelectedIndex="1">
-                <ComboBoxItem Content="0: 不可"/>
-                <ComboBoxItem Content="1: 可"/>
-                <ComboBoxItem Content="2: 優先"/>
-            </ComboBox>
-            <Button Grid.Column="3" VerticalAlignment="Bottom" Content="選択した対象へ一括適用" Click="ApplyMatrix_Click" Style="{StaticResource AccentButtonStyle}"/>
-        </Grid>
-        <TextBlock Margin="0,12,0,0" FontSize="16" FontWeight="SemiBold" Text="複数日付・複数コマへ一括適用"/>
-        <TextBlock Text="上で選択した対象（生徒/講師）へ、複数の日付と複数のコマのすべての組み合わせに同じ値をまとめて適用します。" TextWrapping="Wrap"/>
-        <Grid ColumnSpacing="16">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-            <StackPanel Spacing="4"><TextBlock Text="日付"/><ListView x:Name="BulkMatrixDates" SelectionMode="Multiple" MaxHeight="160" DisplayMemberPath="Label"/></StackPanel>
-            <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="コマ"/><ListView x:Name="BulkMatrixSlots" SelectionMode="Multiple" MaxHeight="160" DisplayMemberPath="Label"/></StackPanel>
-        </Grid>
-        <StackPanel Orientation="Horizontal" Spacing="16">
-            <ComboBox x:Name="BulkMatrixLevel" Header="値" SelectedIndex="1">
-                <ComboBoxItem Content="0: 不可"/>
-                <ComboBoxItem Content="1: 可"/>
-                <ComboBoxItem Content="2: 優先"/>
-            </ComboBox>
-            <Button Content="一括適用" Click="ApplyBulkMatrix_Click" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom"/>
-        </StackPanel>
-        <TextBlock FontWeight="SemiBold" Text="選択日の現在値"/>
-        <ScrollViewer HorizontalScrollBarVisibility="Auto" MaxHeight="320">
-            <Grid x:Name="MatrixGrid"/>
+        <ComboBox x:Name="MatrixEntity" Header="対象" DisplayMemberPath="Label" SelectionChanged="MatrixEntity_SelectionChanged" MinWidth="280" HorizontalAlignment="Left"/>
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" MaxHeight="520">
+            <StackPanel Spacing="4">
+                <Grid x:Name="AvailabilityCalendarWeekdayHeader"/>
+                <Grid x:Name="AvailabilityCalendarGrid" ColumnSpacing="4" RowSpacing="4"/>
+            </StackPanel>
         </ScrollViewer>
     </StackPanel>
 </Border>

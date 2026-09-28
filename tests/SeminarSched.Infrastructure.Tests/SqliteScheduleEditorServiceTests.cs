@@ -111,7 +111,7 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
                 INSERT INTO StudentAvailability(ProjectId,StudentId,OpenDateId,TimeSlotId,AvailabilityLevel)
                 SELECT 1,r.StudentId,$date,$slot1,0 FROM LessonRequest r WHERE r.Id=$request;
                 INSERT INTO StudentAvailability(ProjectId,StudentId,OpenDateId,TimeSlotId,AvailabilityLevel)
-                SELECT 1,r.StudentId,$date,$slot2,2 FROM LessonRequest r WHERE r.Id=$request;
+                SELECT 1,r.StudentId,$date,$slot2,1 FROM LessonRequest r WHERE r.Id=$request;
                 """;
             command.Parameters.AddWithValue("$date",state.DateId);command.Parameters.AddWithValue("$slot1",state.Slot1Id);command.Parameters.AddWithValue("$slot2",state.Slot2Id);command.Parameters.AddWithValue("$request",state.RequestId);
             await command.ExecuteNonQueryAsync();
@@ -226,7 +226,7 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
         await using(var connection=new SqliteConnection($"Data Source={state.Path};Pooling=False"))
         {
             await connection.OpenAsync();await using var availability=connection.CreateCommand();
-            availability.CommandText="INSERT INTO TeacherAvailability(ProjectId,TeacherId,OpenDateId,TimeSlotId,AvailabilityLevel) VALUES(1,$teacher,$date,$slot,2);";
+            availability.CommandText="INSERT INTO TeacherAvailability(ProjectId,TeacherId,OpenDateId,TimeSlotId,AvailabilityLevel) VALUES(1,$teacher,$date,$slot,1);";
             availability.Parameters.AddWithValue("$teacher",unqualifiedTeacher.Id);availability.Parameters.AddWithValue("$date",state.DateId);availability.Parameters.AddWithValue("$slot",state.Slot2Id);
             await availability.ExecuteNonQueryAsync();
         }
@@ -362,7 +362,7 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
         // 明示的に「出勤可能」として登録し、通常どおり盤に表示されるようにする。
         await using(var availability=connection.CreateCommand())
         {
-            availability.CommandText="INSERT INTO TeacherAvailability(ProjectId,TeacherId,OpenDateId,TimeSlotId,AvailabilityLevel) SELECT 1,t.Id,d.Id,ts.Id,2 FROM Teacher t CROSS JOIN OpenDate d CROSS JOIN TimeSlot ts WHERE t.Id IN($teacher1,$teacher2) AND ts.Id IN($slot1,$slot2);";
+            availability.CommandText="INSERT INTO TeacherAvailability(ProjectId,TeacherId,OpenDateId,TimeSlotId,AvailabilityLevel) SELECT 1,t.Id,d.Id,ts.Id,1 FROM Teacher t CROSS JOIN OpenDate d CROSS JOIN TimeSlot ts WHERE t.Id IN($teacher1,$teacher2) AND ts.Id IN($slot1,$slot2);";
             availability.Parameters.AddWithValue("$teacher1",teacher1.Id);availability.Parameters.AddWithValue("$teacher2",teacher2.Id);availability.Parameters.AddWithValue("$slot1",slot1.Id);availability.Parameters.AddWithValue("$slot2",slot2.Id);
             await availability.ExecuteNonQueryAsync();
         }
