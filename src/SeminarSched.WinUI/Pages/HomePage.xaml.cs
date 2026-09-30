@@ -26,14 +26,17 @@ public sealed partial class HomePage : Page
     {
         // 旧実装はNumberBox.Valueが未設定時double.NaNであることを見落とし、"==0"で初回判定していた
         // ため既定値設定・イベント購読が一度も走らないバグがあった（年度の初期値が今の年度にならない）。
-        // 年度はDatePicker（年のみのドラムロール）へ置き換えたことで既定値は自然に「今日」になるため、
-        // ここでは明示的なbool flagで「このPageインスタンスでは初回だけ」実行する。
+        // 年度は一時DatePicker（年のみのドラムロール）へ置き換えていたが、DayVisible/MonthVisible=Falseでも
+        // 非表示にした日・月の列幅が回収されず右寄りの空白ができる不具合があったためNumberBoxへ戻した。
+        // NaN判定バグを再発させないよう、ここでは明示的なbool flagで「このPageインスタンスでは初回だけ」
+        // 実行し、AcademicYearBox.Valueもこの中で明示的に既定値（今の年）を設定する。
         if (!_initialized)
         {
             _initialized = true;
+            AcademicYearBox.Value = DateTime.Now.Year;
             StartDatePicker.Date = DateTimeOffset.Now.Date;
             EndDatePicker.Date = DateTimeOffset.Now.Date.AddDays(30);
-            AcademicYearPicker.DateChanged += ProjectDefinition_Changed;
+            AcademicYearBox.ValueChanged += ProjectDefinition_Changed;
             SeasonBox.SelectionChanged += ProjectDefinition_Changed;
         }
 
@@ -521,7 +524,7 @@ public sealed partial class HomePage : Page
         var end = EndDatePicker.Date
             ?? throw new ArgumentException("終了日を選択してください。");
         return CourseProjectDefinition.Create(
-            AcademicYearPicker.Date.Year,
+            (int)AcademicYearBox.Value,
             (CourseSeason)seasonValue,
             DateOnly.FromDateTime(start.DateTime),
             DateOnly.FromDateTime(end.DateTime),

@@ -25,6 +25,7 @@ public sealed partial class MainWindow : Window
         // 常設インジケーターを表示する。
         OptimizationRunState.Changed += OnOptimizationRunStateChanged;
         Closed += (_, _) => OptimizationRunState.Changed -= OnOptimizationRunStateChanged;
+        NavView.DisplayModeChanged += (_, _) => RefreshOptimizationStatus();
         RefreshOptimizationStatus();
 
         // 3.1/3.2は、開いている（または作成時に）「集団授業の日程を考慮する」を有効にしたプロジェクトの
@@ -50,13 +51,22 @@ public sealed partial class MainWindow : Window
     private void RefreshOptimizationStatus()
     {
         var running = OptimizationRunState.IsRunning;
-        OptimizationStatusPanel.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
-        OptimizationStatusRing.IsActive = running;
+        var isPaneCompact = NavView.DisplayMode != NavigationViewDisplayMode.Expanded;
+        var showCompact = running && isPaneCompact;
+        var showExpanded = running && !isPaneCompact;
+        OptimizationStatusPanelCompact.Visibility = showCompact ? Visibility.Visible : Visibility.Collapsed;
+        OptimizationStatusPanelExpanded.Visibility = showExpanded ? Visibility.Visible : Visibility.Collapsed;
+        OptimizationStatusRing.IsActive = showCompact;
         if (!running) return;
-        var (percent, _, _) = OptimizationRunState.Estimate();
+        var (percent, _, remaining) = OptimizationRunState.Estimate();
         OptimizationStatusRing.Value = percent;
-        OptimizationStatusText.Text = $"{percent:F0}%";
+        OptimizationStatusRingText.Text = $"{percent:F0}%";
+        OptimizationStatusBar.Value = percent;
+        var remainingText = remaining is { } remainingValue ? FormatDuration(remainingValue) : "計算中…";
+        OptimizationStatusText.Text = $"{percent:F0}%　残り目安 {remainingText}";
     }
+
+    private static string FormatDuration(TimeSpan span) => span.TotalMinutes >= 1 ? $"{(int)span.TotalMinutes}分{span.Seconds}秒" : $"{span.TotalSeconds:F0}秒";
 
     private void OptimizationStatusPanel_Tapped(object sender, TappedRoutedEventArgs e)
     {
