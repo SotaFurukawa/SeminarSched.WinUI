@@ -4,7 +4,7 @@
 ; 「.cerをCurrentUser\TrustedPeopleへ信頼登録 → Add-AppxPackageでインストール」を裏側で行う。
 ; CurrentUserストアへの登録・per-userインストールはいずれも管理者権限なしで動作することを
 ; 実機で確認済み（PrivilegesRequired=lowestが成立する）。
-#define MyAppName "SeminarSched.WinUI"
+#define MyAppName "ShikiWari"
 #define MyAppPublisher "SotaFurukawa"
 #define MyIdentityName "F70149DC-0D08-4E3F-B67F-189A3A5E1C51"
 ; Package Family Name = IdentityName + "_" + Publisher(CN=SotaFurukawa)から決まるhash。
