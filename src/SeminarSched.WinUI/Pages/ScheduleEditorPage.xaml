@@ -14,7 +14,7 @@
     <Grid RowDefinitions="Auto,*">
         <InfoBar Grid.Row="0" x:Name="ProjectRequired" Margin="24,16,24,0" />
         <ScrollViewer Grid.Row="1" x:Name="ContentPanel">
-        <StackPanel MaxWidth="1200" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="20">
+        <StackPanel MaxWidth="1440" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="20">
             <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="時間割編集" />
             <TextBlock
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -41,8 +41,12 @@
                         <Button VerticalAlignment="Bottom" Content="すべてリセット" Click="ResetAll_Click"/>
                         <Button x:Name="GoToOptimizationButton" VerticalAlignment="Bottom" Content="⑤ 時間割自動作成へ" Click="GoToOptimization_Click"/>
                     </StackPanel>
+                    <!-- ユーザー指摘（checkpoint120）「自動作成の差分が見えなくなっています」への対応。
+                         以前は220px「未配置」・*「時間割」・280px「差分＋変更履歴」の3列構成で、
+                         時間割の右側に細い列として押し込まれ目立たなくなっていた。差分・変更履歴は
+                         時間割の下へ移し、空いた分だけ時間割（*列）を右へ広げた。 -->
                     <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="*"/><ColumnDefinition Width="280"/></Grid.ColumnDefinitions>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <StackPanel Spacing="8">
                             <TextBlock FontWeight="SemiBold" Text="未配置"/>
                             <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Text="選択中の日付に配置できる受講希望だけを表示します。"/>
@@ -68,21 +72,24 @@
                         <ScrollViewer x:Name="BoardScroll" Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="480" ViewChanged="BoardScroll_ViewChanged">
                             <Grid x:Name="BoardGrid"/>
                         </ScrollViewer>
-                        <StackPanel Grid.Column="2" Spacing="16">
-                            <Border x:Name="DiffCard" Padding="12" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Visibility="Collapsed">
-                                <StackPanel Spacing="8">
-                                    <TextBlock FontWeight="SemiBold" Text="自動作成の差分"/>
-                                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Text="直前に⑤時間割自動作成を実行した時点からの変化です。"/>
-                                    <TextBlock x:Name="DiffSummary" FontSize="11" TextWrapping="Wrap"/>
-                                    <ListView x:Name="DiffDetailList" MaxHeight="200"/>
-                                </StackPanel>
-                            </Border>
+                    </Grid>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <Border x:Name="DiffCard" Padding="12" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Visibility="Collapsed">
+                            <StackPanel Spacing="8">
+                                <TextBlock FontWeight="SemiBold" Text="自動作成の差分"/>
+                                <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Text="直前に⑤時間割自動作成を実行した時点からの変化です。"/>
+                                <TextBlock x:Name="DiffSummary" FontSize="11" TextWrapping="Wrap"/>
+                                <ListView x:Name="DiffDetailList" MaxHeight="260"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Padding="12" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6">
                             <StackPanel Spacing="8">
                                 <TextBlock FontWeight="SemiBold" Text="変更履歴"/>
                                 <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Text="手動配置・事前確定・ロック・出勤可否・元に戻す/やり直すの直近の操作を新しい順に表示します。"/>
-                                <ListView x:Name="HistoryList" MaxHeight="480"/>
+                                <ListView x:Name="HistoryList" MaxHeight="260"/>
                             </StackPanel>
-                        </StackPanel>
+                        </Border>
                     </Grid>
                     <TextBlock Margin="0,12,0,0" FontSize="16" FontWeight="SemiBold" Text="複数コマ・複数講師の出勤可否を一括設定"/>
                     <TextBlock Text="表示中の講師とこの日のコマをそれぞれ複数選び、まとめて出勤可否を切り替えます。" TextWrapping="Wrap"/>
