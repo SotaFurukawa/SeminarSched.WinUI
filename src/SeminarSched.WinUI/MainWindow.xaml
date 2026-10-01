@@ -45,8 +45,23 @@
                         <FontIcon Glyph="&#xE80F;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="① 設定" Tag="setup">
+                <!-- ユーザー要望（checkpoint122）「上側のタブだけでなく、左側のタブにもこれらを
+                     選択できるようにしておきたい。設定を開いている間は右側に1.1, 1.2...のような
+                     ボタンを設置する。設定が開かれていないときはこれを表示しない」への対応。
+                     子項目はSetupPage.xamlのTabViewと同じ並び順（1.1〜1.8）にし、表示/選択状態の
+                     同期はSetupPageNavStateとMainWindow.xaml.csのRefreshSetupNavState()で行う。 -->
+                <NavigationViewItem x:Name="SetupNavItem" Content="① 設定" Tag="setup">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xEBD2;" /></NavigationViewItem.Icon>
+                    <NavigationViewItem.MenuItems>
+                        <NavigationViewItem Content="1.1 生徒" Tag="setupTab:0"/>
+                        <NavigationViewItem Content="1.2 講師" Tag="setupTab:1"/>
+                        <NavigationViewItem Content="1.3 講師指導可能科目" Tag="setupTab:2"/>
+                        <NavigationViewItem Content="1.4 通常授業担当設定" Tag="setupTab:3"/>
+                        <NavigationViewItem Content="1.5 コマ・開校日" Tag="setupTab:4"/>
+                        <NavigationViewItem Content="1.6 スケジュール設定" Tag="setupTab:5"/>
+                        <NavigationViewItem Content="1.7 科目" Tag="setupTab:6"/>
+                        <NavigationViewItem Content="1.8 出力設定" Tag="setupTab:7"/>
+                    </NavigationViewItem.MenuItems>
                 </NavigationViewItem>
                 <NavigationViewItem Content="② アンケート作成" Tag="questionnaire">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xF0E3;" /></NavigationViewItem.Icon>

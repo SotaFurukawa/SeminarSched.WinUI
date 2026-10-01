@@ -24,6 +24,9 @@ public sealed partial class ImportPage : WorkflowPageBase
         _loaded=true;
         var ready=EnsureProject(ProjectRequired);
         SurveySelectStudentButton.IsEnabled=ready;SurveySelectTeacherButton.IsEnabled=ready;
+        // ユーザー指摘（checkpoint122）「選択していないときに空白になるのは違和感がある」への対応。
+        // ファイル未選択時も「未選択」のプレースホルダー文言を最初から表示し、空行にならないようにする。
+        UpdateSurveySelectedFilesText();
         if(ready){await ReloadMatrixAsync();await ReloadLessonRequestsAsync();}
     }
 

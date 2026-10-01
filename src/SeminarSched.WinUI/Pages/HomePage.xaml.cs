@@ -549,6 +549,12 @@ public sealed partial class HomePage : Page
         ScheduleUndoState.Clear();
         var current = App.ProjectService.Current;
         CurrentProjectTitle.Text = current?.Title ?? "プロジェクトは開かれていません";
+        // ユーザー指摘（checkpoint122）「プロジェクトを開いていないときの謎の隙間が気になる」
+        // への対応。空文字のTextBlockも1行分の高さを確保してしまうため、プロジェクト未選択時は
+        // Visibility自体をCollapsedにして隙間ができないようにする。
+        var hasCurrent = current is not null;
+        CurrentProjectPeriod.Visibility = hasCurrent ? Visibility.Visible : Visibility.Collapsed;
+        CurrentProjectPath.Visibility = hasCurrent ? Visibility.Visible : Visibility.Collapsed;
         CurrentProjectPeriod.Text = current is null
             ? string.Empty
             : $"{current.StartDate:yyyy年M月d日} ～ {current.EndDate:yyyy年M月d日}";

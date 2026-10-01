@@ -36,6 +36,17 @@ public sealed partial class SetupPage : WorkflowPageBase
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
+        // ユーザー要望（checkpoint122）「左側のタブにもこれらを選択できるようにしておきたい」
+        // への対応。ナビゲーションペインの子項目（1.1〜1.8）から遷移してきた場合は、先に
+        // 希望タブへ切り替えてからSetupPageNavState.Activate()で左ナビへ現在のタブを知らせる。
+        // プロジェクト未選択でTabs.IsEnabled=falseになる場合でも、左ナビの子項目自体は表示する。
+        if (SetupPageNavState.RequestedTabIndex is { } requestedTabIndex)
+        {
+            SetupPageNavState.RequestedTabIndex = null;
+            Tabs.SelectedIndex = requestedTabIndex;
+        }
+        SetupPageNavState.Activate(Tabs.SelectedIndex);
+
         var current = App.ProjectService.Current;
         if (!EnsureProject(ProjectRequired) || current is null) { Tabs.IsEnabled = false; return; }
         // 不具合修正: このPageはNavigationCacheMode="Required"で使い回されるため、プロジェクトが
@@ -50,6 +61,15 @@ public sealed partial class SetupPage : WorkflowPageBase
         await LoadOutputSettingsAsync(current.Path);
         await LoadSchedulingPolicyAsync(current.Path);
     }
+
+    private void Page_Unloaded(object sender, RoutedEventArgs e) => SetupPageNavState.Deactivate();
+
+    private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e) => SetupPageNavState.SetSelectedTabIndex(Tabs.SelectedIndex);
+
+    // MainWindowがナビゲーションペインの子項目（1.1〜1.8）をクリックしたとき、既にSetupPageが
+    // 開かれている場合はFrame.Navigateを経由せずここを直接呼ぶ（同じPage型へのFrame.Navigateは
+    // 何も起きないため、RequestedTabIndex経由のPage_Loaded消費では届かない）。
+    public void SelectTab(int index) => Tabs.SelectedIndex = index;
 
     private async Task LoadOutputSettingsAsync(string path)
     {

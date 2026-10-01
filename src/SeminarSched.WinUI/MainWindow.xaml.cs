@@ -33,6 +33,31 @@ public sealed partial class MainWindow : Window
         App.ProjectService.Changed += OnProjectServiceChanged;
         Closed += (_, _) => App.ProjectService.Changed -= OnProjectServiceChanged;
         UpdateGroupLessonNavVisibility();
+
+        // ユーザー要望（checkpoint122）「左側のタブにもこれらを選択できるようにしておきたい。
+        // 設定を開いている間は...設定が開かれていないときはこれを表示しない」への対応。
+        SetupPageNavState.Changed += OnSetupPageNavStateChanged;
+        Closed += (_, _) => SetupPageNavState.Changed -= OnSetupPageNavStateChanged;
+        RefreshSetupNavState();
+    }
+
+    private bool _syncingSetupNav;
+
+    private void OnSetupPageNavStateChanged() => DispatcherQueue.TryEnqueue(RefreshSetupNavState);
+
+    private void RefreshSetupNavState()
+    {
+        SetupNavItem.IsExpanded = SetupPageNavState.IsActive;
+        if (!SetupPageNavState.IsActive) return;
+        var tag = $"setupTab:{SetupPageNavState.SelectedTabIndex}";
+        foreach (var child in SetupNavItem.MenuItems.OfType<NavigationViewItem>())
+        {
+            if (child.Tag as string != tag) continue;
+            _syncingSetupNav = true;
+            NavView.SelectedItem = child;
+            _syncingSetupNav = false;
+            break;
+        }
     }
 
     private void OnProjectServiceChanged(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(UpdateGroupLessonNavVisibility);
@@ -89,12 +114,27 @@ public sealed partial class MainWindow : Window
 
     private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
+        if (_syncingSetupNav) return;
         if (args.IsSettingsSelected)
         {
             NavFrame.Navigate(typeof(SettingsPage));
         }
         else if (args.SelectedItem is NavigationViewItem item)
         {
+            if (item.Tag is string tabTag && tabTag.StartsWith("setupTab:", StringComparison.Ordinal))
+            {
+                var tabIndex = int.Parse(tabTag.AsSpan("setupTab:".Length));
+                if (NavFrame.Content is SetupPage setupPage)
+                {
+                    setupPage.SelectTab(tabIndex);
+                }
+                else
+                {
+                    SetupPageNavState.RequestedTabIndex = tabIndex;
+                    NavFrame.Navigate(typeof(SetupPage));
+                }
+                return;
+            }
             switch (item.Tag)
             {
                 case "home":
