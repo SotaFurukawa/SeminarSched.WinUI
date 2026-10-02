@@ -24,7 +24,7 @@
                          （新規作成・別ファイルからの反映・学年繰り上げ）のため、もう一段下へ分けた。 -->
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Click="EditSharedRoster_Click" Content="Excelで基本情報を編集" Style="{StaticResource AccentButtonStyle}" />
-                        <TextBlock Text="→" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <FontIcon Glyph="&#xE76C;" FontSize="16" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         <Button Click="ReflectSharedRosterEdits_Click" Content="編集した内容を反映" Style="{StaticResource AccentButtonStyle}" />
                     </StackPanel>
                     <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="「Excelで基本情報を編集」で開いたファイルを上書き保存した後、「編集した内容を反映」を押すと、共通の基本情報および現在開いているプロジェクトへ反映されます（保存しただけでは自動的には反映されません）。" TextWrapping="Wrap" />

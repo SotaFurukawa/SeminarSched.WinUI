@@ -51,7 +51,27 @@
                     </ListView.ItemTemplate>
                 </ListView>
             </StackPanel></TabViewItem>
-            <TabViewItem Header="講師指導可能科目"><StackPanel Padding="16" Spacing="12"><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="240"/><ColumnDefinition Width="240"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><ComboBox x:Name="QualificationTeacher" Header="講師"/><ComboBox x:Name="QualificationSubject" Grid.Column="1" Header="科目"/><Button Grid.Column="2" VerticalAlignment="Bottom" Content="保存" Click="SaveQualification_Click"/></Grid><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="QualificationCanTeach" Content="指導可能" IsChecked="True"/><TextBox x:Name="QualificationNote" Width="420" Header="備考"/></StackPanel>
+            <TabViewItem Header="講師指導可能科目"><StackPanel Padding="16" Spacing="12">
+                <!-- ユーザー指摘（checkpoint129）「少し離れているのと、指導可能ボタンが下の段に来ているのが
+                     気になる。これを氏名などと同じ段にもってきて、また指導可能かをチェックボックスではなく、
+                     指導可能と指導不可の2択で選べるようにしてほしい。また、指導可能がデフォルトで配置
+                     されているようにする」への対応。講師・科目・指導可否・保存を1行にまとめ、
+                     ComboBoxが既定でGridの固定幅列いっぱいには広がらない問題（checkpoint121と同種）を
+                     避けるため列をAutoにして各コントロールへ明示的なWidthを与えた。 -->
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <ComboBox x:Name="QualificationTeacher" Header="講師" Width="200"/>
+                    <ComboBox x:Name="QualificationSubject" Grid.Column="1" Header="科目" Width="200"/>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="指導可否" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="12" Height="32">
+                            <RadioButton x:Name="QualificationCanTeachYes" Content="指導可能" GroupName="QualificationCanTeach" IsChecked="True"/>
+                            <RadioButton x:Name="QualificationCanTeachNo" Content="指導不可" GroupName="QualificationCanTeach"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Button Grid.Column="3" VerticalAlignment="Bottom" Content="保存" Click="SaveQualification_Click"/>
+                </Grid>
+                <StackPanel Orientation="Horizontal" Spacing="16"><TextBox x:Name="QualificationNote" Width="420" Header="備考"/></StackPanel>
                 <TextBlock Text="表の○をクリックすると指導可能／不可を切り替えられます（備考は上のフォームで個別に設定してください）。横にスクロールしても講師ID・講師氏名は、縦にスクロールしても科目見出しは固定されたままです。" TextWrapping="Wrap"/>
                 <!-- ユーザー要望（checkpoint128）「横にスライドして動かしても、講師ID、講師氏名は左側に
                      固定してほしい。縦にスクロールした場合に、科目が動かないのも同様に」への対応。
@@ -79,7 +99,20 @@
                     </ScrollViewer>
                 </Grid>
             </StackPanel></TabViewItem>
-            <TabViewItem Header="通常授業担当設定"><StackPanel Padding="16" Spacing="12"><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="220"/><ColumnDefinition Width="220"/><ColumnDefinition Width="120"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><ComboBox x:Name="RegularStudent" Header="生徒"/><ComboBox x:Name="RegularSubject" Grid.Column="1" Header="科目"/><ComboBox x:Name="RegularTeacher" Grid.Column="2" Header="通常担当講師（任意）"/><NumberBox x:Name="RegularPriority" Grid.Column="3" Header="優先度 1～5" Minimum="1" Maximum="5" Value="3"/><Button Grid.Column="4" VerticalAlignment="Bottom" Content="保存" Click="SaveRegularLesson_Click"/></Grid><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="RegularOneToOne" Content="1対1必須"/><TextBox x:Name="RegularNote" Width="420" Header="備考"/></StackPanel>
+            <TabViewItem Header="通常授業担当設定"><StackPanel Padding="16" Spacing="12">
+                <!-- ユーザー指摘（checkpoint129）「画像③も同様で離れているのと、1対1を同じ段に持ってくる」
+                     への対応。1対1必須チェックボックスを生徒・科目などと同じ行へ移動し、列をAutoへ変更して
+                     各コントロールへ明示的なWidthを与えた（checkpoint121と同種のComboBox幅問題の回避）。 -->
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <ComboBox x:Name="RegularStudent" Header="生徒" Width="200"/>
+                    <ComboBox x:Name="RegularSubject" Grid.Column="1" Header="科目" Width="160"/>
+                    <ComboBox x:Name="RegularTeacher" Grid.Column="2" Header="通常担当講師（任意）" Width="220"/>
+                    <NumberBox x:Name="RegularPriority" Grid.Column="3" Header="優先度 1～5" Minimum="1" Maximum="5" Value="3" Width="100"/>
+                    <CheckBox x:Name="RegularOneToOne" Grid.Column="4" Content="1対1必須" VerticalAlignment="Bottom"/>
+                    <Button Grid.Column="5" VerticalAlignment="Bottom" Content="保存" Click="SaveRegularLesson_Click"/>
+                </Grid>
+                <StackPanel Orientation="Horizontal" Spacing="16"><TextBox x:Name="RegularNote" Width="420" Header="備考"/></StackPanel>
                 <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="140"/><ColumnDefinition Width="160"/><ColumnDefinition Width="80"/><ColumnDefinition Width="80"/></Grid.ColumnDefinitions><TextBlock FontWeight="SemiBold" Text="生徒氏名"/><TextBlock Grid.Column="1" FontWeight="SemiBold" Text="科目"/><TextBlock Grid.Column="2" FontWeight="SemiBold" Text="通常担当講師"/><TextBlock Grid.Column="3" FontWeight="SemiBold" Text="優先度"/><TextBlock Grid.Column="4" FontWeight="SemiBold" Text="1対1"/></Grid>
                 <ListView x:Name="RegularLessons">
                     <ListView.ItemTemplate>
@@ -170,9 +203,15 @@
                          並び替えに応じてDisplayNumberへ都度再計算する。「考慮しない」以外が選択
                          されると自動的に一番上へ移動する（PolicyOption_SelectionChanged）。 -->
                     <TextBlock FontWeight="SemiBold" Margin="0,8,0,0" Text="探索方針（優先度の高い順）"/>
-                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Text="行にカーソルを合わせると右端に表示される▲▼で並び替えできます。「考慮しない」以外を選ぶと自動的に一番上へ移動します。"/>
-                    <ItemsControl x:Name="PolicyRowsList" ItemsSource="{x:Bind PolicyRows}">
-                        <ItemsControl.ItemTemplate>
+                    <!-- ユーザー要望（checkpoint129）「探索方針について、スライドもできるようにしてほしい」
+                         への対応。ItemsControlからListView（CanReorderItems+AllowDrop）へ変更し、
+                         ▲▼ボタンに加えて行をドラッグ（スライド）して並び替えられるようにした。
+                         ドラッグによる並び替えもObservableCollection.Move()を使うため、▲▼と同じく
+                         並び替え後にDisplayNumberの再計算とコンテナの再構築（RadioButtonの選択状態の
+                         再描画不具合の回避）が必要（PolicyRowsList_DragItemsCompleted）。 -->
+                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Text="行をドラッグするか、カーソルを合わせると右端に表示される▲▼で並び替えできます。「考慮しない」以外を選ぶと自動的に一番上へ移動します。"/>
+                    <ListView x:Name="PolicyRowsList" ItemsSource="{x:Bind PolicyRows}" SelectionMode="None" CanReorderItems="True" AllowDrop="True" DragItemsCompleted="PolicyRowsList_DragItemsCompleted">
+                        <ListView.ItemTemplate>
                             <DataTemplate x:DataType="vm:SchedulingPolicyRowViewModel">
                                 <Grid Margin="0,2,0,2" Padding="4" Background="Transparent" PointerEntered="PolicyRow_PointerEntered" PointerExited="PolicyRow_PointerExited">
                                     <Grid.ColumnDefinitions>
@@ -199,8 +238,8 @@
                                     </StackPanel>
                                 </Grid>
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                        </ListView.ItemTemplate>
+                    </ListView>
 
                     <TextBlock FontWeight="SemiBold" Margin="0,8,0,0" Text="既定の時間（名目時間の2倍）になっても未配置が残っている場合"/>
                     <StackPanel Orientation="Horizontal" Spacing="16">

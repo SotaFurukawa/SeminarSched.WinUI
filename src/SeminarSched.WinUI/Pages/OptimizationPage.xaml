@@ -110,9 +110,13 @@
                                  を共有）をここにも設置し、この回だけ優先順位を一時的に変更できるようにした
                                  （「①設定」側の既定の並び順自体は変更しない）。 -->
                             <TextBlock FontWeight="SemiBold" Margin="0,8,0,0" Text="探索方針（優先度の高い順）"/>
-                            <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Text="行にカーソルを合わせると右端に表示される▲▼で並び替えできます。「考慮しない」以外を選ぶと自動的に一番上へ移動します。"/>
-                            <ItemsControl x:Name="RunPolicyRowsList" ItemsSource="{x:Bind RunPolicyRows}">
-                                <ItemsControl.ItemTemplate>
+                            <!-- ユーザー要望（checkpoint129）「探索方針について、スライドもできるようにして
+                                 ほしい」への対応。ItemsControlからListView（CanReorderItems+AllowDrop）へ
+                                 変更し、▲▼ボタンに加えて行をドラッグ（スライド）して並び替えられるように
+                                 した。 -->
+                            <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Text="行をドラッグするか、カーソルを合わせると右端に表示される▲▼で並び替えできます。「考慮しない」以外を選ぶと自動的に一番上へ移動します。"/>
+                            <ListView x:Name="RunPolicyRowsList" ItemsSource="{x:Bind RunPolicyRows}" SelectionMode="None" CanReorderItems="True" AllowDrop="True" DragItemsCompleted="RunPolicyRowsList_DragItemsCompleted">
+                                <ListView.ItemTemplate>
                                     <DataTemplate x:DataType="vm:SchedulingPolicyRowViewModel">
                                         <Grid Margin="0,2,0,2" Padding="4" Background="Transparent" PointerEntered="RunPolicyRow_PointerEntered" PointerExited="RunPolicyRow_PointerExited">
                                             <Grid.ColumnDefinitions>
@@ -139,8 +143,8 @@
                                             </StackPanel>
                                         </Grid>
                                     </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                                </ListView.ItemTemplate>
+                            </ListView>
 
                             <TextBlock FontWeight="SemiBold" Text="既定の時間（名目時間の2倍）になっても未配置が残っている場合"/>
                             <StackPanel Orientation="Horizontal" Spacing="16">

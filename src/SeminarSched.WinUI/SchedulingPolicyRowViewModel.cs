@@ -125,6 +125,28 @@ public sealed class SchedulingPolicyRowViewModel(
         return rows;
     }
 
+    /// <summary>セッション内で保持した一時的な並び順・選択状態（<see cref="OptimizationPolicyOverrideState"/>）
+    /// から行を復元する。<see cref="BuildRows"/>と異なり、SchedulingPolicyオブジェクトではなく
+    /// 保存済みの(Dimension, SelectedOptionIndex)の並びをそのまま使う。</summary>
+    public static List<SchedulingPolicyRowViewModel> BuildRowsFromSaved(
+        IReadOnlyList<(SchedulingPolicyDimension Dimension, int SelectedOptionIndex)> saved)
+    {
+        var metadataByDimension = DimensionMetadata.ToDictionary(m => m.Dimension);
+        var rows = new List<SchedulingPolicyRowViewModel>();
+        var position = 1;
+        foreach (var (dimension, selectedOptionIndex) in saved)
+        {
+            var metadata = metadataByDimension[dimension];
+            rows.Add(new SchedulingPolicyRowViewModel(dimension, metadata.Title, metadata.Labels, metadata.Values)
+            {
+                SelectedOptionIndex = selectedOptionIndex,
+                DisplayNumber = position++,
+            });
+        }
+
+        return rows;
+    }
+
     public static SchedulingPolicy BuildPolicy(
         IReadOnlyList<SchedulingPolicyRowViewModel> rows,
         int maxStudentsPerTeacher,

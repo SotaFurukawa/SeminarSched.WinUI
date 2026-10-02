@@ -135,6 +135,8 @@ public sealed partial class SetupPage : WorkflowPageBase
 
     private void MovePolicyRowDown_Click(object sender, RoutedEventArgs e) => _policyController.MoveDown(sender, e);
 
+    private void PolicyRowsList_DragItemsCompleted(object sender, DragItemsCompletedEventArgs e) => _policyController.DragItemsCompleted(sender, e);
+
     private void PolicyRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SchedulingPolicyRowsController.RowPointerEntered(sender, e);
 
     private void PolicyRow_PointerExited(object sender, PointerRoutedEventArgs e) => SchedulingPolicyRowsController.RowPointerExited(sender, e);
@@ -275,7 +277,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     private async void SaveQualification_Click(object sender,RoutedEventArgs e)=>await ExecuteAsync(async path=>
     {
         if(QualificationTeacher.SelectedItem is not MasterItem<Teacher> teacher||QualificationSubject.SelectedItem is not MasterItem<Subject> subject)throw new ArgumentException("講師と科目を選択してください。");
-        await App.MasterData.SaveQualificationAsync(path,new TeacherQualification(teacher.Value.Id,subject.Value.Id,QualificationCanTeach.IsChecked==true,QualificationNote.Text));
+        await App.MasterData.SaveQualificationAsync(path,new TeacherQualification(teacher.Value.Id,subject.Value.Id,QualificationCanTeachYes.IsChecked==true,QualificationNote.Text));
     },"講師対応科目を保存しました");
 
     // ユーザー要望「小学校、中学校、高校の並びになるようにしてください。これは他の部分でも同じで、

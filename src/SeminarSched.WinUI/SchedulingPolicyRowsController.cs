@@ -23,6 +23,15 @@ public sealed class SchedulingPolicyRowsController(
         }
     }
 
+    public void LoadFromSaved(IReadOnlyList<(SchedulingPolicyDimension Dimension, int SelectedOptionIndex)> saved)
+    {
+        rows.Clear();
+        foreach (var row in SchedulingPolicyRowViewModel.BuildRowsFromSaved(saved))
+        {
+            rows.Add(row);
+        }
+    }
+
     private void Renumber()
     {
         for (var i = 0; i < rows.Count; i++)
@@ -39,6 +48,16 @@ public sealed class SchedulingPolicyRowsController(
     {
         list.ItemsSource = null;
         list.ItemsSource = rows;
+    }
+
+    // ユーザー要望（checkpoint129）「探索方針について、スライドもできるようにしてほしい」への
+    // 対応。ListViewのCanReorderItems+AllowDropによるドラッグ並び替えも、内部的には▲▼と同じ
+    // ObservableCollection.Move()を使うため、完了後に番号を振り直し、RadioButtonの選択状態の
+    // 再描画不具合を避けるためのコンテナ再構築が必要。
+    public void DragItemsCompleted(object sender, DragItemsCompletedEventArgs e)
+    {
+        Renumber();
+        Refresh();
     }
 
     // ユーザー指摘（checkpoint128）「探索方針のラジオボタンが揃っていない」への対応。以前は

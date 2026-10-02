@@ -105,8 +105,23 @@ public sealed partial class OptimizationPage : WorkflowPageBase
     // ユーザー要望（checkpoint126）「探索方針について、設定だけでなく、自動作成ページの一時的な
     // ものでもできるようにしてほしい」への対応。優先度の並び順（PreferenceOrder）もRunPolicyRows
     // として読み込み、この画面だけで一時的に並び替えられるようにした（「①設定」側は変更しない）。
+    // ユーザー報告（checkpoint129）「ラジオボタンで考慮するを押した後、別のページへ遷移すると、
+    // 元に戻ってしまう。ウィンドウを閉じたり、プロジェクトを変更しない限りはそのままにしておいて
+    // ほしい」への対応。同一プロジェクトでセッション内に保存済みの一時的な状態
+    // （OptimizationPolicyOverrideState）があればそちらを優先して復元し、無ければ従来どおり
+    // プロジェクトの保存済み既定値から読み込む。
     private async Task LoadRunPolicyAsync(string projectPath)
     {
+        if (OptimizationPolicyOverrideState.TryGet(projectPath, out var saved))
+        {
+            RunPolicyMaxStudentsPerTeacher.Value = saved.MaxStudentsPerTeacher;
+            _runPolicyController.LoadFromSaved(saved.Rows);
+            RunPolicyMaxConcurrentSeats.Value = saved.MaxConcurrentSeats;
+            RunPolicyContinueBeyondNominalTimeYes.IsChecked = saved.ContinueBeyondNominalTimeIfIncomplete;
+            RunPolicyContinueBeyondNominalTimeNo.IsChecked = !saved.ContinueBeyondNominalTimeIfIncomplete;
+            return;
+        }
+
         var policy = await App.SchedulingPolicy.GetAsync(projectPath);
         RunPolicyMaxStudentsPerTeacher.Value = policy.MaxStudentsPerTeacher;
         _runPolicyController.Load(policy);
@@ -123,6 +138,8 @@ public sealed partial class OptimizationPage : WorkflowPageBase
 
     private void MoveRunPolicyRowDown_Click(object sender, RoutedEventArgs e) => _runPolicyController.MoveDown(sender, e);
 
+    private void RunPolicyRowsList_DragItemsCompleted(object sender, DragItemsCompletedEventArgs e) => _runPolicyController.DragItemsCompleted(sender, e);
+
     private void RunPolicyRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SchedulingPolicyRowsController.RowPointerEntered(sender, e);
 
     private void RunPolicyRow_PointerExited(object sender, PointerRoutedEventArgs e) => SchedulingPolicyRowsController.RowPointerExited(sender, e);
@@ -133,7 +150,30 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         checked((int)RunPolicyMaxConcurrentSeats.Value),
         RunPolicyContinueBeyondNominalTimeNo.IsChecked != true);
 
-    private void Page_Unloaded(object sender, RoutedEventArgs e) => OptimizationRunState.Changed -= OnRunStateChanged;
+    private void Page_Unloaded(object sender, RoutedEventArgs e)
+    {
+        OptimizationRunState.Changed -= OnRunStateChanged;
+        SaveRunPolicyOverrideState();
+    }
+
+    // ページを離れる（別ページへ遷移する）たびに、その時点のフォーム内容をセッション内の一時状態へ
+    // 保存しておく。ウィンドウを閉じればstaticごと破棄され、プロジェクトを切り替えればパスの
+    // 不一致でLoadRunPolicyAsync側が無視するため、ユーザー要望どおり「ウィンドウを閉じたり、
+    // プロジェクトを変更しない限りはそのまま」という挙動になる。
+    private void SaveRunPolicyOverrideState()
+    {
+        if (!_isLoaded || App.ProjectService.Current is not { } project || RunPolicyRows.Count == 0)
+        {
+            return;
+        }
+
+        var rows = RunPolicyRows.Select(row => (row.Dimension, row.SelectedOptionIndex)).ToArray();
+        OptimizationPolicyOverrideState.Save(project.Path, new OptimizationPolicyOverrideState.SavedState(
+            checked((int)RunPolicyMaxStudentsPerTeacher.Value),
+            checked((int)RunPolicyMaxConcurrentSeats.Value),
+            RunPolicyContinueBeyondNominalTimeNo.IsChecked != true,
+            rows));
+    }
 
     private void OnRunStateChanged() => DispatcherQueue.TryEnqueue(RefreshRunUi);
 

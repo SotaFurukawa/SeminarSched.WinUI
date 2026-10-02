@@ -210,12 +210,9 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         if (_currentBoard is not { } board || board.Slots.Count == 0)
         {
             BoardGrid.Children.Add(new TextBlock { Text = "この日は開講コマがありません。", Margin = new Thickness(8) });
-            BulkAvailabilityTeachers.ItemsSource = null; BulkAvailabilitySlots.ItemsSource = null;
             return;
         }
         var search = BoardSearch.Text?.Trim() ?? "";
-        BulkAvailabilityTeachers.ItemsSource = board.Teachers;
-        BulkAvailabilitySlots.ItemsSource = board.Slots;
 
         BoardGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         foreach (var _ in board.Slots) BoardGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -243,7 +240,7 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         Place(corner, 0, 0);
         for (var c = 0; c < board.Teachers.Count; c++)
         {
-            var header = HeaderCell(new TextBlock { Text = board.Teachers[c].Label, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap }, _columnHeaderTransform);
+            var header = HeaderCell(new TextBlock { Text = board.Teachers[c].Label, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center }, _columnHeaderTransform);
             Canvas.SetZIndex(header, 1);
             Place(header, 0, c + 1);
         }
@@ -337,20 +334,6 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
     {
         if (sender is not Button { Tag: CellTag cell } || App.ProjectService.Current?.Path is not { } path || _selectedDateId is not { } dateId) return;
         await ExecuteEditorAsync(() => App.ScheduleEditor.SetTeacherUnavailableAsync(path, cell.TeacherId, dateId, cell.TimeSlotId, !cell.Blocked), cell.Blocked ? "出勤可能にしました" : "出勤不可にしました", clearsHistory: true);
-    }
-
-    private async void BulkSetUnavailable_Click(object sender, RoutedEventArgs e) => await BulkSetTeacherAvailabilityAsync(true);
-    private async void BulkSetAvailable_Click(object sender, RoutedEventArgs e) => await BulkSetTeacherAvailabilityAsync(false);
-
-    private async Task BulkSetTeacherAvailabilityAsync(bool unavailable)
-    {
-        if (App.ProjectService.Current?.Path is not { } path || _selectedDateId is not { } dateId) return;
-        var teachers = BulkAvailabilityTeachers.SelectedItems.Cast<BoardTeacherColumn>().ToArray();
-        var slots = BulkAvailabilitySlots.SelectedItems.Cast<BoardSlotRow>().ToArray();
-        if (teachers.Length == 0 || slots.Length == 0) { ShowEditorError("講師とコマをそれぞれ1件以上選択してください。"); return; }
-        var targets = teachers.SelectMany(teacher => slots.Select(slot => (teacher.TeacherId, slot.TimeSlotId))).ToArray();
-        await ExecuteEditorAsync(() => App.ScheduleEditor.SetTeacherUnavailableManyAsync(path, dateId, targets, unavailable),
-            $"{teachers.Length}名×{slots.Length}コマを{(unavailable ? "出勤不可" : "出勤可能")}にしました", clearsHistory: true);
     }
 
     private void Cell_DragOver(object sender, DragEventArgs e)

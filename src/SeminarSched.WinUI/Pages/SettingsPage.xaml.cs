@@ -30,6 +30,31 @@ public sealed partial class SettingsPage : Page
             : "まだ確認していません。";
     }
 
+    // ユーザー要望（checkpoint129）「これは動作確認のためでもあるが、ライセンスの解除が
+    // できるようにしてほしい」への対応。保存済みのプロダクトキー認証状態（マスターキー／年度）を
+    // 消去する。次回起動時（MainWindowのRootGrid_Loadedで毎回判定している）に再度プロダクトキーの
+    // 入力が必要になる。
+    private async void ReleaseLicense_Click(object sender, RoutedEventArgs e)
+    {
+        var confirmDialog = new ContentDialog
+        {
+            XamlRoot = Content.XamlRoot,
+            Title = "ライセンスを解除しますか？",
+            Content = "次回このアプリを起動したときに、再度プロダクトキーの入力が必要になります。",
+            PrimaryButtonText = "解除する",
+            CloseButtonText = "キャンセル",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        if (await confirmDialog.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        var settings = await App.SettingsStore.LoadAsync();
+        await App.SettingsStore.SaveAsync(settings with { ProductKeyIsMaster = false, ProductKeyYear = null });
+        LicenseStatusTextBlock.Text = "未認証（次回起動時に再度プロダクトキーの入力が必要です）";
+    }
+
     private async void CheckUpdate_Click(object sender, RoutedEventArgs e)
     {
         CheckUpdateButton.IsEnabled = false;

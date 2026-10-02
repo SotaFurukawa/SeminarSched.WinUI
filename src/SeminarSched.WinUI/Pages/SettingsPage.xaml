@@ -18,16 +18,30 @@
         <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="設定" />
         <StackPanel Grid.Row="1" Spacing="8">
             <TextBlock Text="現在このアプリに個別の設定項目はありません。バージョン情報は「アプリ情報」をご覧ください。" TextWrapping="Wrap" />
-            <TextBlock Margin="0,16,0,0" FontSize="16" FontWeight="SemiBold" Text="ライセンス" />
-            <TextBlock x:Name="LicenseStatusTextBlock" TextWrapping="Wrap" />
 
-            <!-- ユーザー指摘（checkpoint128）「アップデートの確認とその表題の『アップデート』が
-                 離れすぎている。左上⇨アップデート、右上⇨アップデートを確認ボタン、左下⇨最新
-                 バージョン（バージョン番号）です」への対応。見出しとボタンを同じ行に、状態文言を
-                 見出しの直下に配置する。 -->
+            <!-- ユーザー指摘（checkpoint129）「アップデートを確認、が左側の文字列から少し遠い。近くに
+                 持ってきてほしい」への対応。列をAuto/Autoにして、見出し・ボタンが自身の実測幅ぶんだけで
+                 並ぶようにし、ウィンドウ右端まで引き離されないようにした（ライセンス欄も同じ構成に揃えた）。
+                 また「これは動作確認のためでもあるが、ライセンスの解除ができるようにしてほしい。
+                 アップデートを確認の上あたりに」への対応で、ライセンス欄にも見出しと同じ行へ
+                 「ライセンスを解除」ボタンを追加した。 -->
             <Grid Margin="0,16,0,0" ColumnSpacing="16">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Grid.Column="0" FontSize="16" FontWeight="SemiBold" Text="ライセンス" VerticalAlignment="Center" />
+                <Button Grid.Row="0" Grid.Column="1" x:Name="ReleaseLicenseButton" Content="ライセンスを解除" Click="ReleaseLicense_Click" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" x:Name="LicenseStatusTextBlock" TextWrapping="Wrap" />
+            </Grid>
+
+            <Grid Margin="0,16,0,0" ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
@@ -36,7 +50,7 @@
                 </Grid.RowDefinitions>
                 <TextBlock Grid.Row="0" Grid.Column="0" FontSize="16" FontWeight="SemiBold" Text="アップデート" VerticalAlignment="Center" />
                 <Button Grid.Row="0" Grid.Column="1" x:Name="CheckUpdateButton" Content="アップデートを確認" Click="CheckUpdate_Click" />
-                <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8">
                     <TextBlock x:Name="UpdateStatusTextBlock" MaxWidth="500" TextWrapping="Wrap" VerticalAlignment="Center" />
                     <Button x:Name="OpenReleaseButton" Content="ダウンロードページを開く" Click="OpenRelease_Click" Visibility="Collapsed" />
                 </StackPanel>
