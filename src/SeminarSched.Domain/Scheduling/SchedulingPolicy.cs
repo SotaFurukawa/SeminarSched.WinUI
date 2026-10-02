@@ -38,6 +38,26 @@ public enum TimeOfDayPreference { None = 0, Late = 1, Early = 2 }
 public enum TeacherStudentConsecutivePreference { None = 0, PreferConsecutive = 1 }
 
 /// <summary>
+/// ユーザー要望（checkpoint123）「自動作成のオプション機能（探索方針）について、この優先度を
+/// 変えられるようにしたい。校舎によっては、一日に入るコマ数＞遅めの時間に入れることを優先の場合が
+/// あり、その逆も同様である」への対応。7つのトグル可能な探索方針それぞれを識別するための列挙体。
+/// <see cref="SchedulingPolicy.PreferenceOrder"/>がこの7値の並び替え（優先度の高い順）を保持する。
+/// <see cref="SchedulingPolicy.MaxConcurrentSeats"/>（ハード制約）と
+/// <see cref="SchedulingPolicy.ContinueBeyondNominalTimeIfIncomplete"/>（ソルバー制御フラグ）は
+/// 目的関数の重み付けソフト制約ではないため、この並び替え対象に含まれない。
+/// </summary>
+public enum SchedulingPolicyDimension
+{
+    TeacherCountPerDay = 0,
+    TeacherLoadBalance = 1,
+    StudentAttendanceDays = 2,
+    TeacherAttendanceDays = 3,
+    PairingSize = 4,
+    TimeOfDay = 5,
+    TeacherStudentConsecutive = 6,
+}
+
+/// <summary>
 /// プロジェクトごとの最適化探索の方針設定。ユーザー要望「担当する生徒の人数の既定値（1対2）を
 /// 変更できるようにしたい（他校舎の1対3・1対4にも対応）」「一日当たりの講師人数・講師ごとのコマ数の
 /// 偏り・生徒の授業日・1コマあたりの生徒対応人数・時間帯・同時に使える座席数を自由に選択できる
@@ -64,12 +84,17 @@ public sealed record SchedulingPolicy
         TimeOfDayPreference timeOfDayPreference = TimeOfDayPreference.None,
         TeacherStudentConsecutivePreference teacherStudentConsecutivePreference = TeacherStudentConsecutivePreference.None,
         int maxConcurrentSeats = 0,
-        bool continueBeyondNominalTimeIfIncomplete = true)
+        bool continueBeyondNominalTimeIfIncomplete = true,
+        IReadOnlyList<SchedulingPolicyDimension>? preferenceOrder = null)
     {
         if (maxStudentsPerTeacher is < 1 or > 10)
             throw new ArgumentOutOfRangeException(nameof(maxStudentsPerTeacher), "1人の講師が同時に担当できる生徒数は1〜10で指定してください。");
         if (maxConcurrentSeats < 0)
             throw new ArgumentOutOfRangeException(nameof(maxConcurrentSeats), "同時に使える座席数は0以上で指定してください（0は考慮しない）。");
+
+        preferenceOrder ??= DefaultPreferenceOrder;
+        if (preferenceOrder.Count != DefaultPreferenceOrder.Count || preferenceOrder.Distinct().Count() != DefaultPreferenceOrder.Count)
+            throw new ArgumentException("探索方針の優先順位は、7つの方針それぞれをちょうど1回ずつ含む必要があります。", nameof(preferenceOrder));
 
         MaxStudentsPerTeacher = maxStudentsPerTeacher;
         TeacherCountPerDayPreference = teacherCountPerDayPreference;
@@ -81,6 +106,7 @@ public sealed record SchedulingPolicy
         TeacherStudentConsecutivePreference = teacherStudentConsecutivePreference;
         MaxConcurrentSeats = maxConcurrentSeats;
         ContinueBeyondNominalTimeIfIncomplete = continueBeyondNominalTimeIfIncomplete;
+        PreferenceOrder = preferenceOrder;
     }
 
     /// <summary>1人の講師が同時（同じ講師・日付・時間帯）に担当できる生徒数の上限。既定2（1対2）。
@@ -103,5 +129,59 @@ public sealed record SchedulingPolicy
     /// 打ち切る。</summary>
     public bool ContinueBeyondNominalTimeIfIncomplete { get; }
 
+    /// <summary>7つの探索方針を、優先度の高い順（目的関数での重みが大きい順）に並べたもの。
+    /// ユーザー要望（checkpoint123）「校舎によって、どのオプションを優先するか変えられるように
+    /// したい」への対応。既定値<see cref="DefaultPreferenceOrder"/>は、この機能を導入する以前に
+    /// 内部的に固定されていた重み付けの大小関係と同じ順序にしてあるため、並び替えを一度も行って
+    /// いない既存プロジェクト・新規プロジェクトの挙動は変わらない。</summary>
+    public IReadOnlyList<SchedulingPolicyDimension> PreferenceOrder { get; }
+
+    public static readonly IReadOnlyList<SchedulingPolicyDimension> DefaultPreferenceOrder =
+    [
+        SchedulingPolicyDimension.StudentAttendanceDays,
+        SchedulingPolicyDimension.TeacherAttendanceDays,
+        SchedulingPolicyDimension.PairingSize,
+        SchedulingPolicyDimension.TeacherStudentConsecutive,
+        SchedulingPolicyDimension.TeacherCountPerDay,
+        SchedulingPolicyDimension.TeacherLoadBalance,
+        SchedulingPolicyDimension.TimeOfDay,
+    ];
+
     public static readonly SchedulingPolicy Default = new();
+
+    // レコードが自動生成する既定のEqualsは、PreferenceOrder（IReadOnlyList<T>、実体はarray/List）を
+    // 値ではなく参照で比較してしまい、同じ並び順でも別インスタンスなら不一致になる
+    // （SqliteSchedulingPolicyRepositoryのGetAsyncは毎回新しい配列を作って返すため、保存→再読込の
+    // 往復テストが本来等しいはずの値同士で失敗する）。PreferenceOrderだけSequenceEqualで比較する
+    // よう、Equals/GetHashCodeを明示的に上書きする。
+    public bool Equals(SchedulingPolicy? other) =>
+        other is not null
+        && MaxStudentsPerTeacher == other.MaxStudentsPerTeacher
+        && TeacherCountPerDayPreference == other.TeacherCountPerDayPreference
+        && TeacherLoadBalancePreference == other.TeacherLoadBalancePreference
+        && StudentAttendanceDaysPreference == other.StudentAttendanceDaysPreference
+        && TeacherAttendanceDaysPreference == other.TeacherAttendanceDaysPreference
+        && PairingSizePreference == other.PairingSizePreference
+        && TimeOfDayPreference == other.TimeOfDayPreference
+        && TeacherStudentConsecutivePreference == other.TeacherStudentConsecutivePreference
+        && MaxConcurrentSeats == other.MaxConcurrentSeats
+        && ContinueBeyondNominalTimeIfIncomplete == other.ContinueBeyondNominalTimeIfIncomplete
+        && PreferenceOrder.SequenceEqual(other.PreferenceOrder);
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(MaxStudentsPerTeacher);
+        hash.Add(TeacherCountPerDayPreference);
+        hash.Add(TeacherLoadBalancePreference);
+        hash.Add(StudentAttendanceDaysPreference);
+        hash.Add(TeacherAttendanceDaysPreference);
+        hash.Add(PairingSizePreference);
+        hash.Add(TimeOfDayPreference);
+        hash.Add(TeacherStudentConsecutivePreference);
+        hash.Add(MaxConcurrentSeats);
+        hash.Add(ContinueBeyondNominalTimeIfIncomplete);
+        foreach (var dimension in PreferenceOrder) hash.Add(dimension);
+        return hash.ToHashCode();
+    }
 }

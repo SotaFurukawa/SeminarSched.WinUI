@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:SeminarSched_WinUI.Pages"
+    xmlns:vm="using:SeminarSched_WinUI"
     NavigationCacheMode="Required"
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
@@ -20,7 +21,7 @@
              MinWidthで各タブに最低限の余裕を持たせ、詰まった印象にならないようにした。
              「科目・出力設定は優先度が低いので、右端に持ってくる」との指摘を受け、この2つを
              末尾へ並べ替えた。 -->
-        <TabView x:Name="Tabs" TabWidthMode="SizeToContent" SelectionChanged="Tabs_SelectionChanged">
+        <TabView x:Name="Tabs" TabWidthMode="SizeToContent" IsAddTabButtonVisible="False" SelectionChanged="Tabs_SelectionChanged">
             <TabView.Resources>
                 <Style TargetType="TabViewItem">
                     <Setter Property="MinWidth" Value="120"/>
@@ -135,52 +136,37 @@
                         </NumberBox.Header>
                     </NumberBox>
 
-                    <TextBlock FontWeight="SemiBold" Margin="0,8,0,0" Text="①一日当たりの講師人数"/>
-                    <StackPanel Orientation="Horizontal" Spacing="16">
-                        <RadioButton x:Name="PolicyTeacherCountPerDayNone" Content="考慮しない" GroupName="PolicyTeacherCountPerDay" IsChecked="True"/>
-                        <RadioButton x:Name="PolicyTeacherCountPerDayMinimize" Content="できるだけ少なくする" GroupName="PolicyTeacherCountPerDay"/>
-                        <RadioButton x:Name="PolicyTeacherCountPerDayMaximize" Content="できるだけ多くする" GroupName="PolicyTeacherCountPerDay"/>
-                    </StackPanel>
-
-                    <TextBlock FontWeight="SemiBold" Text="②講師ごとのコマ数の偏り"/>
-                    <StackPanel Orientation="Horizontal" Spacing="16">
-                        <RadioButton x:Name="PolicyTeacherLoadBalanceNone" Content="考慮しない" GroupName="PolicyTeacherLoadBalance" IsChecked="True"/>
-                        <RadioButton x:Name="PolicyTeacherLoadBalanceBalance" Content="均等にする" GroupName="PolicyTeacherLoadBalance"/>
-                    </StackPanel>
-
-                    <TextBlock FontWeight="SemiBold" Text="③生徒の授業日"/>
-                    <StackPanel Orientation="Horizontal" Spacing="16">
-                        <RadioButton x:Name="PolicyStudentAttendanceDaysNone" Content="考慮しない" GroupName="PolicyStudentAttendanceDays" IsChecked="True"/>
-                        <RadioButton x:Name="PolicyStudentAttendanceDaysConcentrate" Content="できるだけ減らす（同じ日にまとめる）" GroupName="PolicyStudentAttendanceDays"/>
-                        <RadioButton x:Name="PolicyStudentAttendanceDaysSpread" Content="分散する" GroupName="PolicyStudentAttendanceDays"/>
-                    </StackPanel>
-
-                    <TextBlock FontWeight="SemiBold" Text="④講師の出勤日"/>
-                    <StackPanel Orientation="Horizontal" Spacing="16">
-                        <RadioButton x:Name="PolicyTeacherAttendanceDaysNone" Content="考慮しない" GroupName="PolicyTeacherAttendanceDays" IsChecked="True"/>
-                        <RadioButton x:Name="PolicyTeacherAttendanceDaysConcentrate" Content="できるだけ減らす（同じ日にまとめる）" GroupName="PolicyTeacherAttendanceDays"/>
-                        <RadioButton x:Name="PolicyTeacherAttendanceDaysSpread" Content="分散する" GroupName="PolicyTeacherAttendanceDays"/>
-                    </StackPanel>
-
-                    <TextBlock FontWeight="SemiBold" Text="⑤1コマあたりの生徒の対応人数"/>
-                    <StackPanel Orientation="Horizontal" Spacing="16">
-                        <RadioButton x:Name="PolicyPairingSizeNone" Content="考慮しない" GroupName="PolicyPairingSize" IsChecked="True"/>
-                        <RadioButton x:Name="PolicyPairingSizeMaximize" Content="できるだけ多くする" GroupName="PolicyPairingSize"/>
-                        <RadioButton x:Name="PolicyPairingSizeMinimize" Content="できるだけ少なくする" GroupName="PolicyPairingSize"/>
-                    </StackPanel>
-
-                    <TextBlock FontWeight="SemiBold" Text="⑥時間帯"/>
-                    <StackPanel Orientation="Horizontal" Spacing="16">
-                        <RadioButton x:Name="PolicyTimeOfDayNone" Content="考慮しない" GroupName="PolicyTimeOfDay" IsChecked="True"/>
-                        <RadioButton x:Name="PolicyTimeOfDayLate" Content="できるだけ遅くする" GroupName="PolicyTimeOfDay"/>
-                        <RadioButton x:Name="PolicyTimeOfDayEarly" Content="できるだけ早くする" GroupName="PolicyTimeOfDay"/>
-                    </StackPanel>
-
-                    <TextBlock FontWeight="SemiBold" Text="⑦同一講師×同一生徒の連続コマ"/>
-                    <StackPanel Orientation="Horizontal" Spacing="16">
-                        <RadioButton x:Name="PolicyTeacherStudentConsecutiveNone" Content="考慮しない" GroupName="PolicyTeacherStudentConsecutive" IsChecked="True"/>
-                        <RadioButton x:Name="PolicyTeacherStudentConsecutivePreferConsecutive" Content="できるだけ連続にする" GroupName="PolicyTeacherStudentConsecutive"/>
-                    </StackPanel>
+                    <!-- ユーザー要望（checkpoint123）「自動作成のオプション機能（探索方針）について、
+                         この優先度を変えられるようにしたい。校舎によっては、一日に入るコマ数＞遅めの
+                         時間に入れることを優先の場合があり、その逆も同様である」への対応。以前は
+                         ①〜⑦の固定順・固定番号だったが、PolicyRows（ObservableCollection）を
+                         ItemsControlで表示し、行にカーソルを乗せると右端に上下矢印が現れて並び替え
+                         られるようにした（コードビハインドのMovePolicyRowUp/Down_Click）。番号は
+                         並び替えに応じてDisplayNumberへ都度再計算する。「考慮しない」以外が選択
+                         されると自動的に一番上へ移動する（PolicyOption_SelectionChanged）。 -->
+                    <TextBlock FontWeight="SemiBold" Margin="0,8,0,0" Text="探索方針（優先度の高い順）"/>
+                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Text="行にカーソルを合わせると右端に表示される▲▼で並び替えできます。「考慮しない」以外を選ぶと自動的に一番上へ移動します。"/>
+                    <ItemsControl x:Name="PolicyRowsList" ItemsSource="{x:Bind PolicyRows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SchedulingPolicyRowViewModel">
+                                <Grid Margin="0,2,0,2" Padding="4" Background="Transparent" PointerEntered="PolicyRow_PointerEntered" PointerExited="PolicyRow_PointerExited">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="28"/>
+                                        <ColumnDefinition Width="260"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="56"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Bind DisplayNumber, Mode=OneWay}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Title}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                    <RadioButtons Grid.Column="2" ItemsSource="{x:Bind OptionLabels}" Loaded="PolicyOption_Loaded" SelectionChanged="PolicyOption_SelectionChanged" MaxColumns="3"/>
+                                    <StackPanel x:Name="ArrowsPanel" Grid.Column="3" Orientation="Horizontal" Spacing="2" Visibility="Collapsed" VerticalAlignment="Center">
+                                        <Button Content="▲" Padding="6,2" FontSize="10" Click="MovePolicyRowUp_Click" Tag="{x:Bind}"/>
+                                        <Button Content="▼" Padding="6,2" FontSize="10" Click="MovePolicyRowDown_Click" Tag="{x:Bind}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
                     <NumberBox x:Name="PolicyMaxConcurrentSeats" Header="⑧同時に使える座席数（0=考慮しない）" Minimum="0" SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" Width="280"/>
 

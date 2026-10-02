@@ -92,9 +92,16 @@ public sealed partial class OptimizationPage : WorkflowPageBase
     // プロジェクトに保存済みの方針をそのまま表示し（＝何も変更しなければ既定値通りに実行される）、
     // ユーザーがこの画面だけで変更した内容は、実行時に一度だけ渡すoverrideとして使う
     // （「①設定」側の保存済み既定値そのものは変更しない）。
+    // ユーザー要望（checkpoint123）「探索方針の優先度を変えられるようにしたい」。この画面は
+    // Preference「値」（考慮しない／できるだけ〜）だけをその回限りで上書きする場であり、優先度の
+    // 並び順（PreferenceOrder）自体は「①設定」側でのみ編集する。読み込んだ並び順を保持しておき、
+    // BuildRunPolicyOverride()が既定順へ黙ってリセットしてしまわないようにする。
+    private IReadOnlyList<SchedulingPolicyDimension> _loadedPreferenceOrder = SchedulingPolicy.DefaultPreferenceOrder;
+
     private async Task LoadRunPolicyAsync(string projectPath)
     {
         var policy = await App.SchedulingPolicy.GetAsync(projectPath);
+        _loadedPreferenceOrder = policy.PreferenceOrder;
         RunPolicyMaxStudentsPerTeacher.Value = policy.MaxStudentsPerTeacher;
 
         RunPolicyTeacherCountPerDayMinimize.IsChecked = policy.TeacherCountPerDayPreference == TeacherCountPerDayPreference.Minimize;
@@ -150,7 +157,8 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         RunPolicyTeacherStudentConsecutivePreferConsecutive.IsChecked == true ? TeacherStudentConsecutivePreference.PreferConsecutive
             : TeacherStudentConsecutivePreference.None,
         checked((int)RunPolicyMaxConcurrentSeats.Value),
-        RunPolicyContinueBeyondNominalTimeNo.IsChecked != true);
+        RunPolicyContinueBeyondNominalTimeNo.IsChecked != true,
+        _loadedPreferenceOrder);
 
     private void Page_Unloaded(object sender, RoutedEventArgs e) => OptimizationRunState.Changed -= OnRunStateChanged;
 

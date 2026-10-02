@@ -156,18 +156,19 @@ public sealed class CpSatScheduleSolver
         // (see AddRegularTeacherMinimums) ranks between day-spread and the placement floor.
         // EvenSpacing/SubjectSpacing (see BuildEvenSpacingTerms/BuildSubjectSpacingTerms) refine
         // day-spread further - even interval, not just distinct-day count - and rank just below it.
+        var preferenceWeights = BuildPreferenceWeights(problem.Policy.PreferenceOrder);
         var objectiveTerms = variables.Select(item =>
             LinearExpr.Term(item.variable, 1_000_000L - (item.candidate.PreferencePenalty * 100L) + item.candidate.AvailabilityPreference))
-            .Concat(BuildDayDispersionTerms(model, variables, problem.Policy.StudentAttendanceDaysPreference))
-            .Concat(BuildTeacherDayDispersionTerms(model, variables, problem.Policy.TeacherAttendanceDaysPreference))
+            .Concat(BuildDayDispersionTerms(model, variables, problem.Policy.StudentAttendanceDaysPreference, preferenceWeights[SchedulingPolicyDimension.StudentAttendanceDays]))
+            .Concat(BuildTeacherDayDispersionTerms(model, variables, problem.Policy.TeacherAttendanceDaysPreference, preferenceWeights[SchedulingPolicyDimension.TeacherAttendanceDays]))
             .Concat(BuildEvenSpacingTerms(model, problem, variables))
-            .Concat(BuildPairingSizeTerms(model, variables, problem.Policy.PairingSizePreference, problem.Policy.MaxStudentsPerTeacher))
+            .Concat(BuildPairingSizeTerms(model, variables, problem.Policy.PairingSizePreference, problem.Policy.MaxStudentsPerTeacher, preferenceWeights[SchedulingPolicyDimension.PairingSize]))
             .Concat(BuildSubjectSpacingTerms(model, problem, variables))
             .Concat(BuildTeacherGapAvoidanceTerms(model, problem, variables))
-            .Concat(BuildTeacherCountPerDayTerms(model, variables, problem.Policy.TeacherCountPerDayPreference))
-            .Concat(BuildTeacherLoadBalanceTerms(model, problem, variables, problem.Policy.TeacherLoadBalancePreference))
-            .Concat(BuildTimeOfDayTerms(variables, problem.Policy.TimeOfDayPreference))
-            .Concat(BuildTeacherStudentConsecutiveTerms(model, problem, variables, problem.Policy.TeacherStudentConsecutivePreference))
+            .Concat(BuildTeacherCountPerDayTerms(model, variables, problem.Policy.TeacherCountPerDayPreference, preferenceWeights[SchedulingPolicyDimension.TeacherCountPerDay]))
+            .Concat(BuildTeacherLoadBalanceTerms(model, problem, variables, problem.Policy.TeacherLoadBalancePreference, preferenceWeights[SchedulingPolicyDimension.TeacherLoadBalance]))
+            .Concat(BuildTimeOfDayTerms(variables, problem.Policy.TimeOfDayPreference, preferenceWeights[SchedulingPolicyDimension.TimeOfDay]))
+            .Concat(BuildTeacherStudentConsecutiveTerms(model, problem, variables, problem.Policy.TeacherStudentConsecutivePreference, preferenceWeights[SchedulingPolicyDimension.TeacherStudentConsecutive]))
             .Concat(regularTeacherShortfallTerms);
         model.Maximize(LinearExpr.Sum(objectiveTerms));
 
@@ -245,7 +246,31 @@ public sealed class CpSatScheduleSolver
         }
     }
 
-    private const long DayDispersionWeight = 10_000L;
+    /// <summary>
+    /// ユーザー要望（checkpoint123）「自動作成のオプション機能（探索方針）について、この優先度を
+    /// 変えられるようにしたい。校舎によっては、一日に入るコマ数＞遅めの時間に入れることを優先の
+    /// 場合があり、その逆も同様である」への対応。以前は<see cref="SchedulingPolicyDimension"/>7つ
+    /// それぞれに固定の重み定数（DayDispersionWeight=10,000・PairingSizeWeight=3,000・
+    /// TeacherStudentConsecutiveWeight=2,000・TeacherCountPerDayWeight=1,500・
+    /// TeacherLoadBalanceWeight=1,000・TimeOfDayWeight=200、StudentAttendanceDaysと
+    /// TeacherAttendanceDaysは同率で10,000）を割り当てていたが、この並び自体をユーザーが
+    /// <see cref="SchedulingPolicy.PreferenceOrder"/>で並び替えられるようにしたため、重みは
+    /// 固定定数ではなくこの並び順（上から何番目か）から動的に決める。並び順の配列が7段階の重み
+    /// テーブルの何番目を使うかを決め、同じ段階の重みの大小関係自体は従来のまま維持した
+    /// （<see cref="SchedulingPolicy.DefaultPreferenceOrder"/>は旧来の固定順と完全に一致するため、
+    /// 並び替えを一度も行っていないプロジェクトの挙動は変わらない）。EvenSpacing/SubjectSpacing/
+    /// TeacherGap/RegularTeacherShortfallはトグル不可能な常時ONの項のため、この並び替え・重み
+    /// テーブルの対象には含まれない（固定定数のまま）。
+    /// </summary>
+    private static readonly long[] PreferenceRankWeights = [10_000L, 6_000L, 3_000L, 2_000L, 1_500L, 1_000L, 200L];
+
+    private static Dictionary<SchedulingPolicyDimension, long> BuildPreferenceWeights(IReadOnlyList<SchedulingPolicyDimension> preferenceOrder)
+    {
+        var weights = new Dictionary<SchedulingPolicyDimension, long>();
+        for (var rank = 0; rank < preferenceOrder.Count; rank++)
+            weights[preferenceOrder[rank]] = PreferenceRankWeights[rank];
+        return weights;
+    }
 
     /// <summary>
     /// ③ユーザー要望「生徒の授業日をできるだけ減らす（同じ日にまとめる）／分散する／考慮しない」への
@@ -257,7 +282,8 @@ public sealed class CpSatScheduleSolver
     private static IEnumerable<LinearExpr> BuildDayDispersionTerms(
         CpModel model,
         IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables,
-        StudentAttendanceDaysPreference preference)
+        StudentAttendanceDaysPreference preference,
+        long weight)
     {
         if (preference == StudentAttendanceDaysPreference.None) yield break;
         var sign = preference == StudentAttendanceDaysPreference.Concentrate ? -1L : 1L;
@@ -267,12 +293,12 @@ public sealed class CpSatScheduleSolver
             var dayVariables = group.Select(item => item.variable).ToArray();
             if (dayVariables.Length <= 1)
             {
-                yield return LinearExpr.Term(dayVariables[0], sign * DayDispersionWeight);
+                yield return LinearExpr.Term(dayVariables[0], sign * weight);
                 continue;
             }
             var dayUsed = model.NewBoolVar($"day_used_{index++}");
             model.AddMaxEquality(dayUsed, dayVariables);
-            yield return LinearExpr.Term(dayUsed, sign * DayDispersionWeight);
+            yield return LinearExpr.Term(dayUsed, sign * weight);
         }
     }
 
@@ -287,7 +313,8 @@ public sealed class CpSatScheduleSolver
     private static IEnumerable<LinearExpr> BuildTeacherDayDispersionTerms(
         CpModel model,
         IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables,
-        TeacherAttendanceDaysPreference preference)
+        TeacherAttendanceDaysPreference preference,
+        long weight)
     {
         if (preference == TeacherAttendanceDaysPreference.None) yield break;
         var sign = preference == TeacherAttendanceDaysPreference.Concentrate ? -1L : 1L;
@@ -297,12 +324,12 @@ public sealed class CpSatScheduleSolver
             var dayVariables = group.Select(item => item.variable).ToArray();
             if (dayVariables.Length <= 1)
             {
-                yield return LinearExpr.Term(dayVariables[0], sign * DayDispersionWeight);
+                yield return LinearExpr.Term(dayVariables[0], sign * weight);
                 continue;
             }
             var dayUsed = model.NewBoolVar($"teacher_day_used_{index++}");
             model.AddMaxEquality(dayUsed, dayVariables);
-            yield return LinearExpr.Term(dayUsed, sign * DayDispersionWeight);
+            yield return LinearExpr.Term(dayUsed, sign * weight);
         }
     }
 
@@ -367,8 +394,6 @@ public sealed class CpSatScheduleSolver
             yield return term;
     }
 
-    private const long PairingSizeWeight = 3_000L;
-
     /// <summary>
     /// ④ユーザー要望「1コマあたりの生徒の対応人数をできるだけ多くする／少なくする／考慮しない」への
     /// 対応。checkpoint93までは常時ON・容量2固定（「1対1が多いように見える。絶対ダメではないが
@@ -388,7 +413,8 @@ public sealed class CpSatScheduleSolver
         CpModel model,
         IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables,
         PairingSizePreference preference,
-        int maxStudentsPerTeacher)
+        int maxStudentsPerTeacher,
+        long weight)
     {
         if (preference == PairingSizePreference.None || maxStudentsPerTeacher < 2) yield break;
         var sign = preference == PairingSizePreference.Minimize ? -1L : 1L;
@@ -403,7 +429,7 @@ public sealed class CpSatScheduleSolver
             {
                 var atLeast = model.NewBoolVar($"pairing_at_least_{threshold}_{index++}");
                 model.Add(LinearExpr.Term(atLeast, threshold) <= filled);
-                yield return LinearExpr.Term(atLeast, sign * PairingSizeWeight);
+                yield return LinearExpr.Term(atLeast, sign * weight);
             }
         }
     }
@@ -453,8 +479,6 @@ public sealed class CpSatScheduleSolver
         }
     }
 
-    private const long TeacherStudentConsecutiveWeight = 2_000L;
-
     /// <summary>
     /// ユーザー要望（checkpoint107）「同一講師が同一生徒を連続コマで担当するのを避ける/優遇するに
     /// ついて、避ける意味はあまりないと思うので、『考慮しない』と『できるだけ連続にする』にして、
@@ -470,7 +494,8 @@ public sealed class CpSatScheduleSolver
         CpModel model,
         ScheduleProblem problem,
         IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables,
-        TeacherStudentConsecutivePreference preference)
+        TeacherStudentConsecutivePreference preference,
+        long weight)
     {
         if (preference == TeacherStudentConsecutivePreference.None) yield break;
 
@@ -498,12 +523,10 @@ public sealed class CpSatScheduleSolver
                 var both = model.NewBoolVar($"teacher_student_consecutive_{index++}");
                 model.Add(both <= current);
                 model.Add(both <= next);
-                yield return LinearExpr.Term(both, TeacherStudentConsecutiveWeight);
+                yield return LinearExpr.Term(both, weight);
             }
         }
     }
-
-    private const long TeacherCountPerDayWeight = 1_500L;
 
     /// <summary>
     /// ①ユーザー要望「一日当たりの講師人数をできるだけ少なくする／多くする／考慮しない」への対応。
@@ -518,7 +541,8 @@ public sealed class CpSatScheduleSolver
     private static IEnumerable<LinearExpr> BuildTeacherCountPerDayTerms(
         CpModel model,
         IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables,
-        TeacherCountPerDayPreference preference)
+        TeacherCountPerDayPreference preference,
+        long weight)
     {
         if (preference == TeacherCountPerDayPreference.None) yield break;
         var sign = preference == TeacherCountPerDayPreference.Minimize ? -1L : 1L;
@@ -528,16 +552,14 @@ public sealed class CpSatScheduleSolver
             var dayVariables = group.Select(item => item.variable).ToArray();
             if (dayVariables.Length == 1)
             {
-                yield return LinearExpr.Term(dayVariables[0], sign * TeacherCountPerDayWeight);
+                yield return LinearExpr.Term(dayVariables[0], sign * weight);
                 continue;
             }
             var dayUsed = model.NewBoolVar($"teacher_day_used_{index++}");
             model.AddMaxEquality(dayUsed, dayVariables);
-            yield return LinearExpr.Term(dayUsed, sign * TeacherCountPerDayWeight);
+            yield return LinearExpr.Term(dayUsed, sign * weight);
         }
     }
-
-    private const long TeacherLoadBalanceWeight = 1_000L;
 
     /// <summary>
     /// ②ユーザー要望「講師ごとのコマ数の偏りを均等にする／考慮しない」への対応（新規）。真の分散最小化
@@ -550,7 +572,8 @@ public sealed class CpSatScheduleSolver
         CpModel model,
         ScheduleProblem problem,
         IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables,
-        TeacherLoadBalancePreference preference)
+        TeacherLoadBalancePreference preference,
+        long weight)
     {
         if (preference == TeacherLoadBalancePreference.None) yield break;
         var teacherIds = variables.Select(item => item.candidate.TeacherId).Distinct().ToArray();
@@ -563,10 +586,8 @@ public sealed class CpSatScheduleSolver
             var fixedLoad = problem.ExistingPlacements.Count(item => item.TeacherId == teacherId);
             model.Add(maxLoad >= LinearExpr.Sum(teacherVariables) + fixedLoad);
         }
-        yield return LinearExpr.Term(maxLoad, -TeacherLoadBalanceWeight);
+        yield return LinearExpr.Term(maxLoad, -weight);
     }
-
-    private const long TimeOfDayWeight = 200L;
 
     /// <summary>
     /// ⑤ユーザー要望「時間帯をできるだけ遅くする／早くする／考慮しない」への対応（新規）。
@@ -576,12 +597,13 @@ public sealed class CpSatScheduleSolver
     /// </summary>
     private static IEnumerable<LinearExpr> BuildTimeOfDayTerms(
         IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables,
-        TimeOfDayPreference preference)
+        TimeOfDayPreference preference,
+        long weight)
     {
         if (preference == TimeOfDayPreference.None) yield break;
         var sign = preference == TimeOfDayPreference.Early ? -1L : 1L;
         foreach (var (candidate, variable) in variables)
-            yield return LinearExpr.Term(variable, sign * TimeOfDayWeight * candidate.SlotOrder);
+            yield return LinearExpr.Term(variable, sign * weight * candidate.SlotOrder);
     }
 
     /// <summary>Open (school) dates only, in calendar order - closed days never appear here, so every

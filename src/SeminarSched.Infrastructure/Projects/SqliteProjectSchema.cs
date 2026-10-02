@@ -221,6 +221,15 @@ internal static class SqliteProjectSchema
         // ALTER TABLEで届ける。
         await AddColumnIfMissingAsync(connection, transaction, "SchedulingPolicy", "TeacherStudentConsecutivePreference", "INTEGER NOT NULL DEFAULT 0 CHECK(TeacherStudentConsecutivePreference BETWEEN 0 AND 1)", cancellationToken);
 
+        // ユーザー要望（checkpoint123）「自動作成のオプション機能（探索方針）について、この優先度を
+        // 変えられるようにしたい」。7つの探索方針（SchedulingPolicyDimension、0=TeacherCountPerDay・
+        // 1=TeacherLoadBalance・2=StudentAttendanceDays・3=TeacherAttendanceDays・4=PairingSize・
+        // 5=TimeOfDay・6=TeacherStudentConsecutive）を優先度の高い順にカンマ区切りで並べたもの。
+        // 既定値'2,3,4,6,0,1,5'は、この機能を導入する以前に内部で固定されていた重み付けの大小関係
+        // （SchedulingPolicy.DefaultPreferenceOrderと同一）と一致させてあるため、既存プロジェクトにも
+        // 同じ理由でALTER TABLEで届けても挙動は変わらない。
+        await AddColumnIfMissingAsync(connection, transaction, "SchedulingPolicy", "PreferenceOrder", "TEXT NOT NULL DEFAULT '2,3,4,6,0,1,5'", cancellationToken);
+
         // ユーザー要望（checkpoint112）「集団授業のクラスに担当講師（任意）を割り当て、その日時に
         // 個別授業を持てないようにブロックし、全体時間割にはその講師のその時間を『集団』と表示して
         // ほしい」への対応。既存プロジェクトにも同じ理由でALTER TABLEで届ける。
@@ -434,7 +443,8 @@ internal static class SqliteProjectSchema
             TimeOfDayPreference INTEGER NOT NULL DEFAULT 0 CHECK(TimeOfDayPreference BETWEEN 0 AND 2),
             TeacherStudentConsecutivePreference INTEGER NOT NULL DEFAULT 0 CHECK(TeacherStudentConsecutivePreference BETWEEN 0 AND 1),
             MaxConcurrentSeats INTEGER NOT NULL DEFAULT 0 CHECK(MaxConcurrentSeats >= 0),
-            ContinueBeyondNominalTimeIfIncomplete INTEGER NOT NULL DEFAULT 1 CHECK(ContinueBeyondNominalTimeIfIncomplete IN(0,1))
+            ContinueBeyondNominalTimeIfIncomplete INTEGER NOT NULL DEFAULT 1 CHECK(ContinueBeyondNominalTimeIfIncomplete IN(0,1)),
+            PreferenceOrder TEXT NOT NULL DEFAULT '2,3,4,6,0,1,5'
         );
         CREATE INDEX IF NOT EXISTS IX_AuditLog_Project_Timestamp ON AuditLog(ProjectId,TimestampUtc);
         CREATE INDEX IF NOT EXISTS IX_ValidationIssue_Project_Resolved ON ValidationIssue(ProjectId,Resolved,Severity);

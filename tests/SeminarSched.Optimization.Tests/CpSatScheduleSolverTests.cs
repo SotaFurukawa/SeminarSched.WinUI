@@ -321,6 +321,53 @@ public sealed class CpSatScheduleSolverTests
         Assert.Equal(100L, demand2Placement.TeacherId);
     }
 
+    // ユーザー要望（checkpoint123）「自動作成のオプション機能（探索方針）について、この優先度を
+    // 変えられるようにしたい」を検証する。2つの探索方針（⑤1コマあたりの生徒の対応人数=Maximize・
+    // ⑥時間帯=Late）を意図的に対立させる：生徒10は1限（slotOrder=1）に固定。生徒20は
+    // 「1限（生徒10とペアになれるが早い）」と「2限（生徒10とはペアにならないが遅い）」の
+    // どちらかを選べる。PreferenceOrderでPairingSizeをTimeOfDayより上位にすると1限（ペア優先）が、
+    // 逆にTimeOfDayをPairingSizeより上位にすると2限（時間帯優先）が選ばれるはずで、これは
+    // 「同じpreference値の組でも、並び順だけで実際の重み付け・結果が変わる」ことの直接的な証拠になる。
+    [Theory]
+    [InlineData(true, 1L)]
+    [InlineData(false, 2L)]
+    public async Task SolveAsync_PreferenceOrderDeterminesWhichConflictingPolicyWins(bool pairingSizeRankedFirst, long expectedDemand2TimeSlotId)
+    {
+        var demands = new[] { new LessonDemand(1, 10, 1, 0), new LessonDemand(2, 20, 1, 0) };
+        var candidates = new[]
+        {
+            new PlacementCandidate(1, 10, 100, 1, 1, 1, 1),
+            new PlacementCandidate(2, 20, 100, 1, 1, 1, 1),
+            new PlacementCandidate(2, 20, 100, 1, 2, 1, 2),
+        };
+        var order = pairingSizeRankedFirst
+            ?
+            [
+                SchedulingPolicyDimension.PairingSize, SchedulingPolicyDimension.TeacherCountPerDay,
+                SchedulingPolicyDimension.TeacherLoadBalance, SchedulingPolicyDimension.StudentAttendanceDays,
+                SchedulingPolicyDimension.TeacherAttendanceDays, SchedulingPolicyDimension.TeacherStudentConsecutive,
+                SchedulingPolicyDimension.TimeOfDay,
+            ]
+            : (IReadOnlyList<SchedulingPolicyDimension>)
+            [
+                SchedulingPolicyDimension.TimeOfDay, SchedulingPolicyDimension.TeacherCountPerDay,
+                SchedulingPolicyDimension.TeacherLoadBalance, SchedulingPolicyDimension.StudentAttendanceDays,
+                SchedulingPolicyDimension.TeacherAttendanceDays, SchedulingPolicyDimension.TeacherStudentConsecutive,
+                SchedulingPolicyDimension.PairingSize,
+            ];
+        var policy = new SchedulingPolicy(
+            maxStudentsPerTeacher: 2,
+            pairingSizePreference: PairingSizePreference.Maximize,
+            timeOfDayPreference: TimeOfDayPreference.Late,
+            preferenceOrder: order);
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, Policy: policy), TimeSpan.FromSeconds(5));
+
+        Assert.Equal(2, solution.Placements.Count);
+        var demand2Placement = solution.Placements.Single(p => p.RequestId == 2);
+        Assert.Equal(expectedDemand2TimeSlotId, demand2Placement.TimeSlotId);
+    }
+
     // ユーザー要望「1対1が多いように見える。絶対ダメではないが1対2の方がいい」を検証する。2名の
     // 生徒が同じ講師・同じ日の2コマのどちらにも配置可能（1対1必須ではない）とき、他の条件が同じなら
     // 片方のコマへ2名ともまとめて配置（1対2）し、もう片方のコマは空けたままにするはず。
