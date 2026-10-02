@@ -23,6 +23,8 @@ using SeminarSched.Infrastructure.GroupLessons;
 using SeminarSched.Infrastructure.Settings;
 using SeminarSched.Application.Logging;
 using SeminarSched.Infrastructure.Logging;
+using SeminarSched.Application.Updates;
+using SeminarSched.Infrastructure.Updates;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -81,6 +83,8 @@ public partial class App : Application
     public static IOutputPackageService OutputPackage { get; } = new SqliteOutputPackageService();
 
     public static IGroupLessonService GroupLessons { get; } = new SqliteGroupLessonService();
+
+    public static IUpdateCheckService UpdateCheck { get; } = new GitHubUpdateCheckService();
 
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code

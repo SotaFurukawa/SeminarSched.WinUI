@@ -19,7 +19,12 @@ public sealed record AppSettings(
     /// 認証された場合はtrue（年度に関わらず無期限）。ProductKeyYearは年度キーで認証された年度
     /// （毎年2/1に現在の年度と一致しなくなるため、再度プロダクトキーを要求する判定に使う）。</summary>
     bool ProductKeyIsMaster = false,
-    int? ProductKeyYear = null)
+    int? ProductKeyYear = null,
+    /// <summary>ユーザー要望（checkpoint125）「自動アップデート機能を追加しておきたい。週に1度、
+    /// アップデートがないかのチェックを行い...」への対応。GitHub Releases APIへの問い合わせに
+    /// 成功した直近時刻（UTC）。nullは「まだ一度も確認していない」ことを表す。問い合わせに失敗
+    /// した場合は更新しない（次回起動時に再試行させるため）。</summary>
+    DateTimeOffset? LastUpdateCheckUtc = null)
 {
     public static AppSettings Default { get; } = new(OptimizationProfileCatalog.DefaultLevel);
 

@@ -34,4 +34,27 @@ public sealed class ApplicationVersionTests
     {
         Assert.Throws<FormatException>(() => ApplicationVersion.Parse(value));
     }
+
+    [Theory]
+    [InlineData("0.16.0", "0.15.0", true)]
+    [InlineData("0.15.1", "0.15.0", true)]
+    [InlineData("1.0.0", "0.15.0", true)]
+    [InlineData("0.15.0", "0.15.0", false)]
+    [InlineData("0.14.0", "0.15.0", false)]
+    public void IsNewerThan_ComparesMajorMinorPatchOnly(string candidate, string current, bool expectedNewer)
+    {
+        var candidateVersion = ApplicationVersion.Parse(candidate);
+        var currentVersion = ApplicationVersion.Parse(current);
+
+        Assert.Equal(expectedNewer, candidateVersion.IsNewerThan(currentVersion));
+    }
+
+    [Fact]
+    public void IsNewerThan_IgnoresPrereleaseTag()
+    {
+        var candidate = ApplicationVersion.Parse("0.15.0-beta");
+        var current = ApplicationVersion.Parse("0.15.0-alpha");
+
+        Assert.False(candidate.IsNewerThan(current));
+    }
 }

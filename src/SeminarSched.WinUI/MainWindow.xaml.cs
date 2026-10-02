@@ -2,7 +2,9 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using SeminarSched.Application;
 using SeminarSched.Application.Settings;
+using SeminarSched.Application.Updates;
 using SeminarSched.Domain.Licensing;
 using SeminarSched_WinUI.Pages;
 
@@ -59,16 +61,26 @@ public sealed partial class MainWindow : Window
         }
 
         _productKeyCheckStarted = true;
-        _ = EnsureProductKeyAuthorizedAsync();
+        _ = InitializeStartupChecksAsync();
     }
 
-    private async Task EnsureProductKeyAuthorizedAsync()
+    private async Task InitializeStartupChecksAsync()
+    {
+        if (!await EnsureProductKeyAuthorizedAsync())
+        {
+            return;
+        }
+
+        await CheckForUpdateIfDueAsync();
+    }
+
+    private async Task<bool> EnsureProductKeyAuthorizedAsync()
     {
         var settings = await App.SettingsStore.LoadAsync();
         if (IsLicensed(settings))
         {
             ApplyLicenseLabel(settings);
-            return;
+            return true;
         }
 
         ProductKeyValidationResult? accepted = null;
@@ -121,7 +133,7 @@ public sealed partial class MainWindow : Window
         if (dialogResult != ContentDialogResult.Primary || accepted is not { } validated)
         {
             Application.Current.Exit();
-            return;
+            return false;
         }
 
         settings = settings with
@@ -131,6 +143,7 @@ public sealed partial class MainWindow : Window
         };
         await App.SettingsStore.SaveAsync(settings);
         ApplyLicenseLabel(settings);
+        return true;
     }
 
     private static bool IsLicensed(AppSettings settings) =>
@@ -141,6 +154,54 @@ public sealed partial class MainWindow : Window
         var title = settings.ProductKeyLicenseLabel is { } suffix ? $"ShikiWari {suffix}" : "ShikiWari";
         Title = title;
         AppTitleBar.Title = title;
+    }
+
+    // ユーザー要望（checkpoint125）「週に1度、アップデートがないかのチェックを行い、もしあるなら
+    // アップデートをするかの警告を出すようにする」への対応。GitHub Releases APIへの問い合わせに
+    // 成功した場合のみLastUpdateCheckUtcを更新する（失敗時は次回起動時に再試行させるため）。
+    private static readonly TimeSpan UpdateCheckInterval = TimeSpan.FromDays(7);
+
+    private async Task CheckForUpdateIfDueAsync()
+    {
+        var settings = await App.SettingsStore.LoadAsync();
+        var now = DateTimeOffset.UtcNow;
+        if (settings.LastUpdateCheckUtc is { } lastChecked && now - lastChecked < UpdateCheckInterval)
+        {
+            return;
+        }
+
+        var currentVersion = ApplicationVersion.FromAssembly(typeof(App).Assembly);
+        var result = await App.UpdateCheck.CheckForUpdateAsync(currentVersion);
+        if (!result.Succeeded)
+        {
+            return;
+        }
+
+        await App.SettingsStore.SaveAsync(settings with { LastUpdateCheckUtc = now });
+
+        if (result.IsUpdateAvailable && result.LatestVersion is not null)
+        {
+            await ShowUpdateAvailableDialogAsync(currentVersion, result);
+        }
+    }
+
+    private async Task ShowUpdateAvailableDialogAsync(ApplicationVersion currentVersion, UpdateCheckResult result)
+    {
+        var dialog = new ContentDialog
+        {
+            XamlRoot = Content.XamlRoot,
+            Title = "新しいバージョンがあります",
+            Content = $"現在のバージョン: {currentVersion.DisplayVersion}\n最新バージョン: {result.LatestVersion!.DisplayVersion}\n\nダウンロードページを開きますか？",
+            PrimaryButtonText = "ダウンロードページを開く",
+            CloseButtonText = "後で",
+            DefaultButton = ContentDialogButton.Primary,
+        };
+
+        var dialogResult = await dialog.ShowAsync();
+        if (dialogResult == ContentDialogResult.Primary && result.ReleaseUrl is not null)
+        {
+            await Windows.System.Launcher.LaunchUriAsync(new Uri(result.ReleaseUrl));
+        }
     }
 
     private bool _syncingSetupNav;

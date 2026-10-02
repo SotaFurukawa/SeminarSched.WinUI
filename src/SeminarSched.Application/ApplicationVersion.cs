@@ -12,6 +12,24 @@ public sealed record ApplicationVersion(int Major, int Minor, int Patch, string?
         ? $"v{Major}.{Minor}.{Patch}"
         : $"v{Major}.{Minor}.{Patch} ({Prerelease})";
 
+    /// <summary>Prerelease（常に"beta"）は順序付けに使わず、Major.Minor.Patchのみで比較する。</summary>
+    public bool IsNewerThan(ApplicationVersion other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+
+        if (Major != other.Major)
+        {
+            return Major > other.Major;
+        }
+
+        if (Minor != other.Minor)
+        {
+            return Minor > other.Minor;
+        }
+
+        return Patch > other.Patch;
+    }
+
     public static ApplicationVersion FromAssembly(Assembly assembly)
     {
         ArgumentNullException.ThrowIfNull(assembly);
