@@ -315,8 +315,13 @@ public sealed partial class SetupPage : WorkflowPageBase
             Grid.SetRow(element,row);Grid.SetColumn(element,column);Grid.SetColumnSpan(element,columnSpan);
             QualificationMatrix.Children.Add(element);
         }
+        // ユーザー指摘（checkpoint127）「枠線を少し濃くしてください」への対応。以前はこの表の
+        // セル自体に明示的な境界線が無く、Gridの ColumnSpacing/RowSpacing（背景色の隙間）だけで
+        // 格子状に見えていたため非常に薄かった。全セル（見出し・講師ID/氏名・○ボタン）へ共通の
+        // 境界線を明示的に設定し、GridのSpacingは0へ戻して二重線にならないようにした。
+        var cellBorderBrush=new SolidColorBrush(Windows.UI.Color.FromArgb(255,150,158,171));
         var headerBackground=ResourceBrush("CardBackgroundFillColorSecondaryBrush",Windows.UI.Color.FromArgb(255,242,244,247));
-        Border HeaderCell(string text)=>new(){Background=headerBackground,Padding=new Thickness(4),Child=new TextBlock{Text=text,FontWeight=Microsoft.UI.Text.FontWeights.SemiBold,TextWrapping=TextWrapping.Wrap,TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center}};
+        Border HeaderCell(string text)=>new(){Background=headerBackground,BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),Padding=new Thickness(4),Child=new TextBlock{Text=text,FontWeight=Microsoft.UI.Text.FontWeights.SemiBold,TextWrapping=TextWrapping.Wrap,TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center}};
 
         var columnIndex=2;
         foreach(var group in subjects.GroupBy(s=>s.Value.SchoolLevel))
@@ -333,13 +338,13 @@ public sealed partial class SetupPage : WorkflowPageBase
         {
             var teacher=teachers[r].Value;
             var row=2+r;
-            Place(new Border{Padding=new Thickness(4),Child=new TextBlock{Text=teacher.ExternalId,VerticalAlignment=VerticalAlignment.Center}},row,0);
-            Place(new Border{Padding=new Thickness(4),Child=new TextBlock{Text=teacher.Name,VerticalAlignment=VerticalAlignment.Center}},row,1);
+            Place(new Border{BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),Padding=new Thickness(4),Child=new TextBlock{Text=teacher.ExternalId,VerticalAlignment=VerticalAlignment.Center}},row,0);
+            Place(new Border{BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),Padding=new Thickness(4),Child=new TextBlock{Text=teacher.Name,VerticalAlignment=VerticalAlignment.Center}},row,1);
             for(var c=0;c<subjects.Length;c++)
             {
                 var subject=subjects[c].Value;
                 var canTeach=_qualifications.TryGetValue((teacher.Id,subject.Id),out var q)&&q.CanTeach;
-                var cell=new Button{Content=canTeach?"○":"",Tag=(teacher.Id,subject.Id),HorizontalAlignment=HorizontalAlignment.Stretch,HorizontalContentAlignment=HorizontalAlignment.Center,Padding=new Thickness(0,6,0,6)};
+                var cell=new Button{Content=canTeach?"○":"",Tag=(teacher.Id,subject.Id),BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),HorizontalAlignment=HorizontalAlignment.Stretch,HorizontalContentAlignment=HorizontalAlignment.Center,Padding=new Thickness(0,6,0,6)};
                 cell.Click+=QualificationCell_Click;
                 Place(cell,row,2+c);
             }

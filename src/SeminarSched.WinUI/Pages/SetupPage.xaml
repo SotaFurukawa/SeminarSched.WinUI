@@ -7,7 +7,7 @@
     NavigationCacheMode="Required"
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
-    <ScrollViewer><StackPanel MaxWidth="960" Padding="24" HorizontalAlignment="Left" Spacing="16">
+    <ScrollViewer><StackPanel Padding="24" Spacing="16">
         <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="① 設定"/>
         <InfoBar x:Name="ProjectRequired"/>
         <InfoBar x:Name="Status" IsClosable="True"/>
@@ -54,7 +54,7 @@
             <TabViewItem Header="講師指導可能科目"><StackPanel Padding="16" Spacing="12"><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="240"/><ColumnDefinition Width="240"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><ComboBox x:Name="QualificationTeacher" Header="講師"/><ComboBox x:Name="QualificationSubject" Grid.Column="1" Header="科目"/><Button Grid.Column="2" VerticalAlignment="Bottom" Content="保存" Click="SaveQualification_Click"/></Grid><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="QualificationCanTeach" Content="指導可能" IsChecked="True"/><TextBox x:Name="QualificationNote" Width="420" Header="備考"/></StackPanel>
                 <TextBlock Text="表の○をクリックすると指導可能／不可を切り替えられます（備考は上のフォームで個別に設定してください）。" TextWrapping="Wrap"/>
                 <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="480">
-                    <Grid x:Name="QualificationMatrix" ColumnSpacing="2" RowSpacing="2"/>
+                    <Grid x:Name="QualificationMatrix"/>
                 </ScrollViewer>
             </StackPanel></TabViewItem>
             <TabViewItem Header="通常授業担当設定"><StackPanel Padding="16" Spacing="12"><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="220"/><ColumnDefinition Width="220"/><ColumnDefinition Width="120"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><ComboBox x:Name="RegularStudent" Header="生徒"/><ComboBox x:Name="RegularSubject" Grid.Column="1" Header="科目"/><ComboBox x:Name="RegularTeacher" Grid.Column="2" Header="通常担当講師（任意）"/><NumberBox x:Name="RegularPriority" Grid.Column="3" Header="優先度 1～5" Minimum="1" Maximum="5" Value="3"/><Button Grid.Column="4" VerticalAlignment="Bottom" Content="保存" Click="SaveRegularLesson_Click"/></Grid><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="RegularOneToOne" Content="1対1必須"/><TextBox x:Name="RegularNote" Width="420" Header="備考"/></StackPanel>
