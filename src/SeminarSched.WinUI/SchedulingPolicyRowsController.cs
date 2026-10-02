@@ -21,6 +21,8 @@ public sealed class SchedulingPolicyRowsController(
         {
             rows.Add(row);
         }
+
+        Refresh();
     }
 
     public void LoadFromSaved(IReadOnlyList<(SchedulingPolicyDimension Dimension, int SelectedOptionIndex)> saved)
@@ -30,6 +32,8 @@ public sealed class SchedulingPolicyRowsController(
         {
             rows.Add(row);
         }
+
+        Refresh();
     }
 
     private void Renumber()

@@ -1,13 +1,39 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-02（checkpoint129）
+最終更新: 2026-10-03（checkpoint130）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.19.0 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
-Latest Development Checkpoint: checkpoint 129（ユーザーから設定画面・講師指導可能科目・通常授業
+Current Version: `v0.19.1 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
+Latest Development Checkpoint: checkpoint 130（v0.19.0の9件バッチについて、ユーザーから
+「しばらく原神は触らないので、確認してみてください」と実機確認の再開を明示的に指示され、
+前checkpointで中断していたUI確認を完了した。①アップデートを確認ボタンの位置、②ライセンスを
+解除ボタンの新設（見出しと同じ行）、④時間割編集の講師名中央寄せ、⑤ホーム画面の矢印アイコン、
+⑥講師指導可能科目フォームの行統合＋2択化、⑦通常授業担当設定フォームの行統合、⑧複数コマ・
+複数講師の出勤可否一括設定の削除は、スクリーンショットで問題なしを確認した。
+**③探索方針のドラッグ並び替え:** 実機でマウスドラッグを試したところ、`SetCursorPos`による
+座標テレポート方式ではWinUIのListViewがドラッグジェスチャーとして認識せず並び替わらなかったため、
+検証スクリプトを`mouse_event(MOUSEEVENTF_MOVE)`による相対移動方式へ修正して再試行し、
+ドラッグ中のプレビュー表示・ドロップ後の並び替え・番号振り直し・RadioButton再描画のいずれも
+正しく動作することを確認した（これはテストスクリプト側の問題であり、アプリ側の実装に問題は
+なかった）。
+**⑨探索方針の一時変更のページ遷移保持で新たな不具合を発見・修正:** ドラッグで並び替えた状態
+（2行目を「均等にする」に設定）のまま④時間割編集へ遷移して⑤へ戻ったところ、並び順は正しく
+復元された一方で、2行目のラジオボタンの選択状態が「均等にする」から既定の「考慮しない」へ
+戻って表示される不具合を発見した。原因は`SchedulingPolicyRowsController.Load`/`LoadFromSaved`
+が`rows`（`ObservableCollection`）を入れ替えるだけで、▲▼やドラッグ並び替え後に呼んでいる
+`Refresh()`（`ItemsSource`の張り直しによるコンテナ再構築）を呼んでいなかったこと。WinUIの
+ListViewはコンテナをリサイクルする際に新しいDataContextへ単純に差し替えるだけでLoadedを
+再発火させないため、各行のRadioButtonが前回そのコンテナに割り当てられていた別の行の
+IsChecked状態を引き継いで表示されていた（`OptionLoaded`による手動同期が走らない）。
+`Load`・`LoadFromSaved`の末尾でも`Refresh()`を呼ぶよう修正し、同じシナリオ（ドラッグ→別ページへ
+遷移→戻る）を再度実機で確認して、並び順・選択状態の両方が正しく復元されることを確認した。
+`dotnet test`（`SeminarSched.WinUI.sln`全体）249件全てpassed。v0.19.0 Draft Release後のbug fix
+のためNext Version Ruleの既定を適用しv0.19.1（patch bump）とした。詳細は
+[docs/releases/v0.19.1.md](releases/v0.19.1.md)。
+checkpoint 129（ユーザーから設定画面・講師指導可能科目・通常授業
 担当設定・時間割編集のスクリーンショットを添えて、一度に9件の指摘を受けた
 （①アップデートを確認ボタンの位置、②ライセンスの解除機能の新設、③探索方針のドラッグ並び替え、
 ④時間割編集の講師名中央寄せ、⑤ホーム画面の矢印アイコン、⑥講師指導可能科目フォームの行統合＋
