@@ -33,29 +33,21 @@ public sealed partial class SetupPage : WorkflowPageBase
     private readonly HashSet<DateOnly> _selectedDates = new();
 
     // ユーザー要望（checkpoint123）「探索方針の優先度を変えられるようにしたい」への対応。
-    // 各探索方針の表示名・選択肢ラベル・各ラベル位置に対応する実際のPreference enum序数
-    // （生徒の授業日・講師の出勤日は表示順とenum宣言順が一致しないため明示的に対応表を持つ）。
+    // 並び替えUIのロジック自体はSchedulingPolicyRowsControllerへ切り出し、OptimizationPageの
+    // 一時上書き（checkpoint126）と共有している。
     public ObservableCollection<SchedulingPolicyRowViewModel> PolicyRows { get; } = new();
 
-    private static readonly (SchedulingPolicyDimension Dimension, string Title, string[] Labels, int[] Values)[] PolicyDimensionMetadata =
-    [
-        (SchedulingPolicyDimension.TeacherCountPerDay, "一日当たりの講師人数",
-            ["考慮しない", "できるだけ少なくする", "できるだけ多くする"], [0, 1, 2]),
-        (SchedulingPolicyDimension.TeacherLoadBalance, "講師ごとのコマ数の偏り",
-            ["考慮しない", "均等にする"], [0, 1]),
-        (SchedulingPolicyDimension.StudentAttendanceDays, "生徒の授業日",
-            ["考慮しない", "できるだけ減らす（同じ日にまとめる）", "分散する"], [0, 2, 1]),
-        (SchedulingPolicyDimension.TeacherAttendanceDays, "講師の出勤日",
-            ["考慮しない", "できるだけ減らす（同じ日にまとめる）", "分散する"], [0, 2, 1]),
-        (SchedulingPolicyDimension.PairingSize, "1コマあたりの生徒の対応人数",
-            ["考慮しない", "できるだけ多くする", "できるだけ少なくする"], [0, 1, 2]),
-        (SchedulingPolicyDimension.TimeOfDay, "時間帯",
-            ["考慮しない", "できるだけ遅くする", "できるだけ早くする"], [0, 1, 2]),
-        (SchedulingPolicyDimension.TeacherStudentConsecutive, "同一講師×同一生徒の連続コマ",
-            ["考慮しない", "できるだけ連続にする"], [0, 1]),
-    ];
+    private readonly SchedulingPolicyRowsController _policyController;
 
-    public SetupPage() { InitializeComponent(); TimeSlots.ItemsSource = _timeSlotItems; SlotStartTime.ItemsSource = TimeOfDayOptions.Values; SlotEndTime.ItemsSource = TimeOfDayOptions.Values; RenderCalendarWeekdayHeader(); }
+    public SetupPage()
+    {
+        InitializeComponent();
+        TimeSlots.ItemsSource = _timeSlotItems;
+        SlotStartTime.ItemsSource = TimeOfDayOptions.Values;
+        SlotEndTime.ItemsSource = TimeOfDayOptions.Values;
+        RenderCalendarWeekdayHeader();
+        _policyController = new SchedulingPolicyRowsController(PolicyRows, PolicyRowsList);
+    }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
@@ -124,138 +116,29 @@ public sealed partial class SetupPage : WorkflowPageBase
     {
         var policy = await App.SchedulingPolicy.GetAsync(path);
         PolicyMaxStudentsPerTeacher.Value = policy.MaxStudentsPerTeacher;
-        BuildPolicyRows(policy);
+        _policyController.Load(policy);
         PolicyMaxConcurrentSeats.Value = policy.MaxConcurrentSeats;
         PolicyContinueBeyondNominalTimeYes.IsChecked = policy.ContinueBeyondNominalTimeIfIncomplete;
         PolicyContinueBeyondNominalTimeNo.IsChecked = !policy.ContinueBeyondNominalTimeIfIncomplete;
     }
 
-    private void BuildPolicyRows(SchedulingPolicy policy)
-    {
-        var currentValueByDimension = new Dictionary<SchedulingPolicyDimension, int>
-        {
-            [SchedulingPolicyDimension.TeacherCountPerDay] = (int)policy.TeacherCountPerDayPreference,
-            [SchedulingPolicyDimension.TeacherLoadBalance] = (int)policy.TeacherLoadBalancePreference,
-            [SchedulingPolicyDimension.StudentAttendanceDays] = (int)policy.StudentAttendanceDaysPreference,
-            [SchedulingPolicyDimension.TeacherAttendanceDays] = (int)policy.TeacherAttendanceDaysPreference,
-            [SchedulingPolicyDimension.PairingSize] = (int)policy.PairingSizePreference,
-            [SchedulingPolicyDimension.TimeOfDay] = (int)policy.TimeOfDayPreference,
-            [SchedulingPolicyDimension.TeacherStudentConsecutive] = (int)policy.TeacherStudentConsecutivePreference,
-        };
-        var metadataByDimension = PolicyDimensionMetadata.ToDictionary(m => m.Dimension);
+    private void PolicyOption_Loaded(object sender, RoutedEventArgs e) => _policyController.OptionLoaded(sender, e);
 
-        PolicyRows.Clear();
-        var position = 1;
-        foreach (var dimension in policy.PreferenceOrder)
-        {
-            var metadata = metadataByDimension[dimension];
-            var optionIndex = Array.IndexOf(metadata.Values, currentValueByDimension[dimension]);
-            if (optionIndex < 0) optionIndex = 0;
-            PolicyRows.Add(new SchedulingPolicyRowViewModel(dimension, metadata.Title, metadata.Labels, metadata.Values)
-            {
-                SelectedOptionIndex = optionIndex,
-                DisplayNumber = position++,
-            });
-        }
-    }
+    private void PolicyOption_SelectionChanged(object sender, SelectionChangedEventArgs e) => _policyController.OptionSelectionChanged(sender, e);
 
-    private void RenumberPolicyRows()
-    {
-        for (var i = 0; i < PolicyRows.Count; i++) PolicyRows[i].DisplayNumber = i + 1;
-    }
+    private void MovePolicyRowUp_Click(object sender, RoutedEventArgs e) => _policyController.MoveUp(sender, e);
 
-    // ユーザー要望「カーソルをそれぞれの探索方針のところに持ってくると、右端に上下矢印が出てくる
-    // ようになり、それを押すと、探索方針の順序が入れ替わる」への対応。ObservableCollection.Move()
-    // だけでは、並び替え後にその場へ再配置されたコンテナ内のRadioButtonsがSelectedIndexを正しく
-    // 再描画しない（内部の値自体は正しいが、選択状態の丸印が表示されない）WinUIの既知の挙動が
-    // 確認されたため、並び替えのたびにItemsSourceを張り直してコンテナを作り直し、確実に正しい
-    // 選択状態で再描画させる。
-    private void RefreshPolicyRowsList()
-    {
-        PolicyRowsList.ItemsSource = null;
-        PolicyRowsList.ItemsSource = PolicyRows;
-    }
+    private void MovePolicyRowDown_Click(object sender, RoutedEventArgs e) => _policyController.MoveDown(sender, e);
 
-    // ユーザー要望「探索方針の優先度を変えられるようにしたい」への対応。RadioButtonsの
-    // SelectedIndexをx:Bind Mode=TwoWayで双方向バインドしたところ、ObservableCollection.Move()で
-    // 並び替えた後に再配置されたコンテナのRadioButtonsが選択状態（丸印）を正しく再描画しない
-    // 不具合が確認された（ItemsSourceの張り直しでも解消しなかったため、RadioButtonsの
-    // ItemsSourceが整う前にSelectedIndexが設定される競合が疑わしい）。バインドの自動同期に頼らず、
-    // Loadedで確実にItems準備後に初期値を設定し、SelectionChangedで明示的にViewModelへ書き戻す
-    // 完全手動の方式にして回避した。
-    private void PolicyOption_Loaded(object sender, RoutedEventArgs e)
-    {
-        if (sender is RadioButtons { DataContext: SchedulingPolicyRowViewModel row } radioButtons)
-            radioButtons.SelectedIndex = row.SelectedOptionIndex;
-    }
+    private void PolicyRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SchedulingPolicyRowsController.RowPointerEntered(sender, e);
 
-    private void PolicyOption_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (sender is not RadioButtons { DataContext: SchedulingPolicyRowViewModel row } radioButtons) return;
-        if (radioButtons.SelectedIndex < 0) return;
-        row.SelectedOptionIndex = radioButtons.SelectedIndex;
-        // ユーザー要望「デフォルトはすべて考慮しないとなっているが、もしそれ以外が選択されたら、
-        // 自動的に一番上に来るようにしてほしい」への対応。
-        if (row.SelectedOptionIndex == 0) return;
-        var index = PolicyRows.IndexOf(row);
-        if (index <= 0) return;
-        PolicyRows.Move(index, 0);
-        RenumberPolicyRows();
-        RefreshPolicyRowsList();
-    }
+    private void PolicyRow_PointerExited(object sender, PointerRoutedEventArgs e) => SchedulingPolicyRowsController.RowPointerExited(sender, e);
 
-    private void MovePolicyRowUp_Click(object sender, RoutedEventArgs e)
-    {
-        if (((Button)sender).Tag is not SchedulingPolicyRowViewModel row) return;
-        var index = PolicyRows.IndexOf(row);
-        if (index <= 0) return;
-        PolicyRows.Move(index, index - 1);
-        RenumberPolicyRows();
-        RefreshPolicyRowsList();
-    }
-
-    private void MovePolicyRowDown_Click(object sender, RoutedEventArgs e)
-    {
-        if (((Button)sender).Tag is not SchedulingPolicyRowViewModel row) return;
-        var index = PolicyRows.IndexOf(row);
-        if (index < 0 || index >= PolicyRows.Count - 1) return;
-        PolicyRows.Move(index, index + 1);
-        RenumberPolicyRows();
-        RefreshPolicyRowsList();
-    }
-
-    // ユーザー要望「カーソルをそれぞれの探索方針のところに持ってくると、右端に上下矢印が出てくる
-    // ようになり」への対応。各行のGridはDataTemplateから実体化されるため、x:Nameで付けた名前は
-    // ページ全体のnamescopeへ登録されずFindNameでは解決できない（WinUIのDataTemplateの既知の制約）。
-    // x:Nameは対象のName プロパティ自体には設定されるため、Grid.Childrenを直接たどってNameで
-    // 探す。
-    private void PolicyRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SetArrowsVisibility((Grid)sender, Visibility.Visible);
-
-    private void PolicyRow_PointerExited(object sender, PointerRoutedEventArgs e) => SetArrowsVisibility((Grid)sender, Visibility.Collapsed);
-
-    private static void SetArrowsVisibility(Grid row, Visibility visibility)
-    {
-        if (row.Children.OfType<FrameworkElement>().FirstOrDefault(c => c.Name == "ArrowsPanel") is { } panel)
-            panel.Visibility = visibility;
-    }
-
-    private SchedulingPolicy BuildSchedulingPolicyFromForm()
-    {
-        var valueByDimension = PolicyRows.ToDictionary(row => row.Dimension, row => row.SelectedOptionValue);
-        var order = PolicyRows.Select(row => row.Dimension).ToArray();
-        return new SchedulingPolicy(
-            checked((int)PolicyMaxStudentsPerTeacher.Value),
-            (TeacherCountPerDayPreference)valueByDimension[SchedulingPolicyDimension.TeacherCountPerDay],
-            (TeacherLoadBalancePreference)valueByDimension[SchedulingPolicyDimension.TeacherLoadBalance],
-            (StudentAttendanceDaysPreference)valueByDimension[SchedulingPolicyDimension.StudentAttendanceDays],
-            (TeacherAttendanceDaysPreference)valueByDimension[SchedulingPolicyDimension.TeacherAttendanceDays],
-            (PairingSizePreference)valueByDimension[SchedulingPolicyDimension.PairingSize],
-            (TimeOfDayPreference)valueByDimension[SchedulingPolicyDimension.TimeOfDay],
-            (TeacherStudentConsecutivePreference)valueByDimension[SchedulingPolicyDimension.TeacherStudentConsecutive],
-            checked((int)PolicyMaxConcurrentSeats.Value),
-            PolicyContinueBeyondNominalTimeNo.IsChecked != true,
-            order);
-    }
+    private SchedulingPolicy BuildSchedulingPolicyFromForm() => SchedulingPolicyRowViewModel.BuildPolicy(
+        PolicyRows,
+        checked((int)PolicyMaxStudentsPerTeacher.Value),
+        checked((int)PolicyMaxConcurrentSeats.Value),
+        PolicyContinueBeyondNominalTimeNo.IsChecked != true);
 
     private async void SaveSchedulingPolicy_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
     {

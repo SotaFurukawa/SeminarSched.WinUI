@@ -56,4 +56,79 @@ public sealed class SchedulingPolicyRowViewModel(
 
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+    /// <summary>各探索方針の表示名・選択肢ラベル・各ラベル位置に対応する実際のPreference enum序数
+    /// （生徒の授業日・講師の出勤日は表示順と序数が一致しないため明示的に対応表を持つ）。
+    /// SetupPage（プロジェクトの既定値）とOptimizationPage（その回限りの一時上書き）の両方から
+    /// 参照する共有定義。</summary>
+    public static readonly (SchedulingPolicyDimension Dimension, string Title, string[] Labels, int[] Values)[] DimensionMetadata =
+    [
+        (SchedulingPolicyDimension.TeacherCountPerDay, "一日当たりの講師人数",
+            ["考慮しない", "できるだけ少なくする", "できるだけ多くする"], [0, 1, 2]),
+        (SchedulingPolicyDimension.TeacherLoadBalance, "講師ごとのコマ数の偏り",
+            ["考慮しない", "均等にする"], [0, 1]),
+        (SchedulingPolicyDimension.StudentAttendanceDays, "生徒の授業日",
+            ["考慮しない", "できるだけ減らす（同じ日にまとめる）", "分散する"], [0, 2, 1]),
+        (SchedulingPolicyDimension.TeacherAttendanceDays, "講師の出勤日",
+            ["考慮しない", "できるだけ減らす（同じ日にまとめる）", "分散する"], [0, 2, 1]),
+        (SchedulingPolicyDimension.PairingSize, "1コマあたりの生徒の対応人数",
+            ["考慮しない", "できるだけ多くする", "できるだけ少なくする"], [0, 1, 2]),
+        (SchedulingPolicyDimension.TimeOfDay, "時間帯",
+            ["考慮しない", "できるだけ遅くする", "できるだけ早くする"], [0, 1, 2]),
+        (SchedulingPolicyDimension.TeacherStudentConsecutive, "同一講師×同一生徒の連続コマ",
+            ["考慮しない", "できるだけ連続にする"], [0, 1]),
+    ];
+
+    public static List<SchedulingPolicyRowViewModel> BuildRows(SchedulingPolicy policy)
+    {
+        var currentValueByDimension = new Dictionary<SchedulingPolicyDimension, int>
+        {
+            [SchedulingPolicyDimension.TeacherCountPerDay] = (int)policy.TeacherCountPerDayPreference,
+            [SchedulingPolicyDimension.TeacherLoadBalance] = (int)policy.TeacherLoadBalancePreference,
+            [SchedulingPolicyDimension.StudentAttendanceDays] = (int)policy.StudentAttendanceDaysPreference,
+            [SchedulingPolicyDimension.TeacherAttendanceDays] = (int)policy.TeacherAttendanceDaysPreference,
+            [SchedulingPolicyDimension.PairingSize] = (int)policy.PairingSizePreference,
+            [SchedulingPolicyDimension.TimeOfDay] = (int)policy.TimeOfDayPreference,
+            [SchedulingPolicyDimension.TeacherStudentConsecutive] = (int)policy.TeacherStudentConsecutivePreference,
+        };
+        var metadataByDimension = DimensionMetadata.ToDictionary(m => m.Dimension);
+
+        var rows = new List<SchedulingPolicyRowViewModel>();
+        var position = 1;
+        foreach (var dimension in policy.PreferenceOrder)
+        {
+            var metadata = metadataByDimension[dimension];
+            var optionIndex = Array.IndexOf(metadata.Values, currentValueByDimension[dimension]);
+            if (optionIndex < 0) optionIndex = 0;
+            rows.Add(new SchedulingPolicyRowViewModel(dimension, metadata.Title, metadata.Labels, metadata.Values)
+            {
+                SelectedOptionIndex = optionIndex,
+                DisplayNumber = position++,
+            });
+        }
+
+        return rows;
+    }
+
+    public static SchedulingPolicy BuildPolicy(
+        IReadOnlyList<SchedulingPolicyRowViewModel> rows,
+        int maxStudentsPerTeacher,
+        int maxConcurrentSeats,
+        bool continueBeyondNominalTimeIfIncomplete)
+    {
+        var valueByDimension = rows.ToDictionary(row => row.Dimension, row => row.SelectedOptionValue);
+        var order = rows.Select(row => row.Dimension).ToArray();
+        return new SchedulingPolicy(
+            maxStudentsPerTeacher,
+            (TeacherCountPerDayPreference)valueByDimension[SchedulingPolicyDimension.TeacherCountPerDay],
+            (TeacherLoadBalancePreference)valueByDimension[SchedulingPolicyDimension.TeacherLoadBalance],
+            (StudentAttendanceDaysPreference)valueByDimension[SchedulingPolicyDimension.StudentAttendanceDays],
+            (TeacherAttendanceDaysPreference)valueByDimension[SchedulingPolicyDimension.TeacherAttendanceDays],
+            (PairingSizePreference)valueByDimension[SchedulingPolicyDimension.PairingSize],
+            (TimeOfDayPreference)valueByDimension[SchedulingPolicyDimension.TimeOfDay],
+            (TeacherStudentConsecutivePreference)valueByDimension[SchedulingPolicyDimension.TeacherStudentConsecutive],
+            maxConcurrentSeats,
+            continueBeyondNominalTimeIfIncomplete,
+            order);
+    }
 }

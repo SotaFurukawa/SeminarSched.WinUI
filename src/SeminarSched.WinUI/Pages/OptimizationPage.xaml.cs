@@ -1,6 +1,8 @@
+using System.Collections.ObjectModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
 using SeminarSched.Domain.Scheduling;
 using SeminarSched.Optimization.Execution;
 using SeminarSched.Optimization.Profiles;
@@ -46,9 +48,17 @@ public sealed partial class OptimizationPage : WorkflowPageBase
     {
         InitializeComponent();
         Unloaded += Page_Unloaded;
+        _runPolicyController = new SchedulingPolicyRowsController(RunPolicyRows, RunPolicyRowsList);
     }
 
     public OptimizationQualityViewModel ViewModel { get; } = new();
+
+    // ユーザー要望（checkpoint126）「探索方針について、設定だけでなく、自動作成ページの一時的な
+    // ものでもできるようにしてほしい」への対応。並び替えUI自体はSchedulingPolicyRowsControllerへ
+    // 切り出し、「①設定」のPolicyRowsと同じ仕組みを共有している。
+    public ObservableCollection<SchedulingPolicyRowViewModel> RunPolicyRows { get; } = new();
+
+    private readonly SchedulingPolicyRowsController _runPolicyController;
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
@@ -92,73 +102,36 @@ public sealed partial class OptimizationPage : WorkflowPageBase
     // プロジェクトに保存済みの方針をそのまま表示し（＝何も変更しなければ既定値通りに実行される）、
     // ユーザーがこの画面だけで変更した内容は、実行時に一度だけ渡すoverrideとして使う
     // （「①設定」側の保存済み既定値そのものは変更しない）。
-    // ユーザー要望（checkpoint123）「探索方針の優先度を変えられるようにしたい」。この画面は
-    // Preference「値」（考慮しない／できるだけ〜）だけをその回限りで上書きする場であり、優先度の
-    // 並び順（PreferenceOrder）自体は「①設定」側でのみ編集する。読み込んだ並び順を保持しておき、
-    // BuildRunPolicyOverride()が既定順へ黙ってリセットしてしまわないようにする。
-    private IReadOnlyList<SchedulingPolicyDimension> _loadedPreferenceOrder = SchedulingPolicy.DefaultPreferenceOrder;
-
+    // ユーザー要望（checkpoint126）「探索方針について、設定だけでなく、自動作成ページの一時的な
+    // ものでもできるようにしてほしい」への対応。優先度の並び順（PreferenceOrder）もRunPolicyRows
+    // として読み込み、この画面だけで一時的に並び替えられるようにした（「①設定」側は変更しない）。
     private async Task LoadRunPolicyAsync(string projectPath)
     {
         var policy = await App.SchedulingPolicy.GetAsync(projectPath);
-        _loadedPreferenceOrder = policy.PreferenceOrder;
         RunPolicyMaxStudentsPerTeacher.Value = policy.MaxStudentsPerTeacher;
-
-        RunPolicyTeacherCountPerDayMinimize.IsChecked = policy.TeacherCountPerDayPreference == TeacherCountPerDayPreference.Minimize;
-        RunPolicyTeacherCountPerDayMaximize.IsChecked = policy.TeacherCountPerDayPreference == TeacherCountPerDayPreference.Maximize;
-        RunPolicyTeacherCountPerDayNone.IsChecked = policy.TeacherCountPerDayPreference == TeacherCountPerDayPreference.None;
-
-        RunPolicyTeacherLoadBalanceBalance.IsChecked = policy.TeacherLoadBalancePreference == TeacherLoadBalancePreference.Balance;
-        RunPolicyTeacherLoadBalanceNone.IsChecked = policy.TeacherLoadBalancePreference == TeacherLoadBalancePreference.None;
-
-        RunPolicyStudentAttendanceDaysConcentrate.IsChecked = policy.StudentAttendanceDaysPreference == StudentAttendanceDaysPreference.Concentrate;
-        RunPolicyStudentAttendanceDaysSpread.IsChecked = policy.StudentAttendanceDaysPreference == StudentAttendanceDaysPreference.Spread;
-        RunPolicyStudentAttendanceDaysNone.IsChecked = policy.StudentAttendanceDaysPreference == StudentAttendanceDaysPreference.None;
-
-        RunPolicyTeacherAttendanceDaysConcentrate.IsChecked = policy.TeacherAttendanceDaysPreference == TeacherAttendanceDaysPreference.Concentrate;
-        RunPolicyTeacherAttendanceDaysSpread.IsChecked = policy.TeacherAttendanceDaysPreference == TeacherAttendanceDaysPreference.Spread;
-        RunPolicyTeacherAttendanceDaysNone.IsChecked = policy.TeacherAttendanceDaysPreference == TeacherAttendanceDaysPreference.None;
-
-        RunPolicyPairingSizeMaximize.IsChecked = policy.PairingSizePreference == PairingSizePreference.Maximize;
-        RunPolicyPairingSizeMinimize.IsChecked = policy.PairingSizePreference == PairingSizePreference.Minimize;
-        RunPolicyPairingSizeNone.IsChecked = policy.PairingSizePreference == PairingSizePreference.None;
-
-        RunPolicyTimeOfDayLate.IsChecked = policy.TimeOfDayPreference == TimeOfDayPreference.Late;
-        RunPolicyTimeOfDayEarly.IsChecked = policy.TimeOfDayPreference == TimeOfDayPreference.Early;
-        RunPolicyTimeOfDayNone.IsChecked = policy.TimeOfDayPreference == TimeOfDayPreference.None;
-
-        RunPolicyTeacherStudentConsecutivePreferConsecutive.IsChecked = policy.TeacherStudentConsecutivePreference == TeacherStudentConsecutivePreference.PreferConsecutive;
-        RunPolicyTeacherStudentConsecutiveNone.IsChecked = policy.TeacherStudentConsecutivePreference == TeacherStudentConsecutivePreference.None;
-
+        _runPolicyController.Load(policy);
         RunPolicyMaxConcurrentSeats.Value = policy.MaxConcurrentSeats;
-
         RunPolicyContinueBeyondNominalTimeYes.IsChecked = policy.ContinueBeyondNominalTimeIfIncomplete;
         RunPolicyContinueBeyondNominalTimeNo.IsChecked = !policy.ContinueBeyondNominalTimeIfIncomplete;
     }
 
-    private SchedulingPolicy BuildRunPolicyOverride() => new(
+    private void RunPolicyOption_Loaded(object sender, RoutedEventArgs e) => _runPolicyController.OptionLoaded(sender, e);
+
+    private void RunPolicyOption_SelectionChanged(object sender, SelectionChangedEventArgs e) => _runPolicyController.OptionSelectionChanged(sender, e);
+
+    private void MoveRunPolicyRowUp_Click(object sender, RoutedEventArgs e) => _runPolicyController.MoveUp(sender, e);
+
+    private void MoveRunPolicyRowDown_Click(object sender, RoutedEventArgs e) => _runPolicyController.MoveDown(sender, e);
+
+    private void RunPolicyRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SchedulingPolicyRowsController.RowPointerEntered(sender, e);
+
+    private void RunPolicyRow_PointerExited(object sender, PointerRoutedEventArgs e) => SchedulingPolicyRowsController.RowPointerExited(sender, e);
+
+    private SchedulingPolicy BuildRunPolicyOverride() => SchedulingPolicyRowViewModel.BuildPolicy(
+        RunPolicyRows,
         checked((int)RunPolicyMaxStudentsPerTeacher.Value),
-        RunPolicyTeacherCountPerDayMinimize.IsChecked == true ? TeacherCountPerDayPreference.Minimize
-            : RunPolicyTeacherCountPerDayMaximize.IsChecked == true ? TeacherCountPerDayPreference.Maximize
-            : TeacherCountPerDayPreference.None,
-        RunPolicyTeacherLoadBalanceBalance.IsChecked == true ? TeacherLoadBalancePreference.Balance : TeacherLoadBalancePreference.None,
-        RunPolicyStudentAttendanceDaysConcentrate.IsChecked == true ? StudentAttendanceDaysPreference.Concentrate
-            : RunPolicyStudentAttendanceDaysSpread.IsChecked == true ? StudentAttendanceDaysPreference.Spread
-            : StudentAttendanceDaysPreference.None,
-        RunPolicyTeacherAttendanceDaysConcentrate.IsChecked == true ? TeacherAttendanceDaysPreference.Concentrate
-            : RunPolicyTeacherAttendanceDaysSpread.IsChecked == true ? TeacherAttendanceDaysPreference.Spread
-            : TeacherAttendanceDaysPreference.None,
-        RunPolicyPairingSizeMaximize.IsChecked == true ? PairingSizePreference.Maximize
-            : RunPolicyPairingSizeMinimize.IsChecked == true ? PairingSizePreference.Minimize
-            : PairingSizePreference.None,
-        RunPolicyTimeOfDayLate.IsChecked == true ? TimeOfDayPreference.Late
-            : RunPolicyTimeOfDayEarly.IsChecked == true ? TimeOfDayPreference.Early
-            : TimeOfDayPreference.None,
-        RunPolicyTeacherStudentConsecutivePreferConsecutive.IsChecked == true ? TeacherStudentConsecutivePreference.PreferConsecutive
-            : TeacherStudentConsecutivePreference.None,
         checked((int)RunPolicyMaxConcurrentSeats.Value),
-        RunPolicyContinueBeyondNominalTimeNo.IsChecked != true,
-        _loadedPreferenceOrder);
+        RunPolicyContinueBeyondNominalTimeNo.IsChecked != true);
 
     private void Page_Unloaded(object sender, RoutedEventArgs e) => OptimizationRunState.Changed -= OnRunStateChanged;
 
