@@ -117,7 +117,7 @@ public sealed partial class OptimizationPage : WorkflowPageBase
 
     private void RunPolicyOption_Loaded(object sender, RoutedEventArgs e) => _runPolicyController.OptionLoaded(sender, e);
 
-    private void RunPolicyOption_SelectionChanged(object sender, SelectionChangedEventArgs e) => _runPolicyController.OptionSelectionChanged(sender, e);
+    private void RunPolicyOption_Checked(object sender, RoutedEventArgs e) => _runPolicyController.OptionChecked(sender, e);
 
     private void MoveRunPolicyRowUp_Click(object sender, RoutedEventArgs e) => _runPolicyController.MoveUp(sender, e);
 

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Microsoft.UI.Xaml;
 using SeminarSched.Domain.Scheduling;
 
 namespace SeminarSched_WinUI;
@@ -53,6 +54,20 @@ public sealed class SchedulingPolicyRowViewModel(
     }
 
     public int SelectedOptionValue => OptionValues[SelectedOptionIndex];
+
+    // ユーザー指摘（checkpoint128）「探索方針のラジオボタンが揃っていない」への対応。WinUIの
+    // RadioButtons（ItemsSource一括表示）は、各行ごとに独立してMaxColumnsの列幅を自前の内容量
+    // から自動計算するため、行ごとにOptionLabelsの文字量が異なるとボタンの横位置が行間で揃わない。
+    // 各選択肢を個別のRadioButtonとして固定幅カラムへ配置できるよう、位置ごとのラベルを公開する
+    // （最大3択。2択のダイメンションはOption2Labelが空文字でOption2Visibility=Collapsedになる）。
+    public string Option0Label => OptionLabels.Count > 0 ? OptionLabels[0] : string.Empty;
+    public string Option1Label => OptionLabels.Count > 1 ? OptionLabels[1] : string.Empty;
+    public string Option2Label => OptionLabels.Count > 2 ? OptionLabels[2] : string.Empty;
+    public Visibility Option2Visibility => OptionLabels.Count > 2 ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>RadioButton.GroupNameは同一ページ内で一意である必要がある。1ページに同じ
+    /// Dimensionの行は常に1つしか存在しないため、Dimension自体をグループキーとして使う。</summary>
+    public string GroupKey => Dimension.ToString();
 
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

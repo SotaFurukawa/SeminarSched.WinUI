@@ -136,10 +136,9 @@
                          専用のチェックボックスでのみ編集可否を切り替えるようにした（チェックを外すと
                          既定の2人へ戻す）。あわせて、Headerの文言が折り返さず1行で収まる幅へ広げた。 -->
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <CheckBox x:Name="MaxStudentsPerTeacherEnableCheck" Content="既定値から変更する" VerticalAlignment="Bottom" Checked="MaxStudentsPerTeacherEnableCheck_Changed" Unchecked="MaxStudentsPerTeacherEnableCheck_Changed" />
+                        <CheckBox x:Name="MaxStudentsPerTeacherEnableCheck" Content="一人の講師が同時に担当できる生徒数（既定は2人）" VerticalAlignment="Center" Checked="MaxStudentsPerTeacherEnableCheck_Changed" Unchecked="MaxStudentsPerTeacherEnableCheck_Changed" />
                         <NumberBox
                             x:Name="MaxStudentsPerTeacherBox"
-                            Header="一人の講師が同時に担当できる生徒数（既定は2人）"
                             Minimum="1"
                             Maximum="10"
                             SmallChange="1"
@@ -147,7 +146,7 @@
                             Value="2"
                             IsEnabled="False"
                             HorizontalAlignment="Left"
-                            Width="420" />
+                            Width="110" />
                     </StackPanel>
                     <TextBlock
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"

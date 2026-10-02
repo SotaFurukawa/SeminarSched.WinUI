@@ -22,6 +22,11 @@ public sealed partial class SetupPage : WorkflowPageBase
     private long _teacherEditId;
     private long _subjectEditId;
     private long _slotEditId;
+    // ユーザー要望（checkpoint128）「順序はもう矢印で設定できるので表示しておく必要はない」への
+    // 対応。コマ設定フォームから「順序」NumberBoxを削除し、代わりにこのフィールドで内部管理する
+    // （挙動は従来のNumberBox.Valueベースの実装と同一: 新規追加のたびに+1、既存コマ編集時は
+    // その順序を保持、▲▼ボタンでの並び替えは別経路でDB側を直接更新する）。
+    private int _slotEditOrder = 1;
     private bool _loading;
     private MasterItem<Student>[] _studentItems = [];
     private MasterItem<Teacher>[] _teacherItems = [];
@@ -124,7 +129,7 @@ public sealed partial class SetupPage : WorkflowPageBase
 
     private void PolicyOption_Loaded(object sender, RoutedEventArgs e) => _policyController.OptionLoaded(sender, e);
 
-    private void PolicyOption_SelectionChanged(object sender, SelectionChangedEventArgs e) => _policyController.OptionSelectionChanged(sender, e);
+    private void PolicyOption_Checked(object sender, RoutedEventArgs e) => _policyController.OptionChecked(sender, e);
 
     private void MovePolicyRowUp_Click(object sender, RoutedEventArgs e) => _policyController.MoveUp(sender, e);
 
@@ -164,10 +169,10 @@ public sealed partial class SetupPage : WorkflowPageBase
 
     private async void AddSlot_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
     {
-        var nextOrder = SlotOrder.Value + 1;
+        var nextOrder = _slotEditOrder + 1;
         await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(_slotEditId, SlotCode.Text, SlotName.Text,
-            TimeOfDayOptions.Parse(SlotStartTime.Text), TimeOfDayOptions.Parse(SlotEndTime.Text), checked((int)SlotOrder.Value), SlotActive.IsChecked == true));
-        ResetSlot(); SlotOrder.Value = nextOrder;
+            TimeOfDayOptions.Parse(SlotStartTime.Text), TimeOfDayOptions.Parse(SlotEndTime.Text), _slotEditOrder, SlotActive.IsChecked == true));
+        ResetSlot(); _slotEditOrder = nextOrder;
     }, "コマを保存しました");
 
     // 「有効」チェックボックスだけは、保存ボタンを押さずにチェックの変更だけでそのまま即座に保存する
@@ -195,7 +200,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     {
         if (_loading || _slotEditId == 0) return;
         await ExecuteAsync(async path => await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(_slotEditId, SlotCode.Text, SlotName.Text,
-            TimeOfDayOptions.Parse(SlotStartTime.Text), TimeOfDayOptions.Parse(SlotEndTime.Text), checked((int)SlotOrder.Value), SlotActive.IsChecked == true)), "有効状態を更新しました");
+            TimeOfDayOptions.Parse(SlotStartTime.Text), TimeOfDayOptions.Parse(SlotEndTime.Text), _slotEditOrder, SlotActive.IsChecked == true)), "有効状態を更新しました");
     }
 
     private void Students_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -216,7 +221,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     private void TimeSlots_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_loading || TimeSlots.SelectedItem is not TimeSlotItem selected) return;
-        var value=selected.Value;_slotEditId=value.Id;SlotCode.Text=value.Code;SlotName.Text=value.DisplayName;SlotStartTime.Text=TimeOfDayOptions.Format(value.StartTime);SlotEndTime.Text=TimeOfDayOptions.Format(value.EndTime);SlotOrder.Value=value.SortOrder;SlotActive.IsChecked=value.Active;
+        var value=selected.Value;_slotEditId=value.Id;SlotCode.Text=value.Code;SlotName.Text=value.DisplayName;SlotStartTime.Text=TimeOfDayOptions.Format(value.StartTime);SlotEndTime.Text=TimeOfDayOptions.Format(value.EndTime);_slotEditOrder=value.SortOrder;SlotActive.IsChecked=value.Active;
     }
     private void NewStudent_Click(object sender,RoutedEventArgs e)=>ResetStudent();
     private void NewTeacher_Click(object sender,RoutedEventArgs e)=>ResetTeacher();
@@ -265,7 +270,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     private void ResetStudent(){_studentEditId=0;Students.SelectedItem=null;StudentId.Text=NextExternalId(_studentItems.Select(x=>x.Value.ExternalId),"S-");StudentName.Text=StudentGrade.Text=StudentNote.Text="";StudentMaximum.Value=2;StudentAllowGap.IsChecked=false;StudentActive.IsChecked=true;}
     private void ResetTeacher(){_teacherEditId=0;Teachers.SelectedItem=null;TeacherId.Text=NextExternalId(_teacherItems.Select(x=>x.Value.ExternalId),"T-");TeacherName.Text=TeacherNote.Text="";TeacherAllowGap.IsChecked=false;TeacherActive.IsChecked=true;}
     private void ResetSubject(){_subjectEditId=0;Subjects.SelectedItem=null;SubjectCode.Text=SubjectName.Text=SubjectShort.Text=SubjectLevel.Text="";SubjectOrder.Value=1;SubjectActive.IsChecked=true;}
-    private void ResetSlot(){_slotEditId=0;TimeSlots.SelectedItem=null;SlotCode.Text=SlotName.Text="";SlotStartTime.Text="09:00";SlotEndTime.Text="10:00";SlotOrder.Value=1;SlotActive.IsChecked=true;}
+    private void ResetSlot(){_slotEditId=0;TimeSlots.SelectedItem=null;SlotCode.Text=SlotName.Text="";SlotStartTime.Text="09:00";SlotEndTime.Text="10:00";_slotEditOrder=1;SlotActive.IsChecked=true;}
 
     private async void SaveQualification_Click(object sender,RoutedEventArgs e)=>await ExecuteAsync(async path=>
     {
@@ -292,63 +297,101 @@ public sealed partial class SetupPage : WorkflowPageBase
         return displayName;
     }
 
+    private const double QualificationHeaderRow0Height = 32;
+    private const double QualificationHeaderRow1Height = 56;
+    private const double QualificationDataRowHeight = 40;
+
+    // ユーザー要望（checkpoint128）「横にスライドして動かしても、講師ID、講師氏名は左側に固定して
+    // ほしい。縦にスクロールした場合に、科目が動かないのも同様に」への対応。1つの大きなGridを
+    // 単一のScrollViewerで両方向にスクロールする従来方式から、Excelのウィンドウ枠固定と同じ
+    // 4分割構成（角=QualificationMatrixCorner・見出し=QualificationMatrixHeader（横だけ連動
+    // スクロール）・左列=QualificationMatrixLeft（縦だけ連動スクロール）・本体=
+    // QualificationMatrixBody（両方向スクロール、操作の起点））へ変更した。行の高さを全ペインで
+    // 固定値に揃えることで、ペイン間のズレを防いでいる（Autoサイズだとボタンとラベルで実測の
+    // 高さが微妙に異なりズレる可能性があるため）。見出し・左列のScrollViewerはIsHitTestVisible=
+    // Falseにして直接操作できないようにし、本体のスクロールにだけ追従する一方通行の同期にした。
     private void RenderQualificationMatrix()
     {
-        QualificationMatrix.Children.Clear();QualificationMatrix.RowDefinitions.Clear();QualificationMatrix.ColumnDefinitions.Clear();
+        QualificationMatrixCorner.Children.Clear(); QualificationMatrixCorner.RowDefinitions.Clear(); QualificationMatrixCorner.ColumnDefinitions.Clear();
+        QualificationMatrixHeader.Children.Clear(); QualificationMatrixHeader.RowDefinitions.Clear(); QualificationMatrixHeader.ColumnDefinitions.Clear();
+        QualificationMatrixLeft.Children.Clear(); QualificationMatrixLeft.RowDefinitions.Clear(); QualificationMatrixLeft.ColumnDefinitions.Clear();
+        QualificationMatrixBody.Children.Clear(); QualificationMatrixBody.RowDefinitions.Clear(); QualificationMatrixBody.ColumnDefinitions.Clear();
+
         var teachers=_teacherItems.Where(t=>t.Value.Active).OrderBy(t=>t.Value.ExternalId).ToArray();
         var subjects=_subjectItems.Where(s=>s.Value.Active).OrderBy(s=>SchoolLevelSortKey(s.Value.SchoolLevel)).ThenBy(s=>s.Value.SortOrder).ToArray();
         if(teachers.Length==0||subjects.Length==0)
         {
-            QualificationMatrix.Children.Add(new TextBlock{Text="有効な講師・科目がありません。",Margin=new Thickness(8)});
+            QualificationMatrixBody.Children.Add(new TextBlock{Text="有効な講師・科目がありません。",Margin=new Thickness(8)});
             return;
         }
 
-        QualificationMatrix.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(90)});
-        QualificationMatrix.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(140)});
-        foreach(var _ in subjects)QualificationMatrix.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(70)});
-        QualificationMatrix.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});
-        QualificationMatrix.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});
-        foreach(var _ in teachers)QualificationMatrix.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});
+        QualificationMatrixCorner.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(90)});
+        QualificationMatrixCorner.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(140)});
+        QualificationMatrixLeft.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(90)});
+        QualificationMatrixLeft.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(140)});
+        foreach(var _ in subjects)
+        {
+            QualificationMatrixHeader.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(70)});
+            QualificationMatrixBody.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(70)});
+        }
 
-        void Place(FrameworkElement element,int row,int column,int columnSpan=1)
+        QualificationMatrixCorner.RowDefinitions.Add(new RowDefinition{Height=new GridLength(QualificationHeaderRow0Height)});
+        QualificationMatrixCorner.RowDefinitions.Add(new RowDefinition{Height=new GridLength(QualificationHeaderRow1Height)});
+        QualificationMatrixHeader.RowDefinitions.Add(new RowDefinition{Height=new GridLength(QualificationHeaderRow0Height)});
+        QualificationMatrixHeader.RowDefinitions.Add(new RowDefinition{Height=new GridLength(QualificationHeaderRow1Height)});
+        foreach(var _ in teachers)
+        {
+            QualificationMatrixLeft.RowDefinitions.Add(new RowDefinition{Height=new GridLength(QualificationDataRowHeight)});
+            QualificationMatrixBody.RowDefinitions.Add(new RowDefinition{Height=new GridLength(QualificationDataRowHeight)});
+        }
+
+        static void Place(Grid grid,FrameworkElement element,int row,int column,int columnSpan=1)
         {
             Grid.SetRow(element,row);Grid.SetColumn(element,column);Grid.SetColumnSpan(element,columnSpan);
-            QualificationMatrix.Children.Add(element);
+            grid.Children.Add(element);
         }
-        // ユーザー指摘（checkpoint127）「枠線を少し濃くしてください」への対応。以前はこの表の
-        // セル自体に明示的な境界線が無く、Gridの ColumnSpacing/RowSpacing（背景色の隙間）だけで
-        // 格子状に見えていたため非常に薄かった。全セル（見出し・講師ID/氏名・○ボタン）へ共通の
-        // 境界線を明示的に設定し、GridのSpacingは0へ戻して二重線にならないようにした。
+
+        // ユーザー指摘（checkpoint127）「枠線を少し濃くしてください」への対応。
         var cellBorderBrush=new SolidColorBrush(Windows.UI.Color.FromArgb(255,150,158,171));
         var headerBackground=ResourceBrush("CardBackgroundFillColorSecondaryBrush",Windows.UI.Color.FromArgb(255,242,244,247));
-        Border HeaderCell(string text)=>new(){Background=headerBackground,BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),Padding=new Thickness(4),Child=new TextBlock{Text=text,FontWeight=Microsoft.UI.Text.FontWeights.SemiBold,TextWrapping=TextWrapping.Wrap,TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center}};
+        Border HeaderCell(string text)=>new(){Background=headerBackground,BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),Padding=new Thickness(4),Child=new TextBlock{Text=text,FontWeight=Microsoft.UI.Text.FontWeights.SemiBold,TextWrapping=TextWrapping.Wrap,TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};
 
-        var columnIndex=2;
+        // 角（左上、常に固定）: 講師ID・講師氏名の見出し。
+        Place(QualificationMatrixCorner,new Border{Background=headerBackground,BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1)},0,0,2);
+        Place(QualificationMatrixCorner,HeaderCell("講師ID"),1,0);
+        Place(QualificationMatrixCorner,HeaderCell("講師氏名"),1,1);
+
+        // 見出し（右上、横だけ本体に連動してスクロール）: 校種グループ＋科目名。
+        var columnIndex=0;
         foreach(var group in subjects.GroupBy(s=>s.Value.SchoolLevel))
         {
             var count=group.Count();
-            Place(HeaderCell(group.Key),0,columnIndex,count);
+            Place(QualificationMatrixHeader,HeaderCell(group.Key),0,columnIndex,count);
             columnIndex+=count;
         }
-        Place(HeaderCell("講師ID"),1,0);
-        Place(HeaderCell("講師氏名"),1,1);
-        for(var c=0;c<subjects.Length;c++)Place(HeaderCell(StripSchoolLevelPrefix(subjects[c].Value.DisplayName)),1,2+c);
+        for(var c=0;c<subjects.Length;c++)Place(QualificationMatrixHeader,HeaderCell(StripSchoolLevelPrefix(subjects[c].Value.DisplayName)),1,c);
 
         for(var r=0;r<teachers.Length;r++)
         {
             var teacher=teachers[r].Value;
-            var row=2+r;
-            Place(new Border{BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),Padding=new Thickness(4),Child=new TextBlock{Text=teacher.ExternalId,VerticalAlignment=VerticalAlignment.Center}},row,0);
-            Place(new Border{BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),Padding=new Thickness(4),Child=new TextBlock{Text=teacher.Name,VerticalAlignment=VerticalAlignment.Center}},row,1);
+            // 左列（縦だけ本体に連動してスクロール）: 講師ID・講師氏名。
+            Place(QualificationMatrixLeft,new Border{BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),Padding=new Thickness(4),Child=new TextBlock{Text=teacher.ExternalId,VerticalAlignment=VerticalAlignment.Center}},r,0);
+            Place(QualificationMatrixLeft,new Border{BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),Padding=new Thickness(4),Child=new TextBlock{Text=teacher.Name,VerticalAlignment=VerticalAlignment.Center}},r,1);
             for(var c=0;c<subjects.Length;c++)
             {
                 var subject=subjects[c].Value;
                 var canTeach=_qualifications.TryGetValue((teacher.Id,subject.Id),out var q)&&q.CanTeach;
-                var cell=new Button{Content=canTeach?"○":"",Tag=(teacher.Id,subject.Id),BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),HorizontalAlignment=HorizontalAlignment.Stretch,HorizontalContentAlignment=HorizontalAlignment.Center,Padding=new Thickness(0,6,0,6)};
+                var cell=new Button{Content=canTeach?"○":"",Tag=(teacher.Id,subject.Id),BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),HorizontalAlignment=HorizontalAlignment.Stretch,VerticalAlignment=VerticalAlignment.Stretch,HorizontalContentAlignment=HorizontalAlignment.Center,VerticalContentAlignment=VerticalAlignment.Center,Padding=new Thickness(0)};
                 cell.Click+=QualificationCell_Click;
-                Place(cell,row,2+c);
+                Place(QualificationMatrixBody,cell,r,c);
             }
         }
+    }
+
+    private void QualificationMatrixBodyScroll_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
+    {
+        QualificationMatrixHeaderScroll.ChangeView(QualificationMatrixBodyScroll.HorizontalOffset, null, null, true);
+        QualificationMatrixLeftScroll.ChangeView(null, QualificationMatrixBodyScroll.VerticalOffset, null, true);
     }
 
     private static Microsoft.UI.Xaml.Media.Brush ResourceBrush(string key,Windows.UI.Color fallback)

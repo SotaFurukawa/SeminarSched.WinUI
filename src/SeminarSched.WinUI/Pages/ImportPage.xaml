@@ -19,8 +19,11 @@
              不要な余白ができていた（HomePage.xamlの年度欄と同種の不具合）。列をAutoにし、
              代わりに各コントロール自身へ明示的なWidthを与えることで、列がコントロールの
              実際のサイズにぴったり沿うようにした。 -->
-        <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-            <ComboBox x:Name="RequestStudent" Header="生徒" Width="180"/><ComboBox x:Name="RequestSubject" Grid.Column="1" Header="科目" Width="140"/><NumberBox x:Name="RequestRequiredSessions" Grid.Column="2" Header="必要授業回数" Minimum="1" Value="1" Width="140"/><ComboBox x:Name="RequestRegularTeacher" Grid.Column="3" Header="通常担当講師（任意）" SelectionChanged="RequestRegularTeacher_SelectionChanged" Width="200"/><NumberBox x:Name="RequestRegularPriority" Grid.Column="4" Header="優先度 1～5" Minimum="1" Maximum="5" Value="3" Width="100"/>
+        <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <ComboBox x:Name="RequestStudent" Header="生徒" Width="180"/><ComboBox x:Name="RequestSubject" Grid.Column="1" Header="科目" Width="140"/><NumberBox x:Name="RequestRequiredSessions" Grid.Column="2" Header="必要授業回数" Minimum="1" Value="1" Width="140"/>
+        </Grid>
+        <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <ComboBox x:Name="RequestRegularTeacher" Header="通常担当講師（任意）" SelectionChanged="RequestRegularTeacher_SelectionChanged" Width="200"/><NumberBox x:Name="RequestRegularPriority" Grid.Column="1" Header="優先度 1～5" Minimum="1" Maximum="5" Value="3" Width="100"/>
         </Grid>
         <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <ComboBox x:Name="RequestPreferred1" Header="第1希望講師（任意）" Width="220"/><ComboBox x:Name="RequestPreferred2" Grid.Column="1" Header="第2希望講師（任意）" Width="220"/><ComboBox x:Name="RequestPreferred3" Grid.Column="2" Header="第3希望講師（任意）" Width="220"/>
@@ -58,7 +61,7 @@
             <RadioButton x:Name="MatrixTeacherKind" Content="講師" Checked="MatrixKind_Changed"/>
         </StackPanel>
         <ComboBox x:Name="MatrixEntity" Header="対象" DisplayMemberPath="Label" SelectionChanged="MatrixEntity_SelectionChanged" MinWidth="280" HorizontalAlignment="Left"/>
-        <ScrollViewer HorizontalScrollBarVisibility="Auto" MaxHeight="520">
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
             <StackPanel Spacing="4">
                 <Grid x:Name="AvailabilityCalendarWeekdayHeader"/>
                 <Grid x:Name="AvailabilityCalendarGrid" ColumnSpacing="4" RowSpacing="4"/>

@@ -86,10 +86,23 @@
                         <CheckBox x:Name="UnrestrictedResourceUsageCheckBox" Content="CPU使用率を制限しない（フルパワーで実行）" Checked="UnrestrictedResourceUsageCheckBox_Changed" Unchecked="UnrestrictedResourceUsageCheckBox_Changed"/>
                         <TextBlock Margin="28,0,0,0" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="既定では他の作業と競合したときに優先度を譲り、パソコンが重くなるのを防ぎます（パソコンが空いていれば速度は落ちません）。オンにすると常にフルパワーで実行し、その分速くなる可能性がありますが、実行中は他の作業が重くなることがあります。" TextWrapping="Wrap"/>
                     </StackPanel>
+                    <!-- ユーザー指摘（checkpoint128）「探索方針のラジオボタンが揃っていない」対応で固定幅の
+                         3列Gridへ変更した際、Expander内側のStackPanelに残っていたMaxWidth="900"が
+                         必要な行幅（約1030px）より狭く、3つ目の選択肢が右端で見切れることが実機で
+                         判明したため撤去した（外側のStackPanel MaxWidth="1200"には収まる）。 -->
                     <Expander Header="この回だけ探索の方針を変更する" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
-                        <StackPanel Padding="4,12,4,4" Spacing="12" MaxWidth="900">
+                        <StackPanel Padding="4,12,4,4" Spacing="12">
                             <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Text="既定は「①設定」の「スケジュール設定」タブで保存した内容です。ここで変更しても、このプロジェクトの既定値そのものは変わりません（今回の自動作成にだけ適用されます）。"/>
-                            <NumberBox x:Name="RunPolicyMaxStudentsPerTeacher" Header="一人の講師が同時に担当できる生徒数（既定は2人）" Minimum="1" Maximum="10" SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" Width="260"/>
+                            <!-- ユーザー指摘（checkpoint128）「同時に使える座席数上限」追加時に、NumberBoxの
+                                 HeaderはControl自身の幅（140px）に収まる範囲でしか表示されず、長い説明文が
+                                 途中で切れてしまうことが実機で判明した。説明文はControlの外の独立した
+                                 TextBlockへ分離した。 -->
+                            <TextBlock Text="一人の講師が同時に担当できる生徒数（既定は2人）" TextWrapping="Wrap"/>
+                            <NumberBox x:Name="RunPolicyMaxStudentsPerTeacher" Minimum="1" Maximum="10" SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" Width="140"/>
+                            <!-- ユーザー要望（checkpoint128）「⑧同時に使える座席数について、⑧としての扱いではなく、
+                                 探索方針の上に、一人の講師が担当できる生徒数の下に並べて書いてほしい」への対応。 -->
+                            <TextBlock Margin="0,8,0,0" Text="同時に使える座席数上限（0であれば無制限）" TextWrapping="Wrap"/>
+                            <NumberBox x:Name="RunPolicyMaxConcurrentSeats" Minimum="0" SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" Width="140"/>
 
                             <!-- ユーザー要望（checkpoint126）「探索方針について、設定だけでなく、自動作成
                                  ページの一時的なものでもできるようにしてほしい」への対応。「①設定」側と
@@ -110,7 +123,16 @@
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0" Text="{x:Bind DisplayNumber, Mode=OneWay}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             <TextBlock Grid.Column="1" Text="{x:Bind Title}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"/>
-                                            <RadioButtons Grid.Column="2" ItemsSource="{x:Bind OptionLabels}" Loaded="RunPolicyOption_Loaded" SelectionChanged="RunPolicyOption_SelectionChanged" MaxColumns="3"/>
+                                            <Grid Grid.Column="2" ColumnSpacing="12" HorizontalAlignment="Left">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="140"/>
+                                                    <ColumnDefinition Width="300"/>
+                                                    <ColumnDefinition Width="220"/>
+                                                </Grid.ColumnDefinitions>
+                                                <RadioButton Grid.Column="0" Content="{x:Bind Option0Label}" GroupName="{x:Bind GroupKey}" Tag="0" Loaded="RunPolicyOption_Loaded" Checked="RunPolicyOption_Checked"/>
+                                                <RadioButton Grid.Column="1" Content="{x:Bind Option1Label}" GroupName="{x:Bind GroupKey}" Tag="1" Loaded="RunPolicyOption_Loaded" Checked="RunPolicyOption_Checked"/>
+                                                <RadioButton Grid.Column="2" Content="{x:Bind Option2Label}" Visibility="{x:Bind Option2Visibility}" GroupName="{x:Bind GroupKey}" Tag="2" Loaded="RunPolicyOption_Loaded" Checked="RunPolicyOption_Checked"/>
+                                            </Grid>
                                             <StackPanel x:Name="ArrowsPanel" Grid.Column="3" Orientation="Horizontal" Spacing="2" Visibility="Collapsed" VerticalAlignment="Center">
                                                 <Button Content="▲" Padding="6,2" FontSize="10" Click="MoveRunPolicyRowUp_Click" Tag="{x:Bind}"/>
                                                 <Button Content="▼" Padding="6,2" FontSize="10" Click="MoveRunPolicyRowDown_Click" Tag="{x:Bind}"/>
@@ -119,8 +141,6 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-
-                            <NumberBox x:Name="RunPolicyMaxConcurrentSeats" Header="⑧同時に使える座席数（0=考慮しない）" Minimum="0" SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" Width="280"/>
 
                             <TextBlock FontWeight="SemiBold" Text="既定の時間（名目時間の2倍）になっても未配置が残っている場合"/>
                             <StackPanel Orientation="Horizontal" Spacing="16">
