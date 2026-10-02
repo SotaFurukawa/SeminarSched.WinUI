@@ -50,7 +50,17 @@ public sealed partial class AboutPage : Page
         [HardwareTier.VeryHigh] = "非常に高め",
     };
 
-    private async void Page_Loaded(object sender, RoutedEventArgs e) => await RefreshHardwareTierTextAsync();
+    private async void Page_Loaded(object sender, RoutedEventArgs e)
+    {
+        await RefreshHardwareTierTextAsync();
+        await RefreshAppNameTextAsync();
+    }
+
+    private async Task RefreshAppNameTextAsync()
+    {
+        var settings = await App.SettingsStore.LoadAsync();
+        AppNameTextBlock.Text = settings.ProductKeyLicenseLabel is { } suffix ? $"ShikiWari {suffix}" : "ShikiWari";
+    }
 
     private async Task RefreshHardwareTierTextAsync()
     {

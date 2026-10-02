@@ -14,9 +14,18 @@ public sealed record AppSettings(
     /// ではまだ計測していない」ことを表す。一度計測したら、この設定ファイル（機体・インストールごと、
     /// プロジェクトファイルとは無関係）へ保存し、以降のすべての自動作成実行で再利用する。</summary>
     HardwareTier? HardwareTier = null,
-    double? HardwareBenchmarkElapsedSeconds = null)
+    double? HardwareBenchmarkElapsedSeconds = null,
+    /// <summary>ユーザー要望（checkpoint124）「プロダクトキーを実装したい」への対応。マスターキーで
+    /// 認証された場合はtrue（年度に関わらず無期限）。ProductKeyYearは年度キーで認証された年度
+    /// （毎年2/1に現在の年度と一致しなくなるため、再度プロダクトキーを要求する判定に使う）。</summary>
+    bool ProductKeyIsMaster = false,
+    int? ProductKeyYear = null)
 {
     public static AppSettings Default { get; } = new(OptimizationProfileCatalog.DefaultLevel);
 
     public IReadOnlyList<RecentProjectEntry> SafeRecentProjects => RecentProjects ?? [];
+
+    public string? ProductKeyLicenseLabel => ProductKeyIsMaster
+        ? "完全版"
+        : ProductKeyYear is { } year ? $"{year}年版" : null;
 }

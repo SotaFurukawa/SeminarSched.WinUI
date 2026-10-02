@@ -7,6 +7,7 @@
     xmlns:local="using:SeminarSched_WinUI.Pages"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     NavigationCacheMode="Required"
+    Loaded="Page_Loaded"
     mc:Ignorable="d">
 
     <Grid Padding="24,16,24,16" RowSpacing="24">
@@ -15,6 +16,10 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="設定" />
-        <TextBlock Grid.Row="1" Text="現在このアプリに個別の設定項目はありません。バージョン情報は「アプリ情報」をご覧ください。" TextWrapping="Wrap" />
+        <StackPanel Grid.Row="1" Spacing="8">
+            <TextBlock Text="現在このアプリに個別の設定項目はありません。バージョン情報は「アプリ情報」をご覧ください。" TextWrapping="Wrap" />
+            <TextBlock Margin="0,16,0,0" FontSize="16" FontWeight="SemiBold" Text="ライセンス" />
+            <TextBlock x:Name="LicenseStatusTextBlock" TextWrapping="Wrap" />
+        </StackPanel>
     </Grid>
 </Page>

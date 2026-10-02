@@ -2,6 +2,8 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using SeminarSched.Application.Settings;
+using SeminarSched.Domain.Licensing;
 using SeminarSched_WinUI.Pages;
 
 // To learn more about WinUI, the WinUI project structure,
@@ -39,6 +41,106 @@ public sealed partial class MainWindow : Window
         SetupPageNavState.Changed += OnSetupPageNavStateChanged;
         Closed += (_, _) => SetupPageNavState.Changed -= OnSetupPageNavStateChanged;
         RefreshSetupNavState();
+    }
+
+    private bool _productKeyCheckStarted;
+
+    // ユーザー要望（checkpoint124）「プロダクトキーを実装したい。アプリの初回立ち上げ時に
+    // プロダクトキーを要求するようにする。2/1以降にアプリが立ち上げられた時も再度要求する」への
+    // 対応。ContentDialogにはXamlRootが必要だが、コンストラクタ直後やActivate直後の時点では
+    // まだ存在しない（実機確認: 無言で例外が握りつぶされ、ダイアログが一切表示されなかった）ため、
+    // ルートGridのLoaded（実際にvisual treeへ接続された後）まで遅延させる
+    // （詳細はdocs/adr/0006-product-key-licensing.md）。
+    private void RootGrid_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (_productKeyCheckStarted)
+        {
+            return;
+        }
+
+        _productKeyCheckStarted = true;
+        _ = EnsureProductKeyAuthorizedAsync();
+    }
+
+    private async Task EnsureProductKeyAuthorizedAsync()
+    {
+        var settings = await App.SettingsStore.LoadAsync();
+        if (IsLicensed(settings))
+        {
+            ApplyLicenseLabel(settings);
+            return;
+        }
+
+        ProductKeyValidationResult? accepted = null;
+        var dialog = new ContentDialog
+        {
+            XamlRoot = Content.XamlRoot,
+            Title = "プロダクトキーの入力",
+            PrimaryButtonText = "認証",
+            CloseButtonText = "終了",
+            DefaultButton = ContentDialogButton.Primary,
+        };
+
+        var keyBox = new TextBox { PlaceholderText = "XXXX-XXXX-XXXX" };
+        var errorText = new TextBlock
+        {
+            Text = "プロダクトキーが正しくないか、期限が切れています。",
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"],
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+        };
+        dialog.Content = new StackPanel
+        {
+            Spacing = 8,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "ShikiWariを利用するには、プロダクトキーを入力してください。プロダクトキーは年度（毎年2月1日）ごとに更新が必要です。",
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxWidth = 420,
+                },
+                keyBox,
+                errorText,
+            },
+        };
+        dialog.PrimaryButtonClick += (_, args) =>
+        {
+            var result = ProductKeyService.Validate(keyBox.Text, DateTimeOffset.Now);
+            if (!result.IsValid)
+            {
+                args.Cancel = true;
+                errorText.Visibility = Visibility.Visible;
+                return;
+            }
+
+            accepted = result;
+        };
+
+        var dialogResult = await dialog.ShowAsync();
+        if (dialogResult != ContentDialogResult.Primary || accepted is not { } validated)
+        {
+            Application.Current.Exit();
+            return;
+        }
+
+        settings = settings with
+        {
+            ProductKeyIsMaster = validated.IsMaster,
+            ProductKeyYear = validated.IsMaster ? null : validated.Year,
+        };
+        await App.SettingsStore.SaveAsync(settings);
+        ApplyLicenseLabel(settings);
+    }
+
+    private static bool IsLicensed(AppSettings settings) =>
+        settings.ProductKeyIsMaster || settings.ProductKeyYear == ProductKeyService.CurrentPeriodYear(DateTimeOffset.Now);
+
+    private void ApplyLicenseLabel(AppSettings settings)
+    {
+        var title = settings.ProductKeyLicenseLabel is { } suffix ? $"ShikiWari {suffix}" : "ShikiWari";
+        Title = title;
+        AppTitleBar.Title = title;
     }
 
     private bool _syncingSetupNav;
