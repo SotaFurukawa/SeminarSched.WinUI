@@ -134,7 +134,7 @@ public sealed partial class ImportPage : WorkflowPageBase
                 regularTeacher?.Id,priority,preferred1?.Id,preferred2?.Id,preferred3?.Id,RequestOneToOne.SelectedIndex==1,maxOverride,gapOverride,RequestNote.Text));
             ResetLessonRequest();
             await ReloadLessonRequestsAsync();
-            Status.Severity=InfoBarSeverity.Success;Status.Title="受講希望を保存しました";Status.Message="";Status.IsOpen=true;
+            ToastNotificationState.ShowSuccess("受講希望を保存しました");
         }
         catch(Exception exception)when(exception is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException or OverflowException)
         {
@@ -182,7 +182,7 @@ public sealed partial class ImportPage : WorkflowPageBase
             await App.MasterData.DeleteLessonRequestAsync(path,selected.Value.StudentId,selected.Value.SubjectId);
             ResetLessonRequest();
             await ReloadLessonRequestsAsync();
-            Status.Severity=InfoBarSeverity.Success;Status.Title="受講希望を削除しました";Status.Message="";Status.IsOpen=true;
+            ToastNotificationState.ShowSuccess("受講希望を削除しました");
         }
         catch(Exception exception)when(exception is InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
         {

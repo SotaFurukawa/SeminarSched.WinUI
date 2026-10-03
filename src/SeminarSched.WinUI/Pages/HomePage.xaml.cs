@@ -569,8 +569,11 @@ public sealed partial class HomePage : Page
 
     private void SetBusy(bool isBusy) => IsEnabled = !isBusy;
 
+    // ユーザー要望「保存などの成功通知を、固定位置のページ内表示ではなくスライドイン式の
+    // 通知にしたい」への対応。Successはトーストへ、Warning/Errorは従来どおりページ内へ表示する。
     private void ShowStatus(InfoBarSeverity severity, string title, string message)
     {
+        if (severity == InfoBarSeverity.Success) { ToastNotificationState.ShowSuccess(title); return; }
         StatusInfoBar.Severity = severity;
         StatusInfoBar.Title = title;
         StatusInfoBar.Message = message;

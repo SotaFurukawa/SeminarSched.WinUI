@@ -45,6 +45,12 @@ public sealed partial class MainWindow : Window
         SetupPageNavState.Changed += OnSetupPageNavStateChanged;
         Closed += (_, _) => SetupPageNavState.Changed -= OnSetupPageNavStateChanged;
         RefreshSetupNavState();
+
+        // ユーザー要望「保存などの成功通知を、iPhoneの通知のように上部からスライドインさせたい」
+        // への対応。各ページはToastNotificationState.ShowSuccess()を呼ぶだけで、実際の表示は
+        // ここ（ウィンドウに1つだけ存在するオーバーレイ）が担う。
+        ToastNotificationState.Requested += OnToastRequested;
+        Closed += (_, _) => ToastNotificationState.Requested -= OnToastRequested;
     }
 
     private bool _productKeyCheckStarted;
@@ -370,5 +376,82 @@ public sealed partial class MainWindow : Window
                     throw new InvalidOperationException($"Unknown navigation item tag: {item.Tag}");
             }
         }
+    }
+
+    // ユーザー要望「保存などの成功通知について、iPhoneの通知のように上部からスライドインして
+    // くる形にしたい。2個目の通知が来た場合には、元々存在していた通知はスライドアウトさせ、
+    // その後2個目の通知がスライドインしてくるように」への対応。TranslateTransform.Yをアニメー
+    // ションさせてスライドイン・アウトを行う。InfoBar自体の開閉アニメーションには頼らず
+    // （Visibility=Visibleのままにして）、自前で「表示中に次の通知が来たら先にスライドアウトを
+    // 完了させてから次をスライドインする」という逐次処理を制御する。
+    private const double ToastOffScreenY = -160;
+    private bool _toastVisible;
+    private string? _pendingToastMessage;
+    private DispatcherTimer? _toastDismissTimer;
+
+    private void OnToastRequested(string message) => DispatcherQueue.TryEnqueue(() => ShowToast(message));
+
+    private void ShowToast(string message)
+    {
+        _toastDismissTimer?.Stop();
+
+        if (_toastVisible)
+        {
+            _pendingToastMessage = message;
+            AnimateToast(toOffScreen: true, onCompleted: () =>
+            {
+                ToastText.Text = _pendingToastMessage;
+                _pendingToastMessage = null;
+                AnimateToast(toOffScreen: false, onCompleted: StartToastAutoDismissTimer);
+            });
+            return;
+        }
+
+        ToastText.Text = message;
+        ToastBorder.Visibility = Visibility.Visible;
+        AnimateToast(toOffScreen: false, onCompleted: StartToastAutoDismissTimer);
+    }
+
+    private void StartToastAutoDismissTimer()
+    {
+        _toastDismissTimer?.Stop();
+        _toastDismissTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+        _toastDismissTimer.Tick += (_, _) =>
+        {
+            _toastDismissTimer!.Stop();
+            HideToast();
+        };
+        _toastDismissTimer.Start();
+    }
+
+    private void HideToast() => AnimateToast(toOffScreen: true, onCompleted: () => ToastBorder.Visibility = Visibility.Collapsed);
+
+    private void AnimateToast(bool toOffScreen, Action? onCompleted)
+    {
+        _toastVisible = !toOffScreen;
+        var animation = new Microsoft.UI.Xaml.Media.Animation.DoubleAnimation
+        {
+            To = toOffScreen ? ToastOffScreenY : 0,
+            Duration = new Duration(TimeSpan.FromMilliseconds(220)),
+            EasingFunction = new Microsoft.UI.Xaml.Media.Animation.CubicEase
+            {
+                EasingMode = toOffScreen ? Microsoft.UI.Xaml.Media.Animation.EasingMode.EaseIn : Microsoft.UI.Xaml.Media.Animation.EasingMode.EaseOut,
+            },
+        };
+        Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTarget(animation, ToastTransform);
+        Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTargetProperty(animation, "Y");
+        var storyboard = new Microsoft.UI.Xaml.Media.Animation.Storyboard();
+        storyboard.Children.Add(animation);
+        if (onCompleted is not null)
+        {
+            storyboard.Completed += (_, _) => onCompleted();
+        }
+        storyboard.Begin();
+    }
+
+    private void ToastClose_Click(object sender, RoutedEventArgs e)
+    {
+        _toastDismissTimer?.Stop();
+        HideToast();
     }
 }

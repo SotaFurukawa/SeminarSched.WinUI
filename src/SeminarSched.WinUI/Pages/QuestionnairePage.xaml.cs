@@ -38,7 +38,7 @@ public sealed partial class QuestionnairePage : WorkflowPageBase
             var path = await App.QuestionnaireKit.GenerateAsync(current.Path, WorkspacePaths.Forms, current.Title, studentTitle, teacherTitle, studentDeadline, teacherDeadline, contact);
             _lastOutputDirectory = path;
             ResultPanel.Visibility = Visibility.Visible;
-            Status.Severity=InfoBarSeverity.Success; Status.Title="作成キットを保存しました"; Status.Message=path; Status.IsOpen=true;
+            ToastNotificationState.ShowSuccess("作成キットを保存しました");
         }
         catch(Exception exception) when(exception is InvalidOperationException or ArgumentException or IOException or UnauthorizedAccessException)
         { ResultPanel.Visibility = Visibility.Collapsed; Status.Severity=InfoBarSeverity.Error; Status.Title="作成できませんでした"; Status.Message=exception.Message; Status.IsOpen=true; }

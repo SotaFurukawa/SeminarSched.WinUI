@@ -58,7 +58,7 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
             await App.ScheduleEditor.RestoreSnapshotAsync(path, previous);
             await ReloadEditorAsync();
             UpdateUndoRedoButtons();
-            EditorStatus.Severity = InfoBarSeverity.Success; EditorStatus.Title = "元に戻しました"; EditorStatus.Message = ""; EditorStatus.IsOpen = true;
+            ToastNotificationState.ShowSuccess("元に戻しました");
         }
         catch (Exception exception) when (exception is InvalidOperationException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
         { ShowEditorError(exception.Message); }
@@ -78,7 +78,7 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
             await App.ScheduleEditor.RestoreSnapshotAsync(path, next);
             await ReloadEditorAsync();
             UpdateUndoRedoButtons();
-            EditorStatus.Severity = InfoBarSeverity.Success; EditorStatus.Title = "やり直しました"; EditorStatus.Message = ""; EditorStatus.IsOpen = true;
+            ToastNotificationState.ShowSuccess("やり直しました");
         }
         catch (Exception exception) when (exception is InvalidOperationException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
         { ShowEditorError(exception.Message); }
@@ -496,7 +496,7 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
             if(clearsHistory)ScheduleUndoState.Clear();
             await ReloadEditorAsync();
             UpdateUndoRedoButtons();
-            EditorStatus.Severity=InfoBarSeverity.Success;EditorStatus.Title=success;EditorStatus.Message="";EditorStatus.IsOpen=true;
+            ToastNotificationState.ShowSuccess(success);
         }
         catch(Exception exception)when(exception is InvalidOperationException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
         {

@@ -699,7 +699,14 @@ public sealed partial class SetupPage : WorkflowPageBase
     private static MasterItem<T>[] Filter<T>(MasterItem<T>[] items, string query) =>
         string.IsNullOrWhiteSpace(query) ? items : items.Where(item => item.Display.Contains(query.Trim(), StringComparison.CurrentCultureIgnoreCase)).ToArray();
 
-    private void Show(InfoBarSeverity severity, string title, string message) { Status.Severity = severity; Status.Title = title; Status.Message = message; Status.IsOpen = true; }
+    // ユーザー要望「保存などの成功通知を、固定位置のページ内表示ではなくスライドイン式の
+    // 通知にしたい」への対応。Success（単発の操作結果を知らせるだけのもの）はトーストへ、
+    // Warning/Error（ユーザーが対処すべき状態が残るもの）は従来どおりページ内のStatusへ表示する。
+    private void Show(InfoBarSeverity severity, string title, string message)
+    {
+        if (severity == InfoBarSeverity.Success) { ToastNotificationState.ShowSuccess(title); return; }
+        Status.Severity = severity; Status.Title = title; Status.Message = message; Status.IsOpen = true;
+    }
 
     // ユーザー指示「状態を『有効』『無効』ではなくて、『在籍中』『卒業・無効』にしてください」への対応。
     // 生徒・講師は人（在籍/卒業という概念が成り立つ）だが、科目・コマは物なので「在籍中」は意味が

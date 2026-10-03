@@ -54,7 +54,13 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
     }
 
     private void ShowError(string message) { Status.Severity = InfoBarSeverity.Error; Status.Title = "処理できませんでした"; Status.Message = message; Status.IsOpen = true; }
-    private void Show(InfoBarSeverity severity, string title) { Status.Severity = severity; Status.Title = title; Status.Message = ""; Status.IsOpen = true; }
+    // ユーザー要望「保存などの成功通知を、固定位置のページ内表示ではなくスライドイン式の
+    // 通知にしたい」への対応。Successはトーストへ、Warning/Errorは従来どおりページ内へ表示する。
+    private void Show(InfoBarSeverity severity, string title)
+    {
+        if (severity == InfoBarSeverity.Success) { ToastNotificationState.ShowSuccess(title); return; }
+        Status.Severity = severity; Status.Title = title; Status.Message = ""; Status.IsOpen = true;
+    }
 
     private sealed record GroupClassRow(GroupLessonClass Value, string Display) { public override string ToString() => Display; }
     private sealed record TeacherOption(long Id, string Label) { public override string ToString() => Label; }
