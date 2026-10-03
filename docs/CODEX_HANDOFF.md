@@ -1,13 +1,22 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-03（checkpoint134）
+最終更新: 2026-10-03（checkpoint135）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.19.5 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
-Latest Development Checkpoint: checkpoint 134（v0.19.4のスクリーンショットから、プロダクトキー
+Current Version: `v0.19.6 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
+Latest Development Checkpoint: checkpoint 135（v0.19.5でも「まだこれでも上の方に来ますね。
+ちょっと画面を見ながら真ん中に来るように調整してみてください」と、`VerticalContentAlignment=
+Center`だけでは直っていないとの指摘を受けた。今回は勘で調整するのではなく、一時的な別
+パッケージIDの実機ビルドでスクリーンショットを撮り、`System.Drawing.Bitmap.GetPixel`で
+文字の暗いピクセルが連続する行の範囲（文字の上端・下端）と、枠の罫線（薄いグレー）が現れる行の
+範囲（枠の上端・下端）をそれぞれ特定し、両者の中心座標を数値で比較する方法に切り替えた。
+結果、枠の中心y≈377pxに対し文字の中心y≈370.5pxと、約6.5px上にずれていることを確認。
+`Padding="0,7,0,0"`（上パディング7px）を追加して再計測したところ、文字の中心y≈377.5px・
+枠の中心y≈377.5pxとほぼ完全に一致した。詳細は[docs/releases/v0.19.6.md](releases/v0.19.6.md)。
+checkpoint 134（v0.19.4のスクリーンショットから、プロダクトキー
 入力欄の文字が枠内でやや上寄りに表示される指摘を受けた。原因は各枠の`TextBox`に
 `VerticalContentAlignment`を明示していなかったこと（既定は上揃え）。
 `VerticalContentAlignment="Center"`を追加して解決した。checkpoint133と同じ手順

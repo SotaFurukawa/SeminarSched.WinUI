@@ -49,7 +49,12 @@ public sealed partial class ProductKeyEntryControl : UserControl
                     Height = 36,
                     MinWidth = 0,
                     MinHeight = 0,
-                    Padding = new Thickness(0),
+                    // VerticalContentAlignment=Centerだけでは、WinUI既定のTextBoxテンプレートに
+                    // 残る上部の余白（Header行の名残など）の影響で、実機では文字が枠の中心より
+                    // 明らかに上寄りに描画されることが実測で確認された（枠の中心y≈377pxに対し、
+                    // 文字の中心y≈370.5pxと、約6.5px上に寄っていた）。この分だけ上パディングを
+                    // 足して下へ押し下げ、見た目の中心に合わせる。
+                    Padding = new Thickness(0, 7, 0, 0),
                     MaxLength = 1,
                     FontSize = 14,
                     FontWeight = FontWeights.SemiBold,
