@@ -39,13 +39,19 @@ public sealed partial class ProductKeyEntryControl : UserControl
 
             for (var i = 0; i < GroupSize; i++)
             {
+                // WinUIの既定TextBoxStyleはTextControlThemeMinWidthから約72pxの既定MinWidthを
+                // 持っており、TextBox単体にWidthを明示指定するだけではこの既定MinWidthに負けて
+                // 広いまま描画される（実機で確認済み、1文字あたりの枠が指定値より明らかに広かった
+                // 原因）。MinWidth/MinHeightも明示的に0へ上書きし、Widthが確実に効くようにする。
                 var box = new TextBox
                 {
-                    Width = 28,
-                    Height = 40,
+                    Width = 24,
+                    Height = 36,
+                    MinWidth = 0,
+                    MinHeight = 0,
                     Padding = new Thickness(0),
                     MaxLength = 1,
-                    FontSize = 16,
+                    FontSize = 14,
                     FontWeight = FontWeights.SemiBold,
                     TextAlignment = TextAlignment.Center,
                     CharacterCasing = CharacterCasing.Upper,

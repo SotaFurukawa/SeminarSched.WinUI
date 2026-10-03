@@ -1,13 +1,38 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-03（checkpoint132）
+最終更新: 2026-10-03（checkpoint133）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.19.3 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
-Latest Development Checkpoint: checkpoint 132（v0.19.2のプロダクトキー入力ダイアログを実際に
+Current Version: `v0.19.4 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
+Latest Development Checkpoint: checkpoint 133（v0.19.3でも「中央ぞろえにはできているが、
+まだはみ出ている。一つの文字当たりのマス目の横幅が大きい」という指摘を受け、さらに「作成した
+ものをしっかり確認してから次のマイナーチェンジとしてください」と、実機確認を徹底するよう
+明確に指示された。原因調査の結果、WinUIの既定`TextBox`スタイルが持つテーマ既定の`MinWidth`
+（指定した`Width`より大きい値）に、明示的に指定した`Width`が負けて実際にはより広く描画されて
+いたことが判明した（`MinWidth`はスタイルのSetterによる既定値であり、インスタンスへの明示的な
+ローカル値のほうが優先されるはずだが、今回は明示的に`MinWidth`を設定していなかったため既定値が
+有効なままだった）。各枠へ`MinWidth`/`MinHeight`を明示的に0へ上書きし、幅・フォントサイズも
+併せて縮小した。
+**検証方法（今回から徹底）:** ユーザーの環境には既にパッケージ化された実アプリ（本来の
+Identity Name）がインストール・使用中のため、同じIdentityで`dotnet run`すると競合して
+ユーザーのセッションを壊してしまう。そこで`Package.appxmanifest`の`Identity Name`/
+`PhoneIdentity`を一時的に別のGUID（末尾1文字だけ変更）へ書き換え、その別IDで
+`dotnet build`+`dotnet run`（dev-mode登録は新しいIDの下で行われるため実パッケージと無衝突）し、
+実機スクリーンショットで①12枠すべてがダイアログ内に収まり中央寄せになっていること、
+②1文字ずつ入力して自動的に次の枠へ移動すること、③バックスペースで前の枠へ戻って1文字削除
+されること、④キー全体の貼り付け（Set-Clipboard+Ctrl+V）で全枠へ正しく分配されること、
+⑤「認証」ボタンで実際に検証が成功しホーム画面へ遷移すること、の5点を実際に確認した上で、
+`Package.appxmanifest`の`Identity Name`を元のGUIDへ戻し、検証用の一時パッケージ登録を
+`Remove-AppxPackage`で削除してから出荷した。なお、最初の数文字を高速に連続送信するテストでは
+文字が欠落・重複する現象が見られたが、キー入力の間隔を人間が実際にタイピングする程度
+（300〜600ms）まで広げたところ再現しなくなったため、これはテスト用の疑似キー入力
+（SendKeys）がWinUIの内部ディスパッチより速すぎたことによる試験手法側の制約であり、
+アプリ側の不具合ではないと判断した。
+詳細は[docs/releases/v0.19.4.md](releases/v0.19.4.md)。
+checkpoint 132（v0.19.2のプロダクトキー入力ダイアログを実際に
 ユーザーが使ってみたスクリーンショットから、新設した12枠が横に広すぎてダイアログの右端で
 はみ出し後ろの枠が見えない、かつ左右中央に来ていない、という指摘を受けた。
 `Controls/ProductKeyEntryControl.xaml.cs`の各枠`Width`を36px→28px、`Height`を44px→40px、
