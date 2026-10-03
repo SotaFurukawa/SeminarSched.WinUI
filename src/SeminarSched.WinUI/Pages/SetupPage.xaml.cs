@@ -300,8 +300,28 @@ public sealed partial class SetupPage : WorkflowPageBase
     }
 
     private const double QualificationHeaderRow0Height = 32;
-    private const double QualificationHeaderRow1Height = 56;
+    private const double QualificationHeaderRow1MinHeight = 56;
     private const double QualificationDataRowHeight = 40;
+    private const double QualificationColumnWidth = 70;
+    private const double QualificationHeaderCellPadding = 8; // Border Padding=Thickness(4)の左右・上下合計
+
+    // ユーザー指摘「教科によってははみでてしまう。教科の文字数に応じて、縦の長さを変更してください」
+    // への対応。見出し2段目（科目名）の高さは固定値だったため、列幅70pxで折り返したときに2行を
+    // 超える長い科目名（例: 「算数（中学受験）」）が高さに収まらず上下が欠けて表示されていた。
+    // 科目名ラベルを実際のセルと同じ幅・折り返し設定で仮測定し、最も高さを要する科目に合わせて
+    // 見出し行の高さを動的に決める（短い科目名しかない場合は従来どおりの最小値のまま）。
+    private static double MeasureWrappedTextHeight(string text, double maxWidth, Windows.UI.Text.FontWeight weight)
+    {
+        var probe = new TextBlock
+        {
+            Text = text,
+            FontWeight = weight,
+            TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Center,
+        };
+        probe.Measure(new Windows.Foundation.Size(maxWidth, double.PositiveInfinity));
+        return probe.DesiredSize.Height;
+    }
 
     // ユーザー要望（checkpoint128）「横にスライドして動かしても、講師ID、講師氏名は左側に固定して
     // ほしい。縦にスクロールした場合に、科目が動かないのも同様に」への対応。1つの大きなGridを
@@ -333,14 +353,22 @@ public sealed partial class SetupPage : WorkflowPageBase
         QualificationMatrixLeft.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(140)});
         foreach(var _ in subjects)
         {
-            QualificationMatrixHeader.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(70)});
-            QualificationMatrixBody.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(70)});
+            QualificationMatrixHeader.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(QualificationColumnWidth)});
+            QualificationMatrixBody.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(QualificationColumnWidth)});
+        }
+
+        var headerRow1Height=QualificationHeaderRow1MinHeight;
+        foreach(var s in subjects)
+        {
+            var label=StripSchoolLevelPrefix(s.Value.DisplayName);
+            var measured=MeasureWrappedTextHeight(label,QualificationColumnWidth-QualificationHeaderCellPadding,Microsoft.UI.Text.FontWeights.SemiBold)+QualificationHeaderCellPadding;
+            if(measured>headerRow1Height)headerRow1Height=measured;
         }
 
         QualificationMatrixCorner.RowDefinitions.Add(new RowDefinition{Height=new GridLength(QualificationHeaderRow0Height)});
-        QualificationMatrixCorner.RowDefinitions.Add(new RowDefinition{Height=new GridLength(QualificationHeaderRow1Height)});
+        QualificationMatrixCorner.RowDefinitions.Add(new RowDefinition{Height=new GridLength(headerRow1Height)});
         QualificationMatrixHeader.RowDefinitions.Add(new RowDefinition{Height=new GridLength(QualificationHeaderRow0Height)});
-        QualificationMatrixHeader.RowDefinitions.Add(new RowDefinition{Height=new GridLength(QualificationHeaderRow1Height)});
+        QualificationMatrixHeader.RowDefinitions.Add(new RowDefinition{Height=new GridLength(headerRow1Height)});
         foreach(var _ in teachers)
         {
             QualificationMatrixLeft.RowDefinitions.Add(new RowDefinition{Height=new GridLength(QualificationDataRowHeight)});

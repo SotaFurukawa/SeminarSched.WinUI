@@ -50,7 +50,7 @@
                      ボタンを設置する。設定が開かれていないときはこれを表示しない」への対応。
                      子項目はSetupPage.xamlのTabViewと同じ並び順（1.1〜1.8）にし、表示/選択状態の
                      同期はSetupPageNavStateとMainWindow.xaml.csのRefreshSetupNavState()で行う。 -->
-                <NavigationViewItem x:Name="SetupNavItem" Content="① 設定" Tag="setup">
+                <NavigationViewItem x:Name="SetupNavItem" Content="1 設定" Tag="setup">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xEBD2;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.MenuItems>
                         <NavigationViewItem Content="1.1 生徒" Tag="setupTab:0"/>
@@ -63,10 +63,10 @@
                         <NavigationViewItem Content="1.8 出力設定" Tag="setupTab:7"/>
                     </NavigationViewItem.MenuItems>
                 </NavigationViewItem>
-                <NavigationViewItem Content="② アンケート作成" Tag="questionnaire">
+                <NavigationViewItem Content="2 アンケート作成" Tag="questionnaire">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xF0E3;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="③ アンケート取込" Tag="import">
+                <NavigationViewItem Content="3 アンケート取込" Tag="import">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE78C;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="3.1 集団授業クラス" Tag="groupLessonClass" Visibility="Collapsed">
@@ -75,15 +75,15 @@
                 <NavigationViewItem Content="3.2 集団授業の受講登録" Tag="groupLessonEnrollment" Visibility="Collapsed">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE716;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="④ 時間割編集" Tag="scheduleEditor">
+                <NavigationViewItem Content="4 時間割編集" Tag="scheduleEditor">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE70F;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="⑤ 時間割自動作成" Tag="optimization">
+                <NavigationViewItem Content="5 時間割自動作成" Tag="optimization">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE9D9;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="⑥ 出力" Tag="output">
+                <NavigationViewItem Content="6 出力" Tag="output">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE749;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="アプリ情報" Tag="about">
@@ -112,7 +112,7 @@
                         Spacing="4"
                         Tapped="OptimizationStatusPanel_Tapped"
                         Visibility="Collapsed">
-                        <TextBlock FontSize="12" FontWeight="SemiBold" Text="⑤ 自動作成 実行中" TextWrapping="Wrap" />
+                        <TextBlock FontSize="12" FontWeight="SemiBold" Text="5 自動作成 実行中" TextWrapping="Wrap" />
                         <ProgressBar x:Name="OptimizationStatusBar" Maximum="100" Minimum="0" Value="0" />
                         <TextBlock x:Name="OptimizationStatusText" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                     </StackPanel>

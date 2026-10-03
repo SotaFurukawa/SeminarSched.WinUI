@@ -33,7 +33,7 @@ public sealed partial class AboutPage : Page
 
         if (!check.MeetsMinimum)
         {
-            SystemRequirementsWarning.Message = string.Join(" ", check.Reasons) + " 動作が遅くなる、または一部の機能（特に⑤時間割自動作成）で時間がかかる場合があります。";
+            SystemRequirementsWarning.Message = string.Join(" ", check.Reasons) + " 動作が遅くなる、または一部の機能（特に5 時間割自動作成）で時間がかかる場合があります。";
             SystemRequirementsWarning.IsOpen = true;
         }
     }
@@ -69,7 +69,7 @@ public sealed partial class AboutPage : Page
             ? $"このパソコンで一度だけ測定した結果、探索の並列度は「{TierLabels[tier]}」設定で実行されます" +
               (settings.HardwareBenchmarkElapsedSeconds is { } seconds ? $"（測定値: {seconds:F1}秒）。" : "。") +
               "パソコンを買い替えた場合など、下のボタンから再測定できます。"
-            : "まだ測定していません。⑤時間割自動作成を初めて実行するときに、一度だけ自動で測定されます。";
+            : "まだ測定していません。5 時間割自動作成を初めて実行するときに、一度だけ自動で測定されます。";
     }
 
     private async void Remeasure_Click(object sender, RoutedEventArgs e)

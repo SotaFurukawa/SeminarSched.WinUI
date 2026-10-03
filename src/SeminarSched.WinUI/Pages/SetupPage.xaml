@@ -8,7 +8,7 @@
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
     <ScrollViewer><StackPanel Padding="24" Spacing="16">
-        <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="① 設定"/>
+        <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="1 設定"/>
         <InfoBar x:Name="ProjectRequired"/>
         <InfoBar x:Name="Status" IsClosable="True"/>
         <TextBlock Text="プロジェクト、開校日、コマ、科目、生徒・講師の共通基本情報を設定します。" TextWrapping="Wrap"/>
@@ -181,8 +181,8 @@
             </StackPanel></TabViewItem>
             <TabViewItem Header="スケジュール設定">
                 <StackPanel Padding="16" Spacing="12">
-                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="⑦最適化探索の方針設定"/>
-                    <TextBlock Text="ここで保存した内容がこのプロジェクトの既定値になります。⑤時間割自動作成の画面でも、その回だけの一時的な変更ができます。" TextWrapping="Wrap"/>
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="7 最適化探索の方針設定"/>
+                    <TextBlock Text="ここで保存した内容がこのプロジェクトの既定値になります。5 時間割自動作成の画面でも、その回だけの一時的な変更ができます。" TextWrapping="Wrap"/>
                     <!-- ユーザー指摘（checkpoint128）「同時に使える座席数上限」追加時に、NumberBoxの
                          HeaderはControl自身の幅（140px）に収まる範囲でしか表示されず、長い説明文が
                          途中で切れてしまうことが実機で判明した。説明文はControlの外の独立した
@@ -264,7 +264,7 @@
             </StackPanel></TabViewItem>
             <TabViewItem Header="出力設定">
                 <StackPanel Padding="16" Spacing="12">
-                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="⑥出力の書式設定"/>
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="6 出力の書式設定"/>
                     <TextBlock Text="PDFの用紙サイズ・向き・余白、出力ファイル名の規則（{project}=プロジェクト名、{report}=帳票名、{date}=出力日）、主な塗り色を設定します。" TextWrapping="Wrap"/>
                     <Grid ColumnSpacing="8" RowSpacing="8">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="160"/><ColumnDefinition Width="140"/></Grid.ColumnDefinitions>

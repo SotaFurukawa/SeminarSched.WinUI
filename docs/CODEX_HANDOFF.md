@@ -1,13 +1,40 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-03（checkpoint136）
+最終更新: 2026-10-03（checkpoint137）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.20.0 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
-Latest Development Checkpoint: checkpoint 136（ユーザーから「正しいプロダクトキーが入力された
+Current Version: `v0.20.1 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
+Latest Development Checkpoint: checkpoint 137（ユーザーから2件の指摘を同時に受けた。
+①左ナビゲーションのスクリーンショットを添えて「①や⑥といった丸印と３．１、３．２などの表現が
+混同しており、統一感がない。なにかしら統一感を持たせることができる方法はないか。一応手順が
+わかるように番号を書いておくというのは残しておいてほしい」。②「講師指導可能科目」マトリクスの
+スクリーンショットを添えて「教科によってははみでてしまう。教科の文字数に応じて、縦の長さを
+変更してください」。
+**①番号表記の統一:** `MainWindow.xaml`のナビゲーション項目（①〜⑥）、各ページタイトル
+（`SetupPage.xaml`「① 設定」、`QuestionnairePage.xaml`「② アンケート作成」、
+`ImportPage.xaml`「③ アンケート取込」、`OutputPage.xaml`「⑥ 出力」）、ページ内の相互参照
+文言・ボタン（`HomePage.xaml`・`ScheduleEditorPage.xaml`・`SetupPage.xaml`・
+`OptimizationPage.xaml`・`AboutPage.xaml`・`AboutPage.xaml.cs`・`OptimizationPage.xaml.cs`・
+`GoogleFormsGuide.cs`に点在、`ImportPage.xaml`の①〜④ステップボタンも含む）に残っていた
+丸数字（①②③④⑤⑥⑦）をすべて、既存のサブ項目「1.1」「3.1」と同じ書体の素のアラビア数字
+（1〜7）へ置き換えた（「1 設定」/「1.1 生徒」のように、章＝素の数字・節＝X.Y、という一般的な
+アウトライン番号付けの慣習に統一）。コード内コメント（ユーザーに見えない開発者向け説明）は
+対象外とした。
+**②講師指導可能科目の見出し高さ動的化:** `SetupPage.xaml.cs`の`RenderQualificationMatrix()`で、
+見出し2段目（科目名）の高さが`QualificationHeaderRow1Height=56`の固定値だったため、列幅70pxで
+折り返すと2行を超える科目名（例:「算数（中学受験以外なら可能）」）が上下で欠けていた。新設の
+`MeasureWrappedTextHeight()`で、各科目名を実際のヘッダーセルと同じ折り返し幅・太さで仮測定
+（`TextBlock.Measure()`）し、最も高さを要する科目に合わせて見出し行の高さを動的に算出する
+`QualificationHeaderRow1MinHeight`（最小値56、フォールバック）へ変更した。
+checkpoint133以降と同じ手順（一時的な別パッケージIDでの実機ビルド・検証・原状復帰）で、
+①ナビおよびサブ項目の番号表記統一、②「算数（中学受験以外なら可能）」等の長い科目名が
+見出しからはみ出さず全体表示されることを実機で確認した。UI調整・不具合修正のためNext Version
+Ruleの既定を適用しv0.20.1（patch bump）とした。詳細は
+[docs/releases/v0.20.1.md](releases/v0.20.1.md)。
+checkpoint 136（ユーザーから「正しいプロダクトキーが入力された
 場合には、成功画面を出してください。『Success』の文字と一緒に、緑色の記号を右側に出しておく」
 との要望を受けた。記号の具体的なイメージ（「8個の点が同一円状にならんでいるようなもの」）は
 一意に特定できなかったが、「イメージが分からなければwinuiで」との指示どおりWinUI標準の

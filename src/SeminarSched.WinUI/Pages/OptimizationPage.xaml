@@ -92,7 +92,7 @@
                          判明したため撤去した（外側のStackPanel MaxWidth="1200"には収まる）。 -->
                     <Expander Header="この回だけ探索の方針を変更する" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
                         <StackPanel Padding="4,12,4,4" Spacing="12">
-                            <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Text="既定は「①設定」の「スケジュール設定」タブで保存した内容です。ここで変更しても、このプロジェクトの既定値そのものは変わりません（今回の自動作成にだけ適用されます）。"/>
+                            <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Text="既定は「1 設定」の「スケジュール設定」タブで保存した内容です。ここで変更しても、このプロジェクトの既定値そのものは変わりません（今回の自動作成にだけ適用されます）。"/>
                             <!-- ユーザー指摘（checkpoint128）「同時に使える座席数上限」追加時に、NumberBoxの
                                  HeaderはControl自身の幅（140px）に収まる範囲でしか表示されず、長い説明文が
                                  途中で切れてしまうことが実機で判明した。説明文はControlの外の独立した
@@ -194,8 +194,8 @@
                     </Grid>
                     <TextBlock Text="品質設定に応じて、複数の戦略を順番に実行し、最も良い結果を採用します。進行中に「中断して現在の結果を採用」を押すと、その時点までに見つかった最良の結果を即座に提示します。「一時停止」を押すと、現在の探索が終わり次第、次の探索を始める前に停止します。「再開」を押すと、次の戦略から探索を開始します。" TextWrapping="Wrap"/>
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="④ 時間割編集で結果を確認" Click="GoToEditor_Click"/>
-                        <Button Content="⑥ 出力でExcel、PDFで結果を確認" Click="GoToOutput_Click"/>
+                        <Button Content="4 時間割編集で結果を確認" Click="GoToEditor_Click"/>
+                        <Button Content="6 出力でExcel、PDFで結果を確認" Click="GoToOutput_Click"/>
                     </StackPanel>
                 </StackPanel>
             </Border>

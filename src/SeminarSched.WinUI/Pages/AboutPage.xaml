@@ -45,7 +45,7 @@
                 Severity="Warning"
                 Title="お使いのパソコンは推奨動作環境を下回っている可能性があります" />
 
-            <TextBlock Margin="0,16,0,0" FontSize="16" FontWeight="SemiBold" Text="⑤時間割自動作成の負荷の目安" />
+            <TextBlock Margin="0,16,0,0" FontSize="16" FontWeight="SemiBold" Text="5 時間割自動作成の負荷の目安" />
             <TextBlock
                 x:Name="HardwareTierTextBlock"
                 MaxWidth="640"

@@ -39,7 +39,7 @@
                         <Button x:Name="RedoButton" VerticalAlignment="Bottom" Content="やり直す" IsEnabled="False" Click="Redo_Click"/>
                         <Button x:Name="AddTeacherButton" VerticalAlignment="Bottom" Content="+ 講師を表示" Click="AddTeacher_Click"/>
                         <Button VerticalAlignment="Bottom" Content="すべてリセット" Click="ResetAll_Click"/>
-                        <Button x:Name="GoToOptimizationButton" VerticalAlignment="Bottom" Content="⑤ 時間割自動作成へ" Click="GoToOptimization_Click"/>
+                        <Button x:Name="GoToOptimizationButton" VerticalAlignment="Bottom" Content="5 時間割自動作成へ" Click="GoToOptimization_Click"/>
                     </StackPanel>
                     <!-- ユーザー指摘（checkpoint120）「自動作成の差分が見えなくなっています」への対応。
                          以前は220px「未配置」・*「時間割」・280px「差分＋変更履歴」の3列構成で、
@@ -78,7 +78,7 @@
                         <Border x:Name="DiffCard" Padding="12" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Visibility="Collapsed">
                             <StackPanel Spacing="8">
                                 <TextBlock FontWeight="SemiBold" Text="自動作成の差分"/>
-                                <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Text="直前に⑤時間割自動作成を実行した時点からの変化です。"/>
+                                <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Text="直前に5 時間割自動作成を実行した時点からの変化です。"/>
                                 <TextBlock x:Name="DiffSummary" FontSize="11" TextWrapping="Wrap"/>
                                 <ListView x:Name="DiffDetailList" MaxHeight="260"/>
                             </StackPanel>

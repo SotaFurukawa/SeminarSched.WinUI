@@ -1,6 +1,6 @@
 <local:WorkflowPageBase x:Class="SeminarSched_WinUI.Pages.QuestionnairePage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:SeminarSched_WinUI.Pages" NavigationCacheMode="Required" Loaded="Page_Loaded">
     <ScrollViewer><StackPanel MaxWidth="720" Padding="24" HorizontalAlignment="Left" Spacing="16">
-        <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="② アンケート作成"/>
+        <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="2 アンケート作成"/>
         <InfoBar x:Name="ProjectRequired"/>
         <InfoBar x:Name="Status" IsClosable="True"/>
         <TextBlock Text="設定した開校日・コマ・科目から、生徒用・講師用のGoogleフォーム作成キットを作成します。フォーム回答(Google spreadsheet)を「3.アンケート取込」でそのまま取り込むことができます。" TextWrapping="Wrap"/>
