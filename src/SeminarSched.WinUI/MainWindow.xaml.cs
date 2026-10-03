@@ -6,6 +6,7 @@ using SeminarSched.Application;
 using SeminarSched.Application.Settings;
 using SeminarSched.Application.Updates;
 using SeminarSched.Domain.Licensing;
+using SeminarSched_WinUI.Controls;
 using SeminarSched_WinUI.Pages;
 
 // To learn more about WinUI, the WinUI project structure,
@@ -93,7 +94,7 @@ public sealed partial class MainWindow : Window
             DefaultButton = ContentDialogButton.Primary,
         };
 
-        var keyBox = new TextBox { PlaceholderText = "XXXX-XXXX-XXXX" };
+        var keyEntry = new ProductKeyEntryControl();
         var errorText = new TextBlock
         {
             Text = "プロダクトキーが正しくないか、期限が切れています。",
@@ -108,21 +109,23 @@ public sealed partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "ShikiWariを利用するには、プロダクトキーを入力してください。プロダクトキーは年度（毎年2月1日）ごとに更新が必要です。",
+                    Text = "ShikiWariを利用するにはプロダクトキーを入力してください。プロダクトキーを所持していない、または不明な場合は契約事業者にお問い合わせください。",
                     TextWrapping = TextWrapping.Wrap,
                     MaxWidth = 420,
                 },
-                keyBox,
+                keyEntry,
                 errorText,
             },
         };
+        dialog.Opened += (_, _) => keyEntry.FocusFirst();
         dialog.PrimaryButtonClick += (_, args) =>
         {
-            var result = ProductKeyService.Validate(keyBox.Text, DateTimeOffset.Now);
+            var result = ProductKeyService.Validate(keyEntry.Value, DateTimeOffset.Now);
             if (!result.IsValid)
             {
                 args.Cancel = true;
                 errorText.Visibility = Visibility.Visible;
+                keyEntry.ResetAndFocus();
                 return;
             }
 

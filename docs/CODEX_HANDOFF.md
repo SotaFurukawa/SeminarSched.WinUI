@@ -1,13 +1,65 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-03（checkpoint130）
+最終更新: 2026-10-03（checkpoint131）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.19.1 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
-Latest Development Checkpoint: checkpoint 130（v0.19.0の9件バッチについて、ユーザーから
+Current Version: `v0.19.2 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
+Latest Development Checkpoint: checkpoint 131（v0.19.1のインストーラー修正後、ユーザーが実機で
+Setup.exeを再実行し、パッケージ化されたv0.19.1のインストールに成功、プロダクトキー入力ダイアログの
+スクリーンショットを添えて続けて4件の要望を受けた：①Googleフォーム回答取込の絵文字アイコンを
+WinUI標準アイコンへ、②時間割編集の「事前確定・配置一覧・手動配置（通常は使いません）」の削除、
+③探索方針のドラッグ並び替えで行番号が更新されない不具合の修正、および（別メッセージで）
+④プロダクトキー入力欄をGitHubの二段階認証コードのような12枠自動フォーカス方式へ変更＋案内文の
+変更。
+**①Googleフォーム回答取込のアイコン:** `ImportPage.xaml`の見出し先頭にあった絵文字「🟦」を、
+`MainWindow.xaml`のナビゲーション「③アンケート取込」で既に使っている`FontIcon Glyph="&#xE78C;"`
+へ置き換えた（同じ機能を指すアイコンなので統一、かつ実機で表示確認済みの安全なグリフを再利用）。
+**②事前確定・配置一覧・手動配置の削除:** `ScheduleEditorPage.xaml`から該当Expander
+（`PreconfirmRequest`/`PreconfirmTeacher`/`PreconfirmSlot`/`PreconfirmButton`、
+`ManualRequest`/`ManualTeacher`/`ManualSlot`/`ManualLocked`、`Assignments`ListView、
+関連ボタン）を削除した。これらは、未配置一覧からセルへのドラッグ＆ドロップ（手動配置の追加）、
+配置済みカードの右クリックメニュー（ロック切替・手動配置の削除、`CreateCard()`に既存実装）と
+機能的に重複しており、ユーザーが「通常は使いません」と判断したため削除した。
+`ScheduleEditorPage.xaml.cs`から`Preconfirm_Click`/`AddManual_Click`/`RemoveManual_Click`/
+`ToggleLock_Click`/`ResetAutomatic_Click`、該当ComboBoxへの`ItemsSource`設定、
+`ReloadBoardAsync()`内の`Assignments.ItemsSource`設定を削除した。`App.ScheduleEditor`・
+`App.FixedLessons`側のApplication層API自体（`ResetAutomaticAsync`含む）はそのまま維持し、
+WinUI側の呼び出し元だけを削除した（checkpoint129の一括設定削除と同じ方針）。
+**③探索方針ドラッグ並び替えの番号不具合修正:** 実機検証で、ドラッグ並び替え直後の
+スクリーンショット（4番目の行を先頭へドラッグ）を見返したところ、行の並び（ラベル）は正しく
+先頭へ来ている一方で、その行の番号が「1」ではなく移動前の「4」のまま、以下の行も同様に
+移動前の番号を保持したままズレて表示されていたことが判明した（▲▼ボタンでの並び替えでは
+発生しない）。原因は、WinUIのListView（`CanReorderItems`）によるドラッグ並び替えが、
+`ItemsSource`（`ObservableCollection`、`IList`として扱われる）に対して内部的に
+`RemoveAt`+`Insert`を適用するタイミングが、`DragItemsCompleted`イベントの発火より後になる
+ことがあるため。`SchedulingPolicyRowsController.DragItemsCompleted`で、`Renumber()`・
+`Refresh()`の呼び出しを`list.DispatcherQueue.TryEnqueue(...)`で次のディスパッチへ遅延させ、
+WinUI内部の並び替え適用が確実に完了した後で番号を振り直すよう修正した。
+**④プロダクトキー入力欄のOTP方式化:** 新設`Controls/ProductKeyEntryControl`（UserControl）。
+4桁×3グループ、計12個の1文字`TextBox`を並べ、`BeforeTextChanging`で16進文字以外を拒否、
+`CharacterCasing=Upper`で自動大文字化、`TextChanged`で1文字入力時に次の枠へ自動フォーカス、
+`KeyDown`でBackspace時に自枠が空なら前の枠へ戻って1文字削除（連続バックスペースで後ろから
+消えていくGitHub二段階認証と同じ挙動）、`GotFocus`で既存の1文字を選択状態にして上書き入力を
+可能にし、`Paste`でクリップボードの文字列から16進文字だけを取り出して貼り付け位置以降の枠へ
+分配する（プロダクトキーはメール等でまとめて配布されるため、全体コピペにも対応）。
+`ProductKeyService.TryParseKey`は非16進文字を無視して解釈するため、12枠の値をハイフン無しで
+連結してそのまま渡せる。`MainWindow.xaml.cs`の`EnsureProductKeyAuthorizedAsync`を、単一の
+`TextBox`からこの`ProductKeyEntryControl`を使うよう変更し、ダイアログの案内文も
+「ShikiWariを利用するにはプロダクトキーを入力してください。プロダクトキーを所持していない、
+または不明な場合は契約事業者にお問い合わせください。」へ変更した（年度更新の案内文は削除）。
+**実機確認について:** v0.19.1のSetup.exeインストール成功により、ユーザーの環境へ
+パッケージ化された（非開発モードの）v0.19.1が既にインストール済みとなったため、`dotnet run`
+による開発時デバッグ実行が「同一Package Family Nameが非開発モードで既に登録されている」
+エラーで失敗するようになった（x86プラットフォームでの迂回も試したが、Package Family Name
+自体が同一のため同じエラーで失敗することを確認）。ユーザーが実際にプロダクトキー入力・
+アプリ利用の真っ最中であり、検証のために`Remove-AppxPackage`で一旦取り除くと作業中のセッションを
+壊してしまうため、今回はこの場での実機UI確認は行わず、`dotnet build`+`dotnet test`
+（全249件pass）とコードレビューのみで対応し、ユーザーに次回の更新後の確認を依頼する。
+詳細は[docs/releases/v0.19.2.md](releases/v0.19.2.md)。
+checkpoint 130（v0.19.0の9件バッチについて、ユーザーから
 「しばらく原神は触らないので、確認してみてください」と実機確認の再開を明示的に指示され、
 前checkpointで中断していたUI確認を完了した。①アップデートを確認ボタンの位置、②ライセンスを
 解除ボタンの新設（見出しと同じ行）、④時間割編集の講師名中央寄せ、⑤ホーム画面の矢印アイコン、

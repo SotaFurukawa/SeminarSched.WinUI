@@ -55,13 +55,23 @@ public sealed class SchedulingPolicyRowsController(
     }
 
     // ユーザー要望（checkpoint129）「探索方針について、スライドもできるようにしてほしい」への
-    // 対応。ListViewのCanReorderItems+AllowDropによるドラッグ並び替えも、内部的には▲▼と同じ
-    // ObservableCollection.Move()を使うため、完了後に番号を振り直し、RadioButtonの選択状態の
-    // 再描画不具合を避けるためのコンテナ再構築が必要。
+    // 対応。ListViewのCanReorderItems+AllowDropによるドラッグ並び替えは、ItemsSourceがIList
+    // （ObservableCollectionが実装）であれば内部でRemoveAt+Insertを行いrowsの並び順そのものを
+    // 書き換えるが、このDragItemsCompletedイベントが発火した時点ではまだその書き換えが完了して
+    // いない（WinUI内部の後処理として、このイベント通知より後に適用される）ことがユーザー報告・
+    // 実機確認の両方で判明した。ここで即座にRenumber()すると並び替え前の古いrowsの順序に対して
+    // 番号を振ってしまい、見た目の行順（ラベル）は正しくドラッグ結果どおりになる一方で、各行の
+    // 番号（DisplayNumber）だけが移動前の値のまま残ってしまう（例: 4番目の行を先頭へ移動しても
+    // 先頭の番号が「1」ではなく「4」のまま）。DispatcherQueue.TryEnqueueで次のディスパッチへ
+    // 処理を遅延させ、WinUI内部のrows書き換えが確実に完了した後でRenumber()・コンテナ再構築
+    // （RadioButtonの選択状態の再描画不具合を避けるため）を行うようにした。
     public void DragItemsCompleted(object sender, DragItemsCompletedEventArgs e)
     {
-        Renumber();
-        Refresh();
+        list.DispatcherQueue.TryEnqueue(() =>
+        {
+            Renumber();
+            Refresh();
+        });
     }
 
     // ユーザー指摘（checkpoint128）「探索方針のラジオボタンが揃っていない」への対応。以前は

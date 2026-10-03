@@ -91,8 +91,6 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
     {
         var path=App.ProjectService.Current?.Path;if(path is null)return;
         _loadedDataVersion=await App.ScheduleEditor.GetDataVersionAsync(path);
-        PreconfirmRequest.ItemsSource=await App.FixedLessons.GetRequestsAsync(path);PreconfirmTeacher.ItemsSource=await App.FixedLessons.GetTeachersAsync(path);PreconfirmSlot.ItemsSource=await App.FixedLessons.GetSlotsAsync(path);
-        ManualRequest.ItemsSource=await App.FixedLessons.GetRequestsAsync(path);ManualTeacher.ItemsSource=await App.FixedLessons.GetTeachersAsync(path);ManualSlot.ItemsSource=await App.FixedLessons.GetSlotsAsync(path);
         HistoryList.ItemsSource=await App.ScheduleEditor.GetAuditHistoryAsync(path);
         await ReloadDiffAsync(path);
         await ReloadBoardDatesAsync(path);
@@ -159,16 +157,6 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         return (newlyPlaced, dateChanged, teacherChanged, unassigned, details);
     }
 
-    private async void Preconfirm_Click(object sender, RoutedEventArgs e)
-    {
-        if (PreconfirmRequest.SelectedItem is not LessonRequestOption request || PreconfirmTeacher.SelectedItem is not TeacherOption teacher || PreconfirmSlot.SelectedItem is not ScheduleSlotOption slot)
-        { ShowEditorError("生徒・科目、担当講師、日付・コマを選択してください。"); return; }
-        var path = App.ProjectService.Current!.Path;
-        var (proceed, confirmSoftWarnings, reason) = await ResolveAddPreviewAsync(path, request.Id, teacher.Id, slot.OpenDateId, slot.TimeSlotId);
-        if (!proceed) return;
-        await ExecuteEditorAsync(async () => await App.ScheduleEditor.AddManualAsync(path, request.Id, teacher.Id, slot.OpenDateId, slot.TimeSlotId, true, confirmSoftWarnings, reason), "事前確定として固定しました");
-    }
-
     private async Task ReloadBoardDatesAsync(string path)
     {
         var previous = (BoardDate.SelectedItem as OpenDateOption)?.Id;
@@ -184,13 +172,12 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         var path = App.ProjectService.Current?.Path;
         if (path is null || BoardDate.SelectedItem is not OpenDateOption date)
         {
-            _currentBoard = null; _selectedDateId = null; UnplacedList.ItemsSource = null; Assignments.ItemsSource = null; RenderBoard();
+            _currentBoard = null; _selectedDateId = null; UnplacedList.ItemsSource = null; RenderBoard();
             return;
         }
         _selectedDateId = date.Id;
         _currentBoard = await App.ScheduleEditor.GetBoardAsync(path, date.Id, _extraTeacherIds);
         UnplacedList.ItemsSource = await App.ScheduleEditor.GetUnplacedSessionsAsync(path, date.Id);
-        Assignments.ItemsSource = await App.ScheduleEditor.GetAssignmentsAsync(path, date.Id);
         RenderBoard();
     }
 
@@ -391,24 +378,6 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
             await ReloadBoardAsync();
         }
     }
-
-    private async void AddManual_Click(object sender,RoutedEventArgs e)
-    {
-        if(ManualRequest.SelectedItem is not LessonRequestOption request||ManualTeacher.SelectedItem is not TeacherOption teacher||ManualSlot.SelectedItem is not ScheduleSlotOption slot){ShowEditorError("受講希望・講師・日時を選択してください。");return;}
-        var path=App.ProjectService.Current!.Path;
-        var(proceed,confirmSoftWarnings,reason)=await ResolveAddPreviewAsync(path,request.Id,teacher.Id,slot.OpenDateId,slot.TimeSlotId);
-        if(!proceed)return;
-        await ExecuteEditorAsync(async()=>await App.ScheduleEditor.AddManualAsync(path,request.Id,teacher.Id,slot.OpenDateId,slot.TimeSlotId,ManualLocked.IsChecked==true,confirmSoftWarnings,reason),"手動配置を追加しました");
-    }
-    private async void RemoveManual_Click(object sender,RoutedEventArgs e)
-    {
-        if(Assignments.SelectedItem is not ScheduleAssignmentItem assignment||!assignment.IsManual){ShowEditorError("削除する手動配置を選択してください。自動配置はリセットを使用します。");return;}await ExecuteEditorAsync(async()=>await App.ScheduleEditor.RemoveManualAsync(App.ProjectService.Current!.Path,assignment.Id),"手動配置を削除しました");
-    }
-    private async void ToggleLock_Click(object sender,RoutedEventArgs e)
-    {
-        if(Assignments.SelectedItem is not ScheduleAssignmentItem assignment){ShowEditorError("配置を選択してください。");return;}await ExecuteEditorAsync(async()=>await App.ScheduleEditor.SetLockedAsync(App.ProjectService.Current!.Path,assignment.Id,!assignment.IsLocked),assignment.IsLocked?"ロックを解除しました":"ロックしました");
-    }
-    private async void ResetAutomatic_Click(object sender,RoutedEventArgs e)=>await ExecuteEditorAsync(async()=>await App.ScheduleEditor.ResetAutomaticAsync(App.ProjectService.Current!.Path),"自動配置をリセットしました",clearsHistory:true);
 
     private async void ResetAll_Click(object sender,RoutedEventArgs e)
     {
