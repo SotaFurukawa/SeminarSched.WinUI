@@ -32,7 +32,7 @@ public sealed partial class ProductKeyEntryControl : UserControl
                 RootPanel.Children.Add(new TextBlock
                 {
                     Text = "-",
-                    FontSize = 20,
+                    FontSize = 16,
                     VerticalAlignment = VerticalAlignment.Center,
                 });
             }
@@ -41,10 +41,11 @@ public sealed partial class ProductKeyEntryControl : UserControl
             {
                 var box = new TextBox
                 {
-                    Width = 36,
-                    Height = 44,
+                    Width = 28,
+                    Height = 40,
+                    Padding = new Thickness(0),
                     MaxLength = 1,
-                    FontSize = 20,
+                    FontSize = 16,
                     FontWeight = FontWeights.SemiBold,
                     TextAlignment = TextAlignment.Center,
                     CharacterCasing = CharacterCasing.Upper,

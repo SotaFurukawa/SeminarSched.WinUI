@@ -1,13 +1,23 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-03（checkpoint131）
+最終更新: 2026-10-03（checkpoint132）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.19.2 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
-Latest Development Checkpoint: checkpoint 131（v0.19.1のインストーラー修正後、ユーザーが実機で
+Current Version: `v0.19.3 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
+Latest Development Checkpoint: checkpoint 132（v0.19.2のプロダクトキー入力ダイアログを実際に
+ユーザーが使ってみたスクリーンショットから、新設した12枠が横に広すぎてダイアログの右端で
+はみ出し後ろの枠が見えない、かつ左右中央に来ていない、という指摘を受けた。
+`Controls/ProductKeyEntryControl.xaml.cs`の各枠`Width`を36px→28px、`Height`を44px→40px、
+`FontSize`を20→16、`Padding`を明示的に0へ、区切りのハイフン`TextBlock`も`FontSize`20→16へ
+縮小し、`StackPanel`の`Spacing`を4→3へ詰めて全体の幅を抑えた。また`ProductKeyEntryControl.xaml`
+の`RootPanel`（横並びのStackPanel）へ`HorizontalAlignment="Center"`を追加し、ダイアログに
+対して中央寄せになるようにした。v0.19.2と同じ理由（ユーザーの環境にパッケージ版が
+インストール済みで`dotnet run`が競合する）により今回も実機確認は行わず、`dotnet build`+
+`dotnet test`（全249件pass）のみで対応。詳細は[docs/releases/v0.19.3.md](releases/v0.19.3.md)。
+checkpoint 131（v0.19.1のインストーラー修正後、ユーザーが実機で
 Setup.exeを再実行し、パッケージ化されたv0.19.1のインストールに成功、プロダクトキー入力ダイアログの
 スクリーンショットを添えて続けて4件の要望を受けた：①Googleフォーム回答取込の絵文字アイコンを
 WinUI標準アイコンへ、②時間割編集の「事前確定・配置一覧・手動配置（通常は使いません）」の削除、
