@@ -26,6 +26,7 @@
     <Content Include="Assets\AppIcon.ico" />
     <Content Include="Assets\Wide310x150Logo.scale-200.png" />
     <Content Include="Assets\GoogleFormsGuide\*.png" />
+    <Content Include="Assets\GoogleFormsIcon.svg" />
   </ItemGroup>
 
   <ItemGroup>

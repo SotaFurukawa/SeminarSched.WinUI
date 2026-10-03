@@ -1,13 +1,42 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-03（checkpoint138）
+最終更新: 2026-10-03（checkpoint139）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.21.0 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
-Latest Development Checkpoint: checkpoint 138（ユーザーから「こうした類の通知について、今現状は
+Current Version: `v0.21.1 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
+Latest Development Checkpoint: checkpoint 139（v0.21.0のトースト通知について、ユーザーから
+「やりたいことはできています。スクロール位置も正しいです。横幅をもう少し変えたい。タブバーに
+かからないぐらいから、右端まで、すなわちページの横の長さ分よりほんの少し短いくらいにしたい。
+これはウィンドウが可変だったりした場合には、その長さに調整すること」、続けて「また、文字列は
+アイコンの右側に左詰めで」との追加指摘を受けた。さらに別件で「アンケート取込のアイコンに
+ついて、ページ内のアイコンを変えてもらいましたが、右のタブとは別のものにしたい。google
+フォームっぽいものを選択してきて持ってきてください。フリーの素材があるなら、winuiでなくても
+もってきてもらってもいいです」との要望も受けた。
+**トーストの横幅・文字配置:** `MainWindow.xaml`の`ToastBorder`を、NavigationViewの兄弟要素
+（ウィンドウ全体に重なる）から、NavigationView自体のContent（`NavFrame`と同じGridの中）へ
+移動した。これにより、左ペイン（タブバー）を除いたコンテンツ領域の幅にだけ連動するようになり、
+ウィンドウ幅やペインの展開／収納に応じてGridが自動で再レイアウトされるため、明示的なイベント
+ハンドリングなしで追従する。`HorizontalAlignment`を`Center`から`Stretch`へ、`MaxWidth`指定を
+撤去して`Margin="12,16,12,0"`による左右の小さな余白だけで「ほんの少し短い」見た目にした。
+`ToastText`に`HorizontalAlignment="Left"`を明示し、アイコンのすぐ右に左詰めで表示されるように
+した。
+**Googleフォーム回答の取込アイコン:** ナビゲーションの「3 アンケート取込」と同じ
+`FontIcon Glyph="&#xE78C;"`を使っていたのを、新規オリジナル作成のSVG
+（`Assets/GoogleFormsIcon.svg`、紫の書類＋フォーム罫線＋白チェックマークの円、Googleフォームの
+商標ロゴそのものではなく「フォームらしさ」を表現したオリジナル意匠）へ置き換えた。WinUIの
+`Image`に`Source="Assets/..."`という文字列指定ではSVGが読み込まれない（PNG/ICOと異なりSVGは
+自動検出されない）ことが実機で判明し、`Image.Source`に明示的な`SvgImageSource
+UriSource="ms-appx:///Assets/GoogleFormsIcon.svg"`を指定する方式に直して解決した。csprojの
+`Content Include`にも追加し、パッケージへ確実に含まれるようにした。
+checkpoint133以降と同じ手順（一時的な別パッケージIDでの実機ビルド・検証・原状復帰）で、
+①トーストの横幅がコンテンツ領域に連動すること（ウィンドウ最大化時も追従）、②文字列がアイコンの
+右側に左詰めで表示されること、③新しいGoogleフォームアイコンが正しく表示され、ナビゲーションの
+アイコンとは視覚的に異なることを確認した。UI調整のためNext Version Ruleの既定を適用し
+v0.21.1（patch bump）とした。詳細は[docs/releases/v0.21.1.md](releases/v0.21.1.md)。
+checkpoint 138（ユーザーから「こうした類の通知について、今現状は
 ページの上部に表示し、変更がされた場合には、ページの一番上まで戻すようになっていますが、
 これだといくつか選択しないといけないときに、毎回下までスクロールする必要があり、煩わしい。
 そのため、このスクロールをやめたい。これと同時に、保存などの成功通知は、ページの決まった位置に

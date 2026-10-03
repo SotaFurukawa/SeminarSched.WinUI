@@ -129,48 +129,53 @@
                     </Grid>
                 </Grid>
             </NavigationView.PaneFooter>
-            <Frame x:Name="NavFrame" />
-        </NavigationView>
-
-        <!-- ユーザー要望「保存などの成功通知を、ページ固定位置ではなくiPhoneの通知のように上部から
-             スライドインさせたい。通知のたびにページを一番上まで自動スクロールしてしまうのをやめたい」
-             への対応。各ページのInfoBar（内容がページの状態そのものではなく、単発の操作結果を知らせる
-             だけのもの）の代わりに、MainWindowが1つだけ持つこのオーバーレイへ通知する。どのページの
-             ScrollViewerにも属さない（NavigationViewと同じGrid.Row="1"に後から重ねているだけ）ため、
-             通知を出してもページのスクロール位置に影響しない。ToastNotificationState.ShowSuccess()
-             経由でMainWindow.xaml.csのShowToast()が呼ばれ、TranslateTransformでスライドイン・
-             スライドアウトを行う（InfoBar自体の開閉アニメーションは使わず、常時Visibleのまま
-             Y座標だけを動かすことで、2件目が来たときの「先に出ているものをスライドアウトさせてから
-             2件目をスライドインさせる」という逐次アニメーションを自前で制御できるようにしている）。 -->
-        <Border
-            x:Name="ToastBorder"
-            Grid.Row="1"
-            MinWidth="320"
-            MaxWidth="480"
-            Margin="0,16,0,0"
-            Padding="16,12"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Top"
-            Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}"
-            BorderBrush="{ThemeResource SystemFillColorSuccessBrush}"
-            BorderThickness="1"
-            CornerRadius="4"
-            Visibility="Collapsed">
-            <Border.RenderTransform>
-                <TranslateTransform x:Name="ToastTransform" Y="-160" />
-            </Border.RenderTransform>
-            <Grid ColumnSpacing="12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <FontIcon Grid.Column="0" Glyph="&#xE930;" Foreground="{ThemeResource SystemFillColorSuccessBrush}" VerticalAlignment="Center" />
-                <TextBlock x:Name="ToastText" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" />
-                <Button Grid.Column="2" x:Name="ToastCloseButton" Click="ToastClose_Click" Background="Transparent" BorderThickness="0" Padding="4" VerticalAlignment="Center">
-                    <FontIcon Glyph="&#xE711;" FontSize="12" />
-                </Button>
+            <!-- ユーザー要望「保存などの成功通知を、ページ固定位置ではなくiPhoneの通知のように上部から
+                 スライドインさせたい。通知のたびにページを一番上まで自動スクロールしてしまうのを
+                 やめたい」への対応。各ページのInfoBar（内容がページの状態そのものではなく、単発の
+                 操作結果を知らせるだけのもの）の代わりに、MainWindowが1つだけ持つこのオーバーレイへ
+                 通知する。どのページのScrollViewerにも属さないため、通知を出してもページのスクロール
+                 位置に影響しない。ToastNotificationState.ShowSuccess()経由でMainWindow.xaml.csの
+                 ShowToast()が呼ばれ、TranslateTransformでスライドイン・スライドアウトを行う（InfoBar
+                 自体の開閉アニメーションは使わず、常時Visibleのまま Y座標だけを動かすことで、2件目が
+                 来たときの「先に出ているものをスライドアウトさせてから2件目をスライドインさせる」
+                 という逐次アニメーションを自前で制御できるようにしている）。
+                 ユーザー指摘「横幅を、タブバーにかからないぐらいから右端まで（ページの横の長さ分より
+                 ほんの少し短いくらい）にしたい。ウィンドウが可変だった場合には、その長さに調整する
+                 こと」への対応。NavigationViewの兄弟要素（ウィンドウ全体に重なる）ではなく、
+                 NavigationView自体のContent（NavFrameと同じGridの中）に置くことで、左ペイン（タブ
+                 バー）を除いたコンテンツ領域の幅にだけ連動する。ウィンドウ幅やペインの展開／収納に
+                 応じてGridが自動で再レイアウトされるため、明示的なハンドリングなしで追従する。 -->
+            <Grid>
+                <Frame x:Name="NavFrame" />
+                <Border
+                    x:Name="ToastBorder"
+                    Margin="12,16,12,0"
+                    Padding="16,12"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Top"
+                    Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}"
+                    BorderBrush="{ThemeResource SystemFillColorSuccessBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Visibility="Collapsed">
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="ToastTransform" Y="-160" />
+                    </Border.RenderTransform>
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Grid.Column="0" Glyph="&#xE930;" Foreground="{ThemeResource SystemFillColorSuccessBrush}" VerticalAlignment="Center" />
+                        <!-- ユーザー指摘「文字列はアイコンの右側に左詰めで」への対応。 -->
+                        <TextBlock x:Name="ToastText" Grid.Column="1" TextWrapping="Wrap" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                        <Button Grid.Column="2" x:Name="ToastCloseButton" Click="ToastClose_Click" Background="Transparent" BorderThickness="0" Padding="4" VerticalAlignment="Center">
+                            <FontIcon Glyph="&#xE711;" FontSize="12" />
+                        </Button>
+                    </Grid>
+                </Border>
             </Grid>
-        </Border>
+        </NavigationView>
     </Grid>
 </Window>
