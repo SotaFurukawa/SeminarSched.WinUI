@@ -54,6 +54,7 @@ public sealed partial class ProductKeyEntryControl : UserControl
                     FontSize = 14,
                     FontWeight = FontWeights.SemiBold,
                     TextAlignment = TextAlignment.Center,
+                    VerticalContentAlignment = VerticalAlignment.Center,
                     CharacterCasing = CharacterCasing.Upper,
                 };
                 box.BeforeTextChanging += Box_BeforeTextChanging;

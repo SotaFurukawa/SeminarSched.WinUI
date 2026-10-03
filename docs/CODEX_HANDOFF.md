@@ -1,13 +1,20 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-03（checkpoint133）
+最終更新: 2026-10-03（checkpoint134）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.19.4 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
-Latest Development Checkpoint: checkpoint 133（v0.19.3でも「中央ぞろえにはできているが、
+Current Version: `v0.19.5 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
+Latest Development Checkpoint: checkpoint 134（v0.19.4のスクリーンショットから、プロダクトキー
+入力欄の文字が枠内でやや上寄りに表示される指摘を受けた。原因は各枠の`TextBox`に
+`VerticalContentAlignment`を明示していなかったこと（既定は上揃え）。
+`VerticalContentAlignment="Center"`を追加して解決した。checkpoint133と同じ手順
+（一時的な別パッケージIDでの実機ビルド・検証・原状復帰）で、複数文字を入力して全ての枠で
+上下中央に表示されることを確認してから出荷した。詳細は
+[docs/releases/v0.19.5.md](releases/v0.19.5.md)。
+checkpoint 133（v0.19.3でも「中央ぞろえにはできているが、
 まだはみ出ている。一つの文字当たりのマス目の横幅が大きい」という指摘を受け、さらに「作成した
 ものをしっかり確認してから次のマイナーチェンジとしてください」と、実機確認を徹底するよう
 明確に指示された。原因調査の結果、WinUIの既定`TextBox`スタイルが持つテーマ既定の`MinWidth`
