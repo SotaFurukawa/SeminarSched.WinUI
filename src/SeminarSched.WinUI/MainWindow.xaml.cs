@@ -1,3 +1,4 @@
+using Microsoft.UI.Text;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -117,8 +118,21 @@ public sealed partial class MainWindow : Window
                 errorText,
             },
         };
+        var successPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 12,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 16, 0, 16),
+            Children =
+            {
+                new TextBlock { Text = "Success", FontSize = 24, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center },
+                new FontIcon { Glyph = "", FontSize = 28, Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorSuccessBrush"], VerticalAlignment = VerticalAlignment.Center },
+            },
+        };
+
         dialog.Opened += (_, _) => keyEntry.FocusFirst();
-        dialog.PrimaryButtonClick += (_, args) =>
+        dialog.PrimaryButtonClick += async (_, args) =>
         {
             var result = ProductKeyService.Validate(keyEntry.Value, DateTimeOffset.Now);
             if (!result.IsValid)
@@ -130,10 +144,29 @@ public sealed partial class MainWindow : Window
             }
 
             accepted = result;
+
+            // ユーザー要望「正しいプロダクトキーが入力された場合には、成功画面を出してほしい」への
+            // 対応。args.Cancel=trueでダイアログの自動クローズを止め、入力フォームを「Success」＋
+            // 緑色のチェックマークへ短時間差し替えてからHide()で閉じる。Deferralを使い、この
+            // 非同期処理（表示の差し替え・待機）が終わるまでPrimaryButtonClickの処理完了を遅らせる。
+            args.Cancel = true;
+            var deferral = args.GetDeferral();
+            try
+            {
+                dialog.Content = successPanel;
+                dialog.PrimaryButtonText = string.Empty;
+                dialog.CloseButtonText = string.Empty;
+                await Task.Delay(TimeSpan.FromMilliseconds(1000));
+                dialog.Hide();
+            }
+            finally
+            {
+                deferral.Complete();
+            }
         };
 
-        var dialogResult = await dialog.ShowAsync();
-        if (dialogResult != ContentDialogResult.Primary || accepted is not { } validated)
+        await dialog.ShowAsync();
+        if (accepted is not { } validated)
         {
             Application.Current.Exit();
             return false;

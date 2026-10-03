@@ -1,13 +1,31 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-03（checkpoint135）
+最終更新: 2026-10-03（checkpoint136）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.19.6 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
-Latest Development Checkpoint: checkpoint 135（v0.19.5でも「まだこれでも上の方に来ますね。
+Current Version: `v0.20.0 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
+Latest Development Checkpoint: checkpoint 136（ユーザーから「正しいプロダクトキーが入力された
+場合には、成功画面を出してください。『Success』の文字と一緒に、緑色の記号を右側に出しておく」
+との要望を受けた。記号の具体的なイメージ（「8個の点が同一円状にならんでいるようなもの」）は
+一意に特定できなかったが、「イメージが分からなければwinuiで」との指示どおりWinUI標準の
+Completedアイコン（チェックマーク、`&#xE930;`）を`SystemFillColorSuccessBrush`（Success状態用の
+意味づけされたテーマブラシ、このファイルの`errorText`が使う`SystemFillColorCriticalBrush`と
+対になるもの）で着色して採用した（ユーザーに確認したところ「適切なものを選んでください」と
+一任された）。`MainWindow.xaml.cs`の`EnsureProductKeyAuthorizedAsync`で、
+`PrimaryButtonClick`を検証成功時に`args.Cancel=true`＋`Deferral`で自動クローズを止め、
+ダイアログの`Content`を「Success」テキスト＋緑チェックマークのStackPanelへ差し替え、
+ボタン文言を空にしたうえで1秒待機してから`dialog.Hide()`で閉じるようにした。`accepted`を
+closureで既に保持しているため、成功判定は`dialogResult`（プログラム的なHide()経由だと
+`Primary`にならない）ではなく`accepted is not null`で行うよう変更した。
+checkpoint133以降と同じ手順（一時的な別パッケージIDでの実機ビルド・検証・原状復帰）で、
+①正しいキー入力→成功画面表示→自動的にホーム画面へ遷移、②誤ったキー入力→従来どおり
+エラー表示＋入力欄リセット（成功画面まわりの変更の影響を受けていないこと）の両方を実機で
+確認した。新機能のためNext Version Ruleの既定を適用しv0.20.0（minor bump、patchは0へ
+リセット）とした。詳細は[docs/releases/v0.20.0.md](releases/v0.20.0.md)。
+checkpoint 135（v0.19.5でも「まだこれでも上の方に来ますね。
 ちょっと画面を見ながら真ん中に来るように調整してみてください」と、`VerticalContentAlignment=
 Center`だけでは直っていないとの指摘を受けた。今回は勘で調整するのではなく、一時的な別
 パッケージIDの実機ビルドでスクリーンショットを撮り、`System.Drawing.Bitmap.GetPixel`で
