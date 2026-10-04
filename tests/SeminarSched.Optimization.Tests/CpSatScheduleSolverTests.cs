@@ -296,6 +296,55 @@ public sealed class CpSatScheduleSolverTests
         Assert.Single(solution.Placements.Select(p => p.OpenDateId).Distinct());
     }
 
+    // ユーザー報告（checkpoint140）「講師の出勤日をできるだけ減らすの優先度が高く、時間帯を遅めに
+    // することの優先度が低いのに、自動作成するとZ（最も早いコマ）にほとんど配置されない。Zへ
+    // 配置した方が出勤日を減らせるはずなので不具合ではないか」を検証する。1人の講師・1対1必須の
+    // 8件の受講希望（どれも同じ講師のどの候補日・候補コマへも配置可能）。各日はZ/A/B/C
+    // （SlotOrder 0/1/2/3）の4コマ。8件ちょうどを2日（4コマ×2日=8）へ収めると、非Zのコマ
+    // （A・B・C、1日3つ×2日=6）だけでは足りず、必ず2件はZへ配置することになる。3日目を開けば
+    // 非Zのコマが9つになりZを一切使わずに済むが、講師の出勤日が1日増える。
+    // 「講師の出勤日をできるだけ減らす」を「時間帯をできるだけ遅くする」より上位（この並び順での
+    // 重みはそれぞれ3,000・1,000）にした場合、Zを2件使ってでも2日で収めるのが正しく、3日目を
+    // 開けて時間帯を稼ぐのは誤り。修正前は時間帯側の重みが配置1件ごとに加算される（8件×最大3倍
+    // 差＝最大24,000相当）のに対し、出勤日側は（講師,日付）の組ごとに高々1回（3,000）しか
+    // 加算されないため、本来下位のはずの時間帯が出勤日を押しのけて3日目を開けさせてしまっていた。
+    [Fact]
+    public async Task SolveAsync_PrioritizesFewerTeacherAttendanceDaysOverLaterTimeOfDayWhenManyLessonsAreInvolved()
+    {
+        const long teacherId = 100;
+        var demands = Enumerable.Range(1, 8)
+            .Select(i => new LessonDemand(i, i, 1, 0, OneToOneRequired: true))
+            .ToArray();
+        var candidates = Enumerable.Range(1, 8)
+            .SelectMany(studentId => Enumerable.Range(1, 3)
+                .SelectMany(day => Enumerable.Range(0, 4)
+                    .Select(slotOrder => new PlacementCandidate(
+                        studentId, studentId, teacherId, day, (day * 10) + slotOrder,
+                        SlotOrder: slotOrder, OneToOneRequired: true))))
+            .ToArray();
+        var order = new[]
+        {
+            SchedulingPolicyDimension.TeacherCountPerDay,
+            SchedulingPolicyDimension.TeacherLoadBalance,
+            SchedulingPolicyDimension.TeacherAttendanceDays,
+            SchedulingPolicyDimension.PairingSize,
+            SchedulingPolicyDimension.StudentAttendanceDays,
+            SchedulingPolicyDimension.TimeOfDay,
+            SchedulingPolicyDimension.TeacherStudentConsecutive,
+        };
+        var policy = new SchedulingPolicy(
+            teacherAttendanceDaysPreference: TeacherAttendanceDaysPreference.Concentrate,
+            timeOfDayPreference: TimeOfDayPreference.Late,
+            preferenceOrder: order);
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, Policy: policy), TimeSpan.FromSeconds(10));
+
+        Assert.Equal(8, solution.Placements.Count);
+        Assert.True(
+            solution.Placements.Select(p => p.OpenDateId).Distinct().Count() <= 2,
+            "出勤日を減らす方針が時間帯の方針より上位なら、Zを使ってでも2日に収まるはず（3日目を開いてZを避けるのは誤り）。");
+    }
+
     // ユーザー要望（checkpoint107）「同一講師が同一生徒を連続コマで担当するのを避ける/優遇するに
     // ついて、避ける意味はあまりないと思うので、『考慮しない』と『できるだけ連続にする』にして、
     // 新たな探索方針としてください」を検証する。生徒10の受講希望1件目は講師100・1限に固定。

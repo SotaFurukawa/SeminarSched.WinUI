@@ -156,7 +156,8 @@ public sealed class CpSatScheduleSolver
         // (see AddRegularTeacherMinimums) ranks between day-spread and the placement floor.
         // EvenSpacing/SubjectSpacing (see BuildEvenSpacingTerms/BuildSubjectSpacingTerms) refine
         // day-spread further - even interval, not just distinct-day count - and rank just below it.
-        var preferenceWeights = BuildPreferenceWeights(problem.Policy.PreferenceOrder);
+        var totalPlacementsToSchedule = problem.Demands.Sum(demand => Math.Max(0, demand.RequiredSessions - demand.AlreadyFixedSessions));
+        var preferenceWeights = BuildPreferenceWeights(problem.Policy.PreferenceOrder, totalPlacementsToSchedule);
         var objectiveTerms = variables.Select(item =>
             LinearExpr.Term(item.variable, 1_000_000L - (item.candidate.PreferencePenalty * 100L) + item.candidate.AvailabilityPreference))
             .Concat(BuildDayDispersionTerms(model, variables, problem.Policy.StudentAttendanceDaysPreference, preferenceWeights[SchedulingPolicyDimension.StudentAttendanceDays]))
@@ -261,14 +262,40 @@ public sealed class CpSatScheduleSolver
     /// 並び替えを一度も行っていないプロジェクトの挙動は変わらない）。EvenSpacing/SubjectSpacing/
     /// TeacherGap/RegularTeacherShortfallはトグル不可能な常時ONの項のため、この並び替え・重み
     /// テーブルの対象には含まれない（固定定数のまま）。
+    ///
+    /// ユーザー報告（checkpoint140）「講師の出勤日をできるだけ減らすの優先度が高く、時間帯を遅めに
+    /// することの優先度が低いのに、自動作成するとZ（最も早いコマ）にほとんど配置されない。Zへ
+    /// 配置した方が出勤日を減らせるはずなので不具合ではないか」の調査で発見した設計上の不具合。
+    /// <see cref="BuildTimeOfDayTerms"/>と<see cref="BuildTeacherLoadBalanceTerms"/>は候補1つ
+    /// （＝配置1件）ごとに重みを加算する「配置数に比例して合計が増え続ける」項なのに対し、他の
+    /// 段階（<see cref="BuildTeacherDayDispersionTerms"/>等）は（講師,日付）等の組ごとに高々1回しか
+    /// 加算されない「件数に関わらずほぼ一定の上限を持つ」項だった。そのため、同じ固定の重み定数
+    /// 同士を比較しても、「配置数に比例する」側は配置件数が多い実プロジェクト（数百件規模）では
+    /// 合計がもう一方を大きく上回ってしまい、本来下位であるはずの探索方針が上位の探索方針を
+    /// 数の力で押しのけてしまっていた（小規模なテストデータでは配置件数が少なく顕在化しないため、
+    /// 既存のテストでは発見できていなかった）。「配置数に比例して増え続ける」2項目だけ、その重みを
+    /// 配置予定件数（<paramref name="totalPlacementsToSchedule"/>）で割って縮小し、合計が他の段階
+    /// （件数に関わらずほぼ一定）と同程度の規模に収まるようにした。他の段階の重みは一切変更しない
+    /// （1,000,000-per-placementの床より常に十分小さいという既存の前提を崩さないため）。
     /// </summary>
     private static readonly long[] PreferenceRankWeights = [10_000L, 6_000L, 3_000L, 2_000L, 1_500L, 1_000L, 200L];
 
-    private static Dictionary<SchedulingPolicyDimension, long> BuildPreferenceWeights(IReadOnlyList<SchedulingPolicyDimension> preferenceOrder)
+    private static bool IsPlacementCountScaledDimension(SchedulingPolicyDimension dimension) =>
+        dimension is SchedulingPolicyDimension.TimeOfDay or SchedulingPolicyDimension.TeacherLoadBalance;
+
+    private static Dictionary<SchedulingPolicyDimension, long> BuildPreferenceWeights(
+        IReadOnlyList<SchedulingPolicyDimension> preferenceOrder,
+        int totalPlacementsToSchedule)
     {
+        var sessionDivisor = Math.Max(1L, totalPlacementsToSchedule);
         var weights = new Dictionary<SchedulingPolicyDimension, long>();
         for (var rank = 0; rank < preferenceOrder.Count; rank++)
-            weights[preferenceOrder[rank]] = PreferenceRankWeights[rank];
+        {
+            var dimension = preferenceOrder[rank];
+            weights[dimension] = IsPlacementCountScaledDimension(dimension)
+                ? Math.Max(1L, PreferenceRankWeights[rank] / sessionDivisor)
+                : PreferenceRankWeights[rank];
+        }
         return weights;
     }
 

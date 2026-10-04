@@ -1,13 +1,50 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-03（checkpoint139）
+最終更新: 2026-10-04（checkpoint140）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.21.1 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
-Latest Development Checkpoint: checkpoint 139（v0.21.0のトースト通知について、ユーザーから
+Current Version: `v0.21.2 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
+Latest Development Checkpoint: checkpoint 140（UIではなく最適化エンジン自体の不具合報告。
+ユーザーから探索方針のスクリーンショットを添えて「今このような探索方針になっていて、遅めの
+時間に配置することは優先度が低く、また講師の出勤日ができるだけ少ないようにすることの優先度は
+高いのですが、自動作成してみると、ZABCの時間帯のZにあまりにも配置されない。Zに配置した方が
+出勤日を減らせるはずなので、なにか不具合があるのではないか」との報告を受けた。
+**調査:** `src/SeminarSched.Optimization/Core/CpSatScheduleSolver.cs`の`BuildPreferenceWeights`/
+`PreferenceRankWeights`（checkpoint123で導入、7つの探索方針の並び順から重みを決める仕組み）を
+精査した結果、設計上の不具合を発見した。7つの探索方針それぞれのBuildXxxTermsを調べると、
+`BuildTeacherDayDispersionTerms`（講師の出勤日）・`BuildTeacherCountPerDayTerms`・
+`BuildDayDispersionTerms`（生徒の授業日）・`BuildPairingSizeTerms`は、いずれも（講師,日付）や
+（生徒,日付）等の「組」単位で高々1回しか加算しない項（合計が配置件数に関わらずほぼ一定の
+上限を持つ）だったのに対し、`BuildTimeOfDayTerms`（時間帯）と`BuildTeacherLoadBalanceTerms`
+（講師ごとのコマ数の偏り）は、配置1件（候補1つ）ごとに重みを加算する項だった（`BuildTimeOfDay
+Terms`は`weight * candidate.SlotOrder`を候補ごとに、`BuildTeacherLoadBalanceTerms`は
+`maxLoad`の値域が`variables.Count`まで及ぶ）。そのため、同じ固定の重み定数同士を比較しても、
+「配置件数に比例して合計が増え続ける」側は、数十〜数百件規模の実プロジェクトでは合計がもう
+一方を大きく上回ってしまい、本来下位であるはずの探索方針が、上位であるはずの探索方針を
+「数の力」で押しのけてしまっていた。小規模なテストデータ（既存の
+`SolveAsync_PreferenceOrderDeterminesWhichConflictingPolicyWins`は受講希望2件のみ）では
+配置件数が少なく顕在化しないため、既存のテストでは発見できていなかった。
+**修正:** `BuildTimeOfDayTerms`・`BuildTeacherLoadBalanceTerms`（配置件数に比例して増え続ける
+2項目）だけ、その重みを配置予定件数（`problem.Demands.Sum(d => Math.Max(0,
+d.RequiredSessions - d.AlreadyFixedSessions))`）で割って縮小し、合計が他の段階と同程度の
+規模に収まるようにした（`Math.Max(1L, ...)`で0に丸め込まれないようにしている）。他の段階の
+重みは一切変更していない。当初、全段階の重みを`PreferenceWeightScale`で一律かさ上げしてから
+割る案を試したが、これは「配置1件ごとの1,000,000という床（Assignment count dominates every
+soft penalty）より常にはるかに小さい」という既存の大前提を壊してしまい
+（`SolveAsync_PrefersFewerDistinctAttendanceDaysForATeacherWhenOtherwiseTied`が配置数0で
+失敗する重大な回帰を引き起こした）、対象の2項目だけを直接割る方式に修正し直した。
+**検証:** 新規の回帰テスト`SolveAsync_PrioritizesFewerTeacherAttendanceDaysOverLaterTimeOfDay
+WhenManyLessonsAreInvolved`（1人の講師・1対1必須の8件の受講希望、Z/A/B/Cの4コマ×3日分の
+候補。最少2日に収めると非Zのコマ（6つ）だけでは足りず2件は必ずZへ、3日目を開けば完全に
+Zを避けられるが出勤日が1日増える、というシナリオ）を追加し、修正前はこのテストが実際に失敗
+する（3日目を開いてしまう）ことを一時的に確認した上で、修正後は正しく2日に収まることを確認
+した。既存の最適化エンジンのテスト69件・リポジトリ全体のテスト250件がすべて通過することも
+確認済み。バックエンドのアルゴリズム修正のため実機でのUI確認は行っていない（回帰テストでの
+検証で十分と判断）。詳細は[docs/releases/v0.21.2.md](releases/v0.21.2.md)。
+checkpoint 139（v0.21.0のトースト通知について、ユーザーから
 「やりたいことはできています。スクロール位置も正しいです。横幅をもう少し変えたい。タブバーに
 かからないぐらいから、右端まで、すなわちページの横の長さ分よりほんの少し短いくらいにしたい。
 これはウィンドウが可変だったりした場合には、その長さに調整すること」、続けて「また、文字列は
