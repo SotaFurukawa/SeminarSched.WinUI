@@ -18,17 +18,9 @@ namespace SeminarSched_WinUI.Pages;
 
 public sealed partial class SetupPage : WorkflowPageBase
 {
-    private long _slotEditId;
-    // ユーザー要望（checkpoint128）「順序はもう矢印で設定できるので表示しておく必要はない」への
-    // 対応。コマ設定フォームから「順序」NumberBoxを削除し、代わりにこのフィールドで内部管理する
-    // （挙動は従来のNumberBox.Valueベースの実装と同一: 新規追加のたびに+1、既存コマ編集時は
-    // その順序を保持、▲▼ボタンでの並び替えは別経路でDB側を直接更新する）。
-    private int _slotEditOrder = 1;
-    private bool _loading;
     private MasterItem<Student>[] _studentItems = [];
     private MasterItem<Teacher>[] _teacherItems = [];
     private MasterItem<Subject>[] _subjectItems = [];
-    private MasterItem<Teacher?>[] _nullableTeacherItems = [];
     // ユーザー要望（checkpoint142）「生徒・講師・科目について、上側で入力させる形式ではないように
     // したい」への対応。一覧行そのものが編集状態を持つ（SetupPageRowViewModels.cs参照）ため、
     // MasterItem<T>配列とは別に、行の編集状態を保持する可変のビューモデル一覧を持つ。
@@ -41,8 +33,17 @@ public sealed partial class SetupPage : WorkflowPageBase
     private StudentRowViewModel? _studentRowBeingSaved;
     private TeacherRowViewModel? _teacherRowBeingSaved;
     private SubjectRowViewModel? _subjectRowBeingSaved;
+    // ユーザー要望（checkpoint145/146で承認されたPlanのStage 3）「通常授業担当設定とコマについても、
+    // 生徒・講師ページと同様の仕様にしてほしい」への対応。ImportPageのLessonRequestRowViewModelと
+    // 同じ考え方（行自身がComboBoxの選択肢を持つ）。
+    private List<RegularLessonRowViewModel> _regularLessonRows = [];
+    private RegularLessonRowViewModel? _regularLessonRowBeingSaved;
+    private TimeSlotRowViewModel? _timeSlotRowBeingSaved;
+    private IReadOnlyList<NamedOption<Student>> _regularLessonStudentOptions = [];
+    private IReadOnlyList<NamedOption<Subject>> _regularLessonSubjectOptions = [];
+    private IReadOnlyList<NamedOption<Teacher?>> _regularLessonTeacherOptions = [];
     private Dictionary<(long TeacherId,long SubjectId),TeacherQualification> _qualifications = new();
-    private readonly ObservableCollection<TimeSlotItem> _timeSlotItems = new();
+    private readonly ObservableCollection<TimeSlotRowViewModel> _timeSlotItems = new();
     private CourseDay[] _courseDays = [];
     private readonly HashSet<DateOnly> _selectedDates = new();
 
@@ -57,8 +58,6 @@ public sealed partial class SetupPage : WorkflowPageBase
     {
         InitializeComponent();
         TimeSlots.ItemsSource = _timeSlotItems;
-        SlotStartTime.ItemsSource = TimeOfDayOptions.Values;
-        SlotEndTime.ItemsSource = TimeOfDayOptions.Values;
         RenderCalendarWeekdayHeader();
         _policyController = new SchedulingPolicyRowsController(PolicyRows, PolicyRowsList);
     }
@@ -323,25 +322,46 @@ public sealed partial class SetupPage : WorkflowPageBase
         scrollViewer.ChangeView(null, scrollViewer.ScrollableHeight, null);
     }
 
-    private async void AddSlot_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
+    private void AddTimeSlotRow_Click(object sender, RoutedEventArgs e)
     {
-        var nextOrder = _slotEditOrder + 1;
-        await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(_slotEditId, SlotCode.Text, SlotName.Text,
-            TimeOfDayOptions.Parse(SlotStartTime.Text), TimeOfDayOptions.Parse(SlotEndTime.Text), _slotEditOrder, SlotActive.IsChecked == true));
-        ResetSlot(); _slotEditOrder = nextOrder;
-    }, "コマを保存しました");
-
-    private async void SlotActive_Changed(object sender, RoutedEventArgs e)
-    {
-        if (_loading || _slotEditId == 0) return;
-        await ExecuteAsync(async path => await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(_slotEditId, SlotCode.Text, SlotName.Text,
-            TimeOfDayOptions.Parse(SlotStartTime.Text), TimeOfDayOptions.Parse(SlotEndTime.Text), _slotEditOrder, SlotActive.IsChecked == true)), "有効状態を更新しました");
+        CancelTimeSlotEditing();
+        var nextOrder = _timeSlotItems.Count == 0 ? 1 : _timeSlotItems.Max(x => x.EffectiveSortOrder) + 1;
+        var row = TimeSlotRowViewModel.CreateNew(nextOrder);
+        _timeSlotItems.Add(row);
+        ScrollListToBottom(TimeSlots);
     }
 
-    private void TimeSlots_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void TimeSlotRow_Change_Click(object sender, RoutedEventArgs e)
     {
-        if (_loading || TimeSlots.SelectedItem is not TimeSlotItem selected) return;
-        var value=selected.Value;_slotEditId=value.Id;SlotCode.Text=value.Code;SlotName.Text=value.DisplayName;SlotStartTime.Text=TimeOfDayOptions.Format(value.StartTime);SlotEndTime.Text=TimeOfDayOptions.Format(value.EndTime);_slotEditOrder=value.SortOrder;SlotActive.IsChecked=value.Active;
+        if ((sender as Button)?.DataContext is not TimeSlotRowViewModel row) return;
+        CancelTimeSlotEditing();
+        row.IsEditing = true;
+        if (VisualTreeHelpers.FindAncestor<ListViewItem>((DependencyObject)sender) is { } container && VisualTreeHelpers.FindDescendant<TextBox>(container) is { } codeBox)
+            codeBox.Focus(FocusState.Programmatic);
+    }
+
+    private void TimeSlotCodeBox_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox { DataContext: TimeSlotRowViewModel { IsNew: true, IsEditing: true } } box)
+            box.Focus(FocusState.Programmatic);
+    }
+
+    private async void SaveTimeSlotRow_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.DataContext is not TimeSlotRowViewModel row) return;
+        _timeSlotRowBeingSaved = row;
+        await ExecuteAsync(async path =>
+        {
+            await App.CourseSettings.SaveTimeSlotAsync(path, new TimeSlot(row.IsNew ? 0 : row.Value!.Id, row.DraftCode, row.DraftDisplayName,
+                TimeOfDayOptions.Parse(row.DraftStartText), TimeOfDayOptions.Parse(row.DraftEndText), row.EffectiveSortOrder, row.DraftActive));
+        }, "コマを保存しました");
+    }
+
+    private void CancelTimeSlotEditing()
+    {
+        var editing = _timeSlotItems.FirstOrDefault(r => r.IsEditing);
+        if (editing is null) return;
+        if (editing.IsNew) _timeSlotItems.Remove(editing); else editing.IsEditing = false;
     }
 
     private static string NextExternalId(IEnumerable<string> existingIds, string defaultPrefix)
@@ -354,8 +374,6 @@ public sealed partial class SetupPage : WorkflowPageBase
         var next = group.Max(m => int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture)) + 1;
         return $"{group.Key}{next.ToString(CultureInfo.InvariantCulture).PadLeft(width, '0')}";
     }
-    private void NewSlot_Click(object sender,RoutedEventArgs e)=>ResetSlot();
-
     private async void DeleteSlot_Click(object sender,RoutedEventArgs e)
     {
         if(sender is not FrameworkElement{Tag:long slotId})return;
@@ -366,7 +384,6 @@ public sealed partial class SetupPage : WorkflowPageBase
             IsEnabled=false;
             var path=App.ProjectService.Current?.Path??throw new InvalidOperationException("プロジェクトが開かれていません。");
             await App.CourseSettings.DeleteTimeSlotAsync(path,slotId);
-            if(_slotEditId==slotId)ResetSlot();
             await ReloadAsync();
             Show(InfoBarSeverity.Success,"コマを削除しました","");
         }
@@ -380,7 +397,6 @@ public sealed partial class SetupPage : WorkflowPageBase
         }
         finally{IsEnabled=true;}
     }
-    private void ResetSlot(){_slotEditId=0;TimeSlots.SelectedItem=null;SlotCode.Text=SlotName.Text="";SlotStartTime.Text="09:00";SlotEndTime.Text="10:00";_slotEditOrder=1;SlotActive.IsChecked=true;}
 
     // ユーザー要望（checkpoint142）「講師指導可能科目について、表以外は消す。表だけで十分です」への
     // 対応で入力フォームを削除したため、備考だけは表の○セルを右クリック/長押し（RightTapped）した
@@ -557,12 +573,56 @@ public sealed partial class SetupPage : WorkflowPageBase
         },newCanTeach?"指導可能に設定しました":"指導不可に設定しました");
     }
 
-    private async void SaveRegularLesson_Click(object sender,RoutedEventArgs e)=>await ExecuteAsync(async path=>
+    private void ApplyRegularLessonFilter() => RegularLessons.ItemsSource = _regularLessonRows.Where(r => r.IsEditing || r.Matches(RegularLessonSearch.Text)).ToArray();
+    private void RegularLessonSearch_TextChanged(object sender, TextChangedEventArgs e) => ApplyRegularLessonFilter();
+
+    private void AddRegularLessonRow_Click(object sender, RoutedEventArgs e)
     {
-        if(RegularStudent.SelectedItem is not MasterItem<Student> student||RegularSubject.SelectedItem is not MasterItem<Subject> subject)throw new ArgumentException("生徒と科目を選択してください。");
-        var teacher=(RegularTeacher.SelectedItem as MasterItem<Teacher?>)?.Value;
-        await App.MasterData.SaveRegularLessonAsync(path,new RegularLessonProfile(0,student.Value.Id,subject.Value.Id,teacher?.Id,checked((int)RegularPriority.Value),RegularOneToOne.IsChecked==true,RegularNote.Text));
-    },"通常授業の担当設定を保存しました");
+        CancelRegularLessonEditing();
+        RegularLessonSearch.Text = "";
+        var row = RegularLessonRowViewModel.CreateNew(_regularLessonStudentOptions, _regularLessonSubjectOptions, _regularLessonTeacherOptions);
+        _regularLessonRows.Add(row);
+        ApplyRegularLessonFilter();
+        ScrollListToBottom(RegularLessons);
+    }
+
+    private void RegularLessonRow_Change_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.DataContext is not RegularLessonRowViewModel row) return;
+        CancelRegularLessonEditing();
+        row.IsEditing = true;
+        if (VisualTreeHelpers.FindAncestor<ListViewItem>((DependencyObject)sender) is { } container && VisualTreeHelpers.FindDescendant<ComboBox>(container) is { } studentBox)
+            studentBox.Focus(FocusState.Programmatic);
+    }
+
+    private void RegularLessonStudentBox_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is ComboBox { DataContext: RegularLessonRowViewModel { IsNew: true, IsEditing: true } } box)
+            box.Focus(FocusState.Programmatic);
+    }
+
+    private async void SaveRegularLessonRow_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.DataContext is not RegularLessonRowViewModel row) return;
+        _regularLessonRowBeingSaved = row;
+        await ExecuteAsync(async path =>
+        {
+            if (row.DraftStudent is null || row.DraftSubject is null) throw new ArgumentException("生徒と科目を選択してください。");
+            await App.MasterData.SaveRegularLessonAsync(path, new RegularLessonProfile(0, row.DraftStudent.Value.Id, row.DraftSubject.Value.Id,
+                row.DraftTeacher?.Value?.Id, checked((int)row.DraftPriority), row.DraftOneToOneIndex == 1, row.DraftNote));
+        }, "通常授業の担当設定を保存しました");
+    }
+
+    private void CancelRegularLessonEditing()
+    {
+        var editing = _regularLessonRows.FirstOrDefault(r => r.IsEditing);
+        if (editing is null) return;
+        if (editing.IsNew) _regularLessonRows.Remove(editing); else editing.IsEditing = false;
+        ApplyRegularLessonFilter();
+    }
+
+    private void RegularLessonRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, true);
+    private void RegularLessonRow_PointerExited(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, false);
 
     private static readonly string[] WeekdayHeaders = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -601,7 +661,7 @@ public sealed partial class SetupPage : WorkflowPageBase
                 Tag = day.Date,
             };
             border.Tapped += CalendarDay_Tapped;
-            var slotSummary = string.Join("・", day.EnabledTimeSlotIds.Select(id => _timeSlotItems.FirstOrDefault(x => x.Value.Id == id)?.Value.Code).Where(code => code is not null));
+            var slotSummary = string.Join("・", day.EnabledTimeSlotIds.Select(id => _timeSlotItems.FirstOrDefault(x => x.Value?.Id == id)?.Value?.Code).Where(code => code is not null));
             var stack = new StackPanel { Spacing = 1 };
             stack.Children.Add(new TextBlock { Text = day.Date.ToString("M/d(ddd)", CultureInfo.GetCultureInfo("ja-JP")), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, FontSize = 11 });
             stack.Children.Add(new TextBlock { Text = day.IsOpen ? "✓ 開校" : "－ 休校", Foreground = new SolidColorBrush(day.IsOpen ? Windows.UI.Color.FromArgb(255, 23, 107, 64) : Windows.UI.Color.FromArgb(255, 102, 112, 133)), FontSize = 11, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
@@ -622,9 +682,9 @@ public sealed partial class SetupPage : WorkflowPageBase
     private void RenderCalendarSlotToggles()
     {
         CalendarSlotTogglePanel.Children.Clear();
-        foreach (var item in _timeSlotItems.Where(x => x.Value.Active))
+        foreach (var item in _timeSlotItems.Where(x => x.Value is { Active: true }))
         {
-            var slot = item.Value;
+            var slot = item.Value!;
             var selectedDays = _courseDays.Where(d => _selectedDates.Contains(d.Date)).ToArray();
             var checkedCount = selectedDays.Count(d => d.EnabledTimeSlotIds.Contains(slot.Id));
             var checkBox = new CheckBox
@@ -656,7 +716,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     private async void CalendarAllSlots_Click(object sender, RoutedEventArgs e)
     {
         if (_selectedDates.Count == 0) { Show(InfoBarSeverity.Warning, "日付を選択してください", ""); return; }
-        var allSlotIds = _timeSlotItems.Where(x => x.Value.Active).Select(x => x.Value.Id).ToArray();
+        var allSlotIds = _timeSlotItems.Where(x => x.Value is { Active: true }).Select(x => x.Value!.Id).ToArray();
         await ExecuteAsync(async path =>
         {
             foreach (var date in _selectedDates)
@@ -706,7 +766,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     private async Task SetSelectedDatesOpenAsync(bool isOpen)
     {
         if (_selectedDates.Count == 0) { Show(InfoBarSeverity.Warning, "日付を選択してください", ""); return; }
-        var allSlotIds = _timeSlotItems.Where(x => x.Value.Active).Select(x => x.Value.Id).ToArray();
+        var allSlotIds = _timeSlotItems.Where(x => x.Value is { Active: true }).Select(x => x.Value!.Id).ToArray();
         await ExecuteAsync(async path =>
         {
             foreach (var date in _selectedDates)
@@ -736,7 +796,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     private async Task MoveSlotAsync(object sender, int direction)
     {
         if (sender is not FrameworkElement { Tag: long slotId }) return;
-        var items = _timeSlotItems.Select(item => item.Value).ToList();
+        var items = _timeSlotItems.Where(item => item.Value is not null).Select(item => item.Value!).ToList();
         var index = items.FindIndex(x => x.Id == slotId);
         var targetIndex = index + direction;
         if (index < 0 || targetIndex < 0 || targetIndex >= items.Count) return;
@@ -771,8 +831,6 @@ public sealed partial class SetupPage : WorkflowPageBase
     private async Task ReloadAsync()
     {
         var path = App.ProjectService.Current!.Path;
-        _loading=true;
-        try
         {
             var studentValues=await App.MasterData.GetStudentsAsync(path);var teacherValues=await App.MasterData.GetTeachersAsync(path);var subjectValues=await App.MasterData.GetSubjectsAsync(path);
             var studentItems=studentValues.Select(x => new MasterItem<Student>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.FullName}　{x.Grade}",x.Active,"在籍中","卒業・無効")).ToArray();
@@ -780,27 +838,49 @@ public sealed partial class SetupPage : WorkflowPageBase
             var subjectItems=subjectValues.Select(x => new MasterItem<Subject>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}")).ToArray();
             _studentItems=studentItems;_teacherItems=teacherItems;_subjectItems=subjectItems;
             RebuildStudentRows(studentValues);RebuildTeacherRows(teacherValues);RebuildSubjectRows(subjectValues);
-            RegularStudent.ItemsSource=studentItems;RegularSubject.ItemsSource=subjectItems;
-            _nullableTeacherItems=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.FullName}"))).ToArray();
-            RegularTeacher.ItemsSource=_nullableTeacherItems;if(RegularTeacher.SelectedIndex<0)RegularTeacher.SelectedIndex=0;
             var qualifications=await App.MasterData.GetQualificationsAsync(path);_qualifications=qualifications.ToDictionary(value=>(value.TeacherId,value.SubjectId));RenderQualificationMatrix();
             // ユーザー要望「生徒IDや講師IDは基本的に用いず、内部の処理にのみ使いたいので、ここでの
             // 表示は生徒氏名、講師氏名のみとしてください」への対応。IDは内部処理（保存・照合）だけに
             // 使い、一覧表示は氏名のみにする。
-            var regularLessons=await App.MasterData.GetRegularLessonsAsync(path);RegularLessons.ItemsSource=regularLessons.Select(value=>new RegularLessonItem(
+            _regularLessonStudentOptions=studentValues.Select(x=>new NamedOption<Student>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.FullName}　{x.Grade}")).ToArray();
+            _regularLessonSubjectOptions=subjectValues.Select(x=>new NamedOption<Subject>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}")).ToArray();
+            _regularLessonTeacherOptions=new NamedOption<Teacher?>[]{new(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new NamedOption<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.FullName}"))).ToArray();
+            var regularLessons=await App.MasterData.GetRegularLessonsAsync(path);
+            var previouslyEditingRegularLesson=_regularLessonRows.FirstOrDefault(r=>r.IsEditing&&r!=_regularLessonRowBeingSaved);
+            _regularLessonRowBeingSaved=null;
+            _regularLessonRows=regularLessons.Select(value=>RegularLessonRowViewModel.ForExisting(value,
                 studentValues.Single(x=>x.Id==value.StudentId).FullName,
                 subjectValues.Single(x=>x.Id==value.SubjectId).DisplayName,
                 value.RegularTeacherId is long id?teacherValues.Single(x=>x.Id==id).FullName:"指定なし",
-                value.RegularTeacherPriority,
-                value.OneToOneRequired?"1対1":"通常")).ToArray();
+                _regularLessonStudentOptions,_regularLessonSubjectOptions,_regularLessonTeacherOptions)).ToList();
+            if(previouslyEditingRegularLesson is{IsNew:true})
+            {
+                _regularLessonRows.Add(previouslyEditingRegularLesson);
+            }
+            else if(previouslyEditingRegularLesson is not null&&_regularLessonRows.FirstOrDefault(r=>r.Value!.Id==previouslyEditingRegularLesson.Value!.Id) is{} regularMatch)
+            {
+                regularMatch.IsEditing=true;
+                regularMatch.CopyDraftFrom(previouslyEditingRegularLesson);
+            }
+            ApplyRegularLessonFilter();
             var slots = await App.CourseSettings.GetTimeSlotsAsync(path);
+            var previouslyEditingSlot=_timeSlotItems.FirstOrDefault(r=>r.IsEditing&&r!=_timeSlotRowBeingSaved);
+            _timeSlotRowBeingSaved=null;
             _timeSlotItems.Clear();
-            foreach (var item in slots.OrderBy(x => x.SortOrder).Select(x => new TimeSlotItem(x,x.StartTime.ToString("HH:mm",CultureInfo.InvariantCulture),x.EndTime.ToString("HH:mm",CultureInfo.InvariantCulture)))) _timeSlotItems.Add(item);
+            foreach (var item in slots.OrderBy(x => x.SortOrder).Select(TimeSlotRowViewModel.ForExisting)) _timeSlotItems.Add(item);
+            if(previouslyEditingSlot is{IsNew:true})
+            {
+                _timeSlotItems.Add(previouslyEditingSlot);
+            }
+            else if(previouslyEditingSlot is not null&&_timeSlotItems.FirstOrDefault(r=>r.Value!.Id==previouslyEditingSlot.Value!.Id) is{} slotMatch)
+            {
+                slotMatch.IsEditing=true;
+                slotMatch.CopyDraftFrom(previouslyEditingSlot);
+            }
             _courseDays = (await App.CourseSettings.GetCourseDaysAsync(path)).OrderBy(x => x.Date).ToArray();
             _selectedDates.IntersectWith(_courseDays.Select(x => x.Date));
             RenderCourseDayCalendar(); RenderCalendarSlotToggles(); UpdateCalendarSelectionCount();
         }
-        finally{_loading=false;}
     }
 
     private void StudentSearch_TextChanged(object sender, TextChangedEventArgs e) => ApplyStudentFilter();
@@ -888,11 +968,4 @@ public sealed partial class SetupPage : WorkflowPageBase
         public override string ToString()=>Display;
     }
 
-    private sealed record RegularLessonItem(string StudentName,string SubjectName,string TeacherName,int Priority,string OneToOneText);
-
-    private sealed record TimeSlotItem(TimeSlot Value,string StartText,string EndText)
-    {
-        public string StatusText=>Value.Active?"有効":"停止";
-        public override string ToString()=>$"{(Value.Active?"":"[停止] ")}{Value.SortOrder}　{Value.Code}　{Value.DisplayName}　{StartText}～{EndText}";
-    }
 }

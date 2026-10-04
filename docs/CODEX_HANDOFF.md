@@ -1,14 +1,53 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-04（checkpoint146）
+最終更新: 2026-10-04（checkpoint147）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.25.0 (beta)`（Draft Release作成予定。checkpoint145で承認されたPlanの
-Stage 2（空きコマ許可列・受講希望一覧の列幅改善）が完了。checkpoint146を参照）
-Latest Development Checkpoint: checkpoint 146（checkpoint145の4点依頼のうちStage 2
+Current Version: `v0.26.0 (beta)`（Draft Release作成予定。checkpoint145で承認されたPlanの
+Stage 1〜3すべて完了。checkpoint147を参照）
+Latest Development Checkpoint: checkpoint 147（checkpoint145の4点依頼のうちStage 3
+「③通常授業担当設定とコマ設定も生徒・講師ページと同様の行内編集方式にする」を実装し、
+Plan全体（Stage 1〜3）を完了した。`SetupPageRowViewModels.cs`に`RegularLessonRowViewModel`
+（`ImportPageRowViewModels.cs`の`LessonRequestRowViewModel`と同じ考え方で、`StudentOptions`/
+`SubjectOptions`/`TeacherOptions`を行自身に持たせる`NamedOption<T>`ベース）と
+`TimeSlotRowViewModel`を追加し、`SetupPage.xaml`の「通常授業担当設定」「コマ・開校日」タブを
+常時表示フォーム方式から行内編集方式へ変更した。
+
+**通常授業担当設定:** `SaveRegularLessonAsync`のUPSERTキーが`(StudentId, SubjectId)`で`Id`は
+使われないため（調査済み、checkpoint145時点のメモ参照）、既存行の編集中は生徒・科目の
+ComboBoxを`IsEnabled="{x:Bind IsNew}"`で読み取り専用にし、新規追加時のみ選択可能にした。
+削除機能は生徒・講師タブ同様に設けていない。
+
+**コマ設定:** 従来の「一覧の行をクリック→上部フォームへ読み込み→編集→保存」という選択駆動の
+編集方式（`TimeSlots_SelectionChanged`、`_slotEditId`/`_slotEditOrder`フィールド）を廃止し、
+「コマを追加」ボタン＋行の「変更」ボタンによる行内編集へ変更した。既存の▲▼（並び替え、
+`MoveSlotAsync`は無修正）・×（削除）ボタンは元々このタブで常時表示だったため、他タブのホバー
+表示方式には合わせず、新設の「変更」ボタンも含めて常時表示のまま維持した（`TimeSlotRowViewModel`
+のコメント参照）。`_timeSlotItems`の型を素のrecordから`EditableRowViewModel`派生の
+`TimeSlotRowViewModel`（`Value`が`TimeSlot?`、新規行は`null`）へ変更したことに伴い、カレンダー・
+コマ切替トグル等の既存コードが`.Value`を直接参照していた箇所（`RenderCourseDayCalendar`/
+`RenderCalendarSlotToggles`/`CalendarAllSlots_Click`/`SetSelectedDatesOpenAsync`/
+`MoveSlotAsync`）をすべて`.Value is not null`でガードするよう修正した（未保存の新規コマ行を
+誤ってカレンダー描画対象に含めない、という副次的な正しさの改善も兼ねる）。
+
+**v0.24.0のテストで判明した教訓の再確認:** `RepositoryPolicyTests.
+CentralVersion_IsCurrentBetaVersion`のハードコードされた期待値を`0.26.0`へ更新し、
+`dotnet build`だけでなく`dotnet test`も必ず実行してから次のステップへ進むことを徹底した
+（checkpoint146のv0.25.0リリースノート参照）。
+
+**検証:** 一時的な別パッケージIDでのdev-run実機確認で、①通常授業担当設定タブが新しい行内編集
+UI（検索欄・追加ボタン・一覧列）で正しく表示されること、②コマ設定タブで既存コマの「変更」
+ボタンから編集行が開き、コード・表示名・時刻・有効状態が正しく読み込まれ、「保存」で一覧へ
+正しく反映されること（成功トースト含む）を確認した。既存の全テスト（計252件）がすべて通過する
+ことも確認済み（出力生成系テストで並列実行時に時々発生する一時ディレクトリ競合由来の無関係な
+flakeがあったが、並列実行を無効化して全件グリーンになることを確認し、本変更と無関係と判断
+した）。新機能のためminorを上げてv0.26.0（patchを0へ戻す）とした。詳細は
+[docs/releases/v0.26.0.md](releases/v0.26.0.md)。
+
+checkpoint 146（checkpoint145の4点依頼のうちStage 2
 「②空きコマ許可を生徒・講師一覧へ表示する」「④受講希望一覧の列幅が狭く学年・科目名が途中で
 切れる」を実装した。`SetupPageRowViewModels.cs`の`StudentRowViewModel`/`TeacherRowViewModel`に
 `AllowGapText`（`Value.AllowGap`が`true`なら「あり」、`false`なら「なし」）を追加し、

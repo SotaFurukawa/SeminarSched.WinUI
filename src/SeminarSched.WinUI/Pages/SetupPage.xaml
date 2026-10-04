@@ -135,25 +135,39 @@
                 </Grid>
             </StackPanel></TabViewItem>
             <TabViewItem Header="通常授業担当設定"><StackPanel Padding="16" Spacing="12">
-                <!-- ユーザー指摘（checkpoint129）「画像③も同様で離れているのと、1対1を同じ段に持ってくる」
-                     への対応。1対1必須チェックボックスを生徒・科目などと同じ行へ移動し、列をAutoへ変更して
-                     各コントロールへ明示的なWidthを与えた（checkpoint121と同種のComboBox幅問題の回避）。 -->
-                <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <ComboBox x:Name="RegularStudent" Header="生徒" Width="200"/>
-                    <ComboBox x:Name="RegularSubject" Grid.Column="1" Header="科目" Width="160"/>
-                    <ComboBox x:Name="RegularTeacher" Grid.Column="2" Header="通常担当講師（任意）" Width="220"/>
-                    <NumberBox x:Name="RegularPriority" Grid.Column="3" Header="優先度 1～5" Minimum="1" Maximum="5" Value="3" Width="100"/>
-                    <CheckBox x:Name="RegularOneToOne" Grid.Column="4" Content="1対1必須" VerticalAlignment="Bottom"/>
-                    <Button Grid.Column="5" VerticalAlignment="Bottom" Content="保存" Click="SaveRegularLesson_Click"/>
-                </Grid>
-                <StackPanel Orientation="Horizontal" Spacing="16"><TextBox x:Name="RegularNote" Width="420" Header="備考"/></StackPanel>
+                <!-- ユーザー要望（checkpoint145/146で承認されたPlanのStage 3）「通常授業担当設定とコマ
+                     についても、生徒・講師ページと同様の仕様にしてほしい」への対応。常時表示の入力
+                     フォームを廃止し、生徒・講師・科目タブと同じ行内編集方式へ変更した。削除機能は
+                     生徒・講師タブ同様に設けていない。保存はSaveRegularLessonAsyncが(生徒,科目)の
+                     組をキーにUPSERTするため（Idは使われない）、既存行の編集中は生徒・科目の
+                     ComboBoxを読み取り専用にし（RegularLessonRowViewModelのコメント参照）、
+                     新規追加時のみ選択可能にしている。 -->
+                <TextBlock Text="通常授業の担当講師や優先度を、生徒・科目の組ごとに編集できます。「追加」で一覧の最下部に新しい行が追加されます。既存の行は、カーソルを合わせたときに表示される「変更」ボタンで編集できます（生徒・科目は変更できません。変更したい場合は追加し直してください）。" TextWrapping="Wrap"/>
+                <StackPanel Orientation="Horizontal" Spacing="8"><TextBox x:Name="RegularLessonSearch" PlaceholderText="生徒名・科目名で検索" TextChanged="RegularLessonSearch_TextChanged" Width="320"/><Button Content="通常授業担当設定を追加" Click="AddRegularLessonRow_Click"/></StackPanel>
                 <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="140"/><ColumnDefinition Width="160"/><ColumnDefinition Width="80"/><ColumnDefinition Width="80"/></Grid.ColumnDefinitions><TextBlock FontWeight="SemiBold" Text="生徒氏名"/><TextBlock Grid.Column="1" FontWeight="SemiBold" Text="科目"/><TextBlock Grid.Column="2" FontWeight="SemiBold" Text="通常担当講師"/><TextBlock Grid.Column="3" FontWeight="SemiBold" Text="優先度"/><TextBlock Grid.Column="4" FontWeight="SemiBold" Text="1対1"/></Grid>
-                <ListView x:Name="RegularLessons">
+                <ListView x:Name="RegularLessons" SelectionMode="None">
                     <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <Grid ColumnSpacing="8" Padding="4"><Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="140"/><ColumnDefinition Width="160"/><ColumnDefinition Width="80"/><ColumnDefinition Width="80"/></Grid.ColumnDefinitions>
-                                <TextBlock Text="{Binding StudentName}"/><TextBlock Grid.Column="1" Text="{Binding SubjectName}"/><TextBlock Grid.Column="2" Text="{Binding TeacherName}"/><TextBlock Grid.Column="3" Text="{Binding Priority}"/><TextBlock Grid.Column="4" Text="{Binding OneToOneText}"/>
+                        <DataTemplate x:DataType="local:RegularLessonRowViewModel">
+                            <Grid Padding="4">
+                                <Grid ColumnSpacing="8" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="RegularLessonRow_PointerEntered" PointerExited="RegularLessonRow_PointerExited">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="140"/><ColumnDefinition Width="160"/><ColumnDefinition Width="80"/><ColumnDefinition Width="80"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind StudentName, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="1" Text="{x:Bind SubjectName, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="2" Text="{x:Bind TeacherName, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="3" Text="{x:Bind Value.RegularTeacherPriority, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="4" Text="{x:Bind OneToOneText, Mode=OneWay}"/>
+                                    <Button x:Name="ChangeButton" Grid.Column="5" Content="変更" Visibility="Collapsed" Click="RegularLessonRow_Change_Click"/>
+                                </Grid>
+                                <Grid ColumnSpacing="12" Visibility="{x:Bind EditVisibility, Mode=OneWay}">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="RegularLessonStudentBox" Header="生徒" Width="200" IsEnabled="{x:Bind IsNew}" ItemsSource="{x:Bind StudentOptions}" SelectedItem="{x:Bind DraftStudent, Mode=TwoWay}" Loaded="RegularLessonStudentBox_Loaded"/>
+                                    <ComboBox Grid.Column="1" Header="科目" Width="160" IsEnabled="{x:Bind IsNew}" ItemsSource="{x:Bind SubjectOptions}" SelectedItem="{x:Bind DraftSubject, Mode=TwoWay}"/>
+                                    <ComboBox Grid.Column="2" Header="通常担当講師（任意）" Width="220" ItemsSource="{x:Bind TeacherOptions}" SelectedItem="{x:Bind DraftTeacher, Mode=TwoWay}"/>
+                                    <NumberBox Grid.Column="3" Header="優先度 1～5" Minimum="1" Maximum="5" Width="100" Value="{x:Bind DraftPriority, Mode=TwoWay}"/>
+                                    <ComboBox Grid.Column="4" Header="1対1必須" Width="100" SelectedIndex="{x:Bind DraftOneToOneIndex, Mode=TwoWay}"><ComboBoxItem Content="いいえ"/><ComboBoxItem Content="はい"/></ComboBox>
+                                    <TextBox Grid.Column="5" Header="備考" Width="200" Text="{x:Bind DraftNote, Mode=TwoWay}"/>
+                                    <Button Grid.Column="6" VerticalAlignment="Bottom" Content="保存" Click="SaveRegularLessonRow_Click"/>
+                                </Grid>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>
@@ -161,35 +175,45 @@
             </StackPanel></TabViewItem>
             <TabViewItem Header="コマ・開校日"><StackPanel Padding="16" Spacing="12">
                 <TextBlock FontSize="18" FontWeight="SemiBold" Text="コマ設定"/>
-                <!-- ユーザー要望（checkpoint142）「コマ情報の変更について、有効のチェックボックスは
-                     保存よりも前に来るように」への対応。有効チェックボックスを保存ボタンの直前の列へ
-                     移動した（即時保存の挙動自体はSlotActive_Changedのまま変更なし）。 -->
-                <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="130"/><ColumnDefinition Width="110"/><ColumnDefinition Width="110"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <TextBox x:Name="SlotCode" Header="コード"/><TextBox x:Name="SlotName" Grid.Column="1" Header="表示名"/>
-                    <ComboBox x:Name="SlotStartTime" Grid.Column="2" Header="開始" IsEditable="True" PlaceholderText="09:00"/>
-                    <ComboBox x:Name="SlotEndTime" Grid.Column="3" Header="終了" IsEditable="True" PlaceholderText="10:00"/>
-                    <CheckBox x:Name="SlotActive" Grid.Column="4" VerticalAlignment="Bottom" Content="有効" IsChecked="True" Checked="SlotActive_Changed" Unchecked="SlotActive_Changed"/>
-                    <Button Grid.Column="5" VerticalAlignment="Bottom" Content="保存" Click="AddSlot_Click"/>
-                </Grid><StackPanel Orientation="Horizontal" Spacing="16"><Button Content="新規入力" Click="NewSlot_Click"/></StackPanel>
-                <TextBlock Text="▲▼で表示順を並べ替えられます（動かすとすぐに保存されます）。右端の×で削除できます（時間割配置等で使用中のコマは削除できません）。" TextWrapping="Wrap"/>
-                <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="140"/><ColumnDefinition Width="90"/><ColumnDefinition Width="90"/><ColumnDefinition Width="60"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <!-- ユーザー要望（checkpoint145/146で承認されたPlanのStage 3）「コマについても、
+                     生徒・講師ページと同様の仕様にしてほしい」への対応。常時表示の入力フォーム＋
+                     一覧行クリックでの読み込みをやめ、「コマを追加」ボタンで一覧の最下部に新規行を、
+                     既存行は「変更」ボタンでその場（一覧の行内）で編集する方式へ変更した。ただし
+                     ▲▼（並び替え）・×（削除）ボタンは元々このタブで常時表示だったため、他タブの
+                     ホバー表示方式には合わせず、新設の「変更」ボタンも含めて常時表示のまま維持する
+                     （TimeSlotRowViewModelのコメント参照）。 -->
+                <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="コマを追加" Click="AddTimeSlotRow_Click"/></StackPanel>
+                <TextBlock Text="「変更」でコード・表示名・時刻・有効を編集できます。▲▼で表示順を並べ替えられます（動かすとすぐに保存されます）。×で削除できます（時間割配置等で使用中のコマは削除できません）。" TextWrapping="Wrap"/>
+                <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="140"/><ColumnDefinition Width="90"/><ColumnDefinition Width="90"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions>
                     <TextBlock FontWeight="SemiBold" Text="コード"/><TextBlock Grid.Column="1" FontWeight="SemiBold" Text="表示名"/><TextBlock Grid.Column="2" FontWeight="SemiBold" Text="開始"/><TextBlock Grid.Column="3" FontWeight="SemiBold" Text="終了"/><TextBlock Grid.Column="4" FontWeight="SemiBold" Text="状態"/>
                 </Grid>
-                <ListView x:Name="TimeSlots" SelectionChanged="TimeSlots_SelectionChanged">
+                <ListView x:Name="TimeSlots" SelectionMode="None">
                     <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <Grid ColumnSpacing="8" Padding="4">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="140"/><ColumnDefinition Width="90"/><ColumnDefinition Width="90"/><ColumnDefinition Width="60"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <TextBlock Text="{Binding Value.Code}"/>
-                                <TextBlock Grid.Column="1" Text="{Binding Value.DisplayName}"/>
-                                <TextBlock Grid.Column="2" Text="{Binding StartText}"/>
-                                <TextBlock Grid.Column="3" Text="{Binding EndText}"/>
-                                <TextBlock Grid.Column="4" Text="{Binding StatusText}"/>
-                                <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="4">
-                                    <Button Content="▲" Padding="8,2" Tag="{Binding Value.Id}" Click="MoveSlotUp_Click"/>
-                                    <Button Content="▼" Padding="8,2" Tag="{Binding Value.Id}" Click="MoveSlotDown_Click"/>
-                                    <Button Content="×" Padding="10,2" Tag="{Binding Value.Id}" Click="DeleteSlot_Click"/>
-                                </StackPanel>
+                        <DataTemplate x:DataType="local:TimeSlotRowViewModel">
+                            <Grid Padding="4">
+                                <Grid ColumnSpacing="8" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="140"/><ColumnDefinition Width="90"/><ColumnDefinition Width="90"/><ColumnDefinition Width="60"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind Value.Code, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Value.DisplayName, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="2" Text="{x:Bind StartText, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="3" Text="{x:Bind EndText, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="4" Text="{x:Bind StatusText, Mode=OneWay}"/>
+                                    <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="4">
+                                        <Button Content="変更" Click="TimeSlotRow_Change_Click"/>
+                                        <Button Content="▲" Padding="8,2" Tag="{x:Bind Value.Id}" Click="MoveSlotUp_Click"/>
+                                        <Button Content="▼" Padding="8,2" Tag="{x:Bind Value.Id}" Click="MoveSlotDown_Click"/>
+                                        <Button Content="×" Padding="10,2" Tag="{x:Bind Value.Id}" Click="DeleteSlot_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid ColumnSpacing="8" Visibility="{x:Bind EditVisibility, Mode=OneWay}">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="130"/><ColumnDefinition Width="110"/><ColumnDefinition Width="110"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TimeSlotCodeBox" Header="コード" Text="{x:Bind DraftCode, Mode=TwoWay}" Loaded="TimeSlotCodeBox_Loaded"/>
+                                    <TextBox Grid.Column="1" Header="表示名" Text="{x:Bind DraftDisplayName, Mode=TwoWay}"/>
+                                    <ComboBox Grid.Column="2" Header="開始" IsEditable="True" Text="{x:Bind DraftStartText, Mode=TwoWay}" ItemsSource="{x:Bind TimeOfDayValues}"/>
+                                    <ComboBox Grid.Column="3" Header="終了" IsEditable="True" Text="{x:Bind DraftEndText, Mode=TwoWay}" ItemsSource="{x:Bind TimeOfDayValues}"/>
+                                    <CheckBox Grid.Column="4" VerticalAlignment="Bottom" Content="有効" IsChecked="{x:Bind DraftActive, Mode=TwoWay}"/>
+                                    <Button Grid.Column="5" VerticalAlignment="Bottom" Content="保存" Click="SaveTimeSlotRow_Click"/>
+                                </Grid>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>
