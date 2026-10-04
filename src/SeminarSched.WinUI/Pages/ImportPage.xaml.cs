@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using SeminarSched.Application.Importing;
 using SeminarSched.Domain.MasterData;
@@ -15,9 +16,10 @@ public sealed partial class ImportPage : WorkflowPageBase
     private bool _loaded;
     private string? _surveyStudentPath;
     private string? _surveyTeacherPath;
-    private MasterItem<Student>[] _studentItems=[];
-    private MasterItem<Subject>[] _subjectItems=[];
-    private MasterItem<Teacher?>[] _nullableTeacherItems=[];
+    private List<LessonRequestRowViewModel> _lessonRequestRows = [];
+    // 保存に成功した行は、ReloadAsync直後のRebuildで「編集中だった行」として誤って再び編集状態へ
+    // 戻してしまわないよう、保存中の行を記録しておく（SetupPage.xaml.csと同じ仕組み）。
+    private LessonRequestRowViewModel? _lessonRequestRowBeingSaved;
     public ImportPage() => InitializeComponent();
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
@@ -92,122 +94,140 @@ public sealed partial class ImportPage : WorkflowPageBase
     private async Task<string?> PickResponseAsync(){var p=new FileOpenPicker{SuggestedStartLocation=PickerLocationId.DocumentsLibrary};p.FileTypeFilter.Add(".csv");p.FileTypeFilter.Add(".xlsx");InitializeWithWindow.Initialize(p,WindowNative.GetWindowHandle(App.MainWindow!));return (await p.PickSingleFileAsync())?.Path;}
     private void ShowError(string message){Status.Severity=InfoBarSeverity.Error;Status.Title="処理できませんでした";Status.Message=message;Status.IsOpen=true;}
 
+    private IReadOnlyList<NamedOption<Student>> _studentOptions = [];
+    private IReadOnlyList<NamedOption<Subject>> _subjectOptions = [];
+    private IReadOnlyList<NamedOption<Teacher?>> _teacherOptions = [];
+
     private async Task ReloadLessonRequestsAsync()
     {
         var path=App.ProjectService.Current?.Path;if(path is null)return;
         var studentValues=await App.MasterData.GetStudentsAsync(path);var teacherValues=await App.MasterData.GetTeachersAsync(path);var subjectValues=await App.MasterData.GetSubjectsAsync(path);
-        var studentItems=studentValues.Select(x=>new MasterItem<Student>(x,$"{(x.Active?"":"[卒業・無効] ")}{TrialLabel(x.ExternalId)}{x.Name}　{x.Grade}")).ToArray();
-        var subjectItems=subjectValues.Select(x=>new MasterItem<Subject>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}")).ToArray();
-        _studentItems=studentItems;_subjectItems=subjectItems;
-        _nullableTeacherItems=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.Name}"))).ToArray();
-        RequestStudent.ItemsSource=studentItems;RequestSubject.ItemsSource=subjectItems;
-        RequestRegularTeacher.ItemsSource=_nullableTeacherItems;RequestPreferred1.ItemsSource=_nullableTeacherItems;RequestPreferred2.ItemsSource=_nullableTeacherItems;RequestPreferred3.ItemsSource=_nullableTeacherItems;
-        if(RequestRegularTeacher.SelectedIndex<0)RequestRegularTeacher.SelectedIndex=0;if(RequestPreferred1.SelectedIndex<0)RequestPreferred1.SelectedIndex=0;if(RequestPreferred2.SelectedIndex<0)RequestPreferred2.SelectedIndex=0;if(RequestPreferred3.SelectedIndex<0)RequestPreferred3.SelectedIndex=0;
+        var studentName=(Student x)=>$"{TrialLabel(x.ExternalId)}{x.Name}";
+        _studentOptions=studentValues.Select(x=>new NamedOption<Student>(x,$"{(x.Active?"":"[卒業・無効] ")}{studentName(x)}　{x.Grade}")).ToArray();
+        _subjectOptions=subjectValues.Select(x=>new NamedOption<Subject>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}")).ToArray();
+        _teacherOptions=new NamedOption<Teacher?>[]{new(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new NamedOption<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.Name}"))).ToArray();
+
         var lessonRequests=await App.MasterData.GetLessonRequestsAsync(path);
-        LessonRequests.ItemsSource=lessonRequests.Select(value=>{var s=studentValues.Single(x=>x.Id==value.StudentId);return new LessonRequestRow(value,
-            $"{TrialLabel(s.ExternalId)}{s.Name}",
-            subjectValues.Single(x=>x.Id==value.SubjectId).DisplayName,
-            value.RegularTeacherId is long rid?teacherValues.Single(x=>x.Id==rid).Name:"指定なし");}).ToArray();
+        string TeacherName(long? id)=>id is long tid?teacherValues.Single(x=>x.Id==tid).Name:"指定なし";
+        var previouslyEditing=_lessonRequestRows.FirstOrDefault(r=>r.IsEditing&&r!=_lessonRequestRowBeingSaved);
+        _lessonRequestRowBeingSaved=null;
+        _lessonRequestRows=lessonRequests.Select(value=>
+        {
+            var s=studentValues.Single(x=>x.Id==value.StudentId);
+            return LessonRequestRowViewModel.ForExisting(value,
+                $"{studentName(s)}　{s.Grade}",
+                subjectValues.Single(x=>x.Id==value.SubjectId).DisplayName,
+                TeacherName(value.RegularTeacherId), TeacherName(value.PreferredTeacher1Id), TeacherName(value.PreferredTeacher2Id), TeacherName(value.PreferredTeacher3Id),
+                _studentOptions, _subjectOptions, _teacherOptions);
+        }).ToList();
+        if(previouslyEditing is{IsNew:true})
+        {
+            _lessonRequestRows.Add(previouslyEditing);
+        }
+        else if(previouslyEditing is not null&&_lessonRequestRows.FirstOrDefault(r=>r.Value!.Id==previouslyEditing.Value!.Id) is{} match)
+        {
+            match.IsEditing=true;
+            match.CopyDraftFrom(previouslyEditing);
+        }
+        ApplyLessonRequestFilter();
     }
+
+    private void ApplyLessonRequestFilter() => LessonRequests.ItemsSource = _lessonRequestRows.Where(r => r.IsEditing || r.Matches(LessonRequestSearch.Text)).ToArray();
+    private void LessonRequestSearch_TextChanged(object sender, TextChangedEventArgs e) => ApplyLessonRequestFilter();
 
     // ユーザー要望（checkpoint111）「体験生の項目...アンケート取込でそれが見られるようにしておいて
     // ほしい」への対応。CourseSurveyImportServiceは体験生をExternalId="TRIAL-####"で登録するため
     // （InsertTrialStudent参照）、その命名規則をそのまま可視化に流用する。
     private static string TrialLabel(string externalId)=>externalId.StartsWith("TRIAL-",StringComparison.OrdinalIgnoreCase)?"[体験生] ":"";
 
-    private async void SaveLessonRequest_Click(object sender,RoutedEventArgs e)
+    // ユーザー要望（checkpoint142）「アンケート取込後の一覧についても、設定の生徒、講師、科目と
+    // 同様に追加できるようにする」への対応。生徒・講師・科目タブ（SetupPage.xaml.cs）と同じ
+    // 行内編集（追加・変更・保存）パターン。LessonRequestは外部キーが多いため、選択肢
+    // （StudentOptions等）を行オブジェクト自身に持たせる方式（ImportPageRowViewModels.cs参照）。
+    private void AddLessonRequestRow_Click(object sender, RoutedEventArgs e)
     {
+        CancelLessonRequestEditing();
+        LessonRequestSearch.Text = "";
+        var row = LessonRequestRowViewModel.CreateNew(_studentOptions, _subjectOptions, _teacherOptions);
+        _lessonRequestRows.Add(row);
+        ApplyLessonRequestFilter();
+        LessonRequests.UpdateLayout();
+        LessonRequests.ScrollIntoView(row);
+    }
+
+    private void LessonRequestRow_Change_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.DataContext is not LessonRequestRowViewModel row) return;
+        CancelLessonRequestEditing();
+        row.IsEditing = true;
+        if (VisualTreeHelpers.FindAncestor<ListViewItem>((DependencyObject)sender) is { } container && VisualTreeHelpers.FindDescendant<ComboBox>(container) is { } studentBox)
+            studentBox.Focus(FocusState.Programmatic);
+    }
+
+    private void LessonRequestStudentBox_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is ComboBox { DataContext: LessonRequestRowViewModel { IsNew: true, IsEditing: true } } box)
+            box.Focus(FocusState.Programmatic);
+    }
+
+    private async void SaveLessonRequestRow_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.DataContext is not LessonRequestRowViewModel row) return;
         try
         {
-            if(RequestStudent.SelectedItem is not MasterItem<Student> student||RequestSubject.SelectedItem is not MasterItem<Subject> subject)throw new ArgumentException("生徒と科目を選択してください。");
-            var regularTeacher=(RequestRegularTeacher.SelectedItem as MasterItem<Teacher?>)?.Value;
-            var priority=checked((int)RequestRegularPriority.Value);
-            if(priority==5&&regularTeacher is null)throw new ArgumentException("担当講師優先度5では通常担当講師の指定が必須です。");
-            var preferred1=(RequestPreferred1.SelectedItem as MasterItem<Teacher?>)?.Value;
-            var preferred2=(RequestPreferred2.SelectedItem as MasterItem<Teacher?>)?.Value;
-            var preferred3=(RequestPreferred3.SelectedItem as MasterItem<Teacher?>)?.Value;
-            var maxOverride=RequestMaxConsecutiveOverride.Value<=0?(int?)null:checked((int)RequestMaxConsecutiveOverride.Value);
-            var gapOverride=RequestAllowGapOverride.SelectedIndex switch{1=>true,2=>false,_=>(bool?)null};
-            IsEnabled=false;
-            var path=App.ProjectService.Current?.Path??throw new InvalidOperationException("プロジェクトが開かれていません。");
-            await App.MasterData.SaveLessonRequestAsync(path,new LessonRequest(0,student.Value.Id,subject.Value.Id,checked((int)RequestRequiredSessions.Value),
-                regularTeacher?.Id,priority,preferred1?.Id,preferred2?.Id,preferred3?.Id,RequestOneToOne.SelectedIndex==1,maxOverride,gapOverride,RequestNote.Text));
-            ResetLessonRequest();
+            if (row.DraftStudent is null || row.DraftSubject is null) throw new ArgumentException("生徒と科目を選択してください。");
+            var priority = checked((int)row.DraftRegularPriority);
+            if (priority == 5 && row.DraftRegularTeacher?.Value is null) throw new ArgumentException("担当講師優先度5では通常担当講師の指定が必須です。");
+            var maxOverride = row.DraftMaxConsecutiveOverride <= 0 ? (int?)null : checked((int)row.DraftMaxConsecutiveOverride);
+            var gapOverride = row.DraftAllowGapOverrideIndex switch { 1 => true, 2 => false, _ => (bool?)null };
+            _lessonRequestRowBeingSaved = row;
+            IsEnabled = false;
+            var path = App.ProjectService.Current?.Path ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
+            await App.MasterData.SaveLessonRequestAsync(path, new LessonRequest(row.IsNew ? 0 : row.Value!.Id, row.DraftStudent.Value.Id, row.DraftSubject.Value.Id, checked((int)row.DraftRequiredSessions),
+                row.DraftRegularTeacher?.Value?.Id, priority, row.DraftPreferred1?.Value?.Id, row.DraftPreferred2?.Value?.Id, row.DraftPreferred3?.Value?.Id,
+                row.DraftOneToOneIndex == 1, maxOverride, gapOverride, row.DraftNote));
             await ReloadLessonRequestsAsync();
             ToastNotificationState.ShowSuccess("受講希望を保存しました");
         }
-        catch(Exception exception)when(exception is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException or OverflowException)
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException or OverflowException)
         {
             ShowError(exception.Message);
         }
-        finally{IsEnabled=true;}
+        finally { IsEnabled = true; }
     }
 
-    private void NewLessonRequest_Click(object sender,RoutedEventArgs e)=>ResetLessonRequest();
-
-    // ユーザー指示: 第1希望講師は普通、通常担当講師と同じになるため、通常担当講師を選ぶと
-    // 第1希望講師が未設定（指定なし）のままであれば自動的に同じ講師を初期値として補う。
-    // 第1希望講師をすでに選んでいる場合（既存データの編集時含む）は上書きしない。
-    private void RequestRegularTeacher_SelectionChanged(object sender,SelectionChangedEventArgs e)
+    private void CancelLessonRequestEditing()
     {
-        if(RequestPreferred1.SelectedItem is MasterItem<Teacher?> current && current.Value is not null)return;
-        RequestPreferred1.SelectedItem=RequestRegularTeacher.SelectedItem;
+        var editing = _lessonRequestRows.FirstOrDefault(r => r.IsEditing);
+        if (editing is null) return;
+        if (editing.IsNew) _lessonRequestRows.Remove(editing); else editing.IsEditing = false;
+        ApplyLessonRequestFilter();
     }
 
-    private void LessonRequests_SelectionChanged(object sender,SelectionChangedEventArgs e)
-    {
-        if(LessonRequests.SelectedItem is not LessonRequestRow selected)return;
-        var value=selected.Value;
-        RequestStudent.SelectedItem=_studentItems.FirstOrDefault(item=>item.Value.Id==value.StudentId);
-        RequestSubject.SelectedItem=_subjectItems.FirstOrDefault(item=>item.Value.Id==value.SubjectId);
-        RequestRequiredSessions.Value=value.RequiredSessions;
-        RequestRegularTeacher.SelectedItem=_nullableTeacherItems.FirstOrDefault(item=>item.Value?.Id==value.RegularTeacherId);
-        RequestRegularPriority.Value=value.RegularTeacherPriority;
-        RequestPreferred1.SelectedItem=_nullableTeacherItems.FirstOrDefault(item=>item.Value?.Id==value.PreferredTeacher1Id);
-        RequestPreferred2.SelectedItem=_nullableTeacherItems.FirstOrDefault(item=>item.Value?.Id==value.PreferredTeacher2Id);
-        RequestPreferred3.SelectedItem=_nullableTeacherItems.FirstOrDefault(item=>item.Value?.Id==value.PreferredTeacher3Id);
-        RequestOneToOne.SelectedIndex=value.OneToOneRequired?1:0;
-        RequestMaxConsecutiveOverride.Value=value.MaxConsecutiveSlotsOverride??0;
-        RequestAllowGapOverride.SelectedIndex=value.AllowGapOverride switch{true=>1,false=>2,_=>0};
-        RequestNote.Text=value.Note;
-    }
+    private void LessonRequestRow_PointerEntered(object sender, PointerRoutedEventArgs e) => VisualTreeHelpers.SetNamedChildVisible((Grid)sender, "ChangeDeletePanel", true);
+    private void LessonRequestRow_PointerExited(object sender, PointerRoutedEventArgs e) => VisualTreeHelpers.SetNamedChildVisible((Grid)sender, "ChangeDeletePanel", false);
 
-    private async void DeleteLessonRequest_Click(object sender,RoutedEventArgs e)
+    // ユーザー要望（checkpoint142）「受講希望一覧の『選択した行を削除』は、行にカーソルを合わせたら
+    // 『変更』の隣に『削除』も表示」への対応（ユーザー確認済み）。削除は取り消せないため、
+    // DeleteSlot_Click（SetupPage.xaml.cs）と同じ確認ダイアログを経由する。
+    private async void LessonRequestRow_Delete_Click(object sender, RoutedEventArgs e)
     {
-        if(LessonRequests.SelectedItem is not LessonRequestRow selected){Show(InfoBarSeverity.Warning,"一覧から削除する行を選択してください");return;}
+        if ((sender as Button)?.DataContext is not LessonRequestRowViewModel { Value: not null } row) return;
+        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = "この受講希望を削除しますか？", PrimaryButtonText = "削除", CloseButtonText = "キャンセル", DefaultButton = ContentDialogButton.Close };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         try
         {
-            IsEnabled=false;
-            var path=App.ProjectService.Current?.Path??throw new InvalidOperationException("プロジェクトが開かれていません。");
-            await App.MasterData.DeleteLessonRequestAsync(path,selected.Value.StudentId,selected.Value.SubjectId);
-            ResetLessonRequest();
+            IsEnabled = false;
+            var path = App.ProjectService.Current?.Path ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
+            await App.MasterData.DeleteLessonRequestAsync(path, row.Value.StudentId, row.Value.SubjectId);
             await ReloadLessonRequestsAsync();
             ToastNotificationState.ShowSuccess("受講希望を削除しました");
         }
-        catch(Exception exception)when(exception is InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
         {
             ShowError(exception.Message);
         }
-        finally{IsEnabled=true;}
-    }
-
-    private void ResetLessonRequest()
-    {
-        LessonRequests.SelectedItem=null;
-        RequestStudent.SelectedItem=null;RequestSubject.SelectedItem=null;RequestRequiredSessions.Value=1;
-        RequestRegularTeacher.SelectedIndex=0;RequestRegularPriority.Value=3;
-        RequestPreferred1.SelectedIndex=0;RequestPreferred2.SelectedIndex=0;RequestPreferred3.SelectedIndex=0;
-        RequestOneToOne.SelectedIndex=0;RequestMaxConsecutiveOverride.Value=0;RequestAllowGapOverride.SelectedIndex=0;RequestNote.Text="";
-    }
-
-    private void Show(InfoBarSeverity severity,string title){Status.Severity=severity;Status.Title=title;Status.Message="";Status.IsOpen=true;}
-
-    private sealed record MasterItem<T>(T Value,string Display){public override string ToString()=>Display;}
-
-    private sealed record LessonRequestRow(LessonRequest Value,string StudentName,string SubjectName,string RegularTeacherName)
-    {
-        public string OneToOneText=>Value.OneToOneRequired?"○":"";
-        public override string ToString()=>$"{StudentName}　{SubjectName}　必要{Value.RequiredSessions}回　通常担当:{RegularTeacherName}　優先度{Value.RegularTeacherPriority}　{(Value.OneToOneRequired?"1対1":"通常")}";
+        finally { IsEnabled = true; }
     }
 
     // ユーザー要望（checkpoint111）「可用性の手動編集について、これをカレンダーで変更することは

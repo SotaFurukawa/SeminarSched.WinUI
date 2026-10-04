@@ -177,7 +177,7 @@ public sealed partial class SetupPage : WorkflowPageBase
         if ((sender as Button)?.DataContext is not StudentRowViewModel row) return;
         CancelStudentEditing();
         row.IsEditing = true;
-        if (FindAncestor<ListViewItem>((DependencyObject)sender) is { } container && FindDescendant<TextBox>(container) is { } nameBox)
+        if (VisualTreeHelpers.FindAncestor<ListViewItem>((DependencyObject)sender) is { } container && VisualTreeHelpers.FindDescendant<TextBox>(container) is { } nameBox)
             nameBox.Focus(FocusState.Programmatic);
     }
 
@@ -226,7 +226,7 @@ public sealed partial class SetupPage : WorkflowPageBase
         if ((sender as Button)?.DataContext is not TeacherRowViewModel row) return;
         CancelTeacherEditing();
         row.IsEditing = true;
-        if (FindAncestor<ListViewItem>((DependencyObject)sender) is { } container && FindDescendant<TextBox>(container) is { } nameBox)
+        if (VisualTreeHelpers.FindAncestor<ListViewItem>((DependencyObject)sender) is { } container && VisualTreeHelpers.FindDescendant<TextBox>(container) is { } nameBox)
             nameBox.Focus(FocusState.Programmatic);
     }
 
@@ -275,7 +275,7 @@ public sealed partial class SetupPage : WorkflowPageBase
         if ((sender as Button)?.DataContext is not SubjectRowViewModel row) return;
         CancelSubjectEditing();
         row.IsEditing = true;
-        if (FindAncestor<ListViewItem>((DependencyObject)sender) is { } container && FindDescendant<TextBox>(container) is { } codeBox)
+        if (VisualTreeHelpers.FindAncestor<ListViewItem>((DependencyObject)sender) is { } container && VisualTreeHelpers.FindDescendant<TextBox>(container) is { } codeBox)
             codeBox.Focus(FocusState.Programmatic);
     }
 
@@ -308,32 +308,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     private void SubjectRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, true);
     private void SubjectRow_PointerExited(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, false);
 
-    // 探索方針並び替えリスト（SchedulingPolicyRowsController.SetArrowsVisibility）と同じ手法。
-    // DataTemplateから実体化されるGridのx:Nameはページのnamescopeへ登録されないため、
-    // Grid.Childrenを直接たどってNameで探す。
-    private static void SetChangeButtonVisible(Grid displayRow, bool visible)
-    {
-        if (displayRow.Children.OfType<FrameworkElement>().FirstOrDefault(c => c.Name == "ChangeButton") is Button b)
-            b.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private static T? FindAncestor<T>(DependencyObject node) where T : DependencyObject
-    {
-        for (var c = VisualTreeHelper.GetParent(node); c is not null; c = VisualTreeHelper.GetParent(c))
-            if (c is T match) return match;
-        return null;
-    }
-
-    private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
-    {
-        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
-        {
-            var child = VisualTreeHelper.GetChild(root, i);
-            if (child is T match) return match;
-            if (FindDescendant<T>(child) is { } found) return found;
-        }
-        return null;
-    }
+    private static void SetChangeButtonVisible(Grid displayRow, bool visible) => VisualTreeHelpers.SetNamedChildVisible(displayRow, "ChangeButton", visible);
 
     // ユーザー要望（checkpoint142）「それを押すと、生徒一覧の最下部に移動する」への対応。この
     // ページのListView（生徒・講師・科目）は、外側のページ全体を包むScrollViewer内のStackPanelに
@@ -343,7 +318,7 @@ public sealed partial class SetupPage : WorkflowPageBase
     private static void ScrollListToBottom(ListView list)
     {
         list.UpdateLayout();
-        if (FindAncestor<ScrollViewer>(list) is not { } scrollViewer) return;
+        if (VisualTreeHelpers.FindAncestor<ScrollViewer>(list) is not { } scrollViewer) return;
         scrollViewer.UpdateLayout();
         scrollViewer.ChangeView(null, scrollViewer.ScrollableHeight, null);
     }

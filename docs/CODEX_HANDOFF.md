@@ -1,13 +1,54 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-04（checkpoint143）
+最終更新: 2026-10-04（checkpoint144）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.22.0 (beta)`（Draft Release作成予定。Importページ受講希望一覧の行内編集化（checkpoint142のStage 3）は継続課題としてPlanを承認済み、次のcheckpointで着手）
-Latest Development Checkpoint: checkpoint 143（checkpoint142で承認されたPlanのStage 2
+Current Version: `v0.23.0 (beta)`（Draft Release作成予定。checkpoint142で承認されたPlanの3段階（Stage 1〜3）すべて完了）
+Latest Development Checkpoint: checkpoint 144（checkpoint142で承認されたPlanのStage 3
+「受講希望一覧（ImportPage.xaml）の行内編集化・列追加」を実装し、3段階すべてを完了した。
+`src/SeminarSched.WinUI/Pages/ImportPageRowViewModels.cs`（新規）に`NamedOption<T>`
+（ComboBoxの選択肢用の小さな表示ラッパー）と`LessonRequestRowViewModel`
+（`EditableRowViewModel`を継承）を実装。`LessonRequest`は外部キー（生徒・科目・通常担当講師・
+第1〜3希望講師）が多くStudent/Teacher/SubjectRowViewModelの1行レイアウトには収まらないため、
+編集パネルは旧フォームと同じ複数行レイアウト（`StackPanel`に行ごとの`Grid`を積む）のまま、
+一覧の行の位置に展開される形にした。ComboBoxの選択肢（生徒・科目・講師一覧）は行オブジェクト
+自身に持たせる（`StudentOptions`/`SubjectOptions`/`TeacherOptions`）ことで、ページ側の
+`MasterItem<T>`（ComboBox表示専用、ページごとに個別定義）には依存しない。「通常担当講師を
+選ぶと第1希望講師が未設定なら自動的に同じ講師を補う」という旧フォームの挙動は、
+`DraftRegularTeacher`のsetter内に移植した。
+
+**列追加:** 一覧に5列追加した：最大連続コマ数上書き（`MaxConsecutiveOverrideText`、未設定は
+「既定値」）、第1〜3希望講師（`Preferred1Name`〜`Preferred3Name`）、空きコマ許可上書き
+（`AllowGapOverrideText`、「指定なし」「許可」「不許可」）。列数増加（既存6列＋新規5列＝
+11列＋変更/削除ボタン）により、ウィンドウ幅が狭い場合は末尾の変更/削除ボタンまで収まらない
+ことがあるため、見出し・一覧をまとめて横スクロール可能な`ScrollViewer`
+（`HorizontalScrollBarVisibility="Auto"`、`MinWidth="960"`の内側`StackPanel`）で包んだ
+（講師指導可能科目タブの表と同じ「幅が足りなければ横スクロール」という考え方）。ページ全体の
+`MaxWidth`も960→1400へ拡張した。
+
+**削除ボタンの移行:** 従来の「選択した行を削除」ボタン（一覧の行選択＋ページ下部の共有ボタン）を
+廃止し、行ホバー時に「変更」の隣へ「削除」ボタンとして表示する形に変えた（ユーザー確認済み）。
+削除は取り消せないため、`DeleteSlot_Click`（SetupPage.xaml.cs）と同じ`ContentDialog`による
+確認を経由する。
+
+**共通化:** SetupPage.xaml.csにあった`FindAncestor<T>`/`FindDescendant<T>`/
+`SetChangeButtonVisible`（ビジュアルツリー探索ヘルパー）を、両ページから使う
+`VisualTreeHelpers.cs`（新規、`internal static class`）へ切り出した。同様に
+`EditableRowViewModel`（共通基底）も`SetupPageRowViewModels.cs`から独立した
+`EditableRowViewModel.cs`へ切り出した。
+
+**検証:** 一時的な別パッケージIDでのdev-run実機確認で、実際のテストプロジェクトデータ
+（受講希望約190件）を使い、①新しい5列がすべて正しく表示されること、②追加→一覧最下部へ
+自動スクロール→生徒・科目・通常担当講師（自動補完含む）等を選択→保存→一覧へ正しく反映、
+③検索フィルタ、④行ホバーで変更/削除ボタンが表示されること、⑤削除の確認ダイアログと実際の
+削除、をすべてスクリーンショットで確認した。既存の全テスト（計252件）がすべて通過することも
+確認済み。新機能のためminorを上げてv0.23.0（patchを0へ戻す）とした。詳細は
+[docs/releases/v0.23.0.md](releases/v0.23.0.md)。
+
+checkpoint 143（checkpoint142で承認されたPlanのStage 2
 「生徒・講師・科目タブの行内編集化」を実装した。`src/SeminarSched.WinUI/Pages/
 SetupPageRowViewModels.cs`（新規）に`EditableRowViewModel`（抽象基底、`IsEditing`/
 `IsNew`/`DisplayVisibility`/`EditVisibility`を共通提供）と、`StudentRowViewModel`/
@@ -89,8 +130,8 @@ DataTemplateへ、学年の右に`Value.DefaultMaxConsecutiveSlots`列を追加�
 差分が無いことを確認した。UI調整のためpatchを上げてv0.21.3とした。詳細は
 [docs/releases/v0.21.3.md](releases/v0.21.3.md)。
 
-**Stage 2はcheckpoint143で完了・Stage 3は引き続き未着手。** 技術方針・Stage 2の実装詳細は
-上のcheckpoint143を参照。
+**Stage 2はcheckpoint143で、Stage 3はcheckpoint144で完了。3段階すべて完了。** 技術方針・
+実装詳細は上のcheckpoint143・checkpoint144を参照。
 
 checkpoint 141（ユーザーから「他すべての方針についても、正しく実装できているのか時間をかけて
 全パターン確認してください」という依頼。checkpoint140で`TimeOfDay`/`TeacherLoadBalance`の
