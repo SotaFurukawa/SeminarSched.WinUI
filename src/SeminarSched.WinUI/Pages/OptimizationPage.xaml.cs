@@ -264,7 +264,7 @@ public sealed partial class OptimizationPage : WorkflowPageBase
                 RunStatus.Title = $"未配置が{result.UnassignedLessons}件残ったまま作成しました（要確認）";
                 var reasons = new List<string>();
                 if (result.UnassignedDueToRegularTeacherPriority > 0)
-                    reasons.Add($"うち{result.UnassignedDueToRegularTeacherPriority}件は、担当講師優先度が「5（固定）」に設定されている生徒です。優先度5は通常担当講師・第1〜3希望講師以外を絶対に使わないため、これらの講師の空きコマ不足が原因です。「1 設定」の「通常授業担当設定」タブで優先度や、「講師指導可能科目」タブ・アンケート回答で講師の出勤可否を見直してください。");
+                    reasons.Add($"うち{result.UnassignedDueToRegularTeacherPriority}件は、担当講師優先度が「5（固定）」に設定されている生徒です。優先度5は通常担当講師・第1〜3希望講師以外を絶対に使わないため、これらの講師の空きコマ不足が原因です。「1 プロジェクト設定」の「通常授業担当設定」タブで優先度や、「講師指導可能科目」タブ・アンケート回答で講師の出勤可否を見直してください。");
                 if (result.UnassignedWithNoQualifiedTeacher > 0)
                     reasons.Add($"うち{result.UnassignedWithNoQualifiedTeacher}件は、対応できる講師の候補コマが構造的に見つかりませんでした（講師の資格・出勤可否をご確認ください）。時間をかけても解決しません。");
                 var reasonNote = reasons.Count > 0 ? " " + string.Join(" ", reasons) : "";

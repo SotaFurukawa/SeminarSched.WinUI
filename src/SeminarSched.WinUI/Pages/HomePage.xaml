@@ -150,7 +150,7 @@
                     </StackPanel>
                     <TextBlock
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="一人の講師が担当する生徒の人数を設定できます。後から「1 設定」の「スケジュール設定」タブでも変更できます。"
+                        Text="一人の講師が担当する生徒の人数を設定できます。後から「1 プロジェクト設定」の「スケジュール設定」タブでも変更できます。"
                         TextWrapping="Wrap" />
                     <Button
                         HorizontalAlignment="Right"

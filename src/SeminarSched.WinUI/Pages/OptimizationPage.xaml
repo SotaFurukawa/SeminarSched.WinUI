@@ -92,7 +92,7 @@
                          判明したため撤去した（外側のStackPanel MaxWidth="1200"には収まる）。 -->
                     <Expander Header="この回だけ探索の方針を変更する" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
                         <StackPanel Padding="4,12,4,4" Spacing="12">
-                            <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Text="既定は「1 設定」の「スケジュール設定」タブで保存した内容です。ここで変更しても、このプロジェクトの既定値そのものは変わりません（今回の自動作成にだけ適用されます）。"/>
+                            <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Text="既定は「1 プロジェクト設定」の「スケジュール設定」タブで保存した内容です。ここで変更しても、このプロジェクトの既定値そのものは変わりません（今回の自動作成にだけ適用されます）。"/>
                             <!-- ユーザー指摘（checkpoint128）「同時に使える座席数上限」追加時に、NumberBoxの
                                  HeaderはControl自身の幅（140px）に収まる範囲でしか表示されず、長い説明文が
                                  途中で切れてしまうことが実機で判明した。説明文はControlの外の独立した

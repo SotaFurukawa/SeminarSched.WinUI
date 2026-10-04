@@ -274,11 +274,21 @@ public sealed partial class SetupPage : WorkflowPageBase
     private void ResetSubject(){_subjectEditId=0;Subjects.SelectedItem=null;SubjectCode.Text=SubjectName.Text=SubjectShort.Text=SubjectLevel.Text="";SubjectOrder.Value=1;SubjectActive.IsChecked=true;}
     private void ResetSlot(){_slotEditId=0;TimeSlots.SelectedItem=null;SlotCode.Text=SlotName.Text="";SlotStartTime.Text="09:00";SlotEndTime.Text="10:00";_slotEditOrder=1;SlotActive.IsChecked=true;}
 
-    private async void SaveQualification_Click(object sender,RoutedEventArgs e)=>await ExecuteAsync(async path=>
+    // ユーザー要望（checkpoint142）「講師指導可能科目について、表以外は消す。表だけで十分です」への
+    // 対応で入力フォームを削除したため、備考だけは表の○セルを右クリック/長押し（RightTapped）した
+    // ときに出す小さなダイアログへ移した（指導可否自体はCanTeachをそのまま維持し、備考のみ更新）。
+    private async void QualificationCell_RightTapped(object sender,Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs e)
     {
-        if(QualificationTeacher.SelectedItem is not MasterItem<Teacher> teacher||QualificationSubject.SelectedItem is not MasterItem<Subject> subject)throw new ArgumentException("講師と科目を選択してください。");
-        await App.MasterData.SaveQualificationAsync(path,new TeacherQualification(teacher.Value.Id,subject.Value.Id,QualificationCanTeachYes.IsChecked==true,QualificationNote.Text));
-    },"講師対応科目を保存しました");
+        if(sender is not Button{Tag:(long teacherId,long subjectId)})return;
+        var existing=_qualifications.GetValueOrDefault((teacherId,subjectId));
+        var noteBox=new TextBox{Text=existing?.Note??"",AcceptsReturn=true,TextWrapping=TextWrapping.Wrap,Height=80};
+        var dialog=new ContentDialog{XamlRoot=XamlRoot,Title="備考を編集",Content=noteBox,PrimaryButtonText="保存",CloseButtonText="キャンセル",DefaultButton=ContentDialogButton.Primary};
+        if(await dialog.ShowAsync()!=ContentDialogResult.Primary)return;
+        await ExecuteAsync(async path=>
+        {
+            await App.MasterData.SaveQualificationAsync(path,new TeacherQualification(teacherId,subjectId,existing?.CanTeach??false,noteBox.Text));
+        },"備考を保存しました");
+    }
 
     // ユーザー要望「小学校、中学校、高校の並びになるようにしてください。これは他の部分でも同じで、
     // 順番が変わっているところは、小中高の順番で」への対応。SchoolLevelは自由入力の文字列
@@ -413,6 +423,7 @@ public sealed partial class SetupPage : WorkflowPageBase
                 var canTeach=_qualifications.TryGetValue((teacher.Id,subject.Id),out var q)&&q.CanTeach;
                 var cell=new Button{Content=canTeach?"○":"",Tag=(teacher.Id,subject.Id),BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),HorizontalAlignment=HorizontalAlignment.Stretch,VerticalAlignment=VerticalAlignment.Stretch,HorizontalContentAlignment=HorizontalAlignment.Center,VerticalContentAlignment=VerticalAlignment.Center,Padding=new Thickness(0)};
                 cell.Click+=QualificationCell_Click;
+                cell.RightTapped+=QualificationCell_RightTapped;
                 Place(QualificationMatrixBody,cell,r,c);
             }
         }
@@ -665,7 +676,7 @@ public sealed partial class SetupPage : WorkflowPageBase
             var subjectItems=subjectValues.Select(x => new MasterItem<Subject>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}")).ToArray();
             _studentItems=studentItems;_teacherItems=teacherItems;_subjectItems=subjectItems;
             ApplyStudentFilter();ApplyTeacherFilter();ApplySubjectFilter();
-            QualificationTeacher.ItemsSource=teacherItems;QualificationSubject.ItemsSource=subjectItems;RegularStudent.ItemsSource=studentItems;RegularSubject.ItemsSource=subjectItems;
+            RegularStudent.ItemsSource=studentItems;RegularSubject.ItemsSource=subjectItems;
             _nullableTeacherItems=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.Name}"))).ToArray();
             RegularTeacher.ItemsSource=_nullableTeacherItems;if(RegularTeacher.SelectedIndex<0)RegularTeacher.SelectedIndex=0;
             var qualifications=await App.MasterData.GetQualificationsAsync(path);_qualifications=qualifications.ToDictionary(value=>(value.TeacherId,value.SubjectId));RenderQualificationMatrix();

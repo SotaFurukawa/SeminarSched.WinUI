@@ -646,4 +646,96 @@ public sealed class CpSatScheduleSolverTests
         Assert.Single(solution.Placements);
         Assert.Equal(expectedSlotOrder, solution.Placements[0].TimeSlotId);
     }
+
+    // ユーザー要望（checkpoint141）「他すべての方針についても、正しく実装できているのか時間をかけて
+    // 全パターン確認してほしい」を検証する。checkpoint140で見つかった不具合（配置件数に比例して
+    // 合計が際限なく増え続ける探索方針が、件数に関わらずほぼ一定の上限を持つ探索方針を数の力で
+    // 押しのけてしまう）が、TimeOfDay/TeacherLoadBalance以外の5方針にも潜んでいないかを、
+    // 実際に配置件数を増やした大きめのシナリオでそれぞれ検証する。
+    //
+    // 講師1人・生徒6名、各生徒が1対1必須で4回ずつ（計24件）。1日6コマ・候補日6日（容量36）なので、
+    // 「講師の出勤日をできるだけ減らす」を満たすには最低4日（6コマ×4日=24）で収まるが、候補日は
+    // 6日あるため、もし「生徒の授業日を分散する」（下位方針、配置件数が多いほど対象の生徒×日の組が
+    // 増える）側が数の力で上位方針を押しのける不具合があれば、各生徒の分散を優先して5日目・6日目まで
+    // 開けてしまうはず。
+    [Fact]
+    public async Task SolveAsync_PrioritizesTeacherAttendanceConcentrationOverStudentAttendanceSpreadWhenManyLessonsAreInvolved()
+    {
+        const long teacherId = 100;
+        var demands = Enumerable.Range(1, 6)
+            .Select(i => new LessonDemand(i, i, 4, 0, OneToOneRequired: true))
+            .ToArray();
+        var candidates = Enumerable.Range(1, 6)
+            .SelectMany(studentId => Enumerable.Range(1, 6)
+                .SelectMany(day => Enumerable.Range(1, 6)
+                    .Select(slotOrder => new PlacementCandidate(
+                        studentId, studentId, teacherId, day, (day * 10) + slotOrder,
+                        SlotOrder: slotOrder, OneToOneRequired: true))))
+            .ToArray();
+        var order = new[]
+        {
+            SchedulingPolicyDimension.TeacherAttendanceDays,
+            SchedulingPolicyDimension.TeacherCountPerDay,
+            SchedulingPolicyDimension.TeacherLoadBalance,
+            SchedulingPolicyDimension.PairingSize,
+            SchedulingPolicyDimension.TeacherStudentConsecutive,
+            SchedulingPolicyDimension.TimeOfDay,
+            SchedulingPolicyDimension.StudentAttendanceDays,
+        };
+        var policy = new SchedulingPolicy(
+            teacherAttendanceDaysPreference: TeacherAttendanceDaysPreference.Concentrate,
+            studentAttendanceDaysPreference: StudentAttendanceDaysPreference.Spread,
+            preferenceOrder: order);
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, Policy: policy), TimeSpan.FromSeconds(10));
+
+        Assert.Equal(24, solution.Placements.Count);
+        Assert.True(
+            solution.Placements.Select(p => p.OpenDateId).Distinct().Count() <= 4,
+            "講師の出勤日集約が生徒の授業日分散より上位なら、必要最小限の4日に収まるはず（生徒分散を優先して5日目以降を開けるのは誤り）。");
+    }
+
+    // 同じ不具合クラスを、PairingSize（ペア優遇）対TeacherAttendanceDays（講師の出勤日集約）の
+    // 組み合わせで、かつMaxStudentsPerTeacherを実際に許容される最大値10まで上げた状態で検証する。
+    // BuildPairingSizeTermsはしきい値2〜cap each groupごとに個別の項を発行するため、容量が大きい
+    // ほど1組あたりの発行項数が増える（容量10なら最大9項）。この「容量に応じた項数の増加」が、
+    // 配置件数に比例する不具合と同種の問題を引き起こしていないかを確認する。20名の生徒（ペア可、
+    // 1対1必須ではない）が1回ずつ（計20件）、講師1人・候補日10日・1日1コマ（容量10）。
+    // 「ペアをできるだけ避ける（Minimize、1対1に近づける）」を最下位、「講師の出勤日を集約する」を
+    // 最上位にする。出勤日集約を満たすには最低2日（10名×2日=20）で収まるが、Minimizeが数の力で
+    // 上位方針を押しのける不具合があれば、1組あたりの人数を減らすために3日以上へ広げてしまうはず。
+    [Fact]
+    public async Task SolveAsync_PrioritizesTeacherAttendanceConcentrationOverPairingSizeMinimizeAtMaxCapacity()
+    {
+        const long teacherId = 100;
+        var demands = Enumerable.Range(1, 20)
+            .Select(i => new LessonDemand(i, i, 1, 0))
+            .ToArray();
+        var candidates = Enumerable.Range(1, 20)
+            .SelectMany(studentId => Enumerable.Range(1, 10)
+                .Select(day => new PlacementCandidate(studentId, studentId, teacherId, day, day)))
+            .ToArray();
+        var order = new[]
+        {
+            SchedulingPolicyDimension.TeacherAttendanceDays,
+            SchedulingPolicyDimension.TeacherCountPerDay,
+            SchedulingPolicyDimension.TeacherLoadBalance,
+            SchedulingPolicyDimension.StudentAttendanceDays,
+            SchedulingPolicyDimension.TeacherStudentConsecutive,
+            SchedulingPolicyDimension.TimeOfDay,
+            SchedulingPolicyDimension.PairingSize,
+        };
+        var policy = new SchedulingPolicy(
+            maxStudentsPerTeacher: 10,
+            teacherAttendanceDaysPreference: TeacherAttendanceDaysPreference.Concentrate,
+            pairingSizePreference: PairingSizePreference.Minimize,
+            preferenceOrder: order);
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, Policy: policy), TimeSpan.FromSeconds(10));
+
+        Assert.Equal(20, solution.Placements.Count);
+        Assert.True(
+            solution.Placements.Select(p => p.OpenDateId).Distinct().Count() <= 2,
+            "講師の出勤日集約がペア優遇（最小化）より上位なら、必要最小限の2日に収まるはず（ペアを避けるために3日目以降を開けるのは誤り）。");
+    }
 }

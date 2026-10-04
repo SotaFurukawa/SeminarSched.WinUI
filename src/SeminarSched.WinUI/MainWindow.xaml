@@ -50,7 +50,7 @@
                      ボタンを設置する。設定が開かれていないときはこれを表示しない」への対応。
                      子項目はSetupPage.xamlのTabViewと同じ並び順（1.1〜1.8）にし、表示/選択状態の
                      同期はSetupPageNavStateとMainWindow.xaml.csのRefreshSetupNavState()で行う。 -->
-                <NavigationViewItem x:Name="SetupNavItem" Content="1 設定" Tag="setup">
+                <NavigationViewItem x:Name="SetupNavItem" Content="1 プロジェクト設定" Tag="setup">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xEBD2;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.MenuItems>
                         <NavigationViewItem Content="1.1 生徒" Tag="setupTab:0"/>

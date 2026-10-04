@@ -1,13 +1,98 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-04（checkpoint140）
+最終更新: 2026-10-04（checkpoint142）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.21.2 (beta)`（Draft Release作成予定。品質プロファイルの詳細な数値調整は今後のユーザーフィードバック次第で継続課題）
-Latest Development Checkpoint: checkpoint 140（UIではなく最適化エンジン自体の不具合報告。
+Current Version: `v0.21.3 (beta)`（Draft Release作成予定。Setup/Importページの大きな入力方式刷新（生徒・講師・科目の行内編集化、受講希望一覧の刷新）は継続課題としてPlanを承認済み、次のcheckpointで着手）
+Latest Development Checkpoint: checkpoint 142（ユーザーから設定画面について6点のUI変更依頼。
+①「設定」タブの名称を「プロジェクト設定」へ変更、②生徒一覧に最大連続コマ数列を追加、
+③④生徒・講師・科目の登録を常時表示の入力フォームから一覧内の行内編集へ刷新（追加ボタン→
+末尾に編集行→保存、既存行はホバーで「変更」ボタン）、④講師指導可能科目タブを表だけに簡素化、
+⑤コマ編集の有効チェックボックスを保存ボタンより前に、⑥アンケート取込後の受講希望一覧も同じ
+行内編集方式に統一し最大連続コマ数上書き・希望講師・空きコマ許可上書きを列として可視化、という
+依頼。規模が大きいため、Plan modeで技術方針（DataGridが存在しないリポジトリで、既存の
+`PolicyRowsList`/`SchedulingPolicyRowViewModel`と同じ「可変なINotifyPropertyChangedクラス＋
+x:Bind＋表示/編集二重Gridの可視性切替」パターンを転用）を検討・承認を得た上で、3段階
+（Stage 1: 小規模変更まとめ／Stage 2: 生徒・講師・科目の行内編集化／Stage 3: 受講希望一覧の
+刷新）に分割して着手した。Planは`.claude/plans/functional-scribbling-lecun.md`相当の内容
+（セッションのplanファイル、リポジトリには残らない）。
+
+**Stage 1（本checkpointで完了、v0.21.3）:**
+①「1 設定」→「1 プロジェクト設定」: `MainWindow.xaml`の`SetupNavItem`と`SetupPage.xaml`の
+ページタイトル、および本文中の言及（`HomePage.xaml`、`OptimizationPage.xaml(.cs)`、
+`GoogleFormsGuide.cs`）をすべて揃えた。歯車アイコンの`SettingsPage`（ライセンス・更新確認）は
+対象外。
+②生徒一覧の「最大連続コマ数」列: `SetupPage.xaml`の生徒タブの列見出しGridとListViewの
+DataTemplateへ、学年の右に`Value.DefaultMaxConsecutiveSlots`列を追加。
+④講師指導可能科目タブの簡素化: 講師・科目・指導可否ラジオ・保存の入力Grid、備考TextBox、
+説明TextBlockを削除し、表（4分割のExcelウィンドウ枠固定構成）だけを残した。指導可否の切替は
+従来通り○セルのClick（`QualificationCell_Click`）。備考編集だけは他に手段がなくなるため、
+○セルに`RightTapped`ハンドラ（`QualificationCell_RightTapped`）を追加し、右クリック/長押しで
+小さな`ContentDialog`（TextBox＋保存/キャンセル）を出す形に移した（`CanTeach`は変更せず
+`Note`だけ更新）。
+⑤コマ編集の操作順: `SetupPage.xaml`のコマ・開校日タブ。従来は「入力欄…→保存ボタン（1行目末尾）」
+の次の行に「有効チェックボックス→新規入力ボタン」だったのを、有効チェックボックスを保存ボタンの
+直前の列へ移動し（即時保存の`SlotActive_Changed`はそのまま）、2行目は新規入力ボタンのみに
+した。
+**検証:** 一時的な別パッケージID（`...1C52`）でのdev-run実機確認で、①ナビゲーション名称・
+生徒一覧の新列、②講師指導可能科目タブが表のみになっていること、③○セルの右クリックで備考編集
+ダイアログが開くこと、④コマタブの操作順、をすべてスクリーンショットで確認した。既存の全テスト
+（Architecture 3件・Domain 41件・Application 18件・Optimization 71件・Infrastructure 119件、
+計252件）がすべて通過することも確認済み。確認後はテストプロセス停止→
+`Remove-AppxPackage`→manifestを元のGUID（`...1C51`）へ復元→`git diff`でversion行以外に
+差分が無いことを確認した。UI調整のためpatchを上げてv0.21.3とした。詳細は
+[docs/releases/v0.21.3.md](releases/v0.21.3.md)。
+
+**Stage 2・Stage 3は未着手**（次回checkpointで継続）。計画の要点: 各行を可変の
+`INotifyPropertyChanged`行ビューモデル（`Value`＝保存済みrecord、`Draft*`プロパティへ
+TextBox/NumberBox/ComboBoxを`Mode=TwoWay`で直接bind、`IsEditing`から導出する
+`DisplayVisibility`/`EditVisibility`）として保持し、1つの`DataTemplate`内に表示用Gridと
+編集用Gridを両方置いて`Visibility`で出し分ける（`DataTemplateSelector`は使わない）。保存
+ボタンのClickは`(sender as Button).DataContext`から行オブジェクトを直接取得し、`Draft*`を
+読んでそのまま保存する（ビジュアルツリーを辿らない＝virtualizationでコンテナが再生成されても
+安全）。`ReloadAsync`は編集中行がある場合にDraft値を新しい行オブジェクトへ引き継ぎ、検索
+フィルタは既存の行オブジェクトを`.Where()`するだけにする（どちらも編集中のユーザー入力を
+消さないため）。Stage 3（受講希望一覧）はこれに加え、外部キー選択肢（生徒・科目・講師等）を
+行オブジェクト自身に持たせる（`SubjectOptions`/`DraftSubject`等）。受講希望一覧の「選択した
+行を削除」は、行ホバー時に「変更」の隣へ「削除」ボタンとして出す形に変える（ユーザー確認済み）。
+
+checkpoint 141（ユーザーから「他すべての方針についても、正しく実装できているのか時間をかけて
+全パターン確認してください」という依頼。checkpoint140で`TimeOfDay`/`TeacherLoadBalance`の
+2方針に見つかった「配置件数に比例して合計が際限なく増え続ける」不具合が、残り5方針
+（`TeacherCountPerDay`・`TeacherAttendanceDays`・`PairingSize`・`StudentAttendanceDays`・
+`TeacherStudentConsecutive`）にも潜んでいないかを検証する依頼。
+**調査:** 各`BuildXxxTerms`メソッドを機構レベルで再精査し、7方針すべてについて「個々の配置
+決定が、他の配置と共有されない重みを単独で加算するか」を確認した。結果、`TimeOfDay`
+（候補ごとに無条件加算）・`TeacherLoadBalance`（`maxLoad`の値域が`variables.Count`まで
+及ぶ）以外の5方針は、いずれも（講師,日付）・（生徒,日付）・（講師,日付,コマ）等の「組」単位で
+`AddMaxEquality`等により高々1回しか加算されない、またはしきい値交差ベースでも分割に対して
+不変（`BuildPairingSizeTerms`のしきい値合計は`Σ(n_i-1)`で、同じ総人数ならグループの分け方に
+よらず一定）という、1回の構造的決定の限界効果が小さい項であることを確認し、既存の
+`IsPlacementCountScaledDimension`（`TimeOfDay`・`TeacherLoadBalance`のみを対象とする）が
+正しいことを理論的に確認した。
+**実証:** 大規模な実際のケースを模した新規回帰テスト2件を追加（講師1人・生徒6名・1対1必須4回
+ずつ計24件でTeacherAttendanceDays対StudentAttendanceDaysを検証、MaxStudentsPerTeacher=10
+（実際に許容される最大値）でPairingSize対TeacherAttendanceDaysを検証）、いずれも期待通り
+通過することを確認した。既存の最適化エンジンのテスト69件・リポジトリ全体のテスト250件が
+すべて通過することも確認済み（新規2件を加え252件）。
+**別件の発見（不具合ではなく設計上のトレードオフ、未対応）:** 検証の過程で、`TeacherStudent
+Consecutive`（講師×生徒の連続コマ優遇）を最上位にランクしても、常時ON（並び替え対象外）の
+`BuildEvenSpacingTerms`/`BuildSubjectSpacingTerms`（同一日への過度な集中を抑制する機能、
+固定重み4000/2000）が、同日への集中を必要とする「連続」配置と直接競合し、場合によっては
+上位ランクのTeacherStudentConsecutive（1回あたり重み10000）の効果を打ち消してしまうことを
+8名中4名の実測で確認した。これはEvenSpacing/SubjectSpacingが「day-spread（StudentAttendance
+Days/TeacherAttendanceDays）の精緻化」として設計された際の想定（day-spread系より常に下位）が、
+checkpoint123の並び替え機能導入後は「ユーザーがランク1位に選んだどの方針に対しても下位」という
+保証にはなっていないために起きる。対応方針はユーザー確認が必要なためADR化せず、この
+HANDOFFへ記録するにとどめた（当初作成した検証用テストは、この想定外の仕様が原因で失敗した
+ため、誤った期待値だったとして削除した）。
+バックエンドの検証作業のため実機でのUI確認は行っていない（回帰テストでの検証で十分と判断）。
+version変更は無し（既存の重み付けロジックに変更は加えていないため）。
+
+checkpoint 140（UIではなく最適化エンジン自体の不具合報告。
 ユーザーから探索方針のスクリーンショットを添えて「今このような探索方針になっていて、遅めの
 時間に配置することは優先度が低く、また講師の出勤日ができるだけ少ないようにすることの優先度は
 高いのですが、自動作成してみると、ZABCの時間帯のZにあまりにも配置されない。Zに配置した方が

@@ -8,7 +8,7 @@
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
     <ScrollViewer><StackPanel Padding="24" Spacing="16">
-        <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="1 設定"/>
+        <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="1 プロジェクト設定"/>
         <InfoBar x:Name="ProjectRequired"/>
         <InfoBar x:Name="Status" IsClosable="True"/>
         <TextBlock Text="プロジェクト、開校日、コマ、科目、生徒・講師の共通基本情報を設定します。" TextWrapping="Wrap"/>
@@ -28,12 +28,12 @@
                 </Style>
             </TabView.Resources>
             <TabViewItem Header="生徒"><StackPanel Padding="16" Spacing="10"><TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="新規で通期の生徒を追加できます。ホームの「Excelで基本情報を編集」からでも追加できます。"/><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="100"/><ColumnDefinition Width="130"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="StudentId" Header="生徒ID" IsEnabled="False"/><TextBox x:Name="StudentName" Grid.Column="1" Header="氏名"/><TextBox x:Name="StudentGrade" Grid.Column="2" Header="学年"/><NumberBox x:Name="StudentMaximum" Grid.Column="3" Header="最大連続コマ" Minimum="1" Value="2"/><Button Grid.Column="4" VerticalAlignment="Bottom" Content="保存" Click="AddStudent_Click"/></Grid><TextBox x:Name="StudentNote" Header="備考" Width="420" HorizontalAlignment="Left"/><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="StudentAllowGap" Content="空きコマを許可"/><CheckBox x:Name="StudentActive" Content="在籍中" IsChecked="True" Checked="StudentActive_Changed" Unchecked="StudentActive_Changed"/><Button Content="新規入力" Click="NewStudent_Click"/></StackPanel><TextBlock Text="一覧を選択すると編集できます。「在籍中」のチェックはそのまま即座に保存されます。生徒IDは自動的に割り振られ、変更できません。"/><TextBox x:Name="StudentSearch" PlaceholderText="ID・氏名・学年で検索" TextChanged="StudentSearch_TextChanged" Width="320" HorizontalAlignment="Left"/>
-                <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="100"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions><TextBlock FontWeight="SemiBold" Text="生徒ID"/><TextBlock Grid.Column="1" FontWeight="SemiBold" Text="生徒氏名"/><TextBlock Grid.Column="2" FontWeight="SemiBold" Text="学年"/><TextBlock Grid.Column="3" FontWeight="SemiBold" Text="状態"/></Grid>
+                <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="100"/><ColumnDefinition Width="110"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions><TextBlock FontWeight="SemiBold" Text="生徒ID"/><TextBlock Grid.Column="1" FontWeight="SemiBold" Text="生徒氏名"/><TextBlock Grid.Column="2" FontWeight="SemiBold" Text="学年"/><TextBlock Grid.Column="3" FontWeight="SemiBold" Text="最大連続コマ数"/><TextBlock Grid.Column="4" FontWeight="SemiBold" Text="状態"/></Grid>
                 <ListView x:Name="Students" SelectionChanged="Students_SelectionChanged">
                     <ListView.ItemTemplate>
                         <DataTemplate>
-                            <Grid ColumnSpacing="8" Padding="4"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="100"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions>
-                                <TextBlock Text="{Binding Value.ExternalId}"/><TextBlock Grid.Column="1" Text="{Binding Value.Name}"/><TextBlock Grid.Column="2" Text="{Binding Value.Grade}"/><TextBlock Grid.Column="3" Text="{Binding StatusText}"/>
+                            <Grid ColumnSpacing="8" Padding="4"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="100"/><ColumnDefinition Width="110"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding Value.ExternalId}"/><TextBlock Grid.Column="1" Text="{Binding Value.Name}"/><TextBlock Grid.Column="2" Text="{Binding Value.Grade}"/><TextBlock Grid.Column="3" Text="{Binding Value.DefaultMaxConsecutiveSlots}"/><TextBlock Grid.Column="4" Text="{Binding StatusText}"/>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>
@@ -52,27 +52,11 @@
                 </ListView>
             </StackPanel></TabViewItem>
             <TabViewItem Header="講師指導可能科目"><StackPanel Padding="16" Spacing="12">
-                <!-- ユーザー指摘（checkpoint129）「少し離れているのと、指導可能ボタンが下の段に来ているのが
-                     気になる。これを氏名などと同じ段にもってきて、また指導可能かをチェックボックスではなく、
-                     指導可能と指導不可の2択で選べるようにしてほしい。また、指導可能がデフォルトで配置
-                     されているようにする」への対応。講師・科目・指導可否・保存を1行にまとめ、
-                     ComboBoxが既定でGridの固定幅列いっぱいには広がらない問題（checkpoint121と同種）を
-                     避けるため列をAutoにして各コントロールへ明示的なWidthを与えた。 -->
-                <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <ComboBox x:Name="QualificationTeacher" Header="講師" Width="200"/>
-                    <ComboBox x:Name="QualificationSubject" Grid.Column="1" Header="科目" Width="200"/>
-                    <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="指導可否" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                        <StackPanel Orientation="Horizontal" Spacing="12" Height="32">
-                            <RadioButton x:Name="QualificationCanTeachYes" Content="指導可能" GroupName="QualificationCanTeach" IsChecked="True"/>
-                            <RadioButton x:Name="QualificationCanTeachNo" Content="指導不可" GroupName="QualificationCanTeach"/>
-                        </StackPanel>
-                    </StackPanel>
-                    <Button Grid.Column="3" VerticalAlignment="Bottom" Content="保存" Click="SaveQualification_Click"/>
-                </Grid>
-                <StackPanel Orientation="Horizontal" Spacing="16"><TextBox x:Name="QualificationNote" Width="420" Header="備考"/></StackPanel>
-                <TextBlock Text="表の○をクリックすると指導可能／不可を切り替えられます（備考は上のフォームで個別に設定してください）。横にスクロールしても講師ID・講師氏名は、縦にスクロールしても科目見出しは固定されたままです。" TextWrapping="Wrap"/>
+                <!-- ユーザー要望（checkpoint142）「講師指導可能科目について、表以外は消す。表だけで
+                     十分です」への対応。従来は講師・科目・指導可否・保存の入力フォームと備考欄を表の上に
+                     置いていたが、表の○クリックで指導可否は直接切り替えられるため実質的に不要だった。
+                     備考編集だけは他に手段が無くなるため、○セルの右クリック/長押し（RightTapped）で
+                     備考編集ダイアログ（QualificationCell_RightTapped）を出す形に移した。 -->
                 <!-- ユーザー要望（checkpoint128）「横にスライドして動かしても、講師ID、講師氏名は左側に
                      固定してほしい。縦にスクロールした場合に、科目が動かないのも同様に」への対応。
                      Excelのウィンドウ枠固定と同じ4分割構成（角・見出し・左列・本体）にし、本体
@@ -126,12 +110,16 @@
             </StackPanel></TabViewItem>
             <TabViewItem Header="コマ・開校日"><StackPanel Padding="16" Spacing="12">
                 <TextBlock FontSize="18" FontWeight="SemiBold" Text="コマ設定"/>
-                <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="130"/><ColumnDefinition Width="110"/><ColumnDefinition Width="110"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <!-- ユーザー要望（checkpoint142）「コマ情報の変更について、有効のチェックボックスは
+                     保存よりも前に来るように」への対応。有効チェックボックスを保存ボタンの直前の列へ
+                     移動した（即時保存の挙動自体はSlotActive_Changedのまま変更なし）。 -->
+                <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="130"/><ColumnDefinition Width="110"/><ColumnDefinition Width="110"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <TextBox x:Name="SlotCode" Header="コード"/><TextBox x:Name="SlotName" Grid.Column="1" Header="表示名"/>
                     <ComboBox x:Name="SlotStartTime" Grid.Column="2" Header="開始" IsEditable="True" PlaceholderText="09:00"/>
                     <ComboBox x:Name="SlotEndTime" Grid.Column="3" Header="終了" IsEditable="True" PlaceholderText="10:00"/>
-                    <Button Grid.Column="4" VerticalAlignment="Bottom" Content="保存" Click="AddSlot_Click"/>
-                </Grid><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="SlotActive" Content="有効" IsChecked="True" Checked="SlotActive_Changed" Unchecked="SlotActive_Changed"/><Button Content="新規入力" Click="NewSlot_Click"/></StackPanel>
+                    <CheckBox x:Name="SlotActive" Grid.Column="4" VerticalAlignment="Bottom" Content="有効" IsChecked="True" Checked="SlotActive_Changed" Unchecked="SlotActive_Changed"/>
+                    <Button Grid.Column="5" VerticalAlignment="Bottom" Content="保存" Click="AddSlot_Click"/>
+                </Grid><StackPanel Orientation="Horizontal" Spacing="16"><Button Content="新規入力" Click="NewSlot_Click"/></StackPanel>
                 <TextBlock Text="▲▼で表示順を並べ替えられます（動かすとすぐに保存されます）。右端の×で削除できます（時間割配置等で使用中のコマは削除できません）。" TextWrapping="Wrap"/>
                 <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="140"/><ColumnDefinition Width="90"/><ColumnDefinition Width="90"/><ColumnDefinition Width="60"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <TextBlock FontWeight="SemiBold" Text="コード"/><TextBlock Grid.Column="1" FontWeight="SemiBold" Text="表示名"/><TextBlock Grid.Column="2" FontWeight="SemiBold" Text="開始"/><TextBlock Grid.Column="3" FontWeight="SemiBold" Text="終了"/><TextBlock Grid.Column="4" FontWeight="SemiBold" Text="状態"/>
