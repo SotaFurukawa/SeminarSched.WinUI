@@ -18,9 +18,6 @@ namespace SeminarSched_WinUI.Pages;
 
 public sealed partial class SetupPage : WorkflowPageBase
 {
-    private long _studentEditId;
-    private long _teacherEditId;
-    private long _subjectEditId;
     private long _slotEditId;
     // ユーザー要望（checkpoint128）「順序はもう矢印で設定できるので表示しておく必要はない」への
     // 対応。コマ設定フォームから「順序」NumberBoxを削除し、代わりにこのフィールドで内部管理する
@@ -32,6 +29,18 @@ public sealed partial class SetupPage : WorkflowPageBase
     private MasterItem<Teacher>[] _teacherItems = [];
     private MasterItem<Subject>[] _subjectItems = [];
     private MasterItem<Teacher?>[] _nullableTeacherItems = [];
+    // ユーザー要望（checkpoint142）「生徒・講師・科目について、上側で入力させる形式ではないように
+    // したい」への対応。一覧行そのものが編集状態を持つ（SetupPageRowViewModels.cs参照）ため、
+    // MasterItem<T>配列とは別に、行の編集状態を保持する可変のビューモデル一覧を持つ。
+    private List<StudentRowViewModel> _studentRows = [];
+    private List<TeacherRowViewModel> _teacherRows = [];
+    private List<SubjectRowViewModel> _subjectRows = [];
+    // 保存に成功した行は、ReloadAsync直後のRebuildXxxRowsで「編集中だった行」として誤って再び
+    // 編集状態へ戻してしまわないよう、保存中の行を記録しておき、その回のRebuildだけ除外する
+    // （保存が失敗した場合はReloadAsync自体が呼ばれないため、編集中の入力はそのまま残る）。
+    private StudentRowViewModel? _studentRowBeingSaved;
+    private TeacherRowViewModel? _teacherRowBeingSaved;
+    private SubjectRowViewModel? _subjectRowBeingSaved;
     private Dictionary<(long TeacherId,long SubjectId),TeacherQualification> _qualifications = new();
     private readonly ObservableCollection<TimeSlotItem> _timeSlotItems = new();
     private CourseDay[] _courseDays = [];
@@ -76,8 +85,6 @@ public sealed partial class SetupPage : WorkflowPageBase
         Tabs.IsEnabled = true;
         CourseDayPeriodLabel.Text = $"{current.StartDate:yyyy年M月d日} ～ {current.EndDate:yyyy年M月d日}（変更はすぐに保存されます）";
         await ReloadAsync();
-        ResetStudent();
-        ResetTeacher();
         await LoadOutputSettingsAsync(current.Path);
         await LoadSchedulingPolicyAsync(current.Path);
     }
@@ -152,22 +159,194 @@ public sealed partial class SetupPage : WorkflowPageBase
         await App.SchedulingPolicy.SaveAsync(path, BuildSchedulingPolicyFromForm());
     }, "スケジュール設定を保存しました");
 
-    private async void AddStudent_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
+    // ユーザー要望（checkpoint142）「生徒・講師・科目について、上側で入力させる形式ではないように
+    // したい」への対応。生徒・講師・科目タブの行内編集（追加・変更・保存）。一度に編集状態になれる
+    // 行は1つだけ（新規追加・変更どちらを押しても、既存の編集中行は閉じる＝新規なら取り除く）。
+    private void AddStudentRow_Click(object sender, RoutedEventArgs e)
     {
-        await App.MasterData.SaveStudentAsync(path, new Student(_studentEditId, StudentId.Text, StudentName.Text, StudentGrade.Text, checked((int)StudentMaximum.Value), StudentAllowGap.IsChecked == true, StudentNote.Text, StudentActive.IsChecked == true));
-    }, "生徒を保存しました", ResetStudent);
+        CancelStudentEditing();
+        StudentSearch.Text = "";
+        var row = StudentRowViewModel.CreateNew(NextExternalId(_studentItems.Select(x => x.Value.ExternalId), "S-"));
+        _studentRows.Add(row);
+        ApplyStudentFilter();
+        ScrollListToBottom(Students);
+    }
 
-    private async void AddTeacher_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
+    private void StudentRow_Change_Click(object sender, RoutedEventArgs e)
     {
-        await App.MasterData.SaveTeacherAsync(path, new Teacher(_teacherEditId, TeacherId.Text, TeacherName.Text, TeacherAllowGap.IsChecked == true, TeacherNote.Text, TeacherActive.IsChecked == true));
-    }, "講師を保存しました", ResetTeacher);
+        if ((sender as Button)?.DataContext is not StudentRowViewModel row) return;
+        CancelStudentEditing();
+        row.IsEditing = true;
+        if (FindAncestor<ListViewItem>((DependencyObject)sender) is { } container && FindDescendant<TextBox>(container) is { } nameBox)
+            nameBox.Focus(FocusState.Programmatic);
+    }
 
-    private async void AddSubject_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
+    private void StudentRowNameBox_Loaded(object sender, RoutedEventArgs e)
     {
-        var nextOrder = SubjectOrder.Value + 1;
-        await App.MasterData.SaveSubjectAsync(path, new Subject(_subjectEditId, SubjectCode.Text, SubjectName.Text, SubjectShort.Text, SubjectLevel.Text, checked((int)SubjectOrder.Value), SubjectActive.IsChecked == true));
-        ResetSubject(); SubjectOrder.Value = nextOrder;
-    }, "科目を保存しました");
+        if (sender is TextBox { DataContext: StudentRowViewModel { IsNew: true, IsEditing: true } } box)
+            box.Focus(FocusState.Programmatic);
+    }
+
+    private async void SaveStudentRow_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.DataContext is not StudentRowViewModel row) return;
+        _studentRowBeingSaved = row;
+        await ExecuteAsync(async path =>
+        {
+            var id = row.IsNew ? 0 : row.Value!.Id;
+            var externalId = row.IsNew ? row.PreviewExternalId : row.Value!.ExternalId;
+            await App.MasterData.SaveStudentAsync(path, new Student(id, externalId, row.DraftName, row.DraftGrade,
+                checked((int)row.DraftMaxConsecutiveSlots), row.DraftAllowGap, row.DraftNote, row.DraftActive));
+        }, "生徒を保存しました");
+    }
+
+    private void CancelStudentEditing()
+    {
+        var editing = _studentRows.FirstOrDefault(r => r.IsEditing);
+        if (editing is null) return;
+        if (editing.IsNew) _studentRows.Remove(editing); else editing.IsEditing = false;
+        ApplyStudentFilter();
+    }
+
+    private void StudentRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, true);
+    private void StudentRow_PointerExited(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, false);
+
+    private void AddTeacherRow_Click(object sender, RoutedEventArgs e)
+    {
+        CancelTeacherEditing();
+        TeacherSearch.Text = "";
+        var row = TeacherRowViewModel.CreateNew(NextExternalId(_teacherItems.Select(x => x.Value.ExternalId), "T-"));
+        _teacherRows.Add(row);
+        ApplyTeacherFilter();
+        ScrollListToBottom(Teachers);
+    }
+
+    private void TeacherRow_Change_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.DataContext is not TeacherRowViewModel row) return;
+        CancelTeacherEditing();
+        row.IsEditing = true;
+        if (FindAncestor<ListViewItem>((DependencyObject)sender) is { } container && FindDescendant<TextBox>(container) is { } nameBox)
+            nameBox.Focus(FocusState.Programmatic);
+    }
+
+    private void TeacherRowNameBox_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox { DataContext: TeacherRowViewModel { IsNew: true, IsEditing: true } } box)
+            box.Focus(FocusState.Programmatic);
+    }
+
+    private async void SaveTeacherRow_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.DataContext is not TeacherRowViewModel row) return;
+        _teacherRowBeingSaved = row;
+        await ExecuteAsync(async path =>
+        {
+            var id = row.IsNew ? 0 : row.Value!.Id;
+            var externalId = row.IsNew ? row.PreviewExternalId : row.Value!.ExternalId;
+            await App.MasterData.SaveTeacherAsync(path, new Teacher(id, externalId, row.DraftName, row.DraftAllowGap, row.DraftNote, row.DraftActive));
+        }, "講師を保存しました");
+    }
+
+    private void CancelTeacherEditing()
+    {
+        var editing = _teacherRows.FirstOrDefault(r => r.IsEditing);
+        if (editing is null) return;
+        if (editing.IsNew) _teacherRows.Remove(editing); else editing.IsEditing = false;
+        ApplyTeacherFilter();
+    }
+
+    private void TeacherRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, true);
+    private void TeacherRow_PointerExited(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, false);
+
+    private void AddSubjectRow_Click(object sender, RoutedEventArgs e)
+    {
+        CancelSubjectEditing();
+        SubjectSearch.Text = "";
+        var nextOrder = _subjectItems.Length == 0 ? 1 : _subjectItems.Max(x => x.Value.SortOrder) + 1;
+        var row = SubjectRowViewModel.CreateNew(nextOrder);
+        _subjectRows.Add(row);
+        ApplySubjectFilter();
+        ScrollListToBottom(Subjects);
+    }
+
+    private void SubjectRow_Change_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.DataContext is not SubjectRowViewModel row) return;
+        CancelSubjectEditing();
+        row.IsEditing = true;
+        if (FindAncestor<ListViewItem>((DependencyObject)sender) is { } container && FindDescendant<TextBox>(container) is { } codeBox)
+            codeBox.Focus(FocusState.Programmatic);
+    }
+
+    private void SubjectRowCodeBox_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox { DataContext: SubjectRowViewModel { IsNew: true, IsEditing: true } } box)
+            box.Focus(FocusState.Programmatic);
+    }
+
+    private async void SaveSubjectRow_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.DataContext is not SubjectRowViewModel row) return;
+        _subjectRowBeingSaved = row;
+        await ExecuteAsync(async path =>
+        {
+            var id = row.IsNew ? 0 : row.Value!.Id;
+            await App.MasterData.SaveSubjectAsync(path, new Subject(id, row.DraftCode, row.DraftName, row.DraftShortName,
+                row.DraftSchoolLevel, checked((int)row.DraftSortOrder), row.DraftActive));
+        }, "科目を保存しました");
+    }
+
+    private void CancelSubjectEditing()
+    {
+        var editing = _subjectRows.FirstOrDefault(r => r.IsEditing);
+        if (editing is null) return;
+        if (editing.IsNew) _subjectRows.Remove(editing); else editing.IsEditing = false;
+        ApplySubjectFilter();
+    }
+
+    private void SubjectRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, true);
+    private void SubjectRow_PointerExited(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, false);
+
+    // 探索方針並び替えリスト（SchedulingPolicyRowsController.SetArrowsVisibility）と同じ手法。
+    // DataTemplateから実体化されるGridのx:Nameはページのnamescopeへ登録されないため、
+    // Grid.Childrenを直接たどってNameで探す。
+    private static void SetChangeButtonVisible(Grid displayRow, bool visible)
+    {
+        if (displayRow.Children.OfType<FrameworkElement>().FirstOrDefault(c => c.Name == "ChangeButton") is Button b)
+            b.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static T? FindAncestor<T>(DependencyObject node) where T : DependencyObject
+    {
+        for (var c = VisualTreeHelper.GetParent(node); c is not null; c = VisualTreeHelper.GetParent(c))
+            if (c is T match) return match;
+        return null;
+    }
+
+    private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match) return match;
+            if (FindDescendant<T>(child) is { } found) return found;
+        }
+        return null;
+    }
+
+    // ユーザー要望（checkpoint142）「それを押すと、生徒一覧の最下部に移動する」への対応。この
+    // ページのListView（生徒・講師・科目）は、外側のページ全体を包むScrollViewer内のStackPanelに
+    // そのまま置かれているため、自身の高さをコンテンツに合わせて伸ばすだけで、スクロールは常に
+    // 外側のScrollViewerが担う。ListView.ScrollIntoView()はListView自身のビューポート内でしか
+    // 動かないため、新規行の追加時はこの外側のScrollViewerを直接最下部までスクロールする。
+    private static void ScrollListToBottom(ListView list)
+    {
+        list.UpdateLayout();
+        if (FindAncestor<ScrollViewer>(list) is not { } scrollViewer) return;
+        scrollViewer.UpdateLayout();
+        scrollViewer.ChangeView(null, scrollViewer.ScrollableHeight, null);
+    }
 
     private async void AddSlot_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
     {
@@ -177,27 +356,6 @@ public sealed partial class SetupPage : WorkflowPageBase
         ResetSlot(); _slotEditOrder = nextOrder;
     }, "コマを保存しました");
 
-    // 「有効」チェックボックスだけは、保存ボタンを押さずにチェックの変更だけでそのまま即座に保存する
-    // （既存の項目を選択している場合のみ。新規入力フォームの初期値やResetXxx()での既定値設定でも
-    // Checked/Uncheckedは発火するが、その時点では_studentEditId等が0のため何もしない）。
-    private async void StudentActive_Changed(object sender, RoutedEventArgs e)
-    {
-        if (_loading || _studentEditId == 0) return;
-        await ExecuteAsync(async path => await App.MasterData.SaveStudentAsync(path, new Student(_studentEditId, StudentId.Text, StudentName.Text, StudentGrade.Text, checked((int)StudentMaximum.Value), StudentAllowGap.IsChecked == true, StudentNote.Text, StudentActive.IsChecked == true)), "有効状態を更新しました");
-    }
-
-    private async void TeacherActive_Changed(object sender, RoutedEventArgs e)
-    {
-        if (_loading || _teacherEditId == 0) return;
-        await ExecuteAsync(async path => await App.MasterData.SaveTeacherAsync(path, new Teacher(_teacherEditId, TeacherId.Text, TeacherName.Text, TeacherAllowGap.IsChecked == true, TeacherNote.Text, TeacherActive.IsChecked == true)), "有効状態を更新しました");
-    }
-
-    private async void SubjectActive_Changed(object sender, RoutedEventArgs e)
-    {
-        if (_loading || _subjectEditId == 0) return;
-        await ExecuteAsync(async path => await App.MasterData.SaveSubjectAsync(path, new Subject(_subjectEditId, SubjectCode.Text, SubjectName.Text, SubjectShort.Text, SubjectLevel.Text, checked((int)SubjectOrder.Value), SubjectActive.IsChecked == true)), "有効状態を更新しました");
-    }
-
     private async void SlotActive_Changed(object sender, RoutedEventArgs e)
     {
         if (_loading || _slotEditId == 0) return;
@@ -205,28 +363,11 @@ public sealed partial class SetupPage : WorkflowPageBase
             TimeOfDayOptions.Parse(SlotStartTime.Text), TimeOfDayOptions.Parse(SlotEndTime.Text), _slotEditOrder, SlotActive.IsChecked == true)), "有効状態を更新しました");
     }
 
-    private void Students_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_loading || Students.SelectedItem is not MasterItem<Student> selected) return;
-        var value=selected.Value;_studentEditId=value.Id;StudentId.Text=value.ExternalId;StudentName.Text=value.Name;StudentGrade.Text=value.Grade;StudentMaximum.Value=value.DefaultMaxConsecutiveSlots;StudentAllowGap.IsChecked=value.AllowGap;StudentNote.Text=value.Note;StudentActive.IsChecked=value.Active;
-    }
-    private void Teachers_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_loading || Teachers.SelectedItem is not MasterItem<Teacher> selected) return;
-        var value=selected.Value;_teacherEditId=value.Id;TeacherId.Text=value.ExternalId;TeacherName.Text=value.Name;TeacherAllowGap.IsChecked=value.AllowGap;TeacherNote.Text=value.Note;TeacherActive.IsChecked=value.Active;
-    }
-    private void Subjects_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_loading || Subjects.SelectedItem is not MasterItem<Subject> selected) return;
-        var value=selected.Value;_subjectEditId=value.Id;SubjectCode.Text=value.Code;SubjectName.Text=value.DisplayName;SubjectShort.Text=value.ShortName;SubjectLevel.Text=value.SchoolLevel;SubjectOrder.Value=value.SortOrder;SubjectActive.IsChecked=value.Active;
-    }
     private void TimeSlots_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_loading || TimeSlots.SelectedItem is not TimeSlotItem selected) return;
         var value=selected.Value;_slotEditId=value.Id;SlotCode.Text=value.Code;SlotName.Text=value.DisplayName;SlotStartTime.Text=TimeOfDayOptions.Format(value.StartTime);SlotEndTime.Text=TimeOfDayOptions.Format(value.EndTime);_slotEditOrder=value.SortOrder;SlotActive.IsChecked=value.Active;
     }
-    private void NewStudent_Click(object sender,RoutedEventArgs e)=>ResetStudent();
-    private void NewTeacher_Click(object sender,RoutedEventArgs e)=>ResetTeacher();
 
     private static string NextExternalId(IEnumerable<string> existingIds, string defaultPrefix)
     {
@@ -238,7 +379,6 @@ public sealed partial class SetupPage : WorkflowPageBase
         var next = group.Max(m => int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture)) + 1;
         return $"{group.Key}{next.ToString(CultureInfo.InvariantCulture).PadLeft(width, '0')}";
     }
-    private void NewSubject_Click(object sender,RoutedEventArgs e)=>ResetSubject();
     private void NewSlot_Click(object sender,RoutedEventArgs e)=>ResetSlot();
 
     private async void DeleteSlot_Click(object sender,RoutedEventArgs e)
@@ -265,13 +405,6 @@ public sealed partial class SetupPage : WorkflowPageBase
         }
         finally{IsEnabled=true;}
     }
-    // ユーザー要望「生徒IDは操作者には変更させず、氏名・学年のみを入力させて保存することで、
-    // 自動的にIDが割り振られるようにしてください」への対応。生徒ID・講師IDは基本的に小さい順に
-    // 追加されていくため、「新規入力」の時点で次に採番されるIDをあらかじめ表示しておく
-    // （StudentId/TeacherIdはIsEnabled=falseで直接編集不可。従来の「IDを自動採番」ボタンは廃止）。
-    private void ResetStudent(){_studentEditId=0;Students.SelectedItem=null;StudentId.Text=NextExternalId(_studentItems.Select(x=>x.Value.ExternalId),"S-");StudentName.Text=StudentGrade.Text=StudentNote.Text="";StudentMaximum.Value=2;StudentAllowGap.IsChecked=false;StudentActive.IsChecked=true;}
-    private void ResetTeacher(){_teacherEditId=0;Teachers.SelectedItem=null;TeacherId.Text=NextExternalId(_teacherItems.Select(x=>x.Value.ExternalId),"T-");TeacherName.Text=TeacherNote.Text="";TeacherAllowGap.IsChecked=false;TeacherActive.IsChecked=true;}
-    private void ResetSubject(){_subjectEditId=0;Subjects.SelectedItem=null;SubjectCode.Text=SubjectName.Text=SubjectShort.Text=SubjectLevel.Text="";SubjectOrder.Value=1;SubjectActive.IsChecked=true;}
     private void ResetSlot(){_slotEditId=0;TimeSlots.SelectedItem=null;SlotCode.Text=SlotName.Text="";SlotStartTime.Text="09:00";SlotEndTime.Text="10:00";_slotEditOrder=1;SlotActive.IsChecked=true;}
 
     // ユーザー要望（checkpoint142）「講師指導可能科目について、表以外は消す。表だけで十分です」への
@@ -644,17 +777,13 @@ public sealed partial class SetupPage : WorkflowPageBase
         }, "コマの表示順を更新しました");
     }
 
-    // onReloaded: 保存が成功しReloadAsync()で最新の一覧（_studentItems等）が反映された「後」にだけ
-    // 呼ばれる（保存前や失敗時には呼ばれない）。生徒/講師の次回採番ID（NextExternalId）は直近の
-    // 保存結果を踏まえて計算する必要があるため、ResetStudent/ResetTeacherをここへ渡す。
-    private async Task ExecuteAsync(Func<string, Task> action, string success, Action? onReloaded = null)
+    private async Task ExecuteAsync(Func<string, Task> action, string success)
     {
         try
         {
             IsEnabled = false;
             var path = App.ProjectService.Current?.Path ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
             await action(path); await ReloadAsync();
-            onReloaded?.Invoke();
             Show(InfoBarSeverity.Success, success, "");
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or SqliteException or OverflowException or FormatException)
@@ -675,7 +804,7 @@ public sealed partial class SetupPage : WorkflowPageBase
             var teacherItems=teacherValues.Select(x => new MasterItem<Teacher>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.Name}",x.Active,"在籍中","卒業・無効")).ToArray();
             var subjectItems=subjectValues.Select(x => new MasterItem<Subject>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}")).ToArray();
             _studentItems=studentItems;_teacherItems=teacherItems;_subjectItems=subjectItems;
-            ApplyStudentFilter();ApplyTeacherFilter();ApplySubjectFilter();
+            RebuildStudentRows(studentValues);RebuildTeacherRows(teacherValues);RebuildSubjectRows(subjectValues);
             RegularStudent.ItemsSource=studentItems;RegularSubject.ItemsSource=subjectItems;
             _nullableTeacherItems=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.Name}"))).ToArray();
             RegularTeacher.ItemsSource=_nullableTeacherItems;if(RegularTeacher.SelectedIndex<0)RegularTeacher.SelectedIndex=0;
@@ -703,12 +832,67 @@ public sealed partial class SetupPage : WorkflowPageBase
     private void TeacherSearch_TextChanged(object sender, TextChangedEventArgs e) => ApplyTeacherFilter();
     private void SubjectSearch_TextChanged(object sender, TextChangedEventArgs e) => ApplySubjectFilter();
 
-    private void ApplyStudentFilter() => Students.ItemsSource = Filter(_studentItems, StudentSearch.Text);
-    private void ApplyTeacherFilter() => Teachers.ItemsSource = Filter(_teacherItems, TeacherSearch.Text);
-    private void ApplySubjectFilter() => Subjects.ItemsSource = Filter(_subjectItems, SubjectSearch.Text);
+    // ユーザー要望（checkpoint142）「生徒・講師・科目について、上側で入力させる形式ではないように
+    // したい」への対応。フィルタは既に保持している行ビューモデル（_studentRows等）を絞り込むだけに
+    // し、新しいインスタンスを作り直さない（作り直すと編集中の行のDraft値が検索のたびに消えて
+    // しまう）。編集中の行は、検索語に一致しなくても一覧から消えないよう常に含める。
+    private void ApplyStudentFilter() => Students.ItemsSource = _studentRows.Where(r => r.IsEditing || r.Matches(StudentSearch.Text)).ToArray();
+    private void ApplyTeacherFilter() => Teachers.ItemsSource = _teacherRows.Where(r => r.IsEditing || r.Matches(TeacherSearch.Text)).ToArray();
+    private void ApplySubjectFilter() => Subjects.ItemsSource = _subjectRows.Where(r => r.IsEditing || r.Matches(SubjectSearch.Text)).ToArray();
 
-    private static MasterItem<T>[] Filter<T>(MasterItem<T>[] items, string query) =>
-        string.IsNullOrWhiteSpace(query) ? items : items.Where(item => item.Display.Contains(query.Trim(), StringComparison.CurrentCultureIgnoreCase)).ToArray();
+    // ReloadAsync後に呼ばれる。編集中の行があれば、同じレコードIDに対応する新しいインスタンスへ
+    // Draft値を引き継ぐ（保存以外の操作、例えば他のタブでの保存によるReloadAsyncで、編集中の
+    // 入力途中のテキストが消えないようにするため）。
+    private void RebuildStudentRows(IReadOnlyList<Student> values)
+    {
+        var previouslyEditing = _studentRows.FirstOrDefault(r => r.IsEditing && r != _studentRowBeingSaved);
+        _studentRowBeingSaved = null;
+        _studentRows = values.Select(StudentRowViewModel.ForExisting).ToList();
+        if (previouslyEditing is { IsNew: true })
+        {
+            _studentRows.Add(previouslyEditing); // 未保存の新規行はそのまま編集状態で引き継ぐ
+        }
+        else if (previouslyEditing is not null && _studentRows.FirstOrDefault(r => r.Value!.Id == previouslyEditing.Value!.Id) is { } match)
+        {
+            match.IsEditing = true;
+            match.CopyDraftFrom(previouslyEditing);
+        }
+        ApplyStudentFilter();
+    }
+
+    private void RebuildTeacherRows(IReadOnlyList<Teacher> values)
+    {
+        var previouslyEditing = _teacherRows.FirstOrDefault(r => r.IsEditing && r != _teacherRowBeingSaved);
+        _teacherRowBeingSaved = null;
+        _teacherRows = values.Select(TeacherRowViewModel.ForExisting).ToList();
+        if (previouslyEditing is { IsNew: true })
+        {
+            _teacherRows.Add(previouslyEditing);
+        }
+        else if (previouslyEditing is not null && _teacherRows.FirstOrDefault(r => r.Value!.Id == previouslyEditing.Value!.Id) is { } match)
+        {
+            match.IsEditing = true;
+            match.CopyDraftFrom(previouslyEditing);
+        }
+        ApplyTeacherFilter();
+    }
+
+    private void RebuildSubjectRows(IReadOnlyList<Subject> values)
+    {
+        var previouslyEditing = _subjectRows.FirstOrDefault(r => r.IsEditing && r != _subjectRowBeingSaved);
+        _subjectRowBeingSaved = null;
+        _subjectRows = values.Select(SubjectRowViewModel.ForExisting).ToList();
+        if (previouslyEditing is { IsNew: true })
+        {
+            _subjectRows.Add(previouslyEditing);
+        }
+        else if (previouslyEditing is not null && _subjectRows.FirstOrDefault(r => r.Value!.Id == previouslyEditing.Value!.Id) is { } match)
+        {
+            match.IsEditing = true;
+            match.CopyDraftFrom(previouslyEditing);
+        }
+        ApplySubjectFilter();
+    }
 
     // ユーザー要望「保存などの成功通知を、固定位置のページ内表示ではなくスライドイン式の
     // 通知にしたい」への対応。Success（単発の操作結果を知らせるだけのもの）はトーストへ、

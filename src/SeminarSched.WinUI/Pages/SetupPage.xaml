@@ -27,25 +27,70 @@
                     <Setter Property="MinWidth" Value="120"/>
                 </Style>
             </TabView.Resources>
-            <TabViewItem Header="生徒"><StackPanel Padding="16" Spacing="10"><TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="新規で通期の生徒を追加できます。ホームの「Excelで基本情報を編集」からでも追加できます。"/><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="100"/><ColumnDefinition Width="130"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="StudentId" Header="生徒ID" IsEnabled="False"/><TextBox x:Name="StudentName" Grid.Column="1" Header="氏名"/><TextBox x:Name="StudentGrade" Grid.Column="2" Header="学年"/><NumberBox x:Name="StudentMaximum" Grid.Column="3" Header="最大連続コマ" Minimum="1" Value="2"/><Button Grid.Column="4" VerticalAlignment="Bottom" Content="保存" Click="AddStudent_Click"/></Grid><TextBox x:Name="StudentNote" Header="備考" Width="420" HorizontalAlignment="Left"/><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="StudentAllowGap" Content="空きコマを許可"/><CheckBox x:Name="StudentActive" Content="在籍中" IsChecked="True" Checked="StudentActive_Changed" Unchecked="StudentActive_Changed"/><Button Content="新規入力" Click="NewStudent_Click"/></StackPanel><TextBlock Text="一覧を選択すると編集できます。「在籍中」のチェックはそのまま即座に保存されます。生徒IDは自動的に割り振られ、変更できません。"/><TextBox x:Name="StudentSearch" PlaceholderText="ID・氏名・学年で検索" TextChanged="StudentSearch_TextChanged" Width="320" HorizontalAlignment="Left"/>
-                <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="100"/><ColumnDefinition Width="110"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions><TextBlock FontWeight="SemiBold" Text="生徒ID"/><TextBlock Grid.Column="1" FontWeight="SemiBold" Text="生徒氏名"/><TextBlock Grid.Column="2" FontWeight="SemiBold" Text="学年"/><TextBlock Grid.Column="3" FontWeight="SemiBold" Text="最大連続コマ数"/><TextBlock Grid.Column="4" FontWeight="SemiBold" Text="状態"/></Grid>
-                <ListView x:Name="Students" SelectionChanged="Students_SelectionChanged">
+            <TabViewItem Header="生徒"><StackPanel Padding="16" Spacing="10">
+                <!-- ユーザー要望（checkpoint142）「生徒・講師について、上側で入力させる形式ではない
+                     ようにしたい」への対応。常時表示の入力フォームを廃止し、「生徒追加」ボタンで
+                     一覧の最下部に新規行を、既存行は一覧にカーソルを合わせたときだけ現れる「変更」
+                     ボタンで、その場（一覧の行内）で編集する方式へ変更した。技術方針は
+                     SetupPageRowViewModels.cs（StudentRowViewModel）のコメントを参照。 -->
+                <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="新規で通期の生徒を追加できます。ホームの「Excelで基本情報を編集」からでも追加できます。"/>
+                <TextBlock Text="「生徒追加」で一覧の最下部に新しい行が追加されます。既存の行は、カーソルを合わせたときに表示される「変更」ボタンで編集できます。生徒IDは自動的に割り振られ、変更できません。"/>
+                <StackPanel Orientation="Horizontal" Spacing="8"><TextBox x:Name="StudentSearch" PlaceholderText="ID・氏名・学年で検索" TextChanged="StudentSearch_TextChanged" Width="320"/><Button Content="生徒追加" Click="AddStudentRow_Click"/></StackPanel>
+                <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="100"/><ColumnDefinition Width="110"/><ColumnDefinition Width="80"/></Grid.ColumnDefinitions><TextBlock FontWeight="SemiBold" Text="生徒ID"/><TextBlock Grid.Column="1" FontWeight="SemiBold" Text="生徒氏名"/><TextBlock Grid.Column="2" FontWeight="SemiBold" Text="学年"/><TextBlock Grid.Column="3" FontWeight="SemiBold" Text="最大連続コマ数"/><TextBlock Grid.Column="4" FontWeight="SemiBold" Text="状態"/></Grid>
+                <ListView x:Name="Students" SelectionMode="None">
                     <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <Grid ColumnSpacing="8" Padding="4"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="100"/><ColumnDefinition Width="110"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions>
-                                <TextBlock Text="{Binding Value.ExternalId}"/><TextBlock Grid.Column="1" Text="{Binding Value.Name}"/><TextBlock Grid.Column="2" Text="{Binding Value.Grade}"/><TextBlock Grid.Column="3" Text="{Binding Value.DefaultMaxConsecutiveSlots}"/><TextBlock Grid.Column="4" Text="{Binding StatusText}"/>
+                        <DataTemplate x:DataType="local:StudentRowViewModel">
+                            <Grid Padding="4">
+                                <Grid ColumnSpacing="8" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="StudentRow_PointerEntered" PointerExited="StudentRow_PointerExited">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="100"/><ColumnDefinition Width="110"/><ColumnDefinition Width="80"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind ExternalIdText, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Value.Name, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="2" Text="{x:Bind Value.Grade, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="3" Text="{x:Bind Value.DefaultMaxConsecutiveSlots, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="4" Text="{x:Bind StatusText, Mode=OneWay}"/>
+                                    <Button x:Name="ChangeButton" Grid.Column="5" Content="変更" Visibility="Collapsed" Click="StudentRow_Change_Click"/>
+                                </Grid>
+                                <Grid ColumnSpacing="8" Visibility="{x:Bind EditVisibility, Mode=OneWay}">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="160"/><ColumnDefinition Width="80"/><ColumnDefinition Width="90"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="160"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind ExternalIdText, Mode=OneWay}" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="StudentRowNameBox" Grid.Column="1" PlaceholderText="氏名" Text="{x:Bind DraftName, Mode=TwoWay}" Loaded="StudentRowNameBox_Loaded"/>
+                                    <TextBox Grid.Column="2" PlaceholderText="学年" Text="{x:Bind DraftGrade, Mode=TwoWay}"/>
+                                    <NumberBox Grid.Column="3" Minimum="1" Value="{x:Bind DraftMaxConsecutiveSlots, Mode=TwoWay}"/>
+                                    <CheckBox Grid.Column="4" Content="空きコマ許可" IsChecked="{x:Bind DraftAllowGap, Mode=TwoWay}"/>
+                                    <CheckBox Grid.Column="5" Content="在籍中" IsChecked="{x:Bind DraftActive, Mode=TwoWay}"/>
+                                    <TextBox Grid.Column="6" PlaceholderText="備考" Text="{x:Bind DraftNote, Mode=TwoWay}"/>
+                                    <Button Grid.Column="7" Content="保存" Click="SaveStudentRow_Click"/>
+                                </Grid>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
             </StackPanel></TabViewItem>
-            <TabViewItem Header="講師"><StackPanel Padding="16" Spacing="10"><TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="新規で通期の講師を追加できます。ホームの「Excelで基本情報を編集」からでも追加できます。"/><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="TeacherId" Header="講師ID" IsEnabled="False"/><TextBox x:Name="TeacherName" Grid.Column="1" Header="氏名"/><Button Grid.Column="2" VerticalAlignment="Bottom" Content="保存" Click="AddTeacher_Click"/></Grid><TextBox x:Name="TeacherNote" Header="備考" Width="420" HorizontalAlignment="Left"/><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="TeacherAllowGap" Content="空きコマを許可"/><CheckBox x:Name="TeacherActive" Content="在籍中" IsChecked="True" Checked="TeacherActive_Changed" Unchecked="TeacherActive_Changed"/><Button Content="新規入力" Click="NewTeacher_Click"/></StackPanel><TextBlock Text="一覧を選択すると編集できます。「在籍中」のチェックはそのまま即座に保存されます。講師IDは自動的に割り振られ、変更できません。"/><TextBox x:Name="TeacherSearch" PlaceholderText="ID・氏名で検索" TextChanged="TeacherSearch_TextChanged" Width="320" HorizontalAlignment="Left"/>
-                <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions><TextBlock FontWeight="SemiBold" Text="講師ID"/><TextBlock Grid.Column="1" FontWeight="SemiBold" Text="講師氏名"/><TextBlock Grid.Column="2" FontWeight="SemiBold" Text="状態"/></Grid>
-                <ListView x:Name="Teachers" SelectionChanged="Teachers_SelectionChanged">
+            <TabViewItem Header="講師"><StackPanel Padding="16" Spacing="10">
+                <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="新規で通期の講師を追加できます。ホームの「Excelで基本情報を編集」からでも追加できます。"/>
+                <TextBlock Text="「講師追加」で一覧の最下部に新しい行が追加されます。既存の行は、カーソルを合わせたときに表示される「変更」ボタンで編集できます。講師IDは自動的に割り振られ、変更できません。"/>
+                <StackPanel Orientation="Horizontal" Spacing="8"><TextBox x:Name="TeacherSearch" PlaceholderText="ID・氏名で検索" TextChanged="TeacherSearch_TextChanged" Width="320"/><Button Content="講師追加" Click="AddTeacherRow_Click"/></StackPanel>
+                <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="80"/></Grid.ColumnDefinitions><TextBlock FontWeight="SemiBold" Text="講師ID"/><TextBlock Grid.Column="1" FontWeight="SemiBold" Text="講師氏名"/><TextBlock Grid.Column="2" FontWeight="SemiBold" Text="状態"/></Grid>
+                <ListView x:Name="Teachers" SelectionMode="None">
                     <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <Grid ColumnSpacing="8" Padding="4"><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions>
-                                <TextBlock Text="{Binding Value.ExternalId}"/><TextBlock Grid.Column="1" Text="{Binding Value.Name}"/><TextBlock Grid.Column="2" Text="{Binding StatusText}"/>
+                        <DataTemplate x:DataType="local:TeacherRowViewModel">
+                            <Grid Padding="4">
+                                <Grid ColumnSpacing="8" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="TeacherRow_PointerEntered" PointerExited="TeacherRow_PointerExited">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="220"/><ColumnDefinition Width="80"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind ExternalIdText, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Value.Name, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="2" Text="{x:Bind StatusText, Mode=OneWay}"/>
+                                    <Button x:Name="ChangeButton" Grid.Column="3" Content="変更" Visibility="Collapsed" Click="TeacherRow_Change_Click"/>
+                                </Grid>
+                                <Grid ColumnSpacing="8" Visibility="{x:Bind EditVisibility, Mode=OneWay}">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="220"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="160"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind ExternalIdText, Mode=OneWay}" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="TeacherRowNameBox" Grid.Column="1" PlaceholderText="氏名" Text="{x:Bind DraftName, Mode=TwoWay}" Loaded="TeacherRowNameBox_Loaded"/>
+                                    <CheckBox Grid.Column="2" Content="空きコマ許可" IsChecked="{x:Bind DraftAllowGap, Mode=TwoWay}"/>
+                                    <CheckBox Grid.Column="3" Content="在籍中" IsChecked="{x:Bind DraftActive, Mode=TwoWay}"/>
+                                    <TextBox Grid.Column="4" PlaceholderText="備考" Text="{x:Bind DraftNote, Mode=TwoWay}"/>
+                                    <Button Grid.Column="5" Content="保存" Click="SaveTeacherRow_Click"/>
+                                </Grid>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>
@@ -238,13 +283,34 @@
                     <Button Content="保存" Click="SaveSchedulingPolicy_Click" HorizontalAlignment="Left"/>
                 </StackPanel>
             </TabViewItem>
-            <TabViewItem Header="科目"><StackPanel Padding="16" Spacing="10"><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="180"/><ColumnDefinition Width="80"/><ColumnDefinition Width="120"/><ColumnDefinition Width="90"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="SubjectCode" Header="コード"/><TextBox x:Name="SubjectName" Grid.Column="1" Header="科目名"/><TextBox x:Name="SubjectShort" Grid.Column="2" Header="略称" PlaceholderText="1文字（空欄で自動推定）" MaxLength="1"/><ComboBox x:Name="SubjectLevel" Grid.Column="3" Header="校種" IsEditable="True" PlaceholderText="校種を選択または入力"><ComboBoxItem Content="小学校"/><ComboBoxItem Content="中学校"/><ComboBoxItem Content="高等学校"/></ComboBox><NumberBox x:Name="SubjectOrder" Grid.Column="4" Header="順序" Minimum="1" Value="1"/><Button Grid.Column="5" VerticalAlignment="Bottom" Content="保存" Click="AddSubject_Click"/></Grid><StackPanel Orientation="Horizontal" Spacing="16"><CheckBox x:Name="SubjectActive" Content="有効" IsChecked="True" Checked="SubjectActive_Changed" Unchecked="SubjectActive_Changed"/><Button Content="新規入力" Click="NewSubject_Click"/></StackPanel><TextBox x:Name="SubjectSearch" PlaceholderText="コード・科目名・校種で検索" TextChanged="SubjectSearch_TextChanged" Width="320" HorizontalAlignment="Left"/>
-                <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="130"/><ColumnDefinition Width="180"/><ColumnDefinition Width="80"/><ColumnDefinition Width="120"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions><TextBlock FontWeight="SemiBold" Text="順序"/><TextBlock Grid.Column="1" FontWeight="SemiBold" Text="コード"/><TextBlock Grid.Column="2" FontWeight="SemiBold" Text="科目名"/><TextBlock Grid.Column="3" FontWeight="SemiBold" Text="略称"/><TextBlock Grid.Column="4" FontWeight="SemiBold" Text="校種"/><TextBlock Grid.Column="5" FontWeight="SemiBold" Text="状態"/></Grid>
-                <ListView x:Name="Subjects" SelectionChanged="Subjects_SelectionChanged">
+            <TabViewItem Header="科目"><StackPanel Padding="16" Spacing="10">
+                <TextBlock Text="「科目追加」で一覧の最下部に新しい行が追加されます。既存の行は、カーソルを合わせたときに表示される「変更」ボタンで編集できます。"/>
+                <StackPanel Orientation="Horizontal" Spacing="8"><TextBox x:Name="SubjectSearch" PlaceholderText="コード・科目名・校種で検索" TextChanged="SubjectSearch_TextChanged" Width="320"/><Button Content="科目追加" Click="AddSubjectRow_Click"/></StackPanel>
+                <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="130"/><ColumnDefinition Width="180"/><ColumnDefinition Width="80"/><ColumnDefinition Width="120"/><ColumnDefinition Width="80"/></Grid.ColumnDefinitions><TextBlock FontWeight="SemiBold" Text="順序"/><TextBlock Grid.Column="1" FontWeight="SemiBold" Text="コード"/><TextBlock Grid.Column="2" FontWeight="SemiBold" Text="科目名"/><TextBlock Grid.Column="3" FontWeight="SemiBold" Text="略称"/><TextBlock Grid.Column="4" FontWeight="SemiBold" Text="校種"/><TextBlock Grid.Column="5" FontWeight="SemiBold" Text="状態"/></Grid>
+                <ListView x:Name="Subjects" SelectionMode="None">
                     <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <Grid ColumnSpacing="8" Padding="4"><Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="130"/><ColumnDefinition Width="180"/><ColumnDefinition Width="80"/><ColumnDefinition Width="120"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions>
-                                <TextBlock Text="{Binding Value.SortOrder}"/><TextBlock Grid.Column="1" Text="{Binding Value.Code}"/><TextBlock Grid.Column="2" Text="{Binding Value.DisplayName}"/><TextBlock Grid.Column="3" Text="{Binding Value.ShortName}"/><TextBlock Grid.Column="4" Text="{Binding Value.SchoolLevel}"/><TextBlock Grid.Column="5" Text="{Binding StatusText}"/>
+                        <DataTemplate x:DataType="local:SubjectRowViewModel">
+                            <Grid Padding="4">
+                                <Grid ColumnSpacing="8" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="SubjectRow_PointerEntered" PointerExited="SubjectRow_PointerExited">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="130"/><ColumnDefinition Width="180"/><ColumnDefinition Width="80"/><ColumnDefinition Width="120"/><ColumnDefinition Width="80"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind Value.SortOrder, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Value.Code, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="2" Text="{x:Bind Value.DisplayName, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="3" Text="{x:Bind Value.ShortName, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="4" Text="{x:Bind Value.SchoolLevel, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="5" Text="{x:Bind StatusText, Mode=OneWay}"/>
+                                    <Button x:Name="ChangeButton" Grid.Column="6" Content="変更" Visibility="Collapsed" Click="SubjectRow_Change_Click"/>
+                                </Grid>
+                                <Grid ColumnSpacing="8" Visibility="{x:Bind EditVisibility, Mode=OneWay}">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="140"/><ColumnDefinition Width="160"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <NumberBox Minimum="1" Value="{x:Bind DraftSortOrder, Mode=TwoWay}"/>
+                                    <TextBox x:Name="SubjectRowCodeBox" Grid.Column="1" PlaceholderText="コード" Text="{x:Bind DraftCode, Mode=TwoWay}" Loaded="SubjectRowCodeBox_Loaded"/>
+                                    <TextBox Grid.Column="2" PlaceholderText="科目名" Text="{x:Bind DraftName, Mode=TwoWay}"/>
+                                    <TextBox Grid.Column="3" PlaceholderText="略称" MaxLength="1" Text="{x:Bind DraftShortName, Mode=TwoWay}"/>
+                                    <ComboBox Grid.Column="4" IsEditable="True" PlaceholderText="校種" Text="{x:Bind DraftSchoolLevel, Mode=TwoWay}"><ComboBoxItem Content="小学校"/><ComboBoxItem Content="中学校"/><ComboBoxItem Content="高等学校"/></ComboBox>
+                                    <CheckBox Grid.Column="5" Content="有効" IsChecked="{x:Bind DraftActive, Mode=TwoWay}"/>
+                                    <Button Grid.Column="6" Content="保存" Click="SaveSubjectRow_Click"/>
+                                </Grid>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>

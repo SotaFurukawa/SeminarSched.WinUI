@@ -1,13 +1,56 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-04（checkpoint142）
+最終更新: 2026-10-04（checkpoint143）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.21.3 (beta)`（Draft Release作成予定。Setup/Importページの大きな入力方式刷新（生徒・講師・科目の行内編集化、受講希望一覧の刷新）は継続課題としてPlanを承認済み、次のcheckpointで着手）
-Latest Development Checkpoint: checkpoint 142（ユーザーから設定画面について6点のUI変更依頼。
+Current Version: `v0.22.0 (beta)`（Draft Release作成予定。Importページ受講希望一覧の行内編集化（checkpoint142のStage 3）は継続課題としてPlanを承認済み、次のcheckpointで着手）
+Latest Development Checkpoint: checkpoint 143（checkpoint142で承認されたPlanのStage 2
+「生徒・講師・科目タブの行内編集化」を実装した。`src/SeminarSched.WinUI/Pages/
+SetupPageRowViewModels.cs`（新規）に`EditableRowViewModel`（抽象基底、`IsEditing`/
+`IsNew`/`DisplayVisibility`/`EditVisibility`を共通提供）と、`StudentRowViewModel`/
+`TeacherRowViewModel`/`SubjectRowViewModel`（各`Value`＝保存済みrecord、`Draft*`プロパティ、
+`Matches`検索）を実装。`SetupPage.xaml`の生徒・講師・科目タブから常時表示の入力フォームを
+削除し、検索欄の右に「追加」ボタン、ListViewの`DataTemplate`を表示用/編集用の二重Grid
+（`Visibility`で出し分け）へ変更した。既存行は行ホバーで現れる「変更」ボタン（探索方針
+並び替えリストの▲▼ホバーと同じ`PointerEntered`/`PointerExited`→`Grid.Children`を
+`Name`でたどる手法）、新規行は「追加」ボタン→末尾に`IsNew=true`の行を追加、という流れ。
+
+実装中に2件の設計ミスを実機検証で発見・修正した。①**保存直後に編集行が再び開く不具合**:
+`ReloadAsync`後の`RebuildXxxRows`が「編集中だった行をDraft値ごと新しいインスタンスへ
+引き継ぐ」処理を無条件に行っていたため、保存操作そのものによる`ReloadAsync`でも、
+保存したばかりの行を「編集中だった行」として誤認識し、再び編集状態へ戻してしまっていた。
+`SaveXxxRow_Click`で保存直前に`_xxxRowBeingSaved`へ保存対象の行を記録し、
+`RebuildXxxRows`側でその行だけを「編集中だった行」の判定から除外することで解決した
+（保存失敗時は`ReloadAsync`自体が呼ばれないため、この仕組みを使わなくても編集中の入力は
+そのまま残る）。②**追加ボタンを押しても一覧が自動的に最下部までスクロールしない不具合**:
+`ListView.ScrollIntoView()`はListView自身のビューポート内でしか動かないが、このページの
+ListViewはページ全体を包む外側の`ScrollViewer`内の`StackPanel`に高さ可変で置かれている
+ため、スクロールは常に外側の`ScrollViewer`が担っていた。新規追加の`ScrollIntoView`呼び出しを
+`FindAncestor<ScrollViewer>()`で見つけた外側の`ScrollViewer`を直接最下部まで`ChangeView`する
+`ScrollListToBottom`ヘルパーへ置き換えて解決した。
+
+**検証:** 一時的な別パッケージIDでのdev-run実機確認で、実際のテストプロジェクトデータ
+（生徒77名・講師22名・科目27件）を使い、①生徒タブで既存行の変更→保存→一覧へ正しく反映
+（編集行が閉じて一覧表示に戻ることを含む）、②生徒タブで追加→自動的に最下部までスクロール→
+新規入力→保存→新しいID（S-0077）で一覧へ追加、③講師タブで同様の追加フロー、④科目タブで
+校種ComboBox（IsEditable）を含む全フィールドの追加・保存、⑤行ホバーで「変更」ボタンが
+現れる挙動、をすべてスクリーンショットで確認した。既存の全テスト（計252件）がすべて
+通過することも確認済み。確認後はテストプロセス停止→`Remove-AppxPackage`→manifestを
+元のGUIDへ復元→`git diff`でversion行以外に差分が無いことを確認した。新しい入力方式という
+機能追加のためminorを上げてv0.22.0（patchを0へ戻す）とした。詳細は
+[docs/releases/v0.22.0.md](releases/v0.22.0.md)。
+
+**Stage 3（Importページの受講希望一覧の行内編集化・列追加）は未着手**（次回checkpointで
+継続）。Stage 2と同じ`EditableRowViewModel`パターンを使うが、外部キー選択肢（生徒・科目・
+通常担当講師・第1〜3希望講師）を行オブジェクト自身に持たせる必要がある（`SubjectOptions`/
+`DraftSubject`等）。受講希望一覧の「選択した行を削除」は、行ホバー時に「変更」の隣へ「削除」
+ボタンとして出す形に変える（ユーザー確認済み）。列追加（最大連続コマ数上書き・希望講師・
+空きコマ許可上書き）も未着手。
+
+checkpoint 142（ユーザーから設定画面について6点のUI変更依頼。
 ①「設定」タブの名称を「プロジェクト設定」へ変更、②生徒一覧に最大連続コマ数列を追加、
 ③④生徒・講師・科目の登録を常時表示の入力フォームから一覧内の行内編集へ刷新（追加ボタン→
 末尾に編集行→保存、既存行はホバーで「変更」ボタン）、④講師指導可能科目タブを表だけに簡素化、
@@ -46,18 +89,8 @@ DataTemplateへ、学年の右に`Value.DefaultMaxConsecutiveSlots`列を追加�
 差分が無いことを確認した。UI調整のためpatchを上げてv0.21.3とした。詳細は
 [docs/releases/v0.21.3.md](releases/v0.21.3.md)。
 
-**Stage 2・Stage 3は未着手**（次回checkpointで継続）。計画の要点: 各行を可変の
-`INotifyPropertyChanged`行ビューモデル（`Value`＝保存済みrecord、`Draft*`プロパティへ
-TextBox/NumberBox/ComboBoxを`Mode=TwoWay`で直接bind、`IsEditing`から導出する
-`DisplayVisibility`/`EditVisibility`）として保持し、1つの`DataTemplate`内に表示用Gridと
-編集用Gridを両方置いて`Visibility`で出し分ける（`DataTemplateSelector`は使わない）。保存
-ボタンのClickは`(sender as Button).DataContext`から行オブジェクトを直接取得し、`Draft*`を
-読んでそのまま保存する（ビジュアルツリーを辿らない＝virtualizationでコンテナが再生成されても
-安全）。`ReloadAsync`は編集中行がある場合にDraft値を新しい行オブジェクトへ引き継ぎ、検索
-フィルタは既存の行オブジェクトを`.Where()`するだけにする（どちらも編集中のユーザー入力を
-消さないため）。Stage 3（受講希望一覧）はこれに加え、外部キー選択肢（生徒・科目・講師等）を
-行オブジェクト自身に持たせる（`SubjectOptions`/`DraftSubject`等）。受講希望一覧の「選択した
-行を削除」は、行ホバー時に「変更」の隣へ「削除」ボタンとして出す形に変える（ユーザー確認済み）。
+**Stage 2はcheckpoint143で完了・Stage 3は引き続き未着手。** 技術方針・Stage 2の実装詳細は
+上のcheckpoint143を参照。
 
 checkpoint 141（ユーザーから「他すべての方針についても、正しく実装できているのか時間をかけて
 全パターン確認してください」という依頼。checkpoint140で`TimeOfDay`/`TeacherLoadBalance`の
