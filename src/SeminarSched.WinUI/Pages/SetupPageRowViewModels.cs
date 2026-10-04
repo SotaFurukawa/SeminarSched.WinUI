@@ -20,8 +20,10 @@ public sealed class StudentRowViewModel : EditableRowViewModel
 
     public string StatusText => Value is { Active: true } ? "在籍中" : "卒業・無効";
 
-    private string _draftName = "";
-    public string DraftName { get => _draftName; set { if (_draftName == value) return; _draftName = value; OnPropertyChanged(); } }
+    private string _draftFamilyName = "";
+    public string DraftFamilyName { get => _draftFamilyName; set { if (_draftFamilyName == value) return; _draftFamilyName = value; OnPropertyChanged(); } }
+    private string _draftGivenName = "";
+    public string DraftGivenName { get => _draftGivenName; set { if (_draftGivenName == value) return; _draftGivenName = value; OnPropertyChanged(); } }
     private string _draftGrade = "";
     public string DraftGrade { get => _draftGrade; set { if (_draftGrade == value) return; _draftGrade = value; OnPropertyChanged(); } }
     private double _draftMaxConsecutiveSlots = 2;
@@ -35,7 +37,7 @@ public sealed class StudentRowViewModel : EditableRowViewModel
 
     protected override void ResetDraft()
     {
-        DraftName = Value?.Name ?? ""; DraftGrade = Value?.Grade ?? "";
+        DraftFamilyName = Value?.FamilyName ?? ""; DraftGivenName = Value?.GivenName ?? ""; DraftGrade = Value?.Grade ?? "";
         DraftMaxConsecutiveSlots = Value?.DefaultMaxConsecutiveSlots ?? 2;
         DraftAllowGap = Value?.AllowGap ?? false; DraftActive = Value?.Active ?? true; DraftNote = Value?.Note ?? "";
     }
@@ -43,13 +45,13 @@ public sealed class StudentRowViewModel : EditableRowViewModel
     /// <summary>ReloadAsync後、編集中だった行のDraft値を新しいインスタンスへ引き継ぐときに使う。</summary>
     public void CopyDraftFrom(StudentRowViewModel other)
     {
-        DraftName = other.DraftName; DraftGrade = other.DraftGrade; DraftMaxConsecutiveSlots = other.DraftMaxConsecutiveSlots;
+        DraftFamilyName = other.DraftFamilyName; DraftGivenName = other.DraftGivenName; DraftGrade = other.DraftGrade; DraftMaxConsecutiveSlots = other.DraftMaxConsecutiveSlots;
         DraftAllowGap = other.DraftAllowGap; DraftActive = other.DraftActive; DraftNote = other.DraftNote;
     }
 
     public bool Matches(string query) =>
         string.IsNullOrWhiteSpace(query) ||
-        (Value is { } v && $"{v.ExternalId}{v.Name}{v.Grade}".Contains(query.Trim(), StringComparison.CurrentCultureIgnoreCase));
+        (Value is { } v && $"{v.ExternalId}{v.FullName}{v.Grade}".Contains(query.Trim(), StringComparison.CurrentCultureIgnoreCase));
 }
 
 public sealed class TeacherRowViewModel : EditableRowViewModel
@@ -66,8 +68,10 @@ public sealed class TeacherRowViewModel : EditableRowViewModel
 
     public string StatusText => Value is { Active: true } ? "在籍中" : "卒業・無効";
 
-    private string _draftName = "";
-    public string DraftName { get => _draftName; set { if (_draftName == value) return; _draftName = value; OnPropertyChanged(); } }
+    private string _draftFamilyName = "";
+    public string DraftFamilyName { get => _draftFamilyName; set { if (_draftFamilyName == value) return; _draftFamilyName = value; OnPropertyChanged(); } }
+    private string _draftGivenName = "";
+    public string DraftGivenName { get => _draftGivenName; set { if (_draftGivenName == value) return; _draftGivenName = value; OnPropertyChanged(); } }
     private bool _draftAllowGap;
     public bool DraftAllowGap { get => _draftAllowGap; set { if (_draftAllowGap == value) return; _draftAllowGap = value; OnPropertyChanged(); } }
     private bool _draftActive = true;
@@ -77,18 +81,18 @@ public sealed class TeacherRowViewModel : EditableRowViewModel
 
     protected override void ResetDraft()
     {
-        DraftName = Value?.Name ?? ""; DraftAllowGap = Value?.AllowGap ?? false;
+        DraftFamilyName = Value?.FamilyName ?? ""; DraftGivenName = Value?.GivenName ?? ""; DraftAllowGap = Value?.AllowGap ?? false;
         DraftActive = Value?.Active ?? true; DraftNote = Value?.Note ?? "";
     }
 
     public void CopyDraftFrom(TeacherRowViewModel other)
     {
-        DraftName = other.DraftName; DraftAllowGap = other.DraftAllowGap; DraftActive = other.DraftActive; DraftNote = other.DraftNote;
+        DraftFamilyName = other.DraftFamilyName; DraftGivenName = other.DraftGivenName; DraftAllowGap = other.DraftAllowGap; DraftActive = other.DraftActive; DraftNote = other.DraftNote;
     }
 
     public bool Matches(string query) =>
         string.IsNullOrWhiteSpace(query) ||
-        (Value is { } v && $"{v.ExternalId}{v.Name}".Contains(query.Trim(), StringComparison.CurrentCultureIgnoreCase));
+        (Value is { } v && $"{v.ExternalId}{v.FullName}".Contains(query.Trim(), StringComparison.CurrentCultureIgnoreCase));
 }
 
 public sealed class SubjectRowViewModel : EditableRowViewModel

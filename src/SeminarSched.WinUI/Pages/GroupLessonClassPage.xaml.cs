@@ -77,7 +77,7 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
         var gradeValues = (await App.MasterData.GetStudentsAsync(path)).Select(s => s.Grade).Distinct().OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToArray();
         GroupClassGrade.ItemsSource = gradeValues;
         var previousTeacherId = (GroupClassTeacher.SelectedItem as TeacherOption)?.Id;
-        var teacherOptions = (await App.MasterData.GetTeachersAsync(path)).Where(t => t.Active).Select(t => new TeacherOption(t.Id, t.Name)).ToArray();
+        var teacherOptions = (await App.MasterData.GetTeachersAsync(path)).Where(t => t.Active).Select(t => new TeacherOption(t.Id, t.FullName)).ToArray();
         GroupClassTeacher.ItemsSource = teacherOptions;
         GroupClassTeacher.SelectedItem = teacherOptions.FirstOrDefault(t => t.Id == previousTeacherId);
     }

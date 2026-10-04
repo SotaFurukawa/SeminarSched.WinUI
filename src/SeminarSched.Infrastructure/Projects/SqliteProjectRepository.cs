@@ -315,6 +315,8 @@ public sealed class SqliteProjectRepository : IProjectRepository
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     ExternalId TEXT NOT NULL UNIQUE CHECK (length(trim(ExternalId)) > 0),
                     Name TEXT NOT NULL CHECK (length(trim(Name)) > 0),
+                    FamilyName TEXT NOT NULL CHECK (length(trim(FamilyName)) > 0),
+                    GivenName TEXT NOT NULL DEFAULT '',
                     Grade TEXT NOT NULL,
                     DefaultMaxConsecutiveSlots INTEGER NOT NULL DEFAULT 2 CHECK (DefaultMaxConsecutiveSlots > 0),
                     AllowGap INTEGER NOT NULL DEFAULT 0 CHECK (AllowGap IN (0, 1)),
@@ -325,6 +327,8 @@ public sealed class SqliteProjectRepository : IProjectRepository
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     ExternalId TEXT NOT NULL UNIQUE CHECK (length(trim(ExternalId)) > 0),
                     Name TEXT NOT NULL CHECK (length(trim(Name)) > 0),
+                    FamilyName TEXT NOT NULL CHECK (length(trim(FamilyName)) > 0),
+                    GivenName TEXT NOT NULL DEFAULT '',
                     AllowGap INTEGER NOT NULL DEFAULT 0 CHECK (AllowGap IN (0, 1)),
                     Note TEXT NOT NULL DEFAULT '',
                     Active INTEGER NOT NULL DEFAULT 1 CHECK (Active IN (0, 1))

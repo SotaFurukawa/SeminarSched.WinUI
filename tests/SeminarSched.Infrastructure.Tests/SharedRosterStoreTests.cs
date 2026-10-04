@@ -63,7 +63,7 @@ public sealed class SharedRosterStoreTests : IDisposable
 
         var master = new SqliteMasterDataRepository();
         var students = await master.GetStudentsAsync(projectPath);
-        Assert.Contains(students, s => s.ExternalId == "S-0001" && s.Name == "架空 太郎");
+        Assert.Contains(students, s => s.ExternalId == "S-0001" && s.FullName == "架空 太郎");
     }
 
     [Fact]

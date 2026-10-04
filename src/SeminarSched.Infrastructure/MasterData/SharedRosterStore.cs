@@ -84,7 +84,7 @@ public sealed class SharedRosterStore : ISharedRosterStore
         {
             var (grade, becameGraduate) = GradeAdvancement.Advance(student.Grade);
             if (grade == student.Grade) continue;
-            var updated = new Student(student.Id, student.ExternalId, student.Name, grade, student.DefaultMaxConsecutiveSlots, student.AllowGap, student.Note, active: becameGraduate ? false : student.Active);
+            var updated = new Student(student.Id, student.ExternalId, student.FamilyName, student.GivenName, grade, student.DefaultMaxConsecutiveSlots, student.AllowGap, student.Note, active: becameGraduate ? false : student.Active);
             await _masterData.SaveStudentAsync(_databasePath, updated, cancellationToken).ConfigureAwait(false);
             advanced++;
             if (becameGraduate) graduated++;

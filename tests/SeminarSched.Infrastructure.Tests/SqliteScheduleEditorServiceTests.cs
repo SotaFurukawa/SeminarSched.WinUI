@@ -79,7 +79,7 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
         }
 
         var subjectOther=await master.SaveSubjectAsync(state.Path,new Subject(0,"JH_OTHER","他科目","他","中学校",3));
-        var teacherOther=await master.SaveTeacherAsync(state.Path,new Teacher(0,"T-OTHER","架空 他講師"));
+        var teacherOther=await master.SaveTeacherAsync(state.Path,new Teacher(0,"T-OTHER","架空", "他講師"));
         await master.SaveQualificationAsync(state.Path,new TeacherQualification(teacherOther.Id,subjectOther.Id,true));
         long otherRequestId;
         await using(var connection=new SqliteConnection($"Data Source={state.Path};Pooling=False"))
@@ -219,7 +219,7 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
         var state=await CreateBoardStateAsync();
         await InsertRawAssignmentAsync(state.Path,state.RequestId,state.Teacher1Id,state.DateId,state.Slot1Id,isLocked:false,isManual:false);
         var master=new SqliteMasterDataRepository();
-        var unqualifiedTeacher=await master.SaveTeacherAsync(state.Path,new Teacher(0,"T-BOARD3","架空 盤講師三"));
+        var unqualifiedTeacher=await master.SaveTeacherAsync(state.Path,new Teacher(0,"T-BOARD3","架空", "盤講師三"));
         // このテストは資格外講師のqualification overrideだけを検証したいため、出勤可否は明示的に
         // 「出勤可能」として登録する（アンケート未回答講師を出勤不可扱いにする不具合修正後は、
         // 出勤可否データが1件も無い新規講師は他の講師にデータがある限りRedになってしまうため）。
@@ -339,16 +339,16 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
         await command.ExecuteNonQueryAsync();
     }
 
-    private async Task<State> CreateStateAsync(){Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,$"{Guid.NewGuid():N}.jukuschedule");await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20)));var master=new SqliteMasterDataRepository();var student=await master.SaveStudentAsync(path,new Student(0,"S-EDIT","架空 編集生徒","J2"));var teacher=await master.SaveTeacherAsync(path,new Teacher(0,"T-EDIT","架空 編集講師"));var subject=await master.SaveSubjectAsync(path,new Subject(0,"JH_EDIT","編集科目","編","中学校",1));await master.SaveQualificationAsync(path,new TeacherQualification(teacher.Id,subject.Id,true));var course=new SqliteCourseSettingsRepository();var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));await using var connection=new SqliteConnection($"Data Source={path};Pooling=False");await connection.OpenAsync();await using var command=connection.CreateCommand();command.CommandText="INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,$student,$subject,1);SELECT last_insert_rowid();";command.Parameters.AddWithValue("$student",student.Id);command.Parameters.AddWithValue("$subject",subject.Id);var request=Convert.ToInt64(await command.ExecuteScalarAsync());command.CommandText="SELECT Id FROM OpenDate LIMIT 1;";command.Parameters.Clear();var date=Convert.ToInt64(await command.ExecuteScalarAsync());return new State(path,request,teacher.Id,date,slot.Id);}
+    private async Task<State> CreateStateAsync(){Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,$"{Guid.NewGuid():N}.jukuschedule");await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20)));var master=new SqliteMasterDataRepository();var student=await master.SaveStudentAsync(path,new Student(0,"S-EDIT","架空", "編集生徒","J2"));var teacher=await master.SaveTeacherAsync(path,new Teacher(0,"T-EDIT","架空", "編集講師"));var subject=await master.SaveSubjectAsync(path,new Subject(0,"JH_EDIT","編集科目","編","中学校",1));await master.SaveQualificationAsync(path,new TeacherQualification(teacher.Id,subject.Id,true));var course=new SqliteCourseSettingsRepository();var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));await using var connection=new SqliteConnection($"Data Source={path};Pooling=False");await connection.OpenAsync();await using var command=connection.CreateCommand();command.CommandText="INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,$student,$subject,1);SELECT last_insert_rowid();";command.Parameters.AddWithValue("$student",student.Id);command.Parameters.AddWithValue("$subject",subject.Id);var request=Convert.ToInt64(await command.ExecuteScalarAsync());command.CommandText="SELECT Id FROM OpenDate LIMIT 1;";command.Parameters.Clear();var date=Convert.ToInt64(await command.ExecuteScalarAsync());return new State(path,request,teacher.Id,date,slot.Id);}
 
     private async Task<BoardState> CreateBoardStateAsync()
     {
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,$"{Guid.NewGuid():N}.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20)));
         var master=new SqliteMasterDataRepository();
-        var student=await master.SaveStudentAsync(path,new Student(0,"S-BOARD","架空 盤生徒","J2"));
-        var teacher1=await master.SaveTeacherAsync(path,new Teacher(0,"T-BOARD1","架空 盤講師一"));
-        var teacher2=await master.SaveTeacherAsync(path,new Teacher(0,"T-BOARD2","架空 盤講師二"));
+        var student=await master.SaveStudentAsync(path,new Student(0,"S-BOARD","架空", "盤生徒","J2"));
+        var teacher1=await master.SaveTeacherAsync(path,new Teacher(0,"T-BOARD1","架空", "盤講師一"));
+        var teacher2=await master.SaveTeacherAsync(path,new Teacher(0,"T-BOARD2","架空", "盤講師二"));
         var subject=await master.SaveSubjectAsync(path,new Subject(0,"JH_BOARD","盤科目","盤","中学校",1));
         await master.SaveQualificationAsync(path,new TeacherQualification(teacher1.Id,subject.Id,true));
         await master.SaveQualificationAsync(path,new TeacherQualification(teacher2.Id,subject.Id,true));

@@ -40,8 +40,7 @@ internal static class SharedRosterWorkbookWriter
         var studentRow = 2;
         foreach (var value in students)
         {
-            var (surname, given) = SplitName(value.Name);
-            SetRow(student, studentRow, value.Active ? "TRUE" : "FALSE", value.ExternalId, surname, given, value.Name, value.Grade, value.DefaultMaxConsecutiveSlots, value.AllowGap ? "あり" : "なし", value.Note);
+            SetRow(student, studentRow, value.Active ? "TRUE" : "FALSE", value.ExternalId, value.FamilyName, value.GivenName, value.FullName, value.Grade, value.DefaultMaxConsecutiveSlots, value.AllowGap ? "あり" : "なし", value.Note);
             if (!value.Active) student.Row(studentRow).Style.Fill.BackgroundColor = InactiveRowFill;
             studentRow++;
         }
@@ -51,8 +50,7 @@ internal static class SharedRosterWorkbookWriter
         var teacherRow = 2;
         foreach (var value in teachers)
         {
-            var (surname, given) = SplitName(value.Name);
-            SetRow(teacher, teacherRow, value.Active ? "TRUE" : "FALSE", value.ExternalId, surname, given, value.Name, value.AllowGap ? "あり" : "なし", value.Note);
+            SetRow(teacher, teacherRow, value.Active ? "TRUE" : "FALSE", value.ExternalId, value.FamilyName, value.GivenName, value.FullName, value.AllowGap ? "あり" : "なし", value.Note);
             if (!value.Active) teacher.Row(teacherRow).Style.Fill.BackgroundColor = InactiveRowFill;
             teacherRow++;
         }
@@ -69,7 +67,7 @@ internal static class SharedRosterWorkbookWriter
         foreach (var value in qualifications)
         {
             if (!teacherById.TryGetValue(value.TeacherId, out var qualificationTeacher) || !subjectById.TryGetValue(value.SubjectId, out var qualificationSubject)) continue;
-            SetRow(qualification, qualificationRow++, qualificationTeacher.Name, qualificationTeacher.ExternalId, qualificationSubject.DisplayName, qualificationSubject.Code, value.CanTeach ? "はい" : "いいえ", value.Note);
+            SetRow(qualification, qualificationRow++, qualificationTeacher.FullName, qualificationTeacher.ExternalId, qualificationSubject.DisplayName, qualificationSubject.Code, value.CanTeach ? "はい" : "いいえ", value.Note);
         }
         AddReferenceHelperColumn(workbook, qualification, selectColumn: 1, idColumn: 2, sourceSheetName: "講師", sourceIdColumn: 2, sourceNameColumn: 5, lastDataRow: qualificationRow - 1, idRequired: true);
         AddReferenceHelperColumn(workbook, qualification, selectColumn: 3, idColumn: 4, sourceSheetName: "科目", sourceIdColumn: 1, sourceNameColumn: 2, lastDataRow: qualificationRow - 1, idRequired: true);
@@ -81,7 +79,7 @@ internal static class SharedRosterWorkbookWriter
         {
             if (!studentById.TryGetValue(value.StudentId, out var regularStudent) || !subjectById.TryGetValue(value.SubjectId, out var regularSubject)) continue;
             var regularTeacher = value.RegularTeacherId is long teacherId && teacherById.TryGetValue(teacherId, out var found) ? found : null;
-            SetRow(regularLesson, regularLessonRow++, regularStudent.Name, regularStudent.ExternalId, regularSubject.DisplayName, regularSubject.Code, regularTeacher?.Name ?? "", regularTeacher?.ExternalId ?? "", value.RegularTeacherPriority, value.OneToOneRequired ? "はい" : "いいえ", value.Note);
+            SetRow(regularLesson, regularLessonRow++, regularStudent.FullName, regularStudent.ExternalId, regularSubject.DisplayName, regularSubject.Code, regularTeacher?.FullName ?? "", regularTeacher?.ExternalId ?? "", value.RegularTeacherPriority, value.OneToOneRequired ? "はい" : "いいえ", value.Note);
         }
         AddReferenceHelperColumn(workbook, regularLesson, selectColumn: 1, idColumn: 2, sourceSheetName: "生徒", sourceIdColumn: 2, sourceNameColumn: 5, lastDataRow: regularLessonRow - 1, idRequired: true);
         AddReferenceHelperColumn(workbook, regularLesson, selectColumn: 3, idColumn: 4, sourceSheetName: "科目", sourceIdColumn: 1, sourceNameColumn: 2, lastDataRow: regularLessonRow - 1, idRequired: true);
@@ -138,13 +136,6 @@ internal static class SharedRosterWorkbookWriter
             columnNumber = (columnNumber - 1) / 26;
         }
         return letters;
-    }
-
-    // Student/Teacher.Nameは"姓 名"の単一空白区切りで保存されている（FullName()の逆操作）。
-    private static (string Surname, string Given) SplitName(string name)
-    {
-        var index = name.IndexOf(' ');
-        return index < 0 ? (name, "") : (name[..index], name[(index + 1)..]);
     }
 
     private static void WriteHeaders(IXLWorksheet sheet, string[] headers)

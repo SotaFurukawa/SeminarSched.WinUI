@@ -194,8 +194,8 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
         await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 21)));
         var master = new SqliteMasterDataRepository();
         var course = new SqliteCourseSettingsRepository();
-        var student = await master.SaveStudentAsync(path, new Student(0, "S-0001", "架空 太郎", "中2"));
-        var teacher = await master.SaveTeacherAsync(path, new Teacher(0, "T-0001", "架空 花子"));
+        var student = await master.SaveStudentAsync(path, new Student(0, "S-0001", "架空", "太郎", "中2"));
+        var teacher = await master.SaveTeacherAsync(path, new Teacher(0, "T-0001", "架空", "花子"));
         var subject = await master.SaveSubjectAsync(path, new Subject(0, "JH_ENG", "中学校・英語", "英", "中学校", 1));
         var slot1 = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "1", "1限", new TimeOnly(9, 0), new TimeOnly(10, 0), 1));
         var slot2 = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "2", "2限", new TimeOnly(10, 10), new TimeOnly(11, 10), 2));

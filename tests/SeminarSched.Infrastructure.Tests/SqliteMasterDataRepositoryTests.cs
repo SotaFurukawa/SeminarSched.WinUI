@@ -17,17 +17,17 @@ public sealed class SqliteMasterDataRepositoryTests : IDisposable
             2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 22)));
         var repository = new SqliteMasterDataRepository();
 
-        var student = await repository.SaveStudentAsync(path, new Student(0, "S-001", "架空 生徒", "中2", 3));
-        var teacher = await repository.SaveTeacherAsync(path, new Teacher(0, "T-001", "架空 講師"));
+        var student = await repository.SaveStudentAsync(path, new Student(0, "S-001", "架空", "生徒", "中2", 3));
+        var teacher = await repository.SaveTeacherAsync(path, new Teacher(0, "T-001", "架空", "講師"));
         var subject = await repository.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "数学", "数", "中学", 1));
         await repository.SaveQualificationAsync(path, new TeacherQualification(teacher.Id, subject.Id, true));
         await repository.SaveRegularLessonAsync(path, new RegularLessonProfile(0, student.Id, subject.Id, teacher.Id, 4, true));
-        await repository.SaveStudentAsync(path, new Student(student.Id, "S-001", "架空 生徒・更新", "中3", 2, true, "更新", false));
-        await repository.SaveTeacherAsync(path, new Teacher(teacher.Id, "T-001", "架空 講師・更新", true, "更新", false));
+        await repository.SaveStudentAsync(path, new Student(student.Id, "S-001", "架空", "生徒・更新", "中3", 2, true, "更新", false));
+        await repository.SaveTeacherAsync(path, new Teacher(teacher.Id, "T-001", "架空", "講師・更新", true, "更新", false));
         await repository.SaveSubjectAsync(path, new Subject(subject.Id, "JH_MATH", "数学・更新", "数", "中学", 2, false));
 
-        var storedStudent=Assert.Single(await repository.GetStudentsAsync(path));Assert.Equal("架空 生徒・更新",storedStudent.Name);Assert.False(storedStudent.Active);Assert.True(storedStudent.AllowGap);
-        var storedTeacher=Assert.Single(await repository.GetTeachersAsync(path));Assert.Equal("架空 講師・更新",storedTeacher.Name);Assert.False(storedTeacher.Active);
+        var storedStudent=Assert.Single(await repository.GetStudentsAsync(path));Assert.Equal("架空 生徒・更新",storedStudent.FullName);Assert.False(storedStudent.Active);Assert.True(storedStudent.AllowGap);
+        var storedTeacher=Assert.Single(await repository.GetTeachersAsync(path));Assert.Equal("架空 講師・更新",storedTeacher.FullName);Assert.False(storedTeacher.Active);
         var storedSubject=Assert.Single(await repository.GetSubjectsAsync(path));Assert.Equal("JH_MATH",storedSubject.Code);Assert.False(storedSubject.Active);Assert.Equal(2,storedSubject.SortOrder);
         Assert.Empty(await repository.GetStudentsAsync(path,includeInactive:false));
         var qualification=Assert.Single(await repository.GetQualificationsAsync(path));Assert.Equal(teacher.Id,qualification.TeacherId);Assert.True(qualification.CanTeach);
@@ -42,9 +42,9 @@ public sealed class SqliteMasterDataRepositoryTests : IDisposable
         await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(
             2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 22)));
         var repository = new SqliteMasterDataRepository();
-        var student = await repository.SaveStudentAsync(path, new Student(0, "S-001", "架空 生徒", "中2"));
-        var teacher1 = await repository.SaveTeacherAsync(path, new Teacher(0, "T-001", "架空 講師1"));
-        var teacher2 = await repository.SaveTeacherAsync(path, new Teacher(0, "T-002", "架空 講師2"));
+        var student = await repository.SaveStudentAsync(path, new Student(0, "S-001", "架空", "生徒", "中2"));
+        var teacher1 = await repository.SaveTeacherAsync(path, new Teacher(0, "T-001", "架空", "講師1"));
+        var teacher2 = await repository.SaveTeacherAsync(path, new Teacher(0, "T-002", "架空", "講師2"));
         var subject = await repository.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "数学", "数", "中学", 1));
 
         await repository.SaveLessonRequestAsync(path, new LessonRequest(0, student.Id, subject.Id, 4,
@@ -69,10 +69,10 @@ public sealed class SqliteMasterDataRepositoryTests : IDisposable
         await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(
             2026, CourseSeason.Spring, new DateOnly(2026, 3, 1), new DateOnly(2026, 3, 2)));
         var repository = new SqliteMasterDataRepository();
-        await repository.SaveStudentAsync(path, new Student(0, "S-001", "架空 一郎", "中1"));
+        await repository.SaveStudentAsync(path, new Student(0, "S-001", "架空", "一郎", "中1"));
 
         await Assert.ThrowsAsync<Microsoft.Data.Sqlite.SqliteException>(() =>
-            repository.SaveStudentAsync(path, new Student(0, "S-001", "架空 二郎", "中2")));
+            repository.SaveStudentAsync(path, new Student(0, "S-001", "架空", "二郎", "中2")));
     }
 
     // 過去のバグ（共通名簿Excel取込みが略称列を表示名そのままで上書きしていた）で作られた既存の

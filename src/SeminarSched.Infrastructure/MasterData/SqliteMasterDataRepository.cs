@@ -12,11 +12,11 @@ public sealed class SqliteMasterDataRepository : IMasterDataRepository
         await using var connection = await OpenAsync(projectPath, cancellationToken);
         await EnsureSchemaAsync(connection, cancellationToken);
         await using var command = connection.CreateCommand();
-        command.CommandText = $"SELECT Id, ExternalId, Name, Grade, DefaultMaxConsecutiveSlots, AllowGap, Note, Active FROM Student {(includeInactive ? "" : "WHERE Active = 1")} ORDER BY ExternalId;";
+        command.CommandText = $"SELECT Id, ExternalId, FamilyName, GivenName, Grade, DefaultMaxConsecutiveSlots, AllowGap, Note, Active FROM Student {(includeInactive ? "" : "WHERE Active = 1")} ORDER BY ExternalId;";
         var result = new List<Student>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
-            result.Add(new Student(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetInt32(4), reader.GetBoolean(5), reader.GetString(6), reader.GetBoolean(7)));
+            result.Add(new Student(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetInt32(5), reader.GetBoolean(6), reader.GetString(7), reader.GetBoolean(8)));
         return result;
     }
 
@@ -25,11 +25,14 @@ public sealed class SqliteMasterDataRepository : IMasterDataRepository
         ArgumentNullException.ThrowIfNull(student);
         await using var connection = await OpenAsync(projectPath, cancellationToken);
         await EnsureSchemaAsync(connection, cancellationToken);
+        // Name列は廃止した単一氏名フィールドの名残りで、FamilyName/GivenNameを正式な保存元としつつ、
+        // この列を直接参照する他の生SQL（候補ラベル組み立て等、checkpoint145時点では未移行）が
+        // 動き続けるよう、保存のたびにFamilyName+GivenNameから計算して書き込み続ける。
         var id = await SaveAsync(connection, "Student", student.Id,
-            "ExternalId, Name, Grade, DefaultMaxConsecutiveSlots, AllowGap, Note, Active",
-            "@externalId, @name, @grade, @maximum, @allowGap, @note, @active",
-            "ExternalId=@externalId, Name=@name, Grade=@grade, DefaultMaxConsecutiveSlots=@maximum, AllowGap=@allowGap, Note=@note, Active=@active",
-            command => { command.Parameters.AddWithValue("@externalId", student.ExternalId); command.Parameters.AddWithValue("@name", student.Name); command.Parameters.AddWithValue("@grade", student.Grade); command.Parameters.AddWithValue("@maximum", student.DefaultMaxConsecutiveSlots); command.Parameters.AddWithValue("@allowGap", student.AllowGap); command.Parameters.AddWithValue("@note", student.Note); command.Parameters.AddWithValue("@active", student.Active); }, cancellationToken);
+            "ExternalId, Name, FamilyName, GivenName, Grade, DefaultMaxConsecutiveSlots, AllowGap, Note, Active",
+            "@externalId, @name, @family, @given, @grade, @maximum, @allowGap, @note, @active",
+            "ExternalId=@externalId, Name=@name, FamilyName=@family, GivenName=@given, Grade=@grade, DefaultMaxConsecutiveSlots=@maximum, AllowGap=@allowGap, Note=@note, Active=@active",
+            command => { command.Parameters.AddWithValue("@externalId", student.ExternalId); command.Parameters.AddWithValue("@name", student.FullName); command.Parameters.AddWithValue("@family", student.FamilyName); command.Parameters.AddWithValue("@given", student.GivenName); command.Parameters.AddWithValue("@grade", student.Grade); command.Parameters.AddWithValue("@maximum", student.DefaultMaxConsecutiveSlots); command.Parameters.AddWithValue("@allowGap", student.AllowGap); command.Parameters.AddWithValue("@note", student.Note); command.Parameters.AddWithValue("@active", student.Active); }, cancellationToken);
         return student with { Id = id };
     }
 
@@ -37,18 +40,19 @@ public sealed class SqliteMasterDataRepository : IMasterDataRepository
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken); await EnsureSchemaAsync(connection, cancellationToken);
         await using var command = connection.CreateCommand();
-        command.CommandText = $"SELECT Id, ExternalId, Name, AllowGap, Note, Active FROM Teacher {(includeInactive ? "" : "WHERE Active = 1")} ORDER BY ExternalId;";
+        command.CommandText = $"SELECT Id, ExternalId, FamilyName, GivenName, AllowGap, Note, Active FROM Teacher {(includeInactive ? "" : "WHERE Active = 1")} ORDER BY ExternalId;";
         var result = new List<Teacher>(); await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken)) result.Add(new Teacher(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetBoolean(3), reader.GetString(4), reader.GetBoolean(5)));
+        while (await reader.ReadAsync(cancellationToken)) result.Add(new Teacher(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetBoolean(4), reader.GetString(5), reader.GetBoolean(6)));
         return result;
     }
 
     public async Task<Teacher> SaveTeacherAsync(string projectPath, Teacher teacher, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(teacher); await using var connection = await OpenAsync(projectPath, cancellationToken); await EnsureSchemaAsync(connection, cancellationToken);
-        var id = await SaveAsync(connection, "Teacher", teacher.Id, "ExternalId, Name, AllowGap, Note, Active", "@externalId, @name, @allowGap, @note, @active",
-            "ExternalId=@externalId, Name=@name, AllowGap=@allowGap, Note=@note, Active=@active",
-            command => { command.Parameters.AddWithValue("@externalId", teacher.ExternalId); command.Parameters.AddWithValue("@name", teacher.Name); command.Parameters.AddWithValue("@allowGap", teacher.AllowGap); command.Parameters.AddWithValue("@note", teacher.Note); command.Parameters.AddWithValue("@active", teacher.Active); }, cancellationToken);
+        // Name列についてはSaveStudentAsyncと同じ理由（他の生SQLとの互換のため維持）。
+        var id = await SaveAsync(connection, "Teacher", teacher.Id, "ExternalId, Name, FamilyName, GivenName, AllowGap, Note, Active", "@externalId, @name, @family, @given, @allowGap, @note, @active",
+            "ExternalId=@externalId, Name=@name, FamilyName=@family, GivenName=@given, AllowGap=@allowGap, Note=@note, Active=@active",
+            command => { command.Parameters.AddWithValue("@externalId", teacher.ExternalId); command.Parameters.AddWithValue("@name", teacher.FullName); command.Parameters.AddWithValue("@family", teacher.FamilyName); command.Parameters.AddWithValue("@given", teacher.GivenName); command.Parameters.AddWithValue("@allowGap", teacher.AllowGap); command.Parameters.AddWithValue("@note", teacher.Note); command.Parameters.AddWithValue("@active", teacher.Active); }, cancellationToken);
         return teacher with { Id = id };
     }
 

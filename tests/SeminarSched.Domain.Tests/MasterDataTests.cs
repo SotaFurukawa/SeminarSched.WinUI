@@ -7,10 +7,12 @@ public sealed class MasterDataTests
     [Fact]
     public void Student_NormalizesTextAndRejectsInvalidMaximum()
     {
-        var student = new Student(0, " S-001 ", " 架空 生徒 ", " 中2 ", 3, note: " memo ");
+        var student = new Student(0, " S-001 ", " 架空 ", " 生徒 ", " 中2 ", 3, note: " memo ");
         Assert.Equal("S-001", student.ExternalId);
-        Assert.Equal("架空 生徒", student.Name);
-        Assert.Throws<ArgumentOutOfRangeException>(() => new Student(0, "S", "Name", "中2", 0));
+        Assert.Equal("架空", student.FamilyName);
+        Assert.Equal("生徒", student.GivenName);
+        Assert.Equal("架空 生徒", student.FullName);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Student(0, "S", "Family", "Given", "中2", 0));
     }
 
     [Fact]

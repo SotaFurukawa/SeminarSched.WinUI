@@ -80,7 +80,7 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
                 {
                     if (response.EnrollmentType != "体験生") throw new InvalidOperationException($"未登録の在籍生です: {response.Name}");
                     var externalId = NextTrialId(connection, transaction);
-                    var id = InsertTrialStudent(connection, transaction, externalId, response.Name, response.Grade);
+                    var id = InsertTrialStudent(connection, transaction, externalId, response.FamilyName, response.GivenName, response.Grade);
                     student = new StudentEntity(id, response.Name, response.Grade);
                     studentByKey[key] = student;
                     trialCount++;
@@ -156,7 +156,9 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
         foreach (var row in table.Rows)
         {
             var values = row.Values;
-            var name = FullName(values.GetValueOrDefault(surnameHeader, ""), values.GetValueOrDefault(givenHeader, ""));
+            var familyName = Text(values.GetValueOrDefault(surnameHeader, ""));
+            var givenName = Text(values.GetValueOrDefault(givenHeader, ""));
+            var name = FullName(familyName, givenName);
             var grade = ConvertGrade(Text(values.GetValueOrDefault(gradeHeader, "")));
             var enrollment = Text(values.GetValueOrDefault(enrollmentHeader, ""));
             if (enrollment.Length == 0) enrollment = "在籍生";
@@ -203,7 +205,7 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
                 requests.Add((canonical, count));
             }
             if (requests.Count == 0) issues.Add(Issue(Error, "生徒回答", row.RowNumber, name, "受講教科が1件もありません。", "少なくとも1教科を回答"));
-            result.Add(new StudentResponse(row.RowNumber, name, grade, enrollment, requests, Unavailable(values, dateHeaders, slotCodes), FindNote(table.Headers, values, ["特記事項"])));
+            result.Add(new StudentResponse(row.RowNumber, name, familyName, givenName, grade, enrollment, requests, Unavailable(values, dateHeaders, slotCodes), FindNote(table.Headers, values, ["特記事項"])));
         }
         return result;
     }
@@ -458,12 +460,12 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
 
     // --- DB writes (反映のみで使用) ---
 
-    private static long InsertTrialStudent(SqliteConnection connection, SqliteTransaction transaction, string externalId, string name, string grade)
+    private static long InsertTrialStudent(SqliteConnection connection, SqliteTransaction transaction, string externalId, string familyName, string givenName, string grade)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = "INSERT INTO Student(ExternalId,Name,Grade,DefaultMaxConsecutiveSlots,AllowGap,Note,Active) VALUES($id,$name,$grade,2,0,$note,1) RETURNING Id;";
-        Bind(command, "$id", externalId); Bind(command, "$name", name); Bind(command, "$grade", grade); Bind(command, "$note", "在籍区分: 体験生（アンケート取込で作成）");
+        command.CommandText = "INSERT INTO Student(ExternalId,Name,FamilyName,GivenName,Grade,DefaultMaxConsecutiveSlots,AllowGap,Note,Active) VALUES($id,$name,$family,$given,$grade,2,0,$note,1) RETURNING Id;";
+        Bind(command, "$id", externalId); Bind(command, "$name", FullName(familyName, givenName)); Bind(command, "$family", familyName); Bind(command, "$given", givenName); Bind(command, "$grade", grade); Bind(command, "$note", "在籍区分: 体験生（アンケート取込で作成）");
         return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
     }
 
@@ -668,6 +670,6 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
     private sealed record OpenDateInfo(long Id, DateOnly Date);
     private sealed record RegularProfile(long? RegularTeacherId, int Priority, bool OneToOne, string Note);
 
-    private sealed record StudentResponse(int RowNumber, string Name, string Grade, string EnrollmentType, List<(string Subject, int Count)> Requests, HashSet<(DateOnly Date, string Slot)> Unavailable, string Note);
+    private sealed record StudentResponse(int RowNumber, string Name, string FamilyName, string GivenName, string Grade, string EnrollmentType, List<(string Subject, int Count)> Requests, HashSet<(DateOnly Date, string Slot)> Unavailable, string Note);
     private sealed record TeacherResponse(int RowNumber, string Name, HashSet<(DateOnly Date, string Slot)> Unavailable, string Note);
 }

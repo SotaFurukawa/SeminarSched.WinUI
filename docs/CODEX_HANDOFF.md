@@ -1,13 +1,64 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-04（checkpoint144）
+最終更新: 2026-10-04（checkpoint145）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.23.0 (beta)`（Draft Release作成予定。checkpoint142で承認されたPlanの3段階（Stage 1〜3）すべて完了）
-Latest Development Checkpoint: checkpoint 144（checkpoint142で承認されたPlanのStage 3
+Current Version: `v0.24.0 (beta)`（Draft Release作成予定。生徒・講師の氏名を姓・名に分けて
+保存する変更。checkpoint145を参照）
+Latest Development Checkpoint: checkpoint 145（ユーザーから4点の依頼。①生徒・講師の氏名を
+姓・名に分けて保存する、②空きコマ許可を生徒・講師一覧へ表示する、③通常授業担当設定・コマ
+設定も生徒・講師ページと同様の行内編集方式にする、④受講希望一覧の列幅が狭く学年・科目名が
+途中で切れる。Plan modeで調査・計画のうえ承認を得て、Stage 1（①氏名の姓名分割）を実装し
+v0.24.0としてリリースした。Stage 2（②空きコマ許可列・④列幅修正）とStage 3（③行内編集化）は
+次回以降のcheckpointで継続する。
+
+**Stage 1（氏名の姓名分割）の実装:** `Student`/`Teacher`（`src/SeminarSched.Domain/MasterData/`）
+の単一`Name`プロパティを廃止し、`FamilyName`（姓、必須）・`GivenName`（名、空文字許容）を正式な
+フィールドとした。`FullName`（表示用、`GivenName`が空なら`FamilyName`のみ）という計算プロパティ
+を追加。出力（Excel/PDF帳票）側は元々`WeeklyCalendarLayout.Surname()`等で単一`Name`を空白分割
+して姓のみ表示する「規約ベース」の実装だったため、今回はこれをDBレベルで正式化した形になる。
+
+**DBスキーマ・移行:** `SqliteProjectRepository.cs`の新規プロジェクト用`CREATE TABLE
+Student/Teacher`に`FamilyName`（`CHECK(length(trim(FamilyName))>0)`）・`GivenName`
+（`DEFAULT ''`）を追加。既存プロジェクトは`SqliteProjectSchema.cs`の`EnsureColumnsAsync`で
+同名2列を`ALTER TABLE ... DEFAULT ''`で追加後、新設の`BackfillFamilyGivenNameAsync`が
+（`FamilyName=''`の行についてのみ）既存の`Name`列を最初の半角スペースで分割して書き戻す
+（`SharedRosterWorkbookWriter`の旧`SplitName()`と同じアルゴリズム）。すべて`EnsureCurrentAsync`
+の同一トランザクション内で行われ、`CurrentVersion`（2）は他の加法的変更と同様に据え置き。
+
+**旧`Name`列はあえて残した:** 既存プロジェクトファイルの`NOT NULL`+`CHECK`付き列をALTER TABLE
+だけで安全に削除するのは難しいため、`Name`列自体は削除せず、`SqliteMasterDataRepository.
+SaveStudentAsync`/`SaveTeacherAsync`が保存のたびに`FamilyName + ' ' + GivenName`を計算して
+書き込み続ける形にした。これにより、`SqliteFixedLessonService`/`SqliteScheduleEditorService`/
+`SqliteGroupLessonService`/`SqliteOutputPackageService`や`SeminarSched.Reporting`配下など、
+生SQLで`s.Name`/`t.Name`を直接参照している箇所（Domain recordを経由しない）はすべて無修正で
+動き続ける。`CourseSurveyImportService.InsertTrialStudent`（体験生の自動登録）はDomain record
+を経由しない生SQL INSERTのため、`FamilyName`/`GivenName`も明示的に書き込むよう修正が必要
+だった（新規プロジェクトのCHECK制約に抵触するため）。
+
+**Excel共通名簿（`SharedRosterWorkbookWriter`/`SharedRosterImportService`）:** 生徒・講師シート
+の出力列を「姓（必須）」「名」「氏名（確認）」の3列に変更（氏名確認列は他シートの名前選択
+ドロップダウンの参照元としても使う）。再取込み時（`SharedRosterImportService.ReadName`）は
+「姓」列がシートに存在すればそちらを優先し、無ければ従来通り「氏名」列を分割する後方互換
+パスを通す（過去にエクスポート済みの旧形式Excelファイルを壊さないため）。
+
+**WinUI:** `SetupPage.xaml`の生徒・講師タブを、編集欄・一覧表示列ともに氏名1列から姓・名の
+2列へ分割（`StudentRowViewModel`/`TeacherRowViewModel`の`DraftName`を`DraftFamilyName`/
+`DraftGivenName`へ分離）。講師指導可能科目マトリクス・通常授業担当設定一覧・受講希望一覧
+（ImportPage）・集団授業クラスの講師選択肢など、`.Name`を参照していた箇所はすべて`.FullName`
+へ置き換えた。
+
+**検証:** 既存の全テスト（計252件、位置引数で`Student`/`Teacher`を呼んでいた約14ファイルを
+機械的に姓・名の2引数へ分割）がすべて通過することを確認。加えて一時的な別パッケージIDでの
+dev-run実機確認で、実際のプロジェクトファイル（コピーして検証用に使用）を開き、①既存データの
+姓・名が自動バックフィルで正しく分割表示されること、②生徒一覧の既存行を「変更」→姓・名を
+編集→保存→一覧へ正しく反映されることを確認した。新機能のためminorを上げてv0.24.0
+（patchを0へ戻す）とした。詳細は[docs/releases/v0.24.0.md](releases/v0.24.0.md)。
+
+checkpoint 144（checkpoint142で承認されたPlanのStage 3
 「受講希望一覧（ImportPage.xaml）の行内編集化・列追加」を実装し、3段階すべてを完了した。
 `src/SeminarSched.WinUI/Pages/ImportPageRowViewModels.cs`（新規）に`NamedOption<T>`
 （ComboBoxの選択肢用の小さな表示ラッパー）と`LessonRequestRowViewModel`
@@ -84,12 +135,8 @@ ListViewはページ全体を包む外側の`ScrollViewer`内の`StackPanel`に�
 機能追加のためminorを上げてv0.22.0（patchを0へ戻す）とした。詳細は
 [docs/releases/v0.22.0.md](releases/v0.22.0.md)。
 
-**Stage 3（Importページの受講希望一覧の行内編集化・列追加）は未着手**（次回checkpointで
-継続）。Stage 2と同じ`EditableRowViewModel`パターンを使うが、外部キー選択肢（生徒・科目・
-通常担当講師・第1〜3希望講師）を行オブジェクト自身に持たせる必要がある（`SubjectOptions`/
-`DraftSubject`等）。受講希望一覧の「選択した行を削除」は、行ホバー時に「変更」の隣へ「削除」
-ボタンとして出す形に変える（ユーザー確認済み）。列追加（最大連続コマ数上書き・希望講師・
-空きコマ許可上書き）も未着手。
+**Stage 3（Importページの受講希望一覧の行内編集化・列追加）はcheckpoint144で完了**（詳細は
+上のcheckpoint144を参照）。
 
 checkpoint 142（ユーザーから設定画面について6点のUI変更依頼。
 ①「設定」タブの名称を「プロジェクト設定」へ変更、②生徒一覧に最大連続コマ数列を追加、

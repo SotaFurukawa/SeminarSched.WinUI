@@ -20,7 +20,7 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
     public async Task GenerateAsync_CreatesAllFiveReportKindsAtomically()
     {
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"report.jukuschedule");await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20)));
-        var m=new SqliteMasterDataRepository();var st=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));var te=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 講師"));var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));var course=new SqliteCourseSettingsRepository();var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
+        var m=new SqliteMasterDataRepository();var st=await m.SaveStudentAsync(path,new Student(0,"S-001","架空", "生徒","中2"));var te=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空", "講師"));var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));var course=new SqliteCourseSettingsRepository();var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
         await using(var c=new SqliteConnection($"Data Source={path};Pooling=False")){await c.OpenAsync();await using var q=c.CreateCommand();q.CommandText=$"INSERT INTO LessonRequest(Id,ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,1,{st.Id},{sub.Id},1);INSERT INTO Assignment(Id,LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source) SELECT 1,1,{te.Id},d.Id,{slot.Id},0,'test' FROM OpenDate d LIMIT 1;";await q.ExecuteNonQueryAsync();}
 
         var result=await new SqliteOutputPackageService().GenerateAsync(path,_directory);
@@ -98,10 +98,10 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"multiweek.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,8,10)));
         var m=new SqliteMasterDataRepository();
-        var s1=await m.SaveStudentAsync(path,new Student(0,"S-001","田中 太郎","中2"));
-        var s2=await m.SaveStudentAsync(path,new Student(0,"S-002","田中 次郎","中1"));
-        await m.SaveStudentAsync(path,new Student(0,"S-003","架空 欠席生徒","中3"));
-        var te=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 講師"));
+        var s1=await m.SaveStudentAsync(path,new Student(0,"S-001","田中", "太郎","中2"));
+        var s2=await m.SaveStudentAsync(path,new Student(0,"S-002","田中", "次郎","中1"));
+        await m.SaveStudentAsync(path,new Student(0,"S-003","架空", "欠席生徒","中3"));
+        var te=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空", "講師"));
         var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));
         var course=new SqliteCourseSettingsRepository();
         var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));
@@ -145,9 +145,9 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"shortfall.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,21)));
         var m=new SqliteMasterDataRepository();
-        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));
-        var regular=await m.SaveTeacherAsync(path,new Teacher(0,"T-REG","架空 通常担当"));
-        var substitute=await m.SaveTeacherAsync(path,new Teacher(0,"T-SUB","架空 代講"));
+        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空", "生徒","中2"));
+        var regular=await m.SaveTeacherAsync(path,new Teacher(0,"T-REG","架空", "通常担当"));
+        var substitute=await m.SaveTeacherAsync(path,new Teacher(0,"T-SUB","架空", "代講"));
         var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));
         await m.SaveQualificationAsync(path,new TeacherQualification(regular.Id,sub.Id,true));
         await m.SaveQualificationAsync(path,new TeacherQualification(substitute.Id,sub.Id,true));
@@ -196,8 +196,8 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"unavailable.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20)));
         var m=new SqliteMasterDataRepository();
-        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));
-        var teacher=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 講師"));
+        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空", "生徒","中2"));
+        var teacher=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空", "講師"));
         var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));
         var course=new SqliteCourseSettingsRepository();
         var slot1=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));
@@ -243,9 +243,9 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"unassigned-unavailable.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20)));
         var m=new SqliteMasterDataRepository();
-        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));
-        var assignedTeacher=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 講師一"));
-        var unassignedTeacher=await m.SaveTeacherAsync(path,new Teacher(0,"T-002","架空 講師二"));
+        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空", "生徒","中2"));
+        var assignedTeacher=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空", "講師一"));
+        var unassignedTeacher=await m.SaveTeacherAsync(path,new Teacher(0,"T-002","架空", "講師二"));
         var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));
         var course=new SqliteCourseSettingsRepository();
         var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));
@@ -275,9 +275,9 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"shared-coma-label.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,21)));
         var m=new SqliteMasterDataRepository();
-        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));
-        var teacher1=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 一郎"));
-        var teacher2=await m.SaveTeacherAsync(path,new Teacher(0,"T-002","架空 二郎"));
+        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空", "生徒","中2"));
+        var teacher1=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空", "一郎"));
+        var teacher2=await m.SaveTeacherAsync(path,new Teacher(0,"T-002","架空", "二郎"));
         var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));
         var course=new SqliteCourseSettingsRepository();
         var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));
@@ -319,8 +319,8 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"closed-day-column.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,22)));
         var m=new SqliteMasterDataRepository();
-        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));
-        var teacher=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 講師"));
+        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空", "生徒","中2"));
+        var teacher=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空", "講師"));
         var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));
         var course=new SqliteCourseSettingsRepository();
         var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));
@@ -357,7 +357,7 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         // していない場合は既定値が維持されることも合わせて確認する。
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"style-roundtrip.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20)));
-        var m=new SqliteMasterDataRepository();var st=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));var te=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 講師"));var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));var course=new SqliteCourseSettingsRepository();var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
+        var m=new SqliteMasterDataRepository();var st=await m.SaveStudentAsync(path,new Student(0,"S-001","架空", "生徒","中2"));var te=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空", "講師"));var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));var course=new SqliteCourseSettingsRepository();var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
         await using(var c=new SqliteConnection($"Data Source={path};Pooling=False")){await c.OpenAsync();await using var q=c.CreateCommand();q.CommandText=$"INSERT INTO LessonRequest(Id,ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,1,{st.Id},{sub.Id},1);INSERT INTO Assignment(Id,LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source) SELECT 1,1,{te.Id},d.Id,{slot.Id},0,'test' FROM OpenDate d LIMIT 1;";await q.ExecuteNonQueryAsync();}
 
         var firstResult=await new SqliteOutputPackageService().GenerateAsync(path,_directory);
@@ -398,8 +398,8 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"group-lesson-overlay.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,21)));
         var m=new SqliteMasterDataRepository();
-        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));
-        var teacher=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 講師"));
+        var student=await m.SaveStudentAsync(path,new Student(0,"S-001","架空", "生徒","中2"));
+        var teacher=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空", "講師"));
         var sub=await m.SaveSubjectAsync(path,new Subject(0,"MATH","数学","数","中学",1));
         var course=new SqliteCourseSettingsRepository();
         var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));
@@ -443,7 +443,7 @@ public sealed class SqliteOutputPackageServiceTests : IDisposable
         // 表示名からきちんと一文字の略称になっている必要がある（フルネームへフォールバックしない）。
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"subject-abbreviation.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20)));
-        var m=new SqliteMasterDataRepository();var st=await m.SaveStudentAsync(path,new Student(0,"S-001","架空 生徒","中2"));var te=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空 講師"));
+        var m=new SqliteMasterDataRepository();var st=await m.SaveStudentAsync(path,new Student(0,"S-001","架空", "生徒","中2"));var te=await m.SaveTeacherAsync(path,new Teacher(0,"T-001","架空", "講師"));
         var sub=await m.SaveSubjectAsync(path,new Subject(0,"ENG","英語","","中学",1)); // ShortName未入力
         var course=new SqliteCourseSettingsRepository();var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
         await using(var c=new SqliteConnection($"Data Source={path};Pooling=False")){await c.OpenAsync();await using var q=c.CreateCommand();q.CommandText=$"INSERT INTO LessonRequest(Id,ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,1,{st.Id},{sub.Id},1);INSERT INTO Assignment(Id,LessonRequestId,TeacherId,OpenDateId,TimeSlotId,IsLocked,Source) SELECT 1,1,{te.Id},d.Id,{slot.Id},0,'test' FROM OpenDate d LIMIT 1;";await q.ExecuteNonQueryAsync();}

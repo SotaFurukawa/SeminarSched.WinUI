@@ -195,7 +195,7 @@ public sealed partial class SetupPage : WorkflowPageBase
         {
             var id = row.IsNew ? 0 : row.Value!.Id;
             var externalId = row.IsNew ? row.PreviewExternalId : row.Value!.ExternalId;
-            await App.MasterData.SaveStudentAsync(path, new Student(id, externalId, row.DraftName, row.DraftGrade,
+            await App.MasterData.SaveStudentAsync(path, new Student(id, externalId, row.DraftFamilyName, row.DraftGivenName, row.DraftGrade,
                 checked((int)row.DraftMaxConsecutiveSlots), row.DraftAllowGap, row.DraftNote, row.DraftActive));
         }, "生徒を保存しました");
     }
@@ -244,7 +244,7 @@ public sealed partial class SetupPage : WorkflowPageBase
         {
             var id = row.IsNew ? 0 : row.Value!.Id;
             var externalId = row.IsNew ? row.PreviewExternalId : row.Value!.ExternalId;
-            await App.MasterData.SaveTeacherAsync(path, new Teacher(id, externalId, row.DraftName, row.DraftAllowGap, row.DraftNote, row.DraftActive));
+            await App.MasterData.SaveTeacherAsync(path, new Teacher(id, externalId, row.DraftFamilyName, row.DraftGivenName, row.DraftAllowGap, row.DraftNote, row.DraftActive));
         }, "講師を保存しました");
     }
 
@@ -524,7 +524,7 @@ public sealed partial class SetupPage : WorkflowPageBase
             var teacher=teachers[r].Value;
             // 左列（縦だけ本体に連動してスクロール）: 講師ID・講師氏名。
             Place(QualificationMatrixLeft,new Border{BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),Padding=new Thickness(4),Child=new TextBlock{Text=teacher.ExternalId,VerticalAlignment=VerticalAlignment.Center}},r,0);
-            Place(QualificationMatrixLeft,new Border{BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),Padding=new Thickness(4),Child=new TextBlock{Text=teacher.Name,VerticalAlignment=VerticalAlignment.Center}},r,1);
+            Place(QualificationMatrixLeft,new Border{BorderBrush=cellBorderBrush,BorderThickness=new Thickness(1),Padding=new Thickness(4),Child=new TextBlock{Text=teacher.FullName,VerticalAlignment=VerticalAlignment.Center}},r,1);
             for(var c=0;c<subjects.Length;c++)
             {
                 var subject=subjects[c].Value;
@@ -775,22 +775,22 @@ public sealed partial class SetupPage : WorkflowPageBase
         try
         {
             var studentValues=await App.MasterData.GetStudentsAsync(path);var teacherValues=await App.MasterData.GetTeachersAsync(path);var subjectValues=await App.MasterData.GetSubjectsAsync(path);
-            var studentItems=studentValues.Select(x => new MasterItem<Student>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.Name}　{x.Grade}",x.Active,"在籍中","卒業・無効")).ToArray();
-            var teacherItems=teacherValues.Select(x => new MasterItem<Teacher>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.Name}",x.Active,"在籍中","卒業・無効")).ToArray();
+            var studentItems=studentValues.Select(x => new MasterItem<Student>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.FullName}　{x.Grade}",x.Active,"在籍中","卒業・無効")).ToArray();
+            var teacherItems=teacherValues.Select(x => new MasterItem<Teacher>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.FullName}",x.Active,"在籍中","卒業・無効")).ToArray();
             var subjectItems=subjectValues.Select(x => new MasterItem<Subject>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}")).ToArray();
             _studentItems=studentItems;_teacherItems=teacherItems;_subjectItems=subjectItems;
             RebuildStudentRows(studentValues);RebuildTeacherRows(teacherValues);RebuildSubjectRows(subjectValues);
             RegularStudent.ItemsSource=studentItems;RegularSubject.ItemsSource=subjectItems;
-            _nullableTeacherItems=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.Name}"))).ToArray();
+            _nullableTeacherItems=new[]{new MasterItem<Teacher?>(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new MasterItem<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.FullName}"))).ToArray();
             RegularTeacher.ItemsSource=_nullableTeacherItems;if(RegularTeacher.SelectedIndex<0)RegularTeacher.SelectedIndex=0;
             var qualifications=await App.MasterData.GetQualificationsAsync(path);_qualifications=qualifications.ToDictionary(value=>(value.TeacherId,value.SubjectId));RenderQualificationMatrix();
             // ユーザー要望「生徒IDや講師IDは基本的に用いず、内部の処理にのみ使いたいので、ここでの
             // 表示は生徒氏名、講師氏名のみとしてください」への対応。IDは内部処理（保存・照合）だけに
             // 使い、一覧表示は氏名のみにする。
             var regularLessons=await App.MasterData.GetRegularLessonsAsync(path);RegularLessons.ItemsSource=regularLessons.Select(value=>new RegularLessonItem(
-                studentValues.Single(x=>x.Id==value.StudentId).Name,
+                studentValues.Single(x=>x.Id==value.StudentId).FullName,
                 subjectValues.Single(x=>x.Id==value.SubjectId).DisplayName,
-                value.RegularTeacherId is long id?teacherValues.Single(x=>x.Id==id).Name:"指定なし",
+                value.RegularTeacherId is long id?teacherValues.Single(x=>x.Id==id).FullName:"指定なし",
                 value.RegularTeacherPriority,
                 value.OneToOneRequired?"1対1":"通常")).ToArray();
             var slots = await App.CourseSettings.GetTimeSlotsAsync(path);

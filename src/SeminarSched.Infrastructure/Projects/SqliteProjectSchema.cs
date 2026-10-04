@@ -40,6 +40,7 @@ internal static class SqliteProjectSchema
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         await EnsureColumnsAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await BackfillInvalidSubjectShortNamesAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
+        await BackfillFamilyGivenNameAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await DowngradeRemovedPriorityAvailabilityLevelAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await DropRemovedGroupLessonTeacherTableAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -238,6 +239,56 @@ internal static class SqliteProjectSchema
         // 担当講師割り当てから自動生成した行だけを後から正しく取り消せるよう、由来を記録する
         // （'manual'=手動指定、'group_lesson'=集団授業の担当講師割り当てから自動生成）。
         await AddColumnIfMissingAsync(connection, transaction, "TeacherUnavailability", "Source", "TEXT NOT NULL DEFAULT 'manual' CHECK(Source IN('manual','group_lesson'))", cancellationToken);
+
+        // ユーザー要望（checkpoint145）「生徒や講師の氏名...苗字と名前をわけてかいてください。
+        // 姓と名を分けて保存」。既存プロジェクトにも同じ理由でALTER TABLEで届ける。CHECK制約は
+        // ALTER TABLE ADD COLUMNの直後は既存行がDEFAULT値（空文字列）を持つため、ここでは付けず
+        // （空文字列はCHECKに違反する）、直後のBackfillFamilyGivenNameAsyncで正しい値へ埋めた後も
+        // C#側（Student/Teacherレコードのコンストラクタ検証）でのみ保証する。
+        await AddColumnIfMissingAsync(connection, transaction, "Student", "FamilyName", "TEXT NOT NULL DEFAULT ''", cancellationToken);
+        await AddColumnIfMissingAsync(connection, transaction, "Student", "GivenName", "TEXT NOT NULL DEFAULT ''", cancellationToken);
+        await AddColumnIfMissingAsync(connection, transaction, "Teacher", "FamilyName", "TEXT NOT NULL DEFAULT ''", cancellationToken);
+        await AddColumnIfMissingAsync(connection, transaction, "Teacher", "GivenName", "TEXT NOT NULL DEFAULT ''", cancellationToken);
+    }
+
+    // ユーザー要望（checkpoint145）「姓と名を分けて保存」で追加したFamilyName/GivenName列を、
+    // 既存プロジェクトの生徒・講師については旧来の単一Name列から自己修復で埋める。分割規則は
+    // SharedRosterWorkbookWriter.SplitNameと完全に同じ（最初の半角スペースで分割、無ければ全体を
+    // 姓としGivenNameは空文字列のまま）。FamilyNameが空文字列（=ALTER TABLE直後の初期値、まだ
+    // 一度もこのバックフィルを通っていない）の行だけを対象にする。
+    private static async Task BackfillFamilyGivenNameAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        foreach (var table in new[] { "Student", "Teacher" })
+        {
+            var pending = new List<(long Id, string Name)>();
+            await using (var select = connection.CreateCommand())
+            {
+                select.Transaction = transaction;
+                select.CommandText = $"SELECT Id,Name FROM {table} WHERE FamilyName='';";
+                await using var reader = await select.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    pending.Add((reader.GetInt64(0), reader.GetString(1)));
+            }
+            if (pending.Count == 0) continue;
+
+            await using var update = connection.CreateCommand();
+            update.Transaction = transaction;
+            update.CommandText = $"UPDATE {table} SET FamilyName=$family, GivenName=$given WHERE Id=$id;";
+            var idParameter = update.Parameters.Add("$id", SqliteType.Integer);
+            var familyParameter = update.Parameters.Add("$family", SqliteType.Text);
+            var givenParameter = update.Parameters.Add("$given", SqliteType.Text);
+            foreach (var (id, name) in pending)
+            {
+                var spaceIndex = name.IndexOf(' ');
+                idParameter.Value = id;
+                familyParameter.Value = spaceIndex < 0 ? name : name[..spaceIndex];
+                givenParameter.Value = spaceIndex < 0 ? "" : name[(spaceIndex + 1)..];
+                await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
     }
 
     private static async Task AddColumnIfMissingAsync(

@@ -102,13 +102,13 @@ public sealed partial class ImportPage : WorkflowPageBase
     {
         var path=App.ProjectService.Current?.Path;if(path is null)return;
         var studentValues=await App.MasterData.GetStudentsAsync(path);var teacherValues=await App.MasterData.GetTeachersAsync(path);var subjectValues=await App.MasterData.GetSubjectsAsync(path);
-        var studentName=(Student x)=>$"{TrialLabel(x.ExternalId)}{x.Name}";
+        var studentName=(Student x)=>$"{TrialLabel(x.ExternalId)}{x.FullName}";
         _studentOptions=studentValues.Select(x=>new NamedOption<Student>(x,$"{(x.Active?"":"[卒業・無効] ")}{studentName(x)}　{x.Grade}")).ToArray();
         _subjectOptions=subjectValues.Select(x=>new NamedOption<Subject>(x,$"{(x.Active?"":"[停止] ")}{x.SortOrder}　{x.Code}　{x.DisplayName}（{x.ShortName}）　{x.SchoolLevel}")).ToArray();
-        _teacherOptions=new NamedOption<Teacher?>[]{new(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new NamedOption<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.Name}"))).ToArray();
+        _teacherOptions=new NamedOption<Teacher?>[]{new(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new NamedOption<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.FullName}"))).ToArray();
 
         var lessonRequests=await App.MasterData.GetLessonRequestsAsync(path);
-        string TeacherName(long? id)=>id is long tid?teacherValues.Single(x=>x.Id==tid).Name:"指定なし";
+        string TeacherName(long? id)=>id is long tid?teacherValues.Single(x=>x.Id==tid).FullName:"指定なし";
         var previouslyEditing=_lessonRequestRows.FirstOrDefault(r=>r.IsEditing&&r!=_lessonRequestRowBeingSaved);
         _lessonRequestRowBeingSaved=null;
         _lessonRequestRows=lessonRequests.Select(value=>

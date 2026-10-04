@@ -142,7 +142,8 @@ public sealed class SharedRosterImportService : ISharedRosterImportService
     {
         var id = row.Text("生徒ID", false);
         if (id is null) return null;
-        return new StudentRow(row.RowNumber, row.Boolean("在籍", true, null)!.Value, id, row.Text("氏名", true)!,
+        var (familyName, givenName) = ReadName(row);
+        return new StudentRow(row.RowNumber, row.Boolean("在籍", true, null)!.Value, id, familyName, givenName,
             ConvertGrade(row.Text("学年", true)!), row.Integer("標準最大連続コマ数", false, 2, 1)!.Value,
             row.Boolean("空きコマ許可", false, false)!.Value, row.Text("備考", false) ?? "");
     }
@@ -151,8 +152,22 @@ public sealed class SharedRosterImportService : ISharedRosterImportService
     {
         var id = row.Text("講師ID", false);
         if (id is null) return null;
-        return new TeacherRow(row.RowNumber, row.Boolean("在籍", true, null)!.Value, id, row.Text("氏名", true)!,
+        var (familyName, givenName) = ReadName(row);
+        return new TeacherRow(row.RowNumber, row.Boolean("在籍", true, null)!.Value, id, familyName, givenName,
             row.Boolean("空きコマ許可", false, false)!.Value, row.Text("備考", false) ?? "");
+    }
+
+    // ユーザー要望（checkpoint145）「姓と名を分けて保存」。SharedRosterWorkbookWriterは現在、
+    // 「姓（必須）」「名」「氏名（確認）」の3列を出力するため、新しい「姓」列がある場合はそれを
+    // 優先して読む。「姓」列が無い（このアプリの旧版で出力された、または手作業で作られた）
+    // 古いExcelファイルでは「氏名」列のみを最初の半角スペースで分割する（後方互換）。
+    private static (string FamilyName, string GivenName) ReadName(RowReader row)
+    {
+        if (row.HasColumn("姓"))
+            return (row.Text("姓", true)!, row.Text("名", false) ?? "");
+        var fullName = row.Text("氏名", true)!;
+        var spaceIndex = fullName.IndexOf(' ');
+        return spaceIndex < 0 ? (fullName, "") : (fullName[..spaceIndex], fullName[(spaceIndex + 1)..]);
     }
 
     private static SubjectRow? ParseSubject(RowReader row)
@@ -207,8 +222,8 @@ public sealed class SharedRosterImportService : ISharedRosterImportService
         var result = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in rows)
             result[row.ExternalId] = await UpsertIdAsync(connection, transaction,
-                "INSERT INTO Student(ExternalId,Name,Grade,DefaultMaxConsecutiveSlots,AllowGap,Note,Active) VALUES($key,$name,$grade,$maximum,$gap,$note,$active) ON CONFLICT(ExternalId) DO UPDATE SET Name=excluded.Name,Grade=excluded.Grade,DefaultMaxConsecutiveSlots=excluded.DefaultMaxConsecutiveSlots,AllowGap=excluded.AllowGap,Note=excluded.Note,Active=excluded.Active RETURNING Id;",
-                command => { Bind(command, "$key", row.ExternalId); Bind(command, "$name", row.Name); Bind(command, "$grade", row.Grade); Bind(command, "$maximum", row.DefaultMaximum); Bind(command, "$gap", row.AllowGap); Bind(command, "$note", row.Note); Bind(command, "$active", row.Active); },
+                "INSERT INTO Student(ExternalId,Name,FamilyName,GivenName,Grade,DefaultMaxConsecutiveSlots,AllowGap,Note,Active) VALUES($key,$name,$family,$given,$grade,$maximum,$gap,$note,$active) ON CONFLICT(ExternalId) DO UPDATE SET Name=excluded.Name,FamilyName=excluded.FamilyName,GivenName=excluded.GivenName,Grade=excluded.Grade,DefaultMaxConsecutiveSlots=excluded.DefaultMaxConsecutiveSlots,AllowGap=excluded.AllowGap,Note=excluded.Note,Active=excluded.Active RETURNING Id;",
+                command => { Bind(command, "$key", row.ExternalId); Bind(command, "$name", ComposeFullName(row.FamilyName, row.GivenName)); Bind(command, "$family", row.FamilyName); Bind(command, "$given", row.GivenName); Bind(command, "$grade", row.Grade); Bind(command, "$maximum", row.DefaultMaximum); Bind(command, "$gap", row.AllowGap); Bind(command, "$note", row.Note); Bind(command, "$active", row.Active); },
                 cancellationToken).ConfigureAwait(false);
         return result;
     }
@@ -218,11 +233,15 @@ public sealed class SharedRosterImportService : ISharedRosterImportService
         var result = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in rows)
             result[row.ExternalId] = await UpsertIdAsync(connection, transaction,
-                "INSERT INTO Teacher(ExternalId,Name,AllowGap,Note,Active) VALUES($key,$name,$gap,$note,$active) ON CONFLICT(ExternalId) DO UPDATE SET Name=excluded.Name,AllowGap=excluded.AllowGap,Note=excluded.Note,Active=excluded.Active RETURNING Id;",
-                command => { Bind(command, "$key", row.ExternalId); Bind(command, "$name", row.Name); Bind(command, "$gap", row.AllowGap); Bind(command, "$note", row.Note); Bind(command, "$active", row.Active); },
+                "INSERT INTO Teacher(ExternalId,Name,FamilyName,GivenName,AllowGap,Note,Active) VALUES($key,$name,$family,$given,$gap,$note,$active) ON CONFLICT(ExternalId) DO UPDATE SET Name=excluded.Name,FamilyName=excluded.FamilyName,GivenName=excluded.GivenName,AllowGap=excluded.AllowGap,Note=excluded.Note,Active=excluded.Active RETURNING Id;",
+                command => { Bind(command, "$key", row.ExternalId); Bind(command, "$name", ComposeFullName(row.FamilyName, row.GivenName)); Bind(command, "$family", row.FamilyName); Bind(command, "$given", row.GivenName); Bind(command, "$gap", row.AllowGap); Bind(command, "$note", row.Note); Bind(command, "$active", row.Active); },
                 cancellationToken).ConfigureAwait(false);
         return result;
     }
+
+    // Student/Teacher.FullNameと同じ合成規則（名が空なら姓のみ）。Name列を保存のたびに
+    // 計算して維持するため、Domain recordを経由せずここでも同じ規則を複製する。
+    private static string ComposeFullName(string familyName, string givenName) => givenName.Length == 0 ? familyName : $"{familyName} {givenName}";
 
     // 共通名簿Excelの「科目」シートには略称列が無いため、新規科目の略称は表示名から自動推定する
     // （SubjectAbbreviation.Resolve、Python版default_subject_short_name相当）。既存科目を再取込みで
@@ -329,8 +348,8 @@ public sealed class SharedRosterImportService : ISharedRosterImportService
     private static readonly string[] RegularLessonRequiredHeaders = ["生徒ID", "科目コード", "通常担当講師ID", "担当講師優先度", "1対1必須", "備考"];
 
     private interface IRosterRow { int RowNumber { get; } }
-    private sealed record StudentRow(int RowNumber, bool Active, string ExternalId, string Name, string Grade, int DefaultMaximum, bool AllowGap, string Note) : IRosterRow;
-    private sealed record TeacherRow(int RowNumber, bool Active, string ExternalId, string Name, bool AllowGap, string Note) : IRosterRow;
+    private sealed record StudentRow(int RowNumber, bool Active, string ExternalId, string FamilyName, string GivenName, string Grade, int DefaultMaximum, bool AllowGap, string Note) : IRosterRow;
+    private sealed record TeacherRow(int RowNumber, bool Active, string ExternalId, string FamilyName, string GivenName, bool AllowGap, string Note) : IRosterRow;
     private sealed record SubjectRow(int RowNumber, string Code, string DisplayName, string SchoolLevel, int SortOrder, bool Active) : IRosterRow;
     private sealed record QualificationRow(int RowNumber, string TeacherExternalId, string SubjectCode, bool CanTeach, string Note) : IRosterRow;
     private sealed record RegularLessonRow(int RowNumber, string StudentExternalId, string SubjectCode, string? RegularTeacherExternalId, int Priority, bool OneToOne, string Note) : IRosterRow;
@@ -378,6 +397,7 @@ public sealed class SharedRosterImportService : ISharedRosterImportService
                 _ => throw Failure(header, "真偽値として認識できません。"),
             };
         }
+        public bool HasColumn(string header) => headers.ContainsKey(header);
         private string Raw(string header) => headers.TryGetValue(header, out var column) ? sheet.Cell(rowNumber, column).GetString() : string.Empty;
         private RosterCellException Failure(string header, string message) => new(sheet.Name, rowNumber, header, message);
     }

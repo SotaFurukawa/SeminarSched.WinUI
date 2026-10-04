@@ -147,7 +147,7 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
     {
         var state=await CreateStateWithSlotAsync();var service=new SqliteGroupLessonService();
         var master=new SqliteMasterDataRepository();
-        var teacher2=await master.SaveTeacherAsync(state.Path,new Teacher(0,"T-GROUP2","架空 集団講師二"));
+        var teacher2=await master.SaveTeacherAsync(state.Path,new Teacher(0,"T-GROUP2","架空", "集団講師二"));
         var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学",teacherId:state.Teacher1Id));
         await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(9,30),new TimeOnly(10,30));
         Assert.True(await IsTeacherUnavailableAsync(state.Path,state.Teacher1Id,state.DateId,state.SlotId));
@@ -186,9 +186,9 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
         Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,$"{Guid.NewGuid():N}.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20),considerGroupLessons:true));
         var master=new SqliteMasterDataRepository();
-        var student1=await master.SaveStudentAsync(path,new Student(0,"S-GROUP1","架空 集団生徒一","中2"));
-        var student2=await master.SaveStudentAsync(path,new Student(0,"S-GROUP2","架空 集団生徒二","中1"));
-        var teacher1=await master.SaveTeacherAsync(path,new Teacher(0,"T-GROUP1","架空 集団講師一"));
+        var student1=await master.SaveStudentAsync(path,new Student(0,"S-GROUP1","架空", "集団生徒一","中2"));
+        var student2=await master.SaveStudentAsync(path,new Student(0,"S-GROUP2","架空", "集団生徒二","中1"));
+        var teacher1=await master.SaveTeacherAsync(path,new Teacher(0,"T-GROUP1","架空", "集団講師一"));
         await using var connection=new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False");
         await connection.OpenAsync();await using var command=connection.CreateCommand();command.CommandText="SELECT Id FROM OpenDate LIMIT 1;";
         var date=Convert.ToInt64(await command.ExecuteScalarAsync());

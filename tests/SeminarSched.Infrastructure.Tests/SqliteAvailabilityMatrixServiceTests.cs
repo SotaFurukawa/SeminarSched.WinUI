@@ -92,7 +92,7 @@ public sealed class SqliteAvailabilityMatrixServiceTests : IDisposable
         var path = Path.Combine(_directory, $"{Guid.NewGuid():N}.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 21)));
         var master = new SqliteMasterDataRepository();
-        var student = await master.SaveStudentAsync(path, new Student(0, "S-CAL", "架空 生徒", "中2"));
+        var student = await master.SaveStudentAsync(path, new Student(0, "S-CAL", "架空", "生徒", "中2"));
         var course = new SqliteCourseSettingsRepository();
         var slot1 = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "1", "1限", new TimeOnly(9, 0), new TimeOnly(10, 0), 1));
         var slot2 = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "2", "2限", new TimeOnly(10, 0), new TimeOnly(11, 0), 2));
@@ -120,9 +120,9 @@ public sealed class SqliteAvailabilityMatrixServiceTests : IDisposable
         var path = Path.Combine(_directory, $"{Guid.NewGuid():N}.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
         var master = new SqliteMasterDataRepository();
-        var s1 = await master.SaveStudentAsync(path, new Student(0, "S-MX1", "架空 生徒一", "中2"));
-        var s2 = await master.SaveStudentAsync(path, new Student(0, "S-MX2", "架空 生徒二", "中2"));
-        var teacher = await master.SaveTeacherAsync(path, new Teacher(0, "T-MX1", "架空 講師"));
+        var s1 = await master.SaveStudentAsync(path, new Student(0, "S-MX1", "架空", "生徒一", "中2"));
+        var s2 = await master.SaveStudentAsync(path, new Student(0, "S-MX2", "架空", "生徒二", "中2"));
+        var teacher = await master.SaveTeacherAsync(path, new Teacher(0, "T-MX1", "架空", "講師"));
         var course = new SqliteCourseSettingsRepository();
         var slot = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "1", "1限", new TimeOnly(9, 0), new TimeOnly(10, 0), 1));
         await course.SaveCourseDayAsync(path, new CourseDay(new DateOnly(2026, 7, 20), true, "", [slot.Id]));

@@ -31,8 +31,8 @@ public sealed class PdfScheduleReportRendererLayoutTests : IDisposable
         var path = Path.Combine(_directory, $"pdf-layout-{paperSize}-{orientation}.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
         var m = new SqliteMasterDataRepository();
-        var student = await m.SaveStudentAsync(path, new Student(0, "S-001", "架空 生徒", "中2"));
-        var teacher = await m.SaveTeacherAsync(path, new Teacher(0, "T-001", "架空 講師"));
+        var student = await m.SaveStudentAsync(path, new Student(0, "S-001", "架空", "生徒", "中2"));
+        var teacher = await m.SaveTeacherAsync(path, new Teacher(0, "T-001", "架空", "講師"));
         var subject = await m.SaveSubjectAsync(path, new Subject(0, "MATH", "数学", "数", "中学", 1));
         var course = new SqliteCourseSettingsRepository();
         var slot = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "1", "1限", new TimeOnly(9, 0), new TimeOnly(10, 0), 1));
@@ -67,7 +67,7 @@ public sealed class PdfScheduleReportRendererLayoutTests : IDisposable
         var path = Path.Combine(_directory, "pdf-empty.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
         var m = new SqliteMasterDataRepository();
-        var student = await m.SaveStudentAsync(path, new Student(0, "S-001", "架空 生徒", "中2"));
+        var student = await m.SaveStudentAsync(path, new Student(0, "S-001", "架空", "生徒", "中2"));
         var subject = await m.SaveSubjectAsync(path, new Subject(0, "MATH", "数学", "数", "中学", 1));
         var course = new SqliteCourseSettingsRepository();
         var slot = await course.SaveTimeSlotAsync(path, new TimeSlot(0, "1", "1限", new TimeOnly(9, 0), new TimeOnly(10, 0), 1));

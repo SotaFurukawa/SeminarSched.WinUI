@@ -50,15 +50,15 @@ public sealed class SqliteProjectRepositoryTests : IDisposable
             2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 22)));
         var masterData = new SqliteMasterDataRepository();
 
-        var student = await masterData.SaveStudentAsync(path, new Student(0, "S-001", "架空 生徒", "中2"));
-        var teacher = await masterData.SaveTeacherAsync(path, new Teacher(0, "T-001", "架空 講師"));
+        var student = await masterData.SaveStudentAsync(path, new Student(0, "S-001", "架空", "生徒", "中2"));
+        var teacher = await masterData.SaveTeacherAsync(path, new Teacher(0, "T-001", "架空", "講師"));
         var subject = await masterData.SaveSubjectAsync(path, new Subject(0, "MATH", "数学", "数", "中学", 1));
 
         var students = await masterData.GetStudentsAsync(path);
         var teachers = await masterData.GetTeachersAsync(path);
         var subjects = await masterData.GetSubjectsAsync(path);
-        Assert.Contains(students, s => s.Id == student.Id && s.Name == "架空 生徒");
-        Assert.Contains(teachers, t => t.Id == teacher.Id && t.Name == "架空 講師");
+        Assert.Contains(students, s => s.Id == student.Id && s.FullName == "架空 生徒");
+        Assert.Contains(teachers, t => t.Id == teacher.Id && t.FullName == "架空 講師");
         Assert.Contains(subjects, s => s.Id == subject.Id && s.DisplayName == "数学");
     }
 
