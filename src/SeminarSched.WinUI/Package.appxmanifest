@@ -10,7 +10,7 @@
   <Identity
     Name="F70149DC-0D08-4E3F-B67F-189A3A5E1C51"
     Publisher="CN=SotaFurukawa"
-    Version="0.24.0.0" />
+    Version="0.25.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="F70149DC-0D08-4E3F-B67F-189A3A5E1C51" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 

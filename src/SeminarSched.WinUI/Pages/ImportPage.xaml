@@ -26,7 +26,7 @@
              という考え方）。 -->
         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
         <StackPanel Spacing="8" MinWidth="960">
-        <Grid ColumnSpacing="6" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="80"/><ColumnDefinition Width="55"/><ColumnDefinition Width="90"/><ColumnDefinition Width="45"/><ColumnDefinition Width="35"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="65"/></Grid.ColumnDefinitions>
+        <Grid ColumnSpacing="6" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="110"/><ColumnDefinition Width="*" MinWidth="100"/><ColumnDefinition Width="55"/><ColumnDefinition Width="*" MinWidth="110"/><ColumnDefinition Width="45"/><ColumnDefinition Width="35"/><ColumnDefinition Width="70"/><ColumnDefinition Width="*" MinWidth="90"/><ColumnDefinition Width="*" MinWidth="90"/><ColumnDefinition Width="*" MinWidth="90"/><ColumnDefinition Width="65"/></Grid.ColumnDefinitions>
             <TextBlock FontWeight="SemiBold" Text="生徒氏名"/>
             <TextBlock Grid.Column="1" FontWeight="SemiBold" Text="科目名"/>
             <TextBlock Grid.Column="2" FontWeight="SemiBold" Text="必要回数"/>
@@ -44,7 +44,7 @@
                 <DataTemplate x:DataType="local:LessonRequestRowViewModel">
                     <Grid Padding="4">
                         <Grid ColumnSpacing="6" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="LessonRequestRow_PointerEntered" PointerExited="LessonRequestRow_PointerExited">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="80"/><ColumnDefinition Width="55"/><ColumnDefinition Width="90"/><ColumnDefinition Width="45"/><ColumnDefinition Width="35"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="65"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="110"/><ColumnDefinition Width="*" MinWidth="100"/><ColumnDefinition Width="55"/><ColumnDefinition Width="*" MinWidth="110"/><ColumnDefinition Width="45"/><ColumnDefinition Width="35"/><ColumnDefinition Width="70"/><ColumnDefinition Width="*" MinWidth="90"/><ColumnDefinition Width="*" MinWidth="90"/><ColumnDefinition Width="*" MinWidth="90"/><ColumnDefinition Width="65"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <TextBlock Text="{x:Bind StudentName, Mode=OneWay}"/>
                             <TextBlock Grid.Column="1" Text="{x:Bind SubjectName, Mode=OneWay}"/>
                             <TextBlock Grid.Column="2" Text="{x:Bind Value.RequiredSessions, Mode=OneWay}"/>

@@ -19,6 +19,7 @@ public sealed class StudentRowViewModel : EditableRowViewModel
     public string ExternalIdText => Value?.ExternalId ?? PreviewExternalId;
 
     public string StatusText => Value is { Active: true } ? "在籍中" : "卒業・無効";
+    public string AllowGapText => Value is { AllowGap: true } ? "あり" : "なし";
 
     private string _draftFamilyName = "";
     public string DraftFamilyName { get => _draftFamilyName; set { if (_draftFamilyName == value) return; _draftFamilyName = value; OnPropertyChanged(); } }
@@ -67,6 +68,7 @@ public sealed class TeacherRowViewModel : EditableRowViewModel
     public string ExternalIdText => Value?.ExternalId ?? PreviewExternalId;
 
     public string StatusText => Value is { Active: true } ? "在籍中" : "卒業・無効";
+    public string AllowGapText => Value is { AllowGap: true } ? "あり" : "なし";
 
     private string _draftFamilyName = "";
     public string DraftFamilyName { get => _draftFamilyName; set { if (_draftFamilyName == value) return; _draftFamilyName = value; OnPropertyChanged(); } }

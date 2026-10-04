@@ -1,14 +1,38 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-04（checkpoint145）
+最終更新: 2026-10-04（checkpoint146）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-Current Version: `v0.24.0 (beta)`（Draft Release作成予定。生徒・講師の氏名を姓・名に分けて
-保存する変更。checkpoint145を参照）
-Latest Development Checkpoint: checkpoint 145（ユーザーから4点の依頼。①生徒・講師の氏名を
+Current Version: `v0.25.0 (beta)`（Draft Release作成予定。checkpoint145で承認されたPlanの
+Stage 2（空きコマ許可列・受講希望一覧の列幅改善）が完了。checkpoint146を参照）
+Latest Development Checkpoint: checkpoint 146（checkpoint145の4点依頼のうちStage 2
+「②空きコマ許可を生徒・講師一覧へ表示する」「④受講希望一覧の列幅が狭く学年・科目名が途中で
+切れる」を実装した。`SetupPageRowViewModels.cs`の`StudentRowViewModel`/`TeacherRowViewModel`に
+`AllowGapText`（`Value.AllowGap`が`true`なら「あり」、`false`なら「なし」）を追加し、
+`SetupPage.xaml`の生徒・講師タブの一覧表示列へ「空きコマ許可」列として追加した（最大連続
+コマ数/姓名と状態の間に配置）。`ImportPage.xaml`の受講希望一覧は、生徒氏名・科目名・通常
+担当講師・第1〜3希望の6列を固定px幅から`Width="*"`＋`MinWidth`（例: 生徒氏名は`MinWidth="110"`、
+元の90pxより拡大）へ変更し、ウィンドウの余白を使って表示するようにした。必要回数・優先度・
+1対1・最大連続上書き・空きコマ上書きの5列（値が短い）は固定幅のまま維持し、ウィンドウが
+狭い場合の横スクロール（`ScrollViewer`＋`MinWidth="960"`の`StackPanel`）もそのまま残した。
+見出しGridと一覧行Gridの両方で同じ列定義に揃える必要がある点に注意（既存のまま踏襲）。
+
+**v0.24.0のテスト不具合修正:** `SeminarSched.Architecture.Tests`の
+`RepositoryPolicyTests.CentralVersion_IsCurrentBetaVersion`は`Directory.Build.props`の
+`VersionPrefix`をハードコードした文字列と比較するテストだが、v0.24.0のリリース作業時にこの
+文字列を追従させ忘れており（`dotnet build`のみ再実行して`dotnet test`を再実行していなかった
+ため見落とした）、v0.24.0のコミットには失敗した状態のテストが含まれてしまっていた。v0.24.0は
+Draft Release作成・push済みのためバージョンを使い回さず、このStage 2の変更と合わせて
+v0.25.0としてリリースし、テストの期待値を`0.25.0`へ更新して修正した。**今後、バージョンを
+更新するたびに必ずこのテストの期待値も一緒に更新し、`dotnet test`で確認すること。**
+
+Stage 1（①氏名の姓名分割）はcheckpoint145で完了済み（v0.24.0）。Stage 3（③通常授業担当設定・
+コマ設定の行内編集化）は未着手で、次回以降のcheckpointで継続する。
+
+checkpoint 145（ユーザーから4点の依頼。①生徒・講師の氏名を
 姓・名に分けて保存する、②空きコマ許可を生徒・講師一覧へ表示する、③通常授業担当設定・コマ
 設定も生徒・講師ページと同様の行内編集方式にする、④受講希望一覧の列幅が狭く学年・科目名が
 途中で切れる。Plan modeで調査・計画のうえ承認を得て、Stage 1（①氏名の姓名分割）を実装し
