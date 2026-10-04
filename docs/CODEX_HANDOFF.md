@@ -6,6 +6,15 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
+**重要（checkpoint147で再確認）: バージョンごとのDraft Release作成とインストーラー添付は1つの
+不可分な作業として扱うこと。** v0.24.0〜v0.26.0の3バージョンを連続リリースした際、インストーラー
+のbuild・添付を毎回のサイクルから漏らしてしまい、ユーザーから「毎回githubでインストーラーを
+作ってください」と指摘されて初めて気づき、3バージョン分を事後的に`git checkout <sha>`で各
+バージョンのコミットへ戻って作り直した（タグは付けていないため、バージョンとコミットの対応は
+`git log`のコミットメッセージで確認する）。Draft Release作成の手順（`scripts/New-Installer.ps1`
+→`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-<version>.exe`）は
+例外なく毎回実行すること。
+
 Current Version: `v0.26.0 (beta)`（Draft Release作成予定。checkpoint145で承認されたPlanの
 Stage 1〜3すべて完了。checkpoint147を参照）
 Latest Development Checkpoint: checkpoint 147（checkpoint145の4点依頼のうちStage 3
