@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-05（checkpoint149）
+最終更新: 2026-10-05（checkpoint150）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -15,9 +15,53 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 →`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-<version>.exe`）は
 例外なく毎回実行すること。
 
-Current Version: `v0.27.1 (beta)`（Draft Release作成予定。表示崩れ3件のUI修正。
-checkpoint149を参照）
-Latest Development Checkpoint: checkpoint 149（ユーザーから3点の指摘。①講師指導可能科目の
+Current Version: `v0.27.2 (beta)`（Draft Release作成予定。受講希望一覧の表示崩れ・出力中
+インジケーター配置の修正。checkpoint150を参照）
+Latest Development Checkpoint: checkpoint 150（ユーザーから2件の指摘。①アンケート取込の
+受講希望一覧で「氏名と学年がくっついて表示されているように見えます。別の列にしてください」、
+②「出力時のぐるぐるを、出力ボタンの右に置く。また、このぐるぐるの右側に出力中と表示」。
+①はcheckpoint149の②（表が少しずれていたり、学年のカラムが存在しなくなっている）の再報告でも
+あり、checkpoint149では調査対象を誤って講師指導可能科目タブの校種見出しだと判断していたが、
+実際には受講希望一覧（生徒氏名列に学年が全角スペース区切りで連結されていた）の不具合だったと
+判明した。
+
+**①受講希望一覧の学年列分離・ずれ調査:** `ImportPage.xaml.cs`の`ReloadLessonRequestsAsync`で
+`$"{studentName(s)}　{s.Grade}"`のように生徒氏名へ学年を文字列結合してから
+`LessonRequestRowViewModel.ForExisting`へ渡していたのが原因。`LessonRequestRowViewModel`
+（`ImportPageRowViewModels.cs`）に独立した`Grade`プロパティを追加し、`ForExisting`のシグネチャへ
+`grade`引数を追加して結合をやめた。`ImportPage.xaml`では生徒氏名の右（列1）に学年専用の列
+（幅55、中央寄せ）を挿入し、以降の列インデックスを1つずつ後ろへずらした（見出しGrid・
+データ行Grid・末尾の変更/削除ボタンのGrid.Columnも含めて）。
+「隙間が大きい・ずれている」という指摘についても、見出し行Border・データ行Borderへ一時的に
+別々の背景色（Cyan/LightPink/Yellow）を付けて実機で列境界を直接比較する診断を行い、**列定義・
+列幅は見出しとデータで完全に一致しており、列のズレは存在しない**ことを確認した（checkpoint149
+での「講師指導可能科目の校種見出し」という調査対象の推定は誤りだったが、その時に見つけた
+中央寄せ問題自体の修正は無駄にはならず、v0.27.1としてそのまま出荷済み）。実際の「ずれて見える」
+原因は、必要回数・優先度・1対1・最大連続コマ数・空きコマ許可の各列が見出しの折り返し防止のため
+広めの固定幅を持つ一方、値が既定の左寄せで描画されるため、列の左端に値、右側に大きな余白が
+でき、隣の列と地続きに見えていたことだった。該当列（学年を含む）を見出し・データとも
+`HorizontalAlignment="Center" TextAlignment="Center"`へ変更し、値が列の中央（見出しの真下）に
+来るようにした。生徒氏名・科目名・通常担当講師・第1〜3希望（氏名系で長さが揺れる列）は
+従来通り左寄せのまま維持する。横スクロール発動の目安である`StackPanel MinWidth`は、学年列の
+追加分（55+6px）を見込んで960→1020へ更新した。
+
+**②出力中インジケーターの配置:** `OutputPage.xaml`の`GenerateButton`と`ProgressRing`
+（`x:Name="Progress"`）は、ページ全体を包む縦方向`StackPanel`の直接の子だったため、ボタンの下に
+独立した行としてリングが表示されていた。両者と新設の`TextBlock x:Name="ProgressText" Text="出力中"`
+（初期`Visibility="Collapsed"`）を`StackPanel Orientation="Horizontal"`でひとまとめにし、
+ボタンの右にリング→「出力中」の順で並ぶようにした。`OutputPage.xaml.cs`の`Generate_Click`で、
+`Progress.IsActive=true`と対にして`ProgressText.Visibility=Visibility.Visible`を設定し、
+`finally`ブロックの`Progress.IsActive=false`と対にして`Visibility.Collapsed`へ戻す。
+
+**検証:** 一時的な別パッケージIDでのdev-run実機確認で、①受講希望一覧の生徒氏名・学年が別列で
+表示され、必要回数・優先度・1対1・最大連続コマ数・空きコマ許可の値が見出しの真下（列の中央）に
+表示されること、②ウィンドウ幅を狭めると横スクロールが従来通り機能すること、③出力ボタンを
+押すと、ボタンの右にProgressRingと「出力中」が並んで表示され、出力完了後に両方とも消えて
+生成ファイル一覧が表示されることを確認した。既存の全テスト（計252件）がすべて通過することも
+確認済み。UIの表示崩れ2件の修正のためpatchを上げてv0.27.2とした。詳細は
+[docs/releases/v0.27.2.md](releases/v0.27.2.md)。
+
+checkpoint 149（ユーザーから3点の指摘。①講師指導可能科目の
 表の縦幅をもう少し長くし、ウィンドウ最下部より少し上側に表の最下部が来るようにしたい、
 ②同じ表で「表が少しずれていたり、学年のカラムが存在しなくなっている。また、おそらく右側が
 見切れているのではないか」、③ウィンドウを横に短くしてナビゲーションペインがアイコンのみに

@@ -10,7 +10,7 @@ public sealed partial class OutputPage : WorkflowPageBase
     private void Page_Loaded(object sender,RoutedEventArgs e)=>GenerateButton.IsEnabled=EnsureProject(ProjectRequired);
     private async void Generate_Click(object sender,RoutedEventArgs e)
     {
-        try{IsEnabled=false;Progress.IsActive=true;var result=await App.OutputPackage.GenerateAsync(App.ProjectService.Current!.Path,WorkspacePaths.Output);ToastNotificationState.ShowSuccess($"出力しました（授業{result.AssignmentCount}件・未配置{result.UnassignedCount}件）");App.Logger.Info($"Output generated: assignments={result.AssignmentCount} unassigned={result.UnassignedCount}");
+        try{IsEnabled=false;Progress.IsActive=true;ProgressText.Visibility=Visibility.Visible;var result=await App.OutputPackage.GenerateAsync(App.ProjectService.Current!.Path,WorkspacePaths.Output);ToastNotificationState.ShowSuccess($"出力しました（授業{result.AssignmentCount}件・未配置{result.UnassignedCount}件）");App.Logger.Info($"Output generated: assignments={result.AssignmentCount} unassigned={result.UnassignedCount}");
             _outputDirectory=result.DirectoryPath;
             var files=new List<OutputFileItem>{
                 new(result.OverallExcelPath,Path.GetFileName(result.OverallExcelPath)),new(result.OverallPdfPath,Path.GetFileName(result.OverallPdfPath)),
@@ -22,7 +22,7 @@ public sealed partial class OutputPage : WorkflowPageBase
             if(Directory.Exists(result.TeacherPacketDirectory))
                 files.AddRange(Directory.GetFiles(result.TeacherPacketDirectory).OrderBy(x=>x,StringComparer.Ordinal).Select(f=>new OutputFileItem(f,$"講師配布用講師別時間割/{Path.GetFileName(f)}")));
             GeneratedFiles.ItemsSource=files;OutputFilesPanel.Visibility=Visibility.Visible;
-        }catch(Exception ex)when(ex is IOException or UnauthorizedAccessException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException){Status.Severity=InfoBarSeverity.Error;Status.Title="出力できませんでした";Status.Message=ex.Message;Status.IsOpen=true;App.Logger.Error("Output generation failed",ex);}finally{Progress.IsActive=false;IsEnabled=true;}
+        }catch(Exception ex)when(ex is IOException or UnauthorizedAccessException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException){Status.Severity=InfoBarSeverity.Error;Status.Title="出力できませんでした";Status.Message=ex.Message;Status.IsOpen=true;App.Logger.Error("Output generation failed",ex);}finally{Progress.IsActive=false;ProgressText.Visibility=Visibility.Collapsed;IsEnabled=true;}
     }
 
     private async void OpenSelectedFile_Click(object sender,RoutedEventArgs e)

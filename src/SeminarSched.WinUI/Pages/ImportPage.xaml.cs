@@ -118,7 +118,7 @@ public sealed partial class ImportPage : WorkflowPageBase
         {
             var s=studentValues.Single(x=>x.Id==value.StudentId);
             return LessonRequestRowViewModel.ForExisting(value,
-                $"{studentName(s)}　{s.Grade}",
+                studentName(s), s.Grade,
                 subjectValues.Single(x=>x.Id==value.SubjectId).DisplayName,
                 TeacherName(value.RegularTeacherId), TeacherName(value.PreferredTeacher1Id), TeacherName(value.PreferredTeacher2Id), TeacherName(value.PreferredTeacher3Id),
                 s.DefaultMaxConsecutiveSlots, s.AllowGap,

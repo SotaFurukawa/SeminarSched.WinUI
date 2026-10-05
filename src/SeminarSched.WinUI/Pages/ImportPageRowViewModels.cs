@@ -26,6 +26,7 @@ public sealed class LessonRequestRowViewModel : EditableRowViewModel
 {
     public LessonRequest? Value { get; private set; }
     public string StudentName { get; private set; } = "";
+    public string Grade { get; private set; } = "";
     public string SubjectName { get; private set; } = "";
     public string RegularTeacherName { get; private set; } = "";
     public string Preferred1Name { get; private set; } = "";
@@ -53,13 +54,13 @@ public sealed class LessonRequestRowViewModel : EditableRowViewModel
     private LessonRequestRowViewModel() { }
 
     public static LessonRequestRowViewModel ForExisting(
-        LessonRequest value, string studentName, string subjectName, string regularTeacherName,
+        LessonRequest value, string studentName, string grade, string subjectName, string regularTeacherName,
         string preferred1Name, string preferred2Name, string preferred3Name,
         int studentDefaultMaxConsecutiveSlots, bool studentDefaultAllowGap,
         IReadOnlyList<NamedOption<Student>> studentOptions, IReadOnlyList<NamedOption<Subject>> subjectOptions, IReadOnlyList<NamedOption<Teacher?>> teacherOptions) =>
         new()
         {
-            Value = value, StudentName = studentName, SubjectName = subjectName, RegularTeacherName = regularTeacherName,
+            Value = value, StudentName = studentName, Grade = grade, SubjectName = subjectName, RegularTeacherName = regularTeacherName,
             Preferred1Name = preferred1Name, Preferred2Name = preferred2Name, Preferred3Name = preferred3Name,
             StudentDefaultMaxConsecutiveSlots = studentDefaultMaxConsecutiveSlots, StudentDefaultAllowGap = studentDefaultAllowGap,
             StudentOptions = studentOptions, SubjectOptions = subjectOptions, TeacherOptions = teacherOptions,
