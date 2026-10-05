@@ -207,8 +207,37 @@ public sealed partial class SetupPage : WorkflowPageBase
         ApplyStudentFilter();
     }
 
-    private void StudentRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, true);
-    private void StudentRow_PointerExited(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, false);
+    // ユーザー要望（checkpoint148）「有効・無効だけでなく、そもそもの存在を抹消したい場合（誤って
+    // テストデータを入れてしまったなど）、削除できるように」への対応。削除は取り消せないため、
+    // DeleteSlot_Click/LessonRequestRow_Delete_Clickと同じ確認ダイアログを経由する。
+    // LessonRequest.StudentIdはON DELETE RESTRICTのため、受講希望が1件でも登録済みの生徒は
+    // 削除できない（SqliteMasterDataRepository.DeleteStudentAsyncのコメント参照）。
+    private async void StudentRow_Delete_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.DataContext is not StudentRowViewModel { Value: not null } row) return;
+        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = $"生徒「{row.Value.FullName}」を削除しますか？", Content = "この操作は取り消せません。", PrimaryButtonText = "削除", CloseButtonText = "キャンセル", DefaultButton = ContentDialogButton.Close };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        try
+        {
+            IsEnabled = false;
+            var path = App.ProjectService.Current?.Path ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
+            await App.MasterData.DeleteStudentAsync(path, row.Value.Id);
+            await ReloadAsync();
+            Show(InfoBarSeverity.Success, "生徒を削除しました", "");
+        }
+        catch (SqliteException exception)
+        {
+            Show(InfoBarSeverity.Error, "生徒を削除できませんでした", exception.SqliteErrorCode == 19 ? "この生徒には受講希望が登録されているため削除できません。先に受講希望を削除するか、在籍状態を「卒業・無効」にしてください。" : exception.Message);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            Show(InfoBarSeverity.Error, "生徒を削除できませんでした", exception.Message);
+        }
+        finally { IsEnabled = true; }
+    }
+
+    private void StudentRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SetActionPanelVisible((Grid)sender, true);
+    private void StudentRow_PointerExited(object sender, PointerRoutedEventArgs e) => SetActionPanelVisible((Grid)sender, false);
 
     private void AddTeacherRow_Click(object sender, RoutedEventArgs e)
     {
@@ -255,8 +284,35 @@ public sealed partial class SetupPage : WorkflowPageBase
         ApplyTeacherFilter();
     }
 
-    private void TeacherRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, true);
-    private void TeacherRow_PointerExited(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, false);
+    // StudentRow_Delete_Clickと同じ理由・同じ形。Assignment.TeacherIdはON DELETE RESTRICTのため、
+    // 既に時間割へ配置済みの講師は削除できない（SqliteMasterDataRepository.DeleteTeacherAsyncの
+    // コメント参照）。
+    private async void TeacherRow_Delete_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.DataContext is not TeacherRowViewModel { Value: not null } row) return;
+        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = $"講師「{row.Value.FullName}」を削除しますか？", Content = "この操作は取り消せません。", PrimaryButtonText = "削除", CloseButtonText = "キャンセル", DefaultButton = ContentDialogButton.Close };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        try
+        {
+            IsEnabled = false;
+            var path = App.ProjectService.Current?.Path ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
+            await App.MasterData.DeleteTeacherAsync(path, row.Value.Id);
+            await ReloadAsync();
+            Show(InfoBarSeverity.Success, "講師を削除しました", "");
+        }
+        catch (SqliteException exception)
+        {
+            Show(InfoBarSeverity.Error, "講師を削除できませんでした", exception.SqliteErrorCode == 19 ? "この講師は既に時間割へ配置されているため削除できません。先に時間割の配置を解除するか、在籍状態を「卒業・無効」にしてください。" : exception.Message);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            Show(InfoBarSeverity.Error, "講師を削除できませんでした", exception.Message);
+        }
+        finally { IsEnabled = true; }
+    }
+
+    private void TeacherRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SetActionPanelVisible((Grid)sender, true);
+    private void TeacherRow_PointerExited(object sender, PointerRoutedEventArgs e) => SetActionPanelVisible((Grid)sender, false);
 
     private void AddSubjectRow_Click(object sender, RoutedEventArgs e)
     {
@@ -308,6 +364,11 @@ public sealed partial class SetupPage : WorkflowPageBase
     private void SubjectRow_PointerExited(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, false);
 
     private static void SetChangeButtonVisible(Grid displayRow, bool visible) => VisualTreeHelpers.SetNamedChildVisible(displayRow, "ChangeButton", visible);
+
+    // ユーザー要望（checkpoint148）「変更の右に削除を入れてほしい」への対応。生徒・講師タブは
+    // 変更・削除の2ボタンをStackPanel（x:Name="ChangeDeletePanel"、ImportPageの受講希望一覧と
+    // 同じ命名）へまとめたため、SetChangeButtonVisibleとは別の名前でホバー表示を切り替える。
+    private static void SetActionPanelVisible(Grid displayRow, bool visible) => VisualTreeHelpers.SetNamedChildVisible(displayRow, "ChangeDeletePanel", visible);
 
     // ユーザー要望（checkpoint142）「それを押すと、生徒一覧の最下部に移動する」への対応。この
     // ページのListView（生徒・講師・科目）は、外側のページ全体を包むScrollViewer内のStackPanelに

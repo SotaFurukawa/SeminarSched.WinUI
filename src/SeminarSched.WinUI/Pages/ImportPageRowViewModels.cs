@@ -36,20 +36,32 @@ public sealed class LessonRequestRowViewModel : EditableRowViewModel
     public IReadOnlyList<NamedOption<Subject>> SubjectOptions { get; private init; } = [];
     public IReadOnlyList<NamedOption<Teacher?>> TeacherOptions { get; private init; } = [];
 
+    // ユーザー要望（checkpoint148）「空きコマ上書きについて、指定なしの場合は許可か不許可かを
+    // 生徒個人の設定を表示してください。最大連続コマ数も同様。上書きという言葉を用いず、数字と
+    // 許可不許可で書くこと」への対応。この受講希望のStudentId上書きが無い場合に実際に使われる値
+    // （生徒本人のDefaultMaxConsecutiveSlots/AllowGap）をReloadLessonRequestsAsyncから渡しておき、
+    // 「既定値」「指定なし」といったプレースホルダーではなく、実際に効く数値・許可/不許可を
+    // そのまま表示する（SqliteScheduleRunService.csのCOALESCE(r.MaxConsecutiveSlotsOverride,
+    // s.DefaultMaxConsecutiveSlots)等と同じ解決順）。
+    public int StudentDefaultMaxConsecutiveSlots { get; private init; } = 2;
+    public bool StudentDefaultAllowGap { get; private init; }
+
     public string OneToOneText => Value is { OneToOneRequired: true } ? "○" : "";
-    public string MaxConsecutiveOverrideText => Value?.MaxConsecutiveSlotsOverride is { } n ? n.ToString() : "既定値";
-    public string AllowGapOverrideText => Value?.AllowGapOverride switch { true => "許可", false => "不許可", _ => "指定なし" };
+    public string MaxConsecutiveText => (Value?.MaxConsecutiveSlotsOverride ?? StudentDefaultMaxConsecutiveSlots).ToString();
+    public string AllowGapText => (Value?.AllowGapOverride ?? StudentDefaultAllowGap) ? "許可" : "不許可";
 
     private LessonRequestRowViewModel() { }
 
     public static LessonRequestRowViewModel ForExisting(
         LessonRequest value, string studentName, string subjectName, string regularTeacherName,
         string preferred1Name, string preferred2Name, string preferred3Name,
+        int studentDefaultMaxConsecutiveSlots, bool studentDefaultAllowGap,
         IReadOnlyList<NamedOption<Student>> studentOptions, IReadOnlyList<NamedOption<Subject>> subjectOptions, IReadOnlyList<NamedOption<Teacher?>> teacherOptions) =>
         new()
         {
             Value = value, StudentName = studentName, SubjectName = subjectName, RegularTeacherName = regularTeacherName,
             Preferred1Name = preferred1Name, Preferred2Name = preferred2Name, Preferred3Name = preferred3Name,
+            StudentDefaultMaxConsecutiveSlots = studentDefaultMaxConsecutiveSlots, StudentDefaultAllowGap = studentDefaultAllowGap,
             StudentOptions = studentOptions, SubjectOptions = subjectOptions, TeacherOptions = teacherOptions,
         };
 

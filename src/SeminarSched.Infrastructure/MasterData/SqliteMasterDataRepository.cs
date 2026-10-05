@@ -36,6 +36,21 @@ public sealed class SqliteMasterDataRepository : IMasterDataRepository
         return student with { Id = id };
     }
 
+    // ユーザー要望（checkpoint148）「誤ってテストデータを入れてしまった場合など、そもそもの存在を
+    // 抹消したい」への対応。LessonRequest.StudentIdはON DELETE RESTRICTのため、受講希望が
+    // 1件でも存在する生徒を削除しようとするとSqliteExceptionが飛ぶ（呼び出し側で捕捉してエラー
+    // 表示する）。RegularLessonProfile/StudentAvailability/GroupLessonEnrollmentはON DELETE
+    // CASCADEのため自動的に削除される。
+    public async Task DeleteStudentAsync(string projectPath, long studentId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken); await EnsureSchemaAsync(connection, cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM Student WHERE Id=@id; SELECT changes();";
+        command.Parameters.AddWithValue("@id", studentId);
+        var changed = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken));
+        if (changed != 1) throw new InvalidOperationException("削除対象の生徒が見つかりません。");
+    }
+
     public async Task<IReadOnlyList<Teacher>> GetTeachersAsync(string projectPath, bool includeInactive = true, CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken); await EnsureSchemaAsync(connection, cancellationToken);
@@ -54,6 +69,20 @@ public sealed class SqliteMasterDataRepository : IMasterDataRepository
             "ExternalId=@externalId, Name=@name, FamilyName=@family, GivenName=@given, AllowGap=@allowGap, Note=@note, Active=@active",
             command => { command.Parameters.AddWithValue("@externalId", teacher.ExternalId); command.Parameters.AddWithValue("@name", teacher.FullName); command.Parameters.AddWithValue("@family", teacher.FamilyName); command.Parameters.AddWithValue("@given", teacher.GivenName); command.Parameters.AddWithValue("@allowGap", teacher.AllowGap); command.Parameters.AddWithValue("@note", teacher.Note); command.Parameters.AddWithValue("@active", teacher.Active); }, cancellationToken);
         return teacher with { Id = id };
+    }
+
+    // DeleteStudentAsyncと同じ理由。Assignment.TeacherIdはON DELETE RESTRICTのため、既に時間割へ
+    // 配置済みの講師は削除できない。TeacherQualification/TeacherUnavailability/TeacherAvailability/
+    // GroupLessonTeacherBlockはON DELETE CASCADEで自動削除、LessonRequestの通常担当講師・
+    // 第1〜3希望講師とGroupLessonClassの担当講師はON DELETE SET NULLで参照が外れるだけで残る。
+    public async Task DeleteTeacherAsync(string projectPath, long teacherId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken); await EnsureSchemaAsync(connection, cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM Teacher WHERE Id=@id; SELECT changes();";
+        command.Parameters.AddWithValue("@id", teacherId);
+        var changed = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken));
+        if (changed != 1) throw new InvalidOperationException("削除対象の講師が見つかりません。");
     }
 
     public async Task<IReadOnlyList<Subject>> GetSubjectsAsync(string projectPath, bool includeInactive = true, CancellationToken cancellationToken = default)

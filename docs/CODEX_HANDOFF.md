@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-04（checkpoint147）
+最終更新: 2026-10-05（checkpoint148）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -15,9 +15,67 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 →`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-<version>.exe`）は
 例外なく毎回実行すること。
 
-Current Version: `v0.26.0 (beta)`（Draft Release作成予定。checkpoint145で承認されたPlanの
-Stage 1〜3すべて完了。checkpoint147を参照）
-Latest Development Checkpoint: checkpoint 147（checkpoint145の4点依頼のうちStage 3
+Current Version: `v0.27.0 (beta)`（Draft Release作成予定。生徒・講師の削除機能追加。
+checkpoint148を参照）
+Latest Development Checkpoint: checkpoint 148（ユーザーから3点の依頼。①生徒・講師タブの
+「変更」ボタンの有効範囲が狭く、ボタンへカーソルを動かす途中で消えてしまう、②誤ってテスト
+データを入れた場合などに生徒・講師そのものを削除できるようにしたい（確認ダイアログ必須）、
+③アンケート取込の受講希望一覧で通常担当講師・第1〜3希望講師をフルネームではなく苗字のみ表示し、
+列幅を抑えて右側のはみ出し・見出しの2行折り返しを解消してほしい。加えて、受講希望一覧の
+「最大連続上書き」「空きコマ上書き」列について、未指定の場合に「既定値」「指定なし」ではなく
+生徒本人の実際の設定値（数字・許可/不許可）をそのまま表示し、「上書き」という語を使わないよう
+にしてほしい、という直接の追加指示もあった。
+
+**①ホバー有効範囲の修正:** 原因はWinUIの既知の挙動で、`Background`が未設定（null）の
+`Grid`は、子要素が描画されていない空白部分でポインターイベントを受け取らない
+（`PointerEntered`/`PointerExited`が子要素の実際の描画範囲でしか発火しない）。生徒・講師・
+科目・通常授業担当設定タブ、および受講希望一覧の行内編集で使っている表示用`Grid`
+（`PointerEntered`/`PointerExited`を購読している側）すべてに`Background="Transparent"`を
+追加し、行全体を確実にヒットテスト対象にした（探索方針並び替え行の`PolicyRow`は元から
+`Background="Transparent"`を持っており、この行だけ同種の不具合が起きていなかったことが
+今回の原因特定の手がかりになった）。
+
+**②生徒・講師の削除機能:** `IMasterDataRepository`に`DeleteStudentAsync`/
+`DeleteTeacherAsync`を追加し、`SqliteMasterDataRepository`で実装（`DeleteTimeSlotAsync`
+/`DeleteLessonRequestAsync`と同じ、単純な`DELETE ... ; SELECT changes();`パターン）。
+スキーマを調査した結果、`LessonRequest.StudentId`は`ON DELETE RESTRICT`のため受講希望が
+1件でもある生徒は削除できず（`RegularLessonProfile`/`StudentAvailability`/
+`GroupLessonEnrollment`は`ON DELETE CASCADE`で自動的に片付く）、`Assignment.TeacherId`も
+`ON DELETE RESTRICT`のため既に時間割へ配置済みの講師は削除できない（`TeacherQualification`
+等は`CASCADE`、`LessonRequest`の各種希望講師欄や`GroupLessonClass.TeacherId`は
+`SET NULL`）。`SqliteException.SqliteErrorCode==19`を`DeleteSlot_Click`と同じ要領で捕捉し、
+「この生徒には受講希望が登録されているため削除できません。先に受講希望を削除するか、在籍状態を
+『卒業・無効』にしてください。」のような理由・対処法入りのメッセージへ変換する。WinUI側は
+`LessonRequestRow_Delete_Click`と同じ確認ダイアログパターンを踏襲し、生徒・講師タブの表示用
+Gridに`StackPanel x:Name="ChangeDeletePanel"`（変更・削除の2ボタン、受講希望一覧と同じ命名）
+を追加した。ホバー表示の切り替えは、科目・通常授業担当設定タブが引き続き使う単一ボタン版
+`SetChangeButtonVisible`とは別に、新設の`SetActionPanelVisible`（対象を"ChangeDeletePanel"
+にした別メソッド）を用意して使い分けている。
+
+**③④受講希望一覧の表示改善:** `ImportPage.xaml.cs`の`TeacherName`ローカル関数を
+`.FullName`から`.FamilyName`へ変更（通常担当講師・第1〜3希望講師の4列のみ。生徒氏名列は
+引き続きフルネーム）。列幅を苗字表示向けに縮小しつつ、「最大連続コマ数」「空きコマ許可」の
+2列は見出しが1行に収まる幅へ拡大した。`LessonRequestRowViewModel`に
+`StudentDefaultMaxConsecutiveSlots`/`StudentDefaultAllowGap`を追加し、`ReloadLessonRequestsAsync`
+から生徒本人の`DefaultMaxConsecutiveSlots`/`AllowGap`を渡すことで、`MaxConsecutiveText`/
+`AllowGapText`（旧`MaxConsecutiveOverrideText`/`AllowGapOverrideText`から改称）が
+`Value?.MaxConsecutiveSlotsOverride ?? StudentDefaultMaxConsecutiveSlots`のように、未指定時は
+`SqliteScheduleRunService.cs`の`COALESCE(r.MaxConsecutiveSlotsOverride,s.DefaultMaxConsecutiveSlots)`
+と全く同じ解決順で実際の値を計算して表示するようにした。列見出し・編集パネルのHeaderから
+「上書き」の文言をすべて除去した（例:「最大連続コマ数上書き（0=既定値）」→
+「最大連続コマ数（0=既定値）」）。
+
+**検証:** 一時的な別パッケージIDでのdev-run実機確認で、①生徒一覧へ追加した安全なテスト行の
+削除（確認ダイアログ→削除→一覧から消え「生徒を削除しました」と表示）、②既に受講希望のある
+生徒（飯島あいみ）の削除を試みるとブロックされ理由付きエラーが出ること、③行ホバーで
+「変更」「削除」双方へ問題なくカーソルを到達できること、④受講希望一覧で苗字のみ表示・見出し
+1行化・右側はみ出し解消がすべて同時に確認できたこと、⑤「最大連続コマ数」列が実際の値
+（例: 2）、「空きコマ許可」列が実際の許可/不許可（例: 不許可）をプレースホルダーなしで
+表示すること、⑥編集パネルのHeaderに「上書き」の語が残っていないことをソース上で確認した。
+既存の全テスト（計252件）がすべて通過することも確認済み。新機能（削除）のためminorを上げて
+v0.27.0（patchを0へ戻す）とした。詳細は[docs/releases/v0.27.0.md](releases/v0.27.0.md)。
+
+checkpoint 147（checkpoint145の4点依頼のうちStage 3
 「③通常授業担当設定とコマ設定も生徒・講師ページと同様の行内編集方式にする」を実装し、
 Plan全体（Stage 1〜3）を完了した。`SetupPageRowViewModels.cs`に`RegularLessonRowViewModel`
 （`ImportPageRowViewModels.cs`の`LessonRequestRowViewModel`と同じ考え方で、`StudentOptions`/

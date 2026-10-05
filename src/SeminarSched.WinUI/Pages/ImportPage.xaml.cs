@@ -108,7 +108,10 @@ public sealed partial class ImportPage : WorkflowPageBase
         _teacherOptions=new NamedOption<Teacher?>[]{new(null,"（指定なし）")}.Concat(teacherValues.Select(x=>new NamedOption<Teacher?>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.FullName}"))).ToArray();
 
         var lessonRequests=await App.MasterData.GetLessonRequestsAsync(path);
-        string TeacherName(long? id)=>id is long tid?teacherValues.Single(x=>x.Id==tid).FullName:"指定なし";
+        // ユーザー要望（checkpoint148）「通常担当講師、第一希望から第三希望は講師名を苗字のみ表示。
+        // これにより列幅を短く設定できるはず」への対応。生徒氏名（StudentName、下記studentName）は
+        // 引き続きフルネームのまま、担当講師系の列だけ苗字（FamilyName）のみにする。
+        string TeacherName(long? id)=>id is long tid?teacherValues.Single(x=>x.Id==tid).FamilyName:"指定なし";
         var previouslyEditing=_lessonRequestRows.FirstOrDefault(r=>r.IsEditing&&r!=_lessonRequestRowBeingSaved);
         _lessonRequestRowBeingSaved=null;
         _lessonRequestRows=lessonRequests.Select(value=>
@@ -118,6 +121,7 @@ public sealed partial class ImportPage : WorkflowPageBase
                 $"{studentName(s)}　{s.Grade}",
                 subjectValues.Single(x=>x.Id==value.SubjectId).DisplayName,
                 TeacherName(value.RegularTeacherId), TeacherName(value.PreferredTeacher1Id), TeacherName(value.PreferredTeacher2Id), TeacherName(value.PreferredTeacher3Id),
+                s.DefaultMaxConsecutiveSlots, s.AllowGap,
                 _studentOptions, _subjectOptions, _teacherOptions);
         }).ToList();
         if(previouslyEditing is{IsNew:true})

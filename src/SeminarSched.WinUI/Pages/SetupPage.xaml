@@ -41,7 +41,7 @@
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="local:StudentRowViewModel">
                             <Grid Padding="4">
-                                <Grid ColumnSpacing="8" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="StudentRow_PointerEntered" PointerExited="StudentRow_PointerExited">
+                                <Grid ColumnSpacing="8" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="StudentRow_PointerEntered" PointerExited="StudentRow_PointerExited">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="110"/><ColumnDefinition Width="110"/><ColumnDefinition Width="100"/><ColumnDefinition Width="110"/><ColumnDefinition Width="90"/><ColumnDefinition Width="80"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="{x:Bind ExternalIdText, Mode=OneWay}"/>
                                     <TextBlock Grid.Column="1" Text="{x:Bind Value.FamilyName, Mode=OneWay}"/>
@@ -50,7 +50,10 @@
                                     <TextBlock Grid.Column="4" Text="{x:Bind Value.DefaultMaxConsecutiveSlots, Mode=OneWay}"/>
                                     <TextBlock Grid.Column="5" Text="{x:Bind AllowGapText, Mode=OneWay}"/>
                                     <TextBlock Grid.Column="6" Text="{x:Bind StatusText, Mode=OneWay}"/>
-                                    <Button x:Name="ChangeButton" Grid.Column="7" Content="変更" Visibility="Collapsed" Click="StudentRow_Change_Click"/>
+                                    <StackPanel x:Name="ChangeDeletePanel" Grid.Column="7" Orientation="Horizontal" Spacing="4" Visibility="Collapsed">
+                                        <Button Content="変更" Click="StudentRow_Change_Click"/>
+                                        <Button Content="削除" Click="StudentRow_Delete_Click"/>
+                                    </StackPanel>
                                 </Grid>
                                 <Grid ColumnSpacing="8" Visibility="{x:Bind EditVisibility, Mode=OneWay}">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="80"/><ColumnDefinition Width="80"/><ColumnDefinition Width="80"/><ColumnDefinition Width="90"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="160"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -78,14 +81,17 @@
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="local:TeacherRowViewModel">
                             <Grid Padding="4">
-                                <Grid ColumnSpacing="8" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="TeacherRow_PointerEntered" PointerExited="TeacherRow_PointerExited">
+                                <Grid ColumnSpacing="8" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="TeacherRow_PointerEntered" PointerExited="TeacherRow_PointerExited">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="110"/><ColumnDefinition Width="110"/><ColumnDefinition Width="90"/><ColumnDefinition Width="80"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="{x:Bind ExternalIdText, Mode=OneWay}"/>
                                     <TextBlock Grid.Column="1" Text="{x:Bind Value.FamilyName, Mode=OneWay}"/>
                                     <TextBlock Grid.Column="2" Text="{x:Bind Value.GivenName, Mode=OneWay}"/>
                                     <TextBlock Grid.Column="3" Text="{x:Bind AllowGapText, Mode=OneWay}"/>
                                     <TextBlock Grid.Column="4" Text="{x:Bind StatusText, Mode=OneWay}"/>
-                                    <Button x:Name="ChangeButton" Grid.Column="5" Content="変更" Visibility="Collapsed" Click="TeacherRow_Change_Click"/>
+                                    <StackPanel x:Name="ChangeDeletePanel" Grid.Column="5" Orientation="Horizontal" Spacing="4" Visibility="Collapsed">
+                                        <Button Content="変更" Click="TeacherRow_Change_Click"/>
+                                        <Button Content="削除" Click="TeacherRow_Delete_Click"/>
+                                    </StackPanel>
                                 </Grid>
                                 <Grid ColumnSpacing="8" Visibility="{x:Bind EditVisibility, Mode=OneWay}">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="110"/><ColumnDefinition Width="110"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="160"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -149,7 +155,7 @@
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="local:RegularLessonRowViewModel">
                             <Grid Padding="4">
-                                <Grid ColumnSpacing="8" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="RegularLessonRow_PointerEntered" PointerExited="RegularLessonRow_PointerExited">
+                                <Grid ColumnSpacing="8" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="RegularLessonRow_PointerEntered" PointerExited="RegularLessonRow_PointerExited">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="140"/><ColumnDefinition Width="160"/><ColumnDefinition Width="80"/><ColumnDefinition Width="80"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="{x:Bind StudentName, Mode=OneWay}"/>
                                     <TextBlock Grid.Column="1" Text="{x:Bind SubjectName, Mode=OneWay}"/>
@@ -321,7 +327,7 @@
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="local:SubjectRowViewModel">
                             <Grid Padding="4">
-                                <Grid ColumnSpacing="8" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="SubjectRow_PointerEntered" PointerExited="SubjectRow_PointerExited">
+                                <Grid ColumnSpacing="8" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="SubjectRow_PointerEntered" PointerExited="SubjectRow_PointerExited">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="130"/><ColumnDefinition Width="180"/><ColumnDefinition Width="80"/><ColumnDefinition Width="120"/><ColumnDefinition Width="80"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="{x:Bind Value.SortOrder, Mode=OneWay}"/>
                                     <TextBlock Grid.Column="1" Text="{x:Bind Value.Code, Mode=OneWay}"/>
