@@ -90,7 +90,11 @@ public sealed partial class SetupPage : WorkflowPageBase
 
     private void Page_Unloaded(object sender, RoutedEventArgs e) => SetupPageNavState.Deactivate();
 
-    private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e) => SetupPageNavState.SetSelectedTabIndex(Tabs.SelectedIndex);
+    private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        SetupPageNavState.SetSelectedTabIndex(Tabs.SelectedIndex);
+        if (ReferenceEquals(Tabs.SelectedItem, QualificationTabItem)) DispatcherQueue.TryEnqueue(UpdateQualificationMatrixAvailableHeight);
+    }
 
     // MainWindowがナビゲーションペインの子項目（1.1〜1.8）をクリックしたとき、既にSetupPageが
     // 開かれている場合はFrame.Navigateを経由せずここを直接呼ぶ（同じPage型へのFrame.Navigateは
@@ -587,11 +591,19 @@ public sealed partial class SetupPage : WorkflowPageBase
         Place(QualificationMatrixCorner,HeaderCell("講師氏名"),1,1);
 
         // 見出し（右上、横だけ本体に連動してスクロール）: 校種グループ＋科目名。
+        // ユーザー報告（checkpoint149）「表が少しずれていたり、学年のカラムが存在しなくなっている」
+        // への対応。校種グループの見出しは複数列（高校は14列=980px）にまたがるセルで、中央寄せの
+        // ままだと見出し文字がグループの中央、すなわち初期スクロール位置ではビューポート外に
+        // 描画されてしまい、実質「見出しが消えている」ように見えていた（バグ自体はグループ分けの
+        // ロジックではなく、幅の広いセル内でのテキスト位置にあった）。グループ見出しだけ左寄せにし、
+        // グループの先頭列が見えた時点で見出しも読めるようにする。
         var columnIndex=0;
         foreach(var group in subjects.GroupBy(s=>s.Value.SchoolLevel))
         {
             var count=group.Count();
-            Place(QualificationMatrixHeader,HeaderCell(group.Key),0,columnIndex,count);
+            var groupHeader=HeaderCell(group.Key);
+            if(groupHeader.Child is TextBlock groupLabel){groupLabel.HorizontalAlignment=HorizontalAlignment.Left;groupLabel.TextAlignment=TextAlignment.Left;}
+            Place(QualificationMatrixHeader,groupHeader,0,columnIndex,count);
             columnIndex+=count;
         }
         for(var c=0;c<subjects.Length;c++)Place(QualificationMatrixHeader,HeaderCell(StripSchoolLevelPrefix(subjects[c].Value.DisplayName)),1,c);
@@ -612,7 +624,32 @@ public sealed partial class SetupPage : WorkflowPageBase
                 Place(QualificationMatrixBody,cell,r,c);
             }
         }
+
+        DispatcherQueue.TryEnqueue(UpdateQualificationMatrixAvailableHeight);
     }
+
+    // ユーザー要望（checkpoint149）「縦幅をもう少し長くしたい。ウィンドウ最下部よりも少し上側に、
+    // 表の最下部が来るようにしてほしい」への対応。このタブはページ全体を包む外側ScrollViewer+
+    // StackPanel（Auto高さ）の中にあり、MaxHeightを固定pxにする以外に「残りのウィンドウ高さいっぱい」
+    // を表現する素直な方法が無いため、実測のウィンドウ高さから動的に計算してMaxHeightへ反映する。
+    // タブ非表示中（Collapsed）はTransformToVisualの戻り値が信用できないため、QualificationTabItem
+    // が選択されているときだけ計算する。呼び出し元（RenderQualificationMatrix直後・タブ選択変更・
+    // ウィンドウリサイズ）はいずれも呼び出し時点でレイアウトが未確定な場合があるため、
+    // DispatcherQueue.TryEnqueueでレイアウトパス後まで計算を遅延させている。
+    private const double QualificationMatrixBottomMargin = 24; // 外側StackPanelのPadding(24)と揃える
+    private const double QualificationMatrixMinHeight = 200;
+
+    private void UpdateQualificationMatrixAvailableHeight()
+    {
+        if (XamlRoot is null || !ReferenceEquals(Tabs.SelectedItem, QualificationTabItem)) return;
+        var topY = QualificationMatrixBodyScroll.TransformToVisual(XamlRoot.Content).TransformPoint(new Windows.Foundation.Point(0, 0)).Y;
+        var available = XamlRoot.Size.Height - topY - QualificationMatrixBottomMargin;
+        var height = Math.Max(QualificationMatrixMinHeight, available);
+        QualificationMatrixBodyScroll.MaxHeight = height;
+        QualificationMatrixLeftScroll.MaxHeight = height;
+    }
+
+    private void Page_SizeChanged(object sender, SizeChangedEventArgs e) => DispatcherQueue.TryEnqueue(UpdateQualificationMatrixAvailableHeight);
 
     private void QualificationMatrixBodyScroll_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
     {

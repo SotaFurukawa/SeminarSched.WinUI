@@ -102,6 +102,14 @@
                      （checkpoint118、ユーザー指摘。円が56x56のままだと狭いCompactペイン幅から
                      はみ出すため、32x32へ縮小した）。表示切替はMainWindow.xaml.csの
                      RefreshOptimizationStatus()がNavView.DisplayModeを見て行う。 -->
+                <!-- ユーザー報告（checkpoint149）「ウィンドウを横に短くしたときの、ゲージについて、
+                     少し左に寄っています。他のアイコンと同じように中央に来るようにしてください」
+                     への対応。NavigationViewItemの標準アイコンは選択時のハイライト（ピル）が
+                     ペイン左端から約7〜8px内側から始まる領域の中で中央寄せされるが、PaneFooterの
+                     コンテンツ領域はその内側マージンを持たず、単純にHorizontalAlignment="Center"
+                     のままだと標準アイコンより実測で約4px左に寄って見えていた（Margin.Leftを
+                     ピクセル単位でずらして実機検証し、Margin="6,4,6,6"→"10,4,6,6"で標準アイコンの
+                     中心線と一致することを確認済み）。 -->
                 <Grid>
                     <StackPanel
                         x:Name="OptimizationStatusPanelExpanded"
@@ -120,7 +128,7 @@
                         x:Name="OptimizationStatusPanelCompact"
                         Width="28"
                         Height="28"
-                        Margin="6,4,6,6"
+                        Margin="10,4,6,6"
                         HorizontalAlignment="Center"
                         Tapped="OptimizationStatusPanel_Tapped"
                         Visibility="Collapsed">

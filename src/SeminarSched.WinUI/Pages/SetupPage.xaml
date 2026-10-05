@@ -6,7 +6,8 @@
     xmlns:vm="using:SeminarSched_WinUI"
     NavigationCacheMode="Required"
     Loaded="Page_Loaded"
-    Unloaded="Page_Unloaded">
+    Unloaded="Page_Unloaded"
+    SizeChanged="Page_SizeChanged">
     <ScrollViewer><StackPanel Padding="24" Spacing="16">
         <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="1 プロジェクト設定"/>
         <InfoBar x:Name="ProjectRequired"/>
@@ -108,7 +109,7 @@
                     </ListView.ItemTemplate>
                 </ListView>
             </StackPanel></TabViewItem>
-            <TabViewItem Header="講師指導可能科目"><StackPanel Padding="16" Spacing="12">
+            <TabViewItem x:Name="QualificationTabItem" Header="講師指導可能科目"><StackPanel Padding="16" Spacing="12">
                 <!-- ユーザー要望（checkpoint142）「講師指導可能科目について、表以外は消す。表だけで
                      十分です」への対応。従来は講師・科目・指導可否・保存の入力フォームと備考欄を表の上に
                      置いていたが、表の○クリックで指導可否は直接切り替えられるため実質的に不要だった。
@@ -135,6 +136,11 @@
                     <ScrollViewer x:Name="QualificationMatrixLeftScroll" Grid.Row="1" Grid.Column="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden" MaxHeight="480" IsHitTestVisible="False">
                         <Grid x:Name="QualificationMatrixLeft"/>
                     </ScrollViewer>
+                    <!-- ユーザー要望「縦幅をもう少し長くしたい。ウィンドウ最下部よりも少し上側に、表の最下部が
+                         来るようにしてほしい」への対応。MaxHeight="480"は初回描画までの暫定値で、実際の
+                         高さはUpdateQualificationMatrixAvailableHeight（Page_SizeChanged・タブ選択時・
+                         RenderQualificationMatrix後に呼び出す）がウィンドウの実高さから動的に計算して
+                         上書きする。 -->
                     <ScrollViewer x:Name="QualificationMatrixBodyScroll" Grid.Row="1" Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="480" ViewChanged="QualificationMatrixBodyScroll_ViewChanged">
                         <Grid x:Name="QualificationMatrixBody"/>
                     </ScrollViewer>

@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-05（checkpoint148）
+最終更新: 2026-10-05（checkpoint149）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -15,9 +15,58 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 →`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-<version>.exe`）は
 例外なく毎回実行すること。
 
-Current Version: `v0.27.0 (beta)`（Draft Release作成予定。生徒・講師の削除機能追加。
-checkpoint148を参照）
-Latest Development Checkpoint: checkpoint 148（ユーザーから3点の依頼。①生徒・講師タブの
+Current Version: `v0.27.1 (beta)`（Draft Release作成予定。表示崩れ3件のUI修正。
+checkpoint149を参照）
+Latest Development Checkpoint: checkpoint 149（ユーザーから3点の指摘。①講師指導可能科目の
+表の縦幅をもう少し長くし、ウィンドウ最下部より少し上側に表の最下部が来るようにしたい、
+②同じ表で「表が少しずれていたり、学年のカラムが存在しなくなっている。また、おそらく右側が
+見切れているのではないか」、③ウィンドウを横に短くしてナビゲーションペインがアイコンのみに
+なったとき、時間割自動作成の円形ゲージが他のアイコンより少し左に寄っている、という3点。
+
+**①表の縦幅:** `SetupPage.xaml`の`QualificationMatrixBodyScroll`/`QualificationMatrixLeftScroll`は
+`MaxHeight="480"`で固定されていた。このタブはページ全体を包む外側`ScrollViewer`+`StackPanel`
+（Auto高さ）の中にあるため、単純に`*`行などへ変えるだけでは「残りのウィンドウ高さいっぱい」を
+表現できない。`SetupPage.xaml.cs`に`UpdateQualificationMatrixAvailableHeight()`を追加し、
+`QualificationMatrixBodyScroll.TransformToVisual(XamlRoot.Content)`で実際の画面上のY座標を
+測定し、`XamlRoot.Size.Height`からの残り高さ（下に24pxの余白を残す）をMaxHeightへ反映する。
+タブが非表示（Collapsed）のときは`TransformToVisual`の戻り値が信用できないため、
+`QualificationTabItem`が選択されている場合のみ計算する。呼び出しタイミング
+（`RenderQualificationMatrix`直後・`Tabs_SelectionChanged`でこのタブへ切り替わった時・
+Pageの`SizeChanged`）はいずれもレイアウト未確定の場合があるため、
+`DispatcherQueue.TryEnqueue`で遅延させている。
+
+**②校種見出しが消える不具合:** 調査の結果、「学年」ではなく校種（小学校・中学校・高校）グループ
+見出し行の不具合で、グループ分けのロジック自体（`subjects.GroupBy(s=>s.Value.SchoolLevel)`）には
+誤りがなかった。原因は見出しセルの`TextBlock`が`HorizontalAlignment="Center"`のままだったこと。
+校種グループの見出しは複数列にまたがる1つのセルで、ユーザーの実データでは「高校」グループだけ
+14列（980px）という非常に広いセルになっており、中央寄せだと見出し文字がそのセルの中央、
+すなわち初期スクロール位置（オフセット0）ではビューポート外に描画されてしまい、「見出しが
+消えている」ように見えていた（「小学校」「中学校」は列数が少なく中央がビューポート内に収まって
+いたため気づかれなかった）。校種グループの見出しだけ`HorizontalAlignment`/`TextAlignment`を
+`Left`へ変更し、グループの先頭列が見えた時点で見出しも読めるようにした。なお検証用に複製した
+プロジェクトファイルには校種「高等学校」のテスト科目（`TEST_CODE`）が1件残っていた
+（ユーザー自身が以前の科目タブ検証時に追加したと見られる）。これは実データなのでコードからは
+削除せず、ユーザーへ報告のみ行う。
+
+**③ゲージの左寄り不具合:** `MainWindow.xaml`の`OptimizationStatusPanelCompact`
+（`Margin="6,4,6,6"`、`HorizontalAlignment="Center"`）が、ナビゲーションペインの標準アイコンより
+左に寄って見える件。実機でProgressRingを強制的に表示させ、ピクセル単位で検証した。標準の
+`NavigationViewItem`は選択時のハイライト（ピル）がペイン左端から約7〜8px内側へ入った領域の中で
+中央寄せされるのに対し、`PaneFooter`のコンテンツ領域はその内側マージンを持たないため、単純な
+`HorizontalAlignment="Center"`では標準アイコンの中心線より実測で約4px左に寄ってしまっていた。
+円のあてはめ計算（最小二乗法）でProgressRingの中心x座標を測定しながらMargin.Leftを調整し、
+`Margin="10,4,6,6"`で標準アイコン（ホーム・設定等）の中心線と一致すること（差0.5px未満）を
+確認した。
+
+**検証:** 一時的な別パッケージIDでのdev-run実機確認で、①講師指導可能科目タブを開いた状態で
+ウィンドウの高さを変えると表の下端がウィンドウ下端近く（約24〜35px上）まで伸びること、
+②「高校」グループの見出しが初期表示（スクロール位置0）から見えること、③ナビゲーションペインを
+アイコンのみ表示にしてProgressRingを強制的に表示させた状態で、標準アイコンの中心線とほぼ
+完全に一致することをスクリーンショット・ピクセル解析で確認した。既存の全テスト（計252件）が
+すべて通過することも確認済み。UIの表示崩れ3件の修正のためpatchを上げてv0.27.1とした。詳細は
+[docs/releases/v0.27.1.md](releases/v0.27.1.md)。
+
+checkpoint 148（ユーザーから3点の依頼。①生徒・講師タブの
 「変更」ボタンの有効範囲が狭く、ボタンへカーソルを動かす途中で消えてしまう、②誤ってテスト
 データを入れた場合などに生徒・講師そのものを削除できるようにしたい（確認ダイアログ必須）、
 ③アンケート取込の受講希望一覧で通常担当講師・第1〜3希望講師をフルネームではなく苗字のみ表示し、
