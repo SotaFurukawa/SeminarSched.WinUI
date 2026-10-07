@@ -20,6 +20,12 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
     private readonly TranslateTransform _cornerTransform = new();
     private sealed record CellTag(long TimeSlotId, long TeacherId, bool Blocked);
 
+    // ユーザー要望（checkpoint151）「未配置に残っているものを移そうとしてドラッグしているときに、
+    // 生徒が出席不可にしているコマに禁止マークをつけるようにしておく」への対応。ドラッグ開始時に
+    // その受講希望の生徒が選択中の日付で出席不可にしているコマIdをここへ保持し、RenderBoard()の
+    // CreateCellで（既にグレー表示の出勤不可セルを除いて）禁止マークを重ねて表示する。
+    private HashSet<long>? _draggedStudentUnavailableSlotIds;
+
     // 性能対策: 氏名検索欄は1文字ごとにgrid全体（講師列数×コマ数のBorder/StackPanel/Button一式）を
     // Children.Clear()から作り直すため、無変更でRenderBoard()を都度呼ぶと低速なPCで入力ごとに
     // 目に見えるカクつきが生じる。入力が一瞬止まってからまとめて1回だけ再描画する。
@@ -167,6 +173,12 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
 
     private async void BoardDate_SelectionChanged(object sender, SelectionChangedEventArgs e) => await ReloadBoardAsync();
 
+    // ユーザー要望（checkpoint151）「日付の横に、前や次の日付（授業日）を選択するように、日付の
+    // 左右に矢印を追加してほしい」への対応。BoardDateのSelectedIndexを±1するだけで、
+    // BoardDate_SelectionChangedが通常の手動選択時と同じ経路でボードを再読み込みする。
+    private void PreviousDate_Click(object sender, RoutedEventArgs e) { if (BoardDate.SelectedIndex > 0) BoardDate.SelectedIndex--; }
+    private void NextDate_Click(object sender, RoutedEventArgs e) { if (BoardDate.SelectedIndex < BoardDate.Items.Count - 1) BoardDate.SelectedIndex++; }
+
     private async Task ReloadBoardAsync()
     {
         var path = App.ProjectService.Current?.Path;
@@ -266,6 +278,41 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         foreach (var card in cell?.Cards ?? [])
             content.Children.Add(CreateCard(card, search));
 
+        // ユーザー要望（checkpoint151）「未配置に残っているものを移そうとしてドラッグしているときに、
+        // 生徒が出席不可にしているコマに禁止マークをつけるようにしておく。よくある丸に斜線のもの。
+        // そこの上のレイヤーに(生徒出席不可)を書いておく。枠の中に書いておく。すでにグレー表示の
+        // 四角には入れないようにする」への対応。出勤不可（blocked）のセルは既に別の視覚表現
+        // （濃いグレー）があるため対象外にする。ドロップ自体は引き続き許可し（AllowDropは変えない）、
+        // 実際に置こうとしたときの警告はBuildAddPreviewAsync/BuildMovePreviewAsyncの
+        // 「生徒がアンケートで出席不可にしています。」メッセージ（Yellow判定・確認の上で配置可）に任せる。
+        var studentUnavailable = !blocked && _draggedStudentUnavailableSlotIds?.Contains(timeSlotId) == true;
+        FrameworkElement cellContent = content;
+        if (studentUnavailable)
+        {
+            var overlay = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(200, 255, 235, 235)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(255, 196, 43, 28)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(2),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                IsHitTestVisible = false,
+                Child = new StackPanel
+                {
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Spacing = 2,
+                    Children =
+                    {
+                        new TextBlock { Text = "🚫", FontSize = 18, HorizontalAlignment = HorizontalAlignment.Center },
+                        new TextBlock { Text = "(生徒出席不可)", FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromArgb(255, 150, 20, 10)), TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Center },
+                    },
+                },
+            };
+            cellContent = new Grid { Children = { content, overlay } };
+        }
+
         var border = new Border
         {
             Padding = new Thickness(4),
@@ -278,7 +325,7 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
             BorderThickness = new Thickness(1),
             AllowDrop = !blocked,
             Tag = new CellTag(timeSlotId, teacherId, blocked),
-            Child = content,
+            Child = cellContent,
         };
         border.DragOver += Cell_DragOver;
         border.Drop += Cell_Drop;
@@ -353,13 +400,30 @@ public sealed partial class ScheduleEditorPage : WorkflowPageBase
         finally { deferral.Complete(); }
     }
 
-    private void UnplacedList_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
+    private async void UnplacedList_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
     {
-        if (e.Items.Count > 0 && e.Items[0] is UnplacedSessionOption option)
+        if (e.Items.Count == 0 || e.Items[0] is not UnplacedSessionOption option) return;
+        e.Data.SetText($"request:{option.LessonRequestId}");
+        e.Data.RequestedOperation = DataPackageOperation.Move;
+
+        if (App.ProjectService.Current?.Path is not { } path || _selectedDateId is not { } dateId) return;
+        try
         {
-            e.Data.SetText($"request:{option.LessonRequestId}");
-            e.Data.RequestedOperation = DataPackageOperation.Move;
+            var slotIds = await App.ScheduleEditor.GetStudentUnavailableSlotIdsAsync(path, option.LessonRequestId, dateId);
+            _draggedStudentUnavailableSlotIds = slotIds.Count == 0 ? null : slotIds.ToHashSet();
+            if (_draggedStudentUnavailableSlotIds is not null) RenderBoard();
         }
+        catch (Exception ex) when (ex is IOException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            _draggedStudentUnavailableSlotIds = null;
+        }
+    }
+
+    private void UnplacedList_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs e)
+    {
+        if (_draggedStudentUnavailableSlotIds is null) return;
+        _draggedStudentUnavailableSlotIds = null;
+        RenderBoard();
     }
 
     private async void AddTeacher_Click(object sender, RoutedEventArgs e)

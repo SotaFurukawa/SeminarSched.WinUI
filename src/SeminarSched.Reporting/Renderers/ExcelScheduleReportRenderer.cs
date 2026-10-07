@@ -205,6 +205,8 @@ public sealed class ExcelScheduleReportRenderer
         sheet.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
         sheet.Style.Font.FontName = settings.BodyFontName;
 
+        // ユーザー要望（checkpoint151）「1行目を50幅にしてほしい」への対応。
+        sheet.Row(1).Height = 50;
         sheet.Range(1, 1, 1, 9).Merge(); var title = sheet.Cell(1, 1);
         title.Value = $"{report.AcademicYear}　{report.SeasonName}　個別指導　受講日のご案内";
         title.Style.Font.Bold = true; title.Style.Font.FontSize = settings.TitleFontSize; title.Style.Font.FontName = settings.TitleFontName;
@@ -220,6 +222,31 @@ public sealed class ExcelScheduleReportRenderer
         sheet.Range(4, 2, 4, 8).Style.Border.BottomBorder = XLBorderStyleValues.Thin;
 
         var rows = report.Rows.Where(x => x.Student == student).ToArray();
+        // ユーザー要望（checkpoint151）「生徒配布用ではなく、講師配布用について、受講する科目が2科目の
+        // 場合には、G5+H5, G6+H6に科目+通常授業担当講師を入れるようにしてほしい。また、3科目以上の
+        // 場合は、左に3ずらして、追加していく感じ」への対応。4行目（氏名欄）と7行目（カレンダー開始）の
+        // 間の5〜6行目はこれまで空欄だった。右端の列ペア（G:H）を基準に、2科目で1ペア（5行目・6行目）を
+        // 使い切り、3科目目以降は3列左（D:H→D:E等）へ新しいペアを追加していく（最後に追加したペアが
+        // 常にG:Hになるよう、必要なペア数から逆算して左端のペアの列を決める）。生徒配布用（講師名を
+        // 出さない版）では表示しない。
+        if (includeTeacher)
+        {
+            var subjectTeachers = rows.GroupBy(x => (x.Subject, x.SubjectShortName)).OrderBy(g => g.Key.Subject, StringComparer.Ordinal)
+                .Select(g =>
+                {
+                    var regular = g.FirstOrDefault(x => x.IsRegularTeacher);
+                    return regular is null ? g.Key.SubjectShortName : $"{g.Key.SubjectShortName}　{teacherLabels[regular.Teacher]}";
+                }).ToArray();
+            var pairsNeeded = (subjectTeachers.Length + 1) / 2;
+            for (var k = 0; k < subjectTeachers.Length; k++)
+            {
+                var pairIndex = k / 2;
+                var startCol = 7 - 3 * (pairsNeeded - 1 - pairIndex);
+                var subjectRow = k % 2 == 0 ? 5 : 6;
+                sheet.Range(subjectRow, startCol, subjectRow, startCol + 1).Merge();
+                sheet.Cell(subjectRow, startCol).Value = subjectTeachers[k];
+            }
+        }
         var lessonTextByDateSlot = rows.ToDictionary(x => (DateOnly.Parse(x.Date), x.TimeSlot), string (x) => includeTeacher ? $"{x.SubjectShortName}　{teacherLabels[x.Teacher]}" : x.SubjectShortName);
         var weeks = HandoutPageLayout.Build(report.StartDate, report.EndDate, report.OpenDates.ToHashSet(), report.SlotLabels, lessonTextByDateSlot);
         var slotDefinitionsByLabel = report.SlotDefinitions.ToDictionary(s => s.Label);
@@ -286,15 +313,25 @@ public sealed class ExcelScheduleReportRenderer
                 row++;
             }
             // Python版は休校日・範囲外セルを日付列単位でコマ数ぶん縦結合し、1つの値だけを表示する。
+            // ユーザー要望（checkpoint151）「指定範囲外はセルを結合してほしい」への対応。従来は
+            // 休校日・指定範囲外の日を1日（1列）ごとに個別結合していたため、同じ週に複数日続けて
+            // 指定範囲外や休校日があると、同じ文言が隣接する列へ重複して表示されていた。横方向にも
+            // 同じ種類（Kind）が連続する区間をまとめて1つのセルへ結合する（種類が異なる区間
+            // （指定範囲外→休校日等）はまたがない）。
             var slotBlockRowCount = week.SlotRows.Count;
-            for (var i = 0; i < 7; i++)
+            var dayIndex = 0;
+            while (dayIndex < 7)
             {
-                var day = week.Days[i];
-                if (day.Kind == HandoutDayKind.Open) continue;
-                var cell = sheet.Cell(slotBlockStartRow, 3 + i);
+                var day = week.Days[dayIndex];
+                if (day.Kind == HandoutDayKind.Open) { dayIndex++; continue; }
+                var runStart = dayIndex;
+                while (dayIndex < 7 && week.Days[dayIndex].Kind == day.Kind) dayIndex++;
+                var colStart = 3 + runStart; var colEnd = 3 + dayIndex - 1;
+                var rowEnd = slotBlockStartRow + slotBlockRowCount - 1;
+                if (rowEnd > slotBlockStartRow || colEnd > colStart) sheet.Range(slotBlockStartRow, colStart, rowEnd, colEnd).Merge();
+                var cell = sheet.Cell(slotBlockStartRow, colStart);
                 cell.Value = day.Kind == HandoutDayKind.OutOfRange ? "指定範囲外" : "休校日";
                 cell.Style.Fill.BackgroundColor = day.Kind == HandoutDayKind.OutOfRange ? HandoutOutOfRangeFill : HandoutClosedFill;
-                if (slotBlockRowCount > 1) sheet.Range(slotBlockStartRow, 3 + i, slotBlockStartRow + slotBlockRowCount - 1, 3 + i).Merge();
             }
             // カレンダー部分は隙間なく格子（全セル罫線）にする。
             var weekBlock = sheet.Range(monthRow, 1, row - 1, 9);
@@ -488,6 +525,10 @@ public sealed class ExcelScheduleReportRenderer
 
         int lastCol; int legendRow;
         var closedDayColumns = new List<int>();
+        // ユーザー要望（checkpoint151）「日と日の境目が分かりづらいので、日付は白の縦線を境目に
+        // 入れておく」への対応。各日の列範囲（開始・終了列）をここへ記録し、ループ終了後に
+        // 隣り合う日同士の境目（次の日の開始列の左端）へ白線を引く。
+        var dayColumnRanges = new List<(int Start, int End)>();
         if (week.Days.Count == 0)
         {
             sheet.Cell(dateHeaderRow, 2).Value = "対象となる開校日・出勤予定講師がありません"; sheet.Cell(dateHeaderRow, 2).Style.Fill.BackgroundColor = OverviewSubtitleFill;
@@ -590,6 +631,7 @@ public sealed class ExcelScheduleReportRenderer
                     if (col - dayStartCol > 1) sheet.Range(dateHeaderRow, dayStartCol, dateHeaderRow, col - 1).Merge();
                     WriteOverviewDateHeaderCell(sheet.Cell(dateHeaderRow, dayStartCol), day.Date);
                 }
+                dayColumnRanges.Add((dayStartCol, col - 1));
             }
             lastCol = Math.Max(2, col - 1);
         }
@@ -631,6 +673,26 @@ public sealed class ExcelScheduleReportRenderer
                 var closedRange = sheet.Range(slotStartRow, closedCol, lastContentRow, closedCol);
                 closedRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
                 closedRange.Style.Border.OutsideBorderColor = XLColor.White;
+            }
+        }
+
+        // ユーザー要望（checkpoint151）「全体時間割について、日と日の境目が分かりづらいので、日付は
+        // 白の縦線を境目に入れておく。3行目以降の日と日の境目は現在の縦線の太さの2倍にしておく」
+        // への対応。隣り合う日同士の境目（次の日の開始列の左端）へ白線を引く。日付行（2行目）は
+        // 現状と同じ太さ（Thin）、実際のコマ格子（3行目＝slotStartRow以降）はThinの2倍のMediumにする。
+        // 休校日列（上のループで既にThin・白の外枠を引いている）と隣接する境目もここで一緒に
+        // 太さを揃える（後勝ちでMediumへ上書きされる）。
+        for (var i = 1; i < dayColumnRanges.Count; i++)
+        {
+            var boundaryCol = dayColumnRanges[i].Start;
+            var dateHeaderBoundary = sheet.Range(dateHeaderRow, boundaryCol, dateHeaderRow, boundaryCol);
+            dateHeaderBoundary.Style.Border.LeftBorder = XLBorderStyleValues.Thin;
+            dateHeaderBoundary.Style.Border.LeftBorderColor = XLColor.White;
+            if (lastContentRow >= slotStartRow)
+            {
+                var gridBoundary = sheet.Range(slotStartRow, boundaryCol, lastContentRow, boundaryCol);
+                gridBoundary.Style.Border.LeftBorder = XLBorderStyleValues.Medium;
+                gridBoundary.Style.Border.LeftBorderColor = XLColor.White;
             }
         }
 

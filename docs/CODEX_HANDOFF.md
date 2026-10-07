@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-05（checkpoint150）
+最終更新: 2026-10-07（checkpoint151）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -15,9 +15,101 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 →`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-<version>.exe`）は
 例外なく毎回実行すること。
 
-Current Version: `v0.27.2 (beta)`（Draft Release作成予定。受講希望一覧の表示崩れ・出力中
-インジケーター配置の修正。checkpoint150を参照）
-Latest Development Checkpoint: checkpoint 150（ユーザーから2件の指摘。①アンケート取込の
+Current Version: `v0.28.0 (beta)`（Draft Release作成予定。日別グリッド編集・自動作成・出力xlsx
+関連の新機能6件。checkpoint151を参照）
+Latest Development Checkpoint: checkpoint 151（ユーザーから1メッセージで5件の要望、続けて
+ドラッグ中の視覚表現について1件の追加要望。①日別グリッド編集の日付の左右に前後の授業日へ切り替える
+矢印を追加してほしい、②出力xlsxの生徒ごとのシート（全体時間割以外）で1行目を高さ50にし、指定範囲外は
+セルを結合してほしい、③講師配布用xlsxで、受講科目が2科目ならG5+H5・G6+H6へ、3科目以上なら3列左へ
+ずらしながら「科目＋通常授業担当講師」を追加してほしい、④全体時間割で日と日の境目に白い縦線を入れ、
+3行目以降はその2倍の太さにしてほしい、⑤自動作成に「既に配置したものを動かさない（未配置のみ操作）」
+チェックボックスをCPU使用率の説明の下に追加してほしい。さらに追加の要望として、⑥未配置をドラッグ
+している間、ドラッグ中の受講希望の生徒がアンケートで出席不可にしているコマ（Z・Aのような「ZABC」は
+この生徒・プロジェクトの実際のコマコード）に禁止マーク「🚫」と「(生徒出席不可)」を、既にグレー表示
+（講師の出勤不可）のコマを除いて重ねて表示し、実際にそこへ置こうとしたときは「生徒がアンケートで
+出席不可にしています。」という具体的な警告を出した上で配置できるようにしてほしい、という指摘を
+受けた。
+
+**①日付の前後矢印:** `ScheduleEditorPage.xaml`の`BoardDate`ComboBoxの左右に
+`PreviousDateButton`/`NextDateButton`（Content="◀"/"▶"、プレーンなUnicode文字。最初
+`FontFamily="{ThemeResource SymbolThemeFontFamily}"`でSegoe Fluent Iconsのグリフ
+（`&#xE76B;`/`&#xE76C;`）を試したところ、実機でボタンそのものが描画されずwindowsアプリSDK側で
+このリソースキーが解決できていないと判明したため、既存のセルの○/×トグルと同じ「プレーンな
+Unicode文字をそのままButton Contentにする」方式へ切り替えた）。クリックで`BoardDate.SelectedIndex`
+を±1するだけで、`BoardDate_SelectionChanged`が通常の手動選択時と同じ経路でボードを再読み込みする
+（`GetOpenDatesAsync`はDate昇順を返すため、カレンダー上の前後の日ではなく実際の前後の開校日へ
+切り替わる）。
+
+**②出力xlsxの1行目の高さ・指定範囲外の結合:** `ExcelScheduleReportRenderer.WriteStudentHandoutPage`
+（生徒配布用・講師配布用・講師別配布の3レポートすべてがこの1メソッドを共有、includeTeacherの
+有無だけが異なる）に`sheet.Row(1).Height = 50;`を追加。「指定範囲外はセルを結合してほしい」は、
+実機でdev-run出力を直接生成しopenpyxlで調査した結果、既に「休校日・範囲外セルを日付列単位で
+コマ数ぶん縦結合」はされていたが、同じ週に複数日連続で指定範囲外・休校日があると、列ごとに
+個別結合されるため同じ文言（「指定範囲外」「休校日」）が隣接列へ重複表示されていたと判明した。
+横方向にも同じ種類（`HandoutDayKind`）が連続する区間をまとめて1つのセルへ結合するよう、該当箇所を
+1日ずつのforループから、種類が変わるまで読み進めるwhileループへ書き換えた（種類が異なる区間
+（指定範囲外→休校日等）はまたがない）。
+
+**③講師配布用の科目＋通常担当講師欄:** `WriteStudentHandoutPage`の4行目（氏名欄）と7行目
+（カレンダー開始）の間、5〜6行目はこれまで空欄だった。`includeTeacher`がtrueのときだけ、
+生徒の受講科目（`report.Rows`をSubjectでグループ化、`IsRegularTeacher`フラグが立つ行の講師名を
+「通常授業担当講師」として採用、無ければ科目名のみ）を列挙し、右端の列ペア（G:H）を基準に2科目で
+1ペア（5行目・6行目）を使い切り、3科目目以降は3列左（D:H→D:E等）へ新しいペアを追加していく
+（`pairsNeeded`から逆算し、最後に追加したペアが常にG:Hになるよう左端のペアの列を決める）。
+生徒配布用（`includeTeacher=false`）では一切表示しない。
+
+**④全体時間割の日の境目の白線:** `WriteOverviewWeekSheet`で各日の列範囲（開始・終了列）を
+`dayColumnRanges`へ記録し、ループ終了後、隣り合う日同士の境目（次の日の開始列の左端）へ
+`LeftBorder`を設定する。日付行（2行目）はThin、実際のコマ格子（3行目＝slotStartRow以降）は
+Thinの2倍のMediumにし、どちらも色を白にする（休校日列の既存の白罫線処理より後に実行し、
+休校日列との境目も太さを統一する）。
+
+**⑤既に配置済みの授業は動かさないチェックボックス:** `AppSettings`に`KeepExistingPlacements`
+を追加（`UnrestrictedResourceUsage`と同じ、機体ごとに`SettingsStore`で永続化）。
+`OptimizationPage.xaml`にCPU使用率チェックボックスの直下へ新設し、`Run_Click`から
+`OptimizationRunState.StartAsync`の新しい`keepExistingPlacements`引数へ渡す。実際の効果は
+`SqliteScheduleRunService`側: `BuildProblemAsync`内の「ロック・手動配置済みを固定扱いにする」
+判定（`a.IsLocked=1 OR a.IsManual=1`、3箇所のSQL＋候補生成クエリの計4箇所）を、
+`keepExistingPlacements`がtrueのときは`1=1`（＝既存のAssignment行すべて）へ差し替える
+`fixedFilter`文字列へ一般化した。これにより、前回までの自動作成結果（`IsLocked=0`かつ
+`IsManual=0`、`Source='cp-sat'`）もすべて固定扱いになり、ソルバーは残りの未配置分だけを
+対象にする。`SaveValidatedAsync`の`DELETE FROM Assignment WHERE IsLocked=0 AND IsManual=0`
+（通常実行時に前回の自動配置をクリアしてから再INSERTする処理）も、`keepExistingPlacements`が
+trueの間はスキップする（BuildProblemAsync側で固定扱いにした行は`solution.Placements`に
+含まれず再INSERTされないため、クリアすると消えたまま復元されなくなってしまうため）。
+
+**⑥ドラッグ中の生徒出席不可マーク・警告文言の具体化:** 「ZABC」はこのプロジェクトの実際のコマ
+コード（Z・A・B・C、`docs/CODEX_HANDOFF.md`のcheckpoint140にも登場する実データ）だと
+`TimeSlot.Code`から判明し、調査の結果「ドラッグ中の受講希望の生徒が、その日その時間帯に出席不可と
+回答している」ことを示す新しい視覚表現の要望だと判明した。`IScheduleEditorService`に
+`GetStudentUnavailableSlotIdsAsync`（指定した受講希望の生徒が、選択中の日付で明示的に
+`AvailabilityLevel=0`にしているTimeSlotIdの一覧）を追加。`ScheduleEditorPage.xaml.cs`の
+`UnplacedList_DragItemsStarting`でこれを取得して`_draggedStudentUnavailableSlotIds`へ保持し、
+`RenderBoard()`→`CreateCell`で、出勤不可（grey）のセルを除いて、Grid二重レイヤー（元のcontentの
+上に半透明赤のBorder＋「🚫」「(生徒出席不可)」）を重ねる。`DragItemsCompleted`（新規追加）で
+ドラッグ終了時にクリアする。ドロップ自体は`PreviewAddAsync`（`SqliteFixedLessonService`）が
+既にYellow判定（確認の上で配置可）で許可していたが、警告文言は生徒・講師どちらが原因か区別しない
+共通の「生徒または講師がこの日時に参加できない設定になっています。」だった。`IsAvailableAsync`を
+`IsStudentAvailableAsync`/`IsTeacherAvailableAsync`へ分割し、`BuildAddPreviewAsync`で原因に
+応じて「生徒がアンケートで出席不可にしています。」等の具体的な文言を組み立てるようにした
+（`EnsureAvailabilityAsync`・`BuildMovePreviewAsync`側のRED判定・文言は意図的に変更していない。
+今回のユーザー要望は未配置からのドラッグ＝ADD経路に限定されていたため）。
+
+**検証:** 一時的な別パッケージIDでのdev-run実機確認で、①日付の矢印ボタンで前後の開校日へ正しく
+切り替わること（カレンダー上の連続した日ではなく実際の開校日スキップが機能すること）、②実際に
+生成したxlsx（openpyxlで検査）で1行目の高さが50、「指定範囲外」のセルが複数列にまたがる1つの
+結合セル（例: C10:G13）になっていること、③講師配布用xlsxで2科目の生徒はG5:H5・G6:H6、3科目の
+生徒はD5:E5・D6:E6・G5:H5の結合と内容（例:「英　住ノ江」）が入っており、生徒配布用には一切
+表示されないこと、④全体時間割xlsxで日の境目の罫線色が白、3行目以降がmediumスタイルになっている
+こと、⑤新しいチェックボックスがCPU使用率の説明の下に表示され、チェック状態がページ遷移後も
+保持されること、⑥実際に受講希望をドラッグすると、生徒が出席不可の全コマ（出勤不可グレーのコマを
+除く）に禁止マークが表示され、実際にそのコマへドロップすると「生徒がアンケートで出席不可に
+しています。」という警告を含む確認ダイアログが出て、「いいえ」でキャンセルすると変更履歴・
+未配置一覧が元のまま変わらないことを確認した。既存の全テスト（計252件）がすべて通過することも
+確認済み。新機能6件のためminorを上げてv0.28.0（patchを0へ戻す）とした。詳細は
+[docs/releases/v0.28.0.md](releases/v0.28.0.md)。
+
+checkpoint 150（ユーザーから2件の指摘。①アンケート取込の
 受講希望一覧で「氏名と学年がくっついて表示されているように見えます。別の列にしてください」、
 ②「出力時のぐるぐるを、出力ボタンの右に置く。また、このぐるぐるの右側に出力中と表示」。
 ①はcheckpoint149の②（表が少しずれていたり、学年のカラムが存在しなくなっている）の再報告でも

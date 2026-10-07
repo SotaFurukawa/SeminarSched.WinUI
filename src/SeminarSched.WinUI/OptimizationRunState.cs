@@ -125,7 +125,7 @@ internal static class OptimizationRunState
         return (percent, elapsed, remaining);
     }
 
-    public static async Task StartAsync(string projectPath, OptimizationProfile profile, bool unrestrictedResourceUsage = false, SchedulingPolicy? policyOverride = null)
+    public static async Task StartAsync(string projectPath, OptimizationProfile profile, bool unrestrictedResourceUsage = false, SchedulingPolicy? policyOverride = null, bool keepExistingPlacements = false)
     {
         if (IsRunning) throw new InvalidOperationException("既に時間割自動作成が実行中です。");
         await EnsureHardwareTierMeasuredAsync();
@@ -156,7 +156,7 @@ internal static class OptimizationRunState
         _timer ??= CreateTimer();
         _timer.Start();
         Changed?.Invoke();
-        _ = RunCoreAsync(projectPath, profile, policyOverride);
+        _ = RunCoreAsync(projectPath, profile, policyOverride, keepExistingPlacements);
     }
 
     /// <summary>ユーザー要望（checkpoint108）「このスコアは...初めて自動作成する際に、一度だけ調べる
@@ -263,7 +263,7 @@ internal static class OptimizationRunState
             : _displayedPercent + (target - _displayedPercent) * 0.2;
     }
 
-    private static async Task RunCoreAsync(string projectPath, OptimizationProfile profile, SchedulingPolicy? policyOverride)
+    private static async Task RunCoreAsync(string projectPath, OptimizationProfile profile, SchedulingPolicy? policyOverride, bool keepExistingPlacements)
     {
         var progress = new Progress<OptimizationProgress>(p =>
         {
@@ -293,7 +293,7 @@ internal static class OptimizationRunState
         });
         try
         {
-            var result = await App.ScheduleRun.RunAsync(projectPath, profile, _control!, progress, policyOverride: policyOverride);
+            var result = await App.ScheduleRun.RunAsync(projectPath, profile, _control!, progress, policyOverride: policyOverride, keepExistingPlacements: keepExistingPlacements);
             LastOutcome = new OptimizationRunOutcome(true, result, null);
             App.Logger.Info($"Schedule run completed: placed={result.PlacedLessons} unassigned={result.UnassignedLessons} elapsedSec={result.Elapsed.TotalSeconds:F1} strategy={result.StrategyLabel}");
         }

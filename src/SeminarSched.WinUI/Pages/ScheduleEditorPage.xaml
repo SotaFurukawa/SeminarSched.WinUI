@@ -29,9 +29,17 @@
                     <!-- 不具合修正: 日付・検索・ボタン5個をすべて1行に並べていたため、ウィンドウを
                          縦長（狭幅）にすると*幅の生徒名検索がボタンに押し出されて潰れていた。日付・検索は
                          そのままの1行に収まる専用行とし、ボタン一式は別の行へ分けた。 -->
+                    <!-- ユーザー要望（checkpoint151）「日付の横に、前や次の日付（授業日）を選択するように、
+                         日付の左右に矢印を追加してほしい」への対応。BoardDateのItemsSourceは
+                         GetOpenDatesAsync（SqliteScheduleEditorService）がDate昇順で返すため、
+                         単純にSelectedIndexを±1するだけで前後の授業日へ切り替えられる。 -->
                     <Grid ColumnSpacing="12">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <ComboBox x:Name="BoardDate" Header="日付" DisplayMemberPath="Label" MinWidth="200" SelectionChanged="BoardDate_SelectionChanged"/>
+                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
+                            <Button x:Name="PreviousDateButton" Content="◀" Click="PreviousDate_Click" ToolTipService.ToolTip="前の授業日"/>
+                            <ComboBox x:Name="BoardDate" Header="日付" DisplayMemberPath="Label" MinWidth="200" SelectionChanged="BoardDate_SelectionChanged"/>
+                            <Button x:Name="NextDateButton" Content="▶" Click="NextDate_Click" ToolTipService.ToolTip="次の授業日"/>
+                        </StackPanel>
                         <TextBox x:Name="BoardSearch" Grid.Column="1" Header="生徒名検索" TextChanged="BoardSearch_TextChanged"/>
                     </Grid>
                     <StackPanel Orientation="Horizontal" Spacing="12">
@@ -50,7 +58,7 @@
                         <StackPanel Spacing="8">
                             <TextBlock FontWeight="SemiBold" Text="未配置"/>
                             <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Text="選択中の日付に配置できる受講希望だけを表示します。"/>
-                            <ListView x:Name="UnplacedList" MaxHeight="480" CanDragItems="True" DragItemsStarting="UnplacedList_DragItemsStarting">
+                            <ListView x:Name="UnplacedList" MaxHeight="480" CanDragItems="True" DragItemsStarting="UnplacedList_DragItemsStarting" DragItemsCompleted="UnplacedList_DragItemsCompleted">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Border Padding="6,4,6,4" Margin="0,2,0,0" CornerRadius="4" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" MaxWidth="200">

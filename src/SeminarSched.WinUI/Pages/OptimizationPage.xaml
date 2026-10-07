@@ -85,6 +85,11 @@
                     <StackPanel Spacing="2">
                         <CheckBox x:Name="UnrestrictedResourceUsageCheckBox" Content="CPU使用率を制限しない（フルパワーで実行）" Checked="UnrestrictedResourceUsageCheckBox_Changed" Unchecked="UnrestrictedResourceUsageCheckBox_Changed"/>
                         <TextBlock Margin="28,0,0,0" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="既定では他の作業と競合したときに優先度を譲り、パソコンが重くなるのを防ぎます（パソコンが空いていれば速度は落ちません）。オンにすると常にフルパワーで実行し、その分速くなる可能性がありますが、実行中は他の作業が重くなることがあります。" TextWrapping="Wrap"/>
+                        <!-- ユーザー要望（checkpoint151）「既に配置したものを動かさないようにするか、
+                             つまり未配置のみを操作するようにするかのチェックボックスをCPU使用率の
+                             説明の下に作ってほしい」への対応。 -->
+                        <CheckBox x:Name="KeepExistingPlacementsCheckBox" Margin="0,8,0,0" Content="既に配置済みの授業は動かさない（未配置のみを自動作成する）" Checked="KeepExistingPlacementsCheckBox_Changed" Unchecked="KeepExistingPlacementsCheckBox_Changed"/>
+                        <TextBlock Margin="28,0,0,0" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="既定では前回までの自動作成で配置済みのコマも含めて見直し、全体として良い組み合わせを探します。オンにすると、手動配置・事前確定・ロック済みのコマだけでなく、既に配置されているコマもすべて固定し、まだ配置されていない受講希望だけを対象に自動作成します。" TextWrapping="Wrap"/>
                     </StackPanel>
                     <!-- ユーザー指摘（checkpoint128）「探索方針のラジオボタンが揃っていない」対応で固定幅の
                          3列Gridへ変更した際、Expander内側のStackPanelに残っていたMaxWidth="900"が

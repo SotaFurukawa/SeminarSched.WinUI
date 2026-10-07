@@ -24,7 +24,13 @@ public sealed record AppSettings(
     /// アップデートがないかのチェックを行い...」への対応。GitHub Releases APIへの問い合わせに
     /// 成功した直近時刻（UTC）。nullは「まだ一度も確認していない」ことを表す。問い合わせに失敗
     /// した場合は更新しない（次回起動時に再試行させるため）。</summary>
-    DateTimeOffset? LastUpdateCheckUtc = null)
+    DateTimeOffset? LastUpdateCheckUtc = null,
+    /// <summary>ユーザー要望（checkpoint151）「自動作成について、既に配置したものを動かさないように
+    /// するか、つまり未配置のみを操作するようにするかのチェックボックスをCPU使用率の説明の下に
+    /// 作ってほしい」への対応。オンの間は、ロック・手動配置済みの行だけでなく、前回までの自動作成で
+    /// 配置済みの行もすべて固定扱いにし、ソルバーはまだ未配置の受講希望だけを対象に動かす
+    /// （SqliteScheduleRunService.BuildProblemAsync/SaveValidatedAsync参照）。</summary>
+    bool KeepExistingPlacements = false)
 {
     public static AppSettings Default { get; } = new(OptimizationProfileCatalog.DefaultLevel);
 

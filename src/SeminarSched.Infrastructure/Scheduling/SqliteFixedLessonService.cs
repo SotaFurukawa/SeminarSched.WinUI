@@ -83,9 +83,15 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
             warnings.Add("選択した講師はこの科目を担当可能に設定されていません。");
             deltas.Add(new SoftMetricDelta("qualification_override", "指導可能科目としての登録", HigherIsBetter: false, 0, 1));
         }
-        if (!await IsAvailableAsync(connection, transaction, request.StudentId, teacherId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false))
+        var studentAvailable = await IsStudentAvailableAsync(connection, transaction, request.StudentId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
+        var teacherAvailable = await IsTeacherAvailableAsync(connection, transaction, teacherId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
+        if (!studentAvailable || !teacherAvailable)
         {
-            warnings.Add("生徒または講師がこの日時に参加できない設定になっています。");
+            warnings.Add(!studentAvailable && !teacherAvailable
+                ? "生徒と講師の両方がこの日時に参加できない設定になっています。"
+                : !studentAvailable
+                    ? "生徒がアンケートで出席不可にしています。"
+                    : "講師がこの日時に出勤できない設定になっています。");
             deltas.Add(new SoftMetricDelta("availability_override", "出勤・出席可否の設定", HigherIsBetter: false, 0, 1));
         }
         var addMaxCapacity = await ReadMaxStudentsPerTeacherAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
@@ -391,7 +397,27 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
             throw new InvalidOperationException("同じ日時に生徒の授業が既にあります。");
     }
 
-    private static async Task<bool> IsAvailableAsync(SqliteConnection connection, SqliteTransaction transaction, long studentId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken)
+    // ユーザー要望（checkpoint151）「未配置をドラッグして生徒が出席不可のコマへ置こうとしたとき、
+    // 『生徒がアンケートで出席不可にしています。』のような具体的な警告を出す」への対応。従来は
+    // 生徒側・講師側の出欠を1つのSQLでOR結合した単一のbool（IsAvailableAsync）しか返さず、
+    // 呼び出し側ではどちらが原因かを区別できなかった（メッセージは常に「生徒または講師が...」で
+    // 一括りだった）。生徒側・講師側を別メソッドへ分割し、呼び出し側でどちらが原因かに応じた
+    // メッセージを組み立てられるようにした。
+    private static async Task<bool> IsStudentAvailableAsync(SqliteConnection connection, SqliteTransaction transaction, long studentId, long openDateId, long timeSlotId, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        // 生徒側は意図的な既定動作（未回答なら空き扱い）。
+        command.CommandText = """
+            SELECT NOT (EXISTS(SELECT 1 FROM StudentAvailability WHERE StudentId=$student) AND NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE StudentId=$student AND OpenDateId=$date AND TimeSlotId=$slot AND AvailabilityLevel>0));
+            """;
+        command.Parameters.AddWithValue("$student", studentId);
+        command.Parameters.AddWithValue("$date", openDateId);
+        command.Parameters.AddWithValue("$slot", timeSlotId);
+        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) != 0;
+    }
+
+    private static async Task<bool> IsTeacherAvailableAsync(SqliteConnection connection, SqliteTransaction transaction, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -402,23 +428,23 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
         // （プロジェクト全体でまだ出勤可否データを1件も取込んでいなければ、従来通り出勤可能扱いの
         // ままにする。詳細はSqliteScheduleRunService.BuildProblemAsyncの同種の修正コメント参照。
         // このアプリは1ファイル1プロジェクト固定のためProjectId=1で決め打ちする、この付近の他の
-        // クエリと同じ慣習）。生徒側は意図的な既定動作（未回答なら空き扱い）のため据え置く。
+        // クエリと同じ慣習）。
         command.CommandText = """
-            SELECT
-              (EXISTS(SELECT 1 FROM StudentAvailability WHERE StudentId=$student) AND NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE StudentId=$student AND OpenDateId=$date AND TimeSlotId=$slot AND AvailabilityLevel>0))
-              OR (EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=1) AND NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE TeacherId=$teacher AND OpenDateId=$date AND TimeSlotId=$slot AND AvailabilityLevel>0))
-              OR EXISTS(SELECT 1 FROM TeacherUnavailability WHERE TeacherId=$teacher AND OpenDateId=$date AND TimeSlotId=$slot);
+            SELECT NOT (
+              (EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=1) AND NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE TeacherId=$teacher AND OpenDateId=$date AND TimeSlotId=$slot AND AvailabilityLevel>0))
+              OR EXISTS(SELECT 1 FROM TeacherUnavailability WHERE TeacherId=$teacher AND OpenDateId=$date AND TimeSlotId=$slot));
             """;
-        command.Parameters.AddWithValue("$student", studentId);
         command.Parameters.AddWithValue("$teacher", teacherId);
         command.Parameters.AddWithValue("$date", openDateId);
         command.Parameters.AddWithValue("$slot", timeSlotId);
-        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 0;
+        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) != 0;
     }
 
     private static async Task EnsureAvailabilityAsync(SqliteConnection connection, SqliteTransaction transaction, long studentId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken)
     {
-        if (!await IsAvailableAsync(connection, transaction, studentId, teacherId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false))
+        var studentAvailable = await IsStudentAvailableAsync(connection, transaction, studentId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
+        var teacherAvailable = await IsTeacherAvailableAsync(connection, transaction, teacherId, openDateId, timeSlotId, cancellationToken).ConfigureAwait(false);
+        if (!studentAvailable || !teacherAvailable)
             throw new InvalidOperationException("生徒または講師が参加できない日時です。");
     }
 

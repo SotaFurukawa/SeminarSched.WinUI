@@ -210,6 +210,28 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
             .ToList();
     }
 
+    // ユーザー要望（checkpoint151）「未配置に残っているものを移そうとしてドラッグしているときに、
+    // 生徒が出席不可にしているコマに禁止マークをつけるようにしておく」への対応。明示的に
+    // AvailabilityLevel=0の行だけを対象にする（未回答＝行が無い場合は出席可として扱う、
+    // このファイルの他クエリと同じ既定値の慣習）。
+    public async Task<IReadOnlyList<long>> GetStudentUnavailableSlotIdsAsync(string projectPath,long lessonRequestId,long openDateId,CancellationToken cancellationToken=default)
+    {
+        await using var connection=await OpenAsync(projectPath,cancellationToken).ConfigureAwait(false);await SqliteProjectSchema.EnsureCurrentAsync(connection,cancellationToken).ConfigureAwait(false);
+        await using var command=connection.CreateCommand();
+        command.CommandText="""
+            SELECT sa.TimeSlotId
+            FROM StudentAvailability sa
+            JOIN LessonRequest r ON r.StudentId=sa.StudentId
+            WHERE r.Id=$request AND sa.OpenDateId=$date AND sa.AvailabilityLevel=0;
+            """;
+        command.Parameters.AddWithValue("$request",lessonRequestId);
+        command.Parameters.AddWithValue("$date",openDateId);
+        var result=new List<long>();
+        await using var reader=await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while(await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) result.Add(reader.GetInt64(0));
+        return result;
+    }
+
     /// <summary>
     /// CountCandidatesAsync（旧実装）と同じ条件（資格・空き時間・出勤不可・同時刻の生徒衝突）を、
     /// 日付を1つに絞って実際のコマコードを返す形に書き換えたもの。講師の同時担当上限（2名まで）は

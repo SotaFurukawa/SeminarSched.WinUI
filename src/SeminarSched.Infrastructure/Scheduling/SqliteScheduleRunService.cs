@@ -30,12 +30,13 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         OptimizationRunControl control,
         IProgress<OptimizationProgress>? progress = null,
         CancellationToken cancellationToken = default,
-        SchedulingPolicy? policyOverride = null)
+        SchedulingPolicy? policyOverride = null,
+        bool keepExistingPlacements = false)
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
         await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
         var policy = policyOverride ?? await ReadSchedulingPolicyAsync(connection, cancellationToken).ConfigureAwait(false);
-        var (problem, regularTeacherRestrictedRequestIds) = await BuildProblemAsync(connection, policy, cancellationToken).ConfigureAwait(false);
+        var (problem, regularTeacherRestrictedRequestIds) = await BuildProblemAsync(connection, policy, keepExistingPlacements, cancellationToken).ConfigureAwait(false);
 
         var optimizer = new ScheduleOptimizer<ScheduleProblem, ScheduleSolution>(CreateStrategies());
         var result = await optimizer.RunAsync(problem, profile, control, progress, cancellationToken, policy.ContinueBeyondNominalTimeIfIncomplete).ConfigureAwait(false);
@@ -44,7 +45,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
 
         var solution = result.Best.Solution;
         ScheduleSolutionValidator.Validate(problem, solution);
-        await SaveValidatedAsync(connection, problem, solution, profile.MaximumDuration, cancellationToken).ConfigureAwait(false);
+        await SaveValidatedAsync(connection, problem, solution, profile.MaximumDuration, keepExistingPlacements, cancellationToken).ConfigureAwait(false);
         var (priorityFiveShortfall, noQualifiedTeacher) = DiagnoseUnassignedDemands(problem, solution, regularTeacherRestrictedRequestIds);
         return new ScheduleRunSummary(
             solution.Placements.Count, solution.UnassignedLessons, result.Elapsed, result.Best.Strategy.ToString(), result.WasExtended,
@@ -114,18 +115,24 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
             reader.GetBoolean(9));
     }
 
-    private static async Task<(ScheduleProblem Problem, HashSet<long> RegularTeacherRestrictedRequestIds)> BuildProblemAsync(SqliteConnection connection, SchedulingPolicy policy, CancellationToken cancellationToken)
+    // ユーザー要望（checkpoint151）「既に配置したものを動かさないようにするか、つまり未配置のみを
+    // 操作するようにするか」への対応。既定（false）は従来通りIsLocked/IsManualの行だけを固定扱いにし、
+    // 前回までの自動作成結果（Source='cp-sat'、IsLocked=0かつIsManual=0）は毎回解き直す。
+    // trueのときは、以下のSQLすべてで固定扱いの条件を「1=1」（＝既存のAssignment行すべて）へ
+    // 差し替え、前回までの自動作成結果もロック・手動配置と同じ扱いで固定する。
+    private static async Task<(ScheduleProblem Problem, HashSet<long> RegularTeacherRestrictedRequestIds)> BuildProblemAsync(SqliteConnection connection, SchedulingPolicy policy, bool keepExistingPlacements, CancellationToken cancellationToken)
     {
+        var fixedFilter = keepExistingPlacements ? "1=1" : "(a.IsLocked=1 OR a.IsManual=1)";
         var demands = new List<LessonDemand>();
         var metadata = new Dictionary<long, RequestMetadata>();
         await using (var command = connection.CreateCommand())
         {
-            command.CommandText = """
+            command.CommandText = $"""
                 SELECT r.Id,r.StudentId,r.RequiredSessions,
-                  (SELECT COUNT(*) FROM Assignment a WHERE a.LessonRequestId=r.Id AND (a.IsLocked=1 OR a.IsManual=1)),
+                  (SELECT COUNT(*) FROM Assignment a WHERE a.LessonRequestId=r.Id AND {fixedFilter}),
                   COALESCE(r.RegularTeacherId,p.RegularTeacherId),
                   COALESCE(NULLIF(r.RegularTeacherPriority,1),p.RegularTeacherPriority,1),
-                  (SELECT COUNT(*) FROM Assignment a WHERE a.LessonRequestId=r.Id AND (a.IsLocked=1 OR a.IsManual=1) AND a.TeacherId=COALESCE(r.RegularTeacherId,p.RegularTeacherId)),
+                  (SELECT COUNT(*) FROM Assignment a WHERE a.LessonRequestId=r.Id AND {fixedFilter} AND a.TeacherId=COALESCE(r.RegularTeacherId,p.RegularTeacherId)),
                   COALESCE(r.MaxConsecutiveSlotsOverride,s.DefaultMaxConsecutiveSlots),
                   COALESCE(r.AllowGapOverride,s.AllowGap),
                   CASE WHEN r.OneToOneRequired=1 OR COALESCE(p.OneToOneRequired,0)=1 THEN 1 ELSE 0 END,
@@ -178,7 +185,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         var candidates = new List<PlacementCandidate>();
         await using (var command = connection.CreateCommand())
         {
-            command.CommandText = """
+            command.CommandText = $"""
                 SELECT r.Id,r.StudentId,tq.TeacherId,ds.OpenDateId,ds.TimeSlotId,
                        CAST(julianday(d.Date)-julianday(cp.StartDate) AS INTEGER),ts.SortOrder,
                        COALESCE(sa.AvailabilityLevel,1),COALESCE(ta.AvailabilityLevel,1),
@@ -196,7 +203,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
                 WHERE (NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE ProjectId=r.ProjectId AND StudentId=r.StudentId) OR COALESCE(sa.AvailabilityLevel,0)>0)
                   AND (NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=r.ProjectId) OR COALESCE(ta.AvailabilityLevel,0)>0)
                   AND NOT EXISTS(SELECT 1 FROM TeacherUnavailability u WHERE u.TeacherId=tq.TeacherId AND u.OpenDateId=ds.OpenDateId AND u.TimeSlotId=ds.TimeSlotId)
-                  AND NOT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest ar ON ar.Id=a.LessonRequestId WHERE (a.IsLocked=1 OR a.IsManual=1) AND a.OpenDateId=ds.OpenDateId AND a.TimeSlotId=ds.TimeSlotId AND ar.StudentId=r.StudentId);
+                  AND NOT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest ar ON ar.Id=a.LessonRequestId WHERE {fixedFilter} AND a.OpenDateId=ds.OpenDateId AND a.TimeSlotId=ds.TimeSlotId AND ar.StudentId=r.StudentId);
                 """;
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -237,7 +244,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         var fixedPlacements = new List<FixedPlacement>();
         await using (var command = connection.CreateCommand())
         {
-            command.CommandText = """
+            command.CommandText = $"""
                 SELECT a.LessonRequestId,r.StudentId,a.TeacherId,a.OpenDateId,a.TimeSlotId,
                        CAST(julianday(d.Date)-julianday(cp.StartDate) AS INTEGER),ts.SortOrder,
                        CASE WHEN r.OneToOneRequired=1 OR COALESCE(p.OneToOneRequired,0)=1 THEN 1 ELSE 0 END
@@ -247,7 +254,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
                 JOIN OpenDate d ON d.Id=a.OpenDateId
                 JOIN TimeSlot ts ON ts.Id=a.TimeSlotId
                 LEFT JOIN RegularLessonProfile p ON p.ProjectId=r.ProjectId AND p.StudentId=r.StudentId AND p.SubjectId=r.SubjectId
-                WHERE a.IsLocked=1 OR a.IsManual=1;
+                WHERE {fixedFilter};
                 """;
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -309,7 +316,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         scores[id] = Math.Max(scores.GetValueOrDefault(id), score);
     }
 
-    private static async Task SaveValidatedAsync(SqliteConnection connection, ScheduleProblem problem, ScheduleSolution solution, TimeSpan timeLimit, CancellationToken cancellationToken)
+    private static async Task SaveValidatedAsync(SqliteConnection connection, ScheduleProblem problem, ScheduleSolution solution, TimeSpan timeLimit, bool keepExistingPlacements, CancellationToken cancellationToken)
     {
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         var started = DateTimeOffset.UtcNow - solution.Elapsed;
@@ -330,8 +337,13 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         run.Parameters.AddWithValue("$elapsed", solution.Elapsed.TotalSeconds);
         var runId = Convert.ToInt64(await run.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture);
 
-        await using (var clear = connection.CreateCommand())
+        // keepExistingPlacements=trueの間は、既に配置済みの行（前回までの自動作成結果を含む）を
+        // BuildProblemAsyncがすべて固定扱い（ExistingPlacements）にしており、solution.Placementsには
+        // 含まれない。ここで無条件にDELETEすると、再挿入されないままそれらの行が失われてしまうため、
+        // このモードのときはクリアをスキップする（本当に未配置だった受講希望の分だけが新規にINSERTされる）。
+        if (!keepExistingPlacements)
         {
+            await using var clear = connection.CreateCommand();
             clear.Transaction = (SqliteTransaction)transaction;
             clear.CommandText = "DELETE FROM Assignment WHERE IsLocked=0 AND IsManual=0;";
             await clear.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);

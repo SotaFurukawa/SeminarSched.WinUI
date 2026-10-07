@@ -112,6 +112,11 @@ public interface IScheduleEditorService
     Task<IReadOnlyList<OpenDateOption>> GetOpenDatesAsync(string projectPath, CancellationToken cancellationToken = default);
     Task<ScheduleBoard> GetBoardAsync(string projectPath, long openDateId, IReadOnlyCollection<long> extraTeacherIds, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UnplacedSessionOption>> GetUnplacedSessionsAsync(string projectPath, long openDateId, CancellationToken cancellationToken = default);
+    // ユーザー要望（checkpoint151）「未配置に残っているものを移そうとしてドラッグしているときに、
+    // 生徒が出席不可にしているコマに禁止マークをつけるようにしておく」への対応。ドラッグ開始時に
+    // この受講希望の生徒が選択中の日付で明示的に出席不可（AvailabilityLevel=0）に設定している
+    // コマのIdだけを返す（未回答＝既定で出席可の行は含めない）。
+    Task<IReadOnlyList<long>> GetStudentUnavailableSlotIdsAsync(string projectPath, long lessonRequestId, long openDateId, CancellationToken cancellationToken = default);
     Task<EditPreview> PreviewMoveAsync(string projectPath, long assignmentId, long teacherId, long openDateId, long timeSlotId, CancellationToken cancellationToken = default);
     Task MoveAsync(string projectPath, long assignmentId, long teacherId, long openDateId, long timeSlotId, bool confirmSoftWarnings = false, string? reason = null, CancellationToken cancellationToken = default);
     Task SetTeacherUnavailableAsync(string projectPath, long teacherId, long openDateId, long timeSlotId, bool unavailable, CancellationToken cancellationToken = default);
