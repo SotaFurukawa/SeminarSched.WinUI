@@ -92,6 +92,21 @@ public sealed class SoftWarningConfirmationRequiredException(EditPreview preview
     public EditPreview Preview { get; } = preview;
 }
 
+// ユーザー要望（checkpoint152）「自動作成の後から配置するものは元から動かないようにするという
+// 設定で、残ったものがどこにも配置できなかった場合に、ここをこう変えれば配置できますよ、という
+// のがあれば警告を出して、『入れ替えて配置する』『配置せずそのままにする』ボタンを用意してほしい。
+// この入れ替えはできるだけ最小になるように」への対応。未配置の受講希望1件につき、既存の固定配置
+// （ロック・手動配置は対象外）を1件だけ別の空きコマへ移動すれば配置できる、という「1手」の
+// 入れ替え案だけを探す（それ以上の連鎖的な入れ替えは探索しない＝これが「最小」の実装範囲）。
+public sealed record SwapSuggestion(
+    long UnassignedRequestId, string UnassignedLabel,
+    long MovingAssignmentId, string MovingAssignmentLabel,
+    long FreedTeacherId, long FreedOpenDateId, long FreedTimeSlotId, string FreedSlotLabel,
+    long NewTeacherId, long NewOpenDateId, long NewTimeSlotId, string NewSlotLabel)
+{
+    public string Message => $"{UnassignedLabel}は、{MovingAssignmentLabel}（現在: {FreedSlotLabel}）を{NewSlotLabel}へ移動すれば{FreedSlotLabel}へ配置できます。";
+}
+
 public interface IScheduleEditorService
 {
     // プロジェクトファイル（WALモードのため本体＋"-wal"サイドカーの新しい方）の最終更新時刻を
@@ -125,4 +140,12 @@ public interface IScheduleEditorService
     Task RestoreSnapshotAsync(string projectPath, ScheduleSnapshot snapshot, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AuditHistoryEntry>> GetAuditHistoryAsync(string projectPath, int limit = 50, CancellationToken cancellationToken = default);
     Task<ScheduleLabelSet> GetLabelSetAsync(string projectPath, CancellationToken cancellationToken = default);
+
+    // ユーザー要望（checkpoint152）。keepExistingPlacements=trueで自動作成した結果、未配置が残った
+    // ときに呼び出し側（OptimizationPage）から使う。1件も見つからなければ空配列を返す。
+    Task<IReadOnlyList<SwapSuggestion>> FindSwapSuggestionsAsync(string projectPath, CancellationToken cancellationToken = default);
+    // suggestion.MovingAssignmentIdをsuggestion.New...へ移動し、suggestion.UnassignedRequestIdを
+    // suggestion.Freed...（＝移動前にMovingAssignmentIdがあったコマ）へ手動配置する。1つの
+    // トランザクションで原子的に行う（Finding時点から状態が変わっていた場合はInvalidOperationException）。
+    Task ApplySwapSuggestionAsync(string projectPath, SwapSuggestion suggestion, CancellationToken cancellationToken = default);
 }

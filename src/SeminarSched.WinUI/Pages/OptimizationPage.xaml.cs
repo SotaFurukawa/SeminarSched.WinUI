@@ -3,10 +3,13 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using SeminarSched.Application.Scheduling;
 using SeminarSched.Domain.Scheduling;
 using SeminarSched.Optimization.Execution;
 using SeminarSched.Optimization.Profiles;
 using SeminarSched_WinUI.ViewModels;
+using Windows.UI;
 
 namespace SeminarSched_WinUI.Pages;
 
@@ -184,6 +187,7 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         {
             var path = App.ProjectService.Current!.Path;
             var profile = OptimizationProfileCatalog.Get(ViewModel.Level);
+            ClearSwapSuggestions();
             await OptimizationRunState.StartAsync(path, profile, UnrestrictedResourceUsageCheckBox.IsChecked == true, BuildRunPolicyOverride(), KeepExistingPlacementsCheckBox.IsChecked == true);
             RefreshRunUi();
         }
@@ -270,11 +274,17 @@ public sealed partial class OptimizationPage : WorkflowPageBase
                     reasons.Add($"うち{result.UnassignedWithNoQualifiedTeacher}件は、対応できる講師の候補コマが構造的に見つかりませんでした（講師の資格・出勤可否をご確認ください）。時間をかけても解決しません。");
                 var reasonNote = reasons.Count > 0 ? " " + string.Join(" ", reasons) : "";
                 RunStatus.Message = baseMessage + reasonNote;
+                // ユーザー要望（checkpoint152）。「既に配置済みの授業は動かさない」設定で未配置が残った
+                // ときだけ、既存配置を1件動かせば配置できる候補を探す（通常の自動作成では、ソルバーが
+                // 既存配置も含めて全体最適化するため、この種の「動かせば置ける」状況はそもそも起きない）。
+                if (KeepExistingPlacementsCheckBox.IsChecked == true && App.ProjectService.Current is { } project)
+                    _ = LoadSwapSuggestionsAsync(project.Path);
             }
             else
             {
                 RunStatus.Severity = InfoBarSeverity.Success; RunStatus.Title = "時間割を作成しました";
                 RunStatus.Message = baseMessage;
+                ClearSwapSuggestions();
             }
             RunStatus.IsOpen = true;
         }
@@ -283,6 +293,86 @@ public sealed partial class OptimizationPage : WorkflowPageBase
             RunStatus.Severity = InfoBarSeverity.Error; RunStatus.Title = "時間割を作成できませんでした"; RunStatus.Message = outcome.ErrorMessage ?? ""; RunStatus.IsOpen = true;
         }
     }
+
+    // ユーザー要望（checkpoint152）「入れ替えて配置する／配置せずそのままにする」の実体。
+    // FindSwapSuggestionsAsyncは最大1秒程度かかりうるため、RefreshRunUi（同期・高頻度）からは
+    // 呼ばずfire-and-forgetする。失敗しても自動作成そのものの結果表示は妨げない。
+    private async Task LoadSwapSuggestionsAsync(string path)
+    {
+        try
+        {
+            var suggestions = await App.ScheduleEditor.FindSwapSuggestionsAsync(path);
+            DispatcherQueue.TryEnqueue(() => RenderSwapSuggestions(path, suggestions));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or Microsoft.Data.Sqlite.SqliteException)
+        {
+        }
+    }
+
+    private void ClearSwapSuggestions()
+    {
+        SwapSuggestionsList.Children.Clear();
+        SwapSuggestionsPanel.Visibility = Visibility.Collapsed;
+    }
+
+    private void RenderSwapSuggestions(string path, IReadOnlyList<SwapSuggestion> suggestions)
+    {
+        SwapSuggestionsList.Children.Clear();
+        if (suggestions.Count == 0)
+        {
+            SwapSuggestionsPanel.Visibility = Visibility.Collapsed;
+            return;
+        }
+        foreach (var suggestion in suggestions) SwapSuggestionsList.Children.Add(BuildSwapSuggestionCard(path, suggestion));
+        SwapSuggestionsPanel.Visibility = Visibility.Visible;
+    }
+
+    private Border BuildSwapSuggestionCard(string path, SwapSuggestion suggestion)
+    {
+        var applyButton = new Button { Content = "入れ替えて配置する" };
+        var dismissButton = new Button { Content = "配置せずそのままにする" };
+        var card = new Border
+        {
+            Padding = new Thickness(12),
+            CornerRadius = new CornerRadius(6),
+            Background = ResourceBrush("CardBackgroundFillColorSecondaryBrush", Color.FromArgb(255, 235, 235, 235)),
+            Child = new StackPanel
+            {
+                Spacing = 8,
+                Children =
+                {
+                    new TextBlock { Text = suggestion.Message, TextWrapping = TextWrapping.Wrap },
+                    new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { applyButton, dismissButton } },
+                },
+            },
+        };
+
+        applyButton.Click += async (_, _) =>
+        {
+            applyButton.IsEnabled = false; dismissButton.IsEnabled = false;
+            try
+            {
+                await App.ScheduleEditor.ApplySwapSuggestionAsync(path, suggestion);
+                RunStatus.Severity = InfoBarSeverity.Success; RunStatus.Title = "入れ替えて配置しました"; RunStatus.Message = suggestion.Message; RunStatus.IsOpen = true;
+            }
+            catch (InvalidOperationException ex)
+            {
+                RunStatus.Severity = InfoBarSeverity.Error; RunStatus.Title = "入れ替えを適用できませんでした"; RunStatus.Message = ex.Message; RunStatus.IsOpen = true;
+            }
+            SwapSuggestionsList.Children.Remove(card);
+            if (SwapSuggestionsList.Children.Count == 0) SwapSuggestionsPanel.Visibility = Visibility.Collapsed;
+        };
+        dismissButton.Click += (_, _) =>
+        {
+            SwapSuggestionsList.Children.Remove(card);
+            if (SwapSuggestionsList.Children.Count == 0) SwapSuggestionsPanel.Visibility = Visibility.Collapsed;
+        };
+
+        return card;
+    }
+
+    private static Brush ResourceBrush(string key, Color fallback)
+        => Application.Current.Resources.TryGetValue(key, out var value) && value is Brush brush ? brush : new SolidColorBrush(fallback);
 
     private static string FormatDuration(TimeSpan span) => span.TotalMinutes>=1?$"{(int)span.TotalMinutes}分{span.Seconds}秒":$"{span.TotalSeconds:F0}秒";
 

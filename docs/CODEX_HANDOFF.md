@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-07（checkpoint151）
+最終更新: 2026-10-07（checkpoint152）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -15,9 +15,55 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 →`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-<version>.exe`）は
 例外なく毎回実行すること。
 
-Current Version: `v0.28.0 (beta)`（Draft Release作成予定。日別グリッド編集・自動作成・出力xlsx
-関連の新機能6件。checkpoint151を参照）
-Latest Development Checkpoint: checkpoint 151（ユーザーから1メッセージで5件の要望、続けて
+Current Version: `v0.29.0 (beta)`（Draft Release作成予定。矢印ボタンの位置調整と、自動作成の
+入れ替え提案機能の2件。checkpoint152を参照）
+Latest Development Checkpoint: checkpoint 152（ユーザーから2件の要望。①日別グリッド編集の
+日付左右の前後矢印ボタンを、日付ComboBoxの真横（隙間なし）に置き、縦幅を揃えて上下端が同じ高さに
+なるようにしてほしい。②「既に配置済みの授業は動かさない」設定で自動作成した結果、未配置が残った
+とき、既存の固定配置を1件だけ別のコマへ動かせば配置できる組み合わせがあれば警告を出し、「入れ替えて
+配置する」「配置せずそのままにする」の2つのボタンを用意してほしい。入れ替えはできるだけ最小に
+したい、という要望だった。
+
+**①矢印ボタンの位置調整:** `ScheduleEditorPage.xaml`の`PreviousDateButton`/`BoardDate`/
+`NextDateButton`を包む`StackPanel`の`Spacing`を`4`から`0`へ、`VerticalAlignment`を
+`Bottom`に変更。ボタン側に`Height="32"`（`ComboBox`の入力枠部分の高さに相当、Header文字の
+高さを除く）・`Padding="8,0"`・左右それぞれ`CornerRadius="4,0,0,4"`/`0,4,4,0"`を追加し、
+`ComboBox`側にも`CornerRadius="0"`を設定して中央だけ角を無くし、3つが1つの区切りの無い帯
+（セグメントコントロール）に見えるようにした。
+
+**②入れ替え提案機能:** `IScheduleEditorService`に`FindSwapSuggestionsAsync`/
+`ApplySwapSuggestionAsync`を追加（実装は既存の`AddManualAsync`等と同じ委譲パターンで
+`SqliteFixedLessonService`内。`SqliteScheduleEditorService`は1行の委譲のみ）。
+`FindSwapSuggestionsAsync`は、未配置の受講希望1件ごとに「指導可能・出欠可・生徒の二重予約なし
+だが講師の同時担当上限が埋まっている」コマを探し、そのコマを占有している配置（ロック・手動配置は
+対象外＝ユーザーが確定させたものは動かさない）を1件だけ別の空きコマへ動かせば未配置分が収まるか
+どうかを判定する。該当する移動先が見つかった最初の1件だけを採用する「1手」の入れ替え案のみを
+探す（それ以上の連鎖的な入れ替えは探索しない＝ユーザーの「できるだけ最小に」という要望への対応で
+あり、意図的な実装範囲の制限）。組み合わせ爆発を避けるため、個別SQLをネストで発行せず、必要な
+データ（開講コマ、科目別の指導可能講師、生徒・講師の出欠、現在の配置、未配置の受講希望）を一括
+読み込みしてインメモリで判定する（`SqliteScheduleRunService.BuildProblemAsync`と同じ設計
+方針）。`ApplySwapSuggestionAsync`は1つのトランザクションで、移動対象の配置を検索時点から
+動いていないか確認した上で実際に移動し、未配置だった受講希望を空いたコマへ手動配置として追加する
+（状態が変わっていた場合は何も変更せず`InvalidOperationException`）。`OptimizationPage`では、
+「既に配置済みの授業は動かさない」設定がオンの状態で自動作成した結果、未配置が残ったときだけ
+`FindSwapSuggestionsAsync`を呼び、見つかった候補ごとにカード（提案文＋「入れ替えて配置する」
+「配置せずそのままにする」の2ボタン）を表示する。「入れ替えて配置する」を押すと
+`ApplySwapSuggestionAsync`を実行し、カードを一覧から取り除く。
+
+**検証:** `SqliteFixedLessonServiceTests`に、1講師・2コマ・1対1必須の受講希望2件という最小
+構成で（a）既存の自動配置（`IsManual=0`）を動かせば未配置が収まる場合に正しい入れ替え案が
+返り、`ApplySwapSuggestionAsync`適用後に両方の受講希望が正しいコマへ配置されること、（b）
+占有している配置がすべて手動配置・ロック済みで動かせない場合は提案が0件になること、（c）移動先に
+なり得るコマが存在しない場合も提案が0件になることを確認する新規テスト3件を追加した。既存の
+全テスト（計252件）と合わせて計255件がすべて通過することを確認済み。**①の矢印ボタンの見た目、
+②のUI（カードの表示・ボタンの動作）については、ビルド成功とコードレベルの確認（ロジックの
+手作業トレース、新規テストの通過）のみ行い、実機（dev-run）での画面確認はこのcheckpointでは
+行っていない**（検証を試みた時点でユーザーが別の作業（オンラインゲーム等）で実機を使用中だと
+判明したため、誤操作のリスクを避けて自動クリックによる実機確認を見送った。ユーザー自身による
+目視確認を依頼する必要がある）。新機能のためminorを上げてv0.29.0（patchを0へ戻す）とした。
+詳細は[docs/releases/v0.29.0.md](releases/v0.29.0.md)。
+
+checkpoint 151（ユーザーから1メッセージで5件の要望、続けて
 ドラッグ中の視覚表現について1件の追加要望。①日別グリッド編集の日付の左右に前後の授業日へ切り替える
 矢印を追加してほしい、②出力xlsxの生徒ごとのシート（全体時間割以外）で1行目を高さ50にし、指定範囲外は
 セルを結合してほしい、③講師配布用xlsxで、受講科目が2科目ならG5+H5・G6+H6へ、3科目以上なら3列左へ

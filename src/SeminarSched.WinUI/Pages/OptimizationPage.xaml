@@ -82,6 +82,16 @@
                 <StackPanel Spacing="12">
                     <TextBlock FontSize="20" FontWeight="SemiBold" Text="自動作成"/>
                     <InfoBar x:Name="RunStatus" IsClosable="True"/>
+                    <!-- ユーザー要望（checkpoint152）「既に配置済みの授業は動かさない」設定で自動作成した
+                         結果、未配置が残ったとき、既存配置を1件だけ動かせば配置できる場合に警告を出し、
+                         「入れ替えて配置する」「配置せずそのままにする」を選べるようにしてほしい、への
+                         対応。カード自体は候補ごとに内容・ボタンが異なるため、ここではコンテナだけを
+                         置き、中身はSwapSuggestions_RenderAsync（コードビハインド）で組み立てる。 -->
+                    <StackPanel x:Name="SwapSuggestionsPanel" Spacing="8" Visibility="Collapsed">
+                        <TextBlock FontWeight="SemiBold" Text="入れ替えれば配置できる候補があります"/>
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Text="未配置のまま残った受講希望について、既存の自動配置を1件だけ別のコマへ動かせば配置できる組み合わせが見つかりました。入れ替えるかどうかを個別に選べます（手動配置・事前確定・ロック済みのコマは動かしません）。"/>
+                        <StackPanel x:Name="SwapSuggestionsList" Spacing="8"/>
+                    </StackPanel>
                     <StackPanel Spacing="2">
                         <CheckBox x:Name="UnrestrictedResourceUsageCheckBox" Content="CPU使用率を制限しない（フルパワーで実行）" Checked="UnrestrictedResourceUsageCheckBox_Changed" Unchecked="UnrestrictedResourceUsageCheckBox_Changed"/>
                         <TextBlock Margin="28,0,0,0" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="既定では他の作業と競合したときに優先度を譲り、パソコンが重くなるのを防ぎます（パソコンが空いていれば速度は落ちません）。オンにすると常にフルパワーで実行し、その分速くなる可能性がありますが、実行中は他の作業が重くなることがあります。" TextWrapping="Wrap"/>

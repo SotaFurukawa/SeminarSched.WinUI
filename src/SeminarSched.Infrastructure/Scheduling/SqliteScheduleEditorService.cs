@@ -421,6 +421,12 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
         return new ScheduleLabelSet(requests,teachers,dates,slots);
     }
 
+    public async Task<IReadOnlyList<SwapSuggestion>> FindSwapSuggestionsAsync(string projectPath,CancellationToken cancellationToken=default)
+        => await new SqliteFixedLessonService().FindSwapSuggestionsAsync(projectPath,cancellationToken).ConfigureAwait(false);
+
+    public async Task ApplySwapSuggestionAsync(string projectPath,SwapSuggestion suggestion,CancellationToken cancellationToken=default)
+        => await new SqliteFixedLessonService().ApplySwapSuggestionAsync(projectPath,suggestion,cancellationToken).ConfigureAwait(false);
+
     private static async Task InsertAuditAsync(SqliteConnection connection,SqliteTransaction transaction,string action,string entityId,object? summary,CancellationToken cancellationToken){await using var command=connection.CreateCommand();command.Transaction=transaction;command.CommandText="INSERT INTO AuditLog(ProjectId,TimestampUtc,Action,EntityType,EntityId,AfterJson,Reason,Source,OperationId) VALUES(1,$utc,$action,'assignment',$entity,$after,'時間割手動編集','manual',$operation);";command.Parameters.AddWithValue("$utc",DateTimeOffset.UtcNow.ToString("O",CultureInfo.InvariantCulture));command.Parameters.AddWithValue("$action",action);command.Parameters.AddWithValue("$entity",entityId);command.Parameters.AddWithValue("$after",summary is null?DBNull.Value:JsonSerializer.Serialize(summary));command.Parameters.AddWithValue("$operation",Guid.NewGuid().ToString("N"));await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);}
     private static async Task<SqliteConnection> OpenAsync(string path,CancellationToken cancellationToken){var connection=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.GetFullPath(path),Mode=SqliteOpenMode.ReadWrite,ForeignKeys=true,Pooling=false}.ToString());await connection.OpenAsync(cancellationToken).ConfigureAwait(false);return connection;}
 }

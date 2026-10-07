@@ -35,10 +35,15 @@
                          単純にSelectedIndexを±1するだけで前後の授業日へ切り替えられる。 -->
                     <Grid ColumnSpacing="12">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
-                            <Button x:Name="PreviousDateButton" Content="◀" Click="PreviousDate_Click" ToolTipService.ToolTip="前の授業日"/>
-                            <ComboBox x:Name="BoardDate" Header="日付" DisplayMemberPath="Label" MinWidth="200" SelectionChanged="BoardDate_SelectionChanged"/>
-                            <Button x:Name="NextDateButton" Content="▶" Click="NextDate_Click" ToolTipService.ToolTip="次の授業日"/>
+                        <!-- ユーザー要望（checkpoint152）「矢印を日付の枠の真横においてください。縦幅
+                             などもそろえて、上枠と下枠が同じ高さになるように」への対応。矢印ボタンと
+                             日付ComboBoxの間の隙間を無くし（Spacing="0"）、ボタンの高さをComboBoxの
+                             入力枠部分（Header文字を除く）と同じ32pxに固定、VerticalAlignment="Bottom"
+                             で下端をComboBoxの入力枠の下端に揃える。 -->
+                        <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Bottom">
+                            <Button x:Name="PreviousDateButton" Content="◀" Height="32" Padding="8,0" VerticalAlignment="Bottom" CornerRadius="4,0,0,4" Click="PreviousDate_Click" ToolTipService.ToolTip="前の授業日"/>
+                            <ComboBox x:Name="BoardDate" Header="日付" DisplayMemberPath="Label" MinWidth="200" CornerRadius="0" SelectionChanged="BoardDate_SelectionChanged"/>
+                            <Button x:Name="NextDateButton" Content="▶" Height="32" Padding="8,0" VerticalAlignment="Bottom" CornerRadius="0,4,4,0" Click="NextDate_Click" ToolTipService.ToolTip="次の授業日"/>
                         </StackPanel>
                         <TextBox x:Name="BoardSearch" Grid.Column="1" Header="生徒名検索" TextChanged="BoardSearch_TextChanged"/>
                     </Grid>
