@@ -160,6 +160,41 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
         Assert.True(await IsTeacherUnavailableAsync(state.Path,teacher2.Id,state.DateId,state.SlotId));
     }
 
+    // ユーザー要望（checkpoint155）「集団授業と個別指導の間の空き時間の最小値を指定させる。負数も
+    // 入力可とする」の検証。
+    [Fact]
+    public async Task SaveClassAsync_PersistsMinGapMinutesIncludingNegativeValues()
+    {
+        var state=await CreateStateAsync();var service=new SqliteGroupLessonService();
+        var created=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学",minGapMinutes:-5));
+        Assert.Equal(-5,created.MinGapMinutes);
+        var listed=Assert.Single(await service.GetClassesAsync(state.Path));
+        Assert.Equal(-5,listed.MinGapMinutes);
+    }
+
+    [Fact]
+    public async Task SaveClassAsync_NegativeMinGapMinutes_AllowsSlightOverlapToRemainUnblocked()
+    {
+        var state=await CreateStateWithSlotAsync();var service=new SqliteGroupLessonService();
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学",teacherId:state.Teacher1Id,minGapMinutes:-5));
+        // コマは9:00-10:00。開講セッションは9:55-11:00で、gap=0なら5分重なりブロックされるはず
+        // だが、-5分の設定で実効ブロック範囲が[10:00,10:55]へ狭まり、コマの終了(10:00)と
+        // 接するだけで重ならなくなる。
+        await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(9,55),new TimeOnly(11,0));
+        Assert.False(await IsTeacherUnavailableAsync(state.Path,state.Teacher1Id,state.DateId,state.SlotId));
+    }
+
+    [Fact]
+    public async Task SaveClassAsync_PositiveMinGapMinutes_BlocksANearbySlotThatDoesNotLiterallyOverlap()
+    {
+        var state=await CreateStateWithSlotAsync();var service=new SqliteGroupLessonService();
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学",teacherId:state.Teacher1Id,minGapMinutes:10));
+        // コマは9:00-10:00。開講セッションは10:05-11:00で、gap=0なら重ならずブロックされないはず
+        // だが、+10分の設定で実効ブロック範囲が[9:55,11:10]へ広がり、コマの終了(10:00)と重なる。
+        await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(10,5),new TimeOnly(11,0));
+        Assert.True(await IsTeacherUnavailableAsync(state.Path,state.Teacher1Id,state.DateId,state.SlotId));
+    }
+
     private static async Task<bool> IsTeacherUnavailableAsync(string path,long teacherId,long openDateId,long timeSlotId)
     {
         await using var connection=new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False");

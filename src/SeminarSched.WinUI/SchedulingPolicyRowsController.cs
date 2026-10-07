@@ -25,17 +25,6 @@ public sealed class SchedulingPolicyRowsController(
         Refresh();
     }
 
-    public void LoadFromSaved(IReadOnlyList<(SchedulingPolicyDimension Dimension, int SelectedOptionIndex)> saved)
-    {
-        rows.Clear();
-        foreach (var row in SchedulingPolicyRowViewModel.BuildRowsFromSaved(saved))
-        {
-            rows.Add(row);
-        }
-
-        Refresh();
-    }
-
     private void Renumber()
     {
         for (var i = 0; i < rows.Count; i++)

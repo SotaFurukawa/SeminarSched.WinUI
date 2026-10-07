@@ -79,4 +79,28 @@ public sealed class OverviewGridLayoutTests
         Assert.True(cell.IsGroupLesson);
         Assert.False(cell.Unavailable);
     }
+
+    // ユーザー要望（checkpoint155）「集団授業と個別指導の間の空き時間の最小値にマイナス値を設定し、
+    // 個別指導が集団授業の開講時間そのものと重なったまま配置された場合、黄色で警告表示する」への
+    // 対応の検証。マイナスの空き時間設定により、この講師のこのコマへ個別指導のAssignmentが実際に
+    // 存在する状態（＝Assignmentがあるにもかかわらず同じコマが集団授業のコマ一覧にも含まれる状態）を
+    // 再現し、黒塗り「集団」表示（IsGroupLesson）ではなく、カードを保持したまま警告フラグが立つ
+    // ことを確認する。
+    [Fact]
+    public void Build_FlagsOverlapWarningWhenAnAssignmentExistsInAGroupLessonOverlappingCell()
+    {
+        var openDates = new HashSet<DateOnly> { new(2026, 7, 20) };
+        var assignments = new[]
+        {
+            new OverviewAssignment(new DateOnly(2026, 7, 20), "佐藤t", "1限 09:00-10:00", "中2", "数", "山田"),
+        };
+        var groupLessons = new[] { new OverviewGroupLessonCell(new DateOnly(2026, 7, 20), "佐藤t", "1限 09:00-10:00") };
+        var grid = OverviewGridLayout.Build(new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20), openDates, ["1限 09:00-10:00"], assignments, null, groupLessons);
+
+        var cell = Assert.Single(Assert.Single(Assert.Single(Assert.Single(grid.Weeks).Days).Teachers).Cells);
+        Assert.True(cell.HasOverlapWarning);
+        Assert.False(cell.IsGroupLesson);
+        var card = Assert.Single(cell.Cards);
+        Assert.Equal("山田", card.Student);
+    }
 }

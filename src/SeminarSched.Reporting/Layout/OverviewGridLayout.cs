@@ -3,8 +3,12 @@ namespace SeminarSched.Reporting.Layout;
 public sealed record OverviewCard(string Grade, string SubjectShortName, string Student, bool OneToOneRequired = false, bool IsLocked = false, bool IsManual = false);
 
 /// <summary>IsGroupLesson=trueの場合、この講師はこのコマの時間帯に集団授業を担当しており、
-/// レンダラー側は個別指導のカードの代わりに黒塗り「集団」表示にする（Cardsは常に空）。</summary>
-public sealed record OverviewCell(string SlotLabel, IReadOnlyList<OverviewCard> Cards, bool Unavailable = false, bool IsGroupLesson = false);
+/// レンダラー側は個別指導のカードの代わりに黒塗り「集団」表示にする（Cardsは常に空）。
+/// ユーザー要望（checkpoint155）「集団授業と個別指導の間の空き時間の最小値」にマイナス値を設定した
+/// 場合、個別指導がこの講師の集団授業の開講時間そのものと重なった状態のまま配置されることがある
+/// （本来は数分ずらして運用する前提の許容範囲）。HasOverlapWarning=trueはこの状態を示し、
+/// レンダラー側はカードを黄色で警告表示する（Cardsは通常どおり中身を持つ）。</summary>
+public sealed record OverviewCell(string SlotLabel, IReadOnlyList<OverviewCard> Cards, bool Unavailable = false, bool IsGroupLesson = false, bool HasOverlapWarning = false);
 
 public sealed record OverviewTeacherColumn(string TeacherName, IReadOnlyList<OverviewCell> Cells);
 
@@ -67,8 +71,13 @@ public static class OverviewGridLayout
                         {
                             var cards = dayAssignments.Where(a => a.Teacher == teacherName && a.SlotLabel == slot)
                                 .Select(a => new OverviewCard(a.Grade, a.SubjectShortName, a.Student, a.OneToOneRequired, a.IsLocked, a.IsManual)).ToArray();
-                            var isGroupLesson = cards.Length == 0 && dayGroupLessons.Any(g => g.Teacher == teacherName && g.SlotLabel == slot);
-                            return new OverviewCell(slot, cards, cards.Length == 0 && !isGroupLesson && unavailableCells.Contains((date, teacherName, slot)), isGroupLesson);
+                            var overlapsGroupLesson = dayGroupLessons.Any(g => g.Teacher == teacherName && g.SlotLabel == slot);
+                            var isGroupLesson = cards.Length == 0 && overlapsGroupLesson;
+                            // ユーザー要望（checkpoint155）。個別指導のカードがあり、かつ同じコマがこの講師の
+                            // 集団授業の開講時間（gap=0の文字どおりの時間帯）とも重なっている＝マイナスの
+                            // 空き時間設定により重なりを許容されたまま配置された状態。警告として扱う。
+                            var hasOverlapWarning = cards.Length > 0 && overlapsGroupLesson;
+                            return new OverviewCell(slot, cards, cards.Length == 0 && !isGroupLesson && unavailableCells.Contains((date, teacherName, slot)), isGroupLesson, hasOverlapWarning);
                         }).ToArray();
                         return new OverviewTeacherColumn(teacherName, cells);
                     }).ToArray();

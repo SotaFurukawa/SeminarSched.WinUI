@@ -249,6 +249,14 @@ internal static class SqliteProjectSchema
         await AddColumnIfMissingAsync(connection, transaction, "Student", "GivenName", "TEXT NOT NULL DEFAULT ''", cancellationToken);
         await AddColumnIfMissingAsync(connection, transaction, "Teacher", "FamilyName", "TEXT NOT NULL DEFAULT ''", cancellationToken);
         await AddColumnIfMissingAsync(connection, transaction, "Teacher", "GivenName", "TEXT NOT NULL DEFAULT ''", cancellationToken);
+
+        // ユーザー要望（checkpoint155）「集団授業と個別指導の間の空き時間の最小値を指定させる。
+        // 負数も入力可とする。個別指導の時間を5分くらいずらせば集団授業クラスに参加できるとした場合、
+        // マイナス値を設定しておけば個別指導に入ることが可能になる」への対応。
+        // RecomputeTeacherBlocksForClassAsyncの重なり判定（講師のTeacherUnavailability自動生成）で、
+        // 集団授業の開講時間帯をこの分だけ前後に広げる（正の値）／狭める（負の値）ために使う。
+        // 既存プロジェクトにも同じ理由でALTER TABLEで届ける。
+        await AddColumnIfMissingAsync(connection, transaction, "GroupLessonClass", "MinGapMinutes", "INTEGER NOT NULL DEFAULT 0", cancellationToken);
     }
 
     // ユーザー要望（checkpoint145）「姓と名を分けて保存」で追加したFamilyName/GivenName列を、
@@ -461,6 +469,7 @@ internal static class SqliteProjectSchema
             AllowOtherGrades INTEGER NOT NULL DEFAULT 0 CHECK(AllowOtherGrades IN(0,1)),
             Active INTEGER NOT NULL DEFAULT 1 CHECK(Active IN(0,1)),
             TeacherId INTEGER REFERENCES Teacher(Id) ON DELETE SET NULL,
+            MinGapMinutes INTEGER NOT NULL DEFAULT 0,
             UNIQUE(ProjectId,Name)
         );
         CREATE TABLE IF NOT EXISTS GroupLessonSession (

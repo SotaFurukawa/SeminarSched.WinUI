@@ -16,16 +16,19 @@
         <ScrollViewer Grid.Row="1" x:Name="ContentPanel">
         <StackPanel MaxWidth="1440" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="20">
             <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="時間割編集" />
+            <!-- ユーザー要望（checkpoint155）「『日別グリッド編集』から『...追加してください。』までの
+                 文章をなくす」「枠外の『...右クリックから選択してください』に、セル右上のバツ印/丸印の
+                 説明と『+講師を表示』の説明を追加する」への対応。カード冒頭にあった見出し「日別グリッド
+                 編集」と、その下の講師出勤可否編集の説明をまとめて削除し、代わりにこのページ冒頭の説明文へ
+                 その内容を追記した。 -->
             <TextBlock
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="時間割の自動作成前に、あらかじめ指定しておきたいコマをドラッグ・ドロップで指定できます。未配置一覧からセルへドラッグして配置してください。配置済みカードを未配置の状態にしたい場合は右クリックから選択してください。"
+                Text="時間割の自動作成前に、あらかじめ指定しておきたいコマをドラッグ・ドロップで指定できます。未配置一覧からセルへドラッグして配置してください。配置済みカードを未配置の状態にしたい場合は右クリックから選択してください。セル右上のバツ印/丸印から、講師の出勤可否をここでも変更できます。表示されていない講師を追加したい場合は、「+講師を表示」から追加してください。"
                 TextWrapping="Wrap" />
             <InfoBar x:Name="EditorStatus" IsClosable="True" />
 
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Spacing="12">
-                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="日別グリッド編集"/>
-                    <TextBlock Text="講師の出勤可否をここでも変更できます。セル右上のバツ印/丸印から出勤可能日を変更できます。アンケートで出勤不可と回答した講師を追加したい場合は、「+講師を表示」から追加してください。" TextWrapping="Wrap"/>
                     <!-- 不具合修正: 日付・検索・ボタン5個をすべて1行に並べていたため、ウィンドウを
                          縦長（狭幅）にすると*幅の生徒名検索がボタンに押し出されて潰れていた。日付・検索は
                          そのままの1行に収まる専用行とし、ボタン一式は別の行へ分けた。 -->

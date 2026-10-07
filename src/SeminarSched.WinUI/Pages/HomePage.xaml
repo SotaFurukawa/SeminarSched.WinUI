@@ -38,55 +38,9 @@
                 </StackPanel>
             </Border>
 
-            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
-                <StackPanel Spacing="14">
-                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="現在のプロジェクト" />
-                    <TextBlock x:Name="CurrentProjectTitle" FontSize="18" Text="プロジェクトは開かれていません" />
-                    <TextBlock x:Name="CurrentProjectPeriod" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <TextBlock x:Name="CurrentProjectPath" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Click="OpenProject_Click" Content="既存プロジェクトを開く" />
-                        <Button Click="CloseProject_Click" Content="閉じる" />
-                        <Button Click="CreateBackup_Click" Content="バックアップを作成" />
-                        <Button Click="RestoreBackup_Click" Content="バックアップから復元" />
-                        <Button Click="SaveAs_Click" Content="複製して切り替え" />
-                    </StackPanel>
-                    <TextBlock
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="バックアップから復元する場合は、現在のプロジェクトが書き換えられますので、ご注意ください。"
-                        TextWrapping="Wrap" />
-                </StackPanel>
-            </Border>
-
-            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
-                <StackPanel Spacing="12">
-                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="最近使ったプロジェクト" />
-                    <ListView x:Name="RecentProjectsList" IsItemClickEnabled="True" ItemClick="RecentProject_ItemClick">
-                        <ListView.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Padding="4" ColumnSpacing="8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Spacing="2">
-                                        <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
-                                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{Binding Path}" TextWrapping="Wrap" />
-                                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" Text="{Binding LastModifiedText}" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                        <Button Content="プロジェクトを開く" Tag="{Binding Path}" Click="OpenRecentProjectButton_Click" />
-                                        <Button Content="フォルダーを開く" Tag="{Binding Path}" Click="OpenRecentProjectFolder_Click" />
-                                        <Button Content="表示しない" Tag="{Binding Path}" Click="HideRecentProject_Click" />
-                                    </StackPanel>
-                                </Grid>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
-                    <TextBlock x:Name="NoRecentProjectsText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="最近使ったプロジェクトはありません。" />
-                </StackPanel>
-            </Border>
-
+            <!-- ユーザー要望（checkpoint155）「今はホームは基本情報、現在、最近、新規の順だが、
+                 基本情報、新規、現在、最近の順にしてほしい」への対応。カードの並び順だけを変更し、
+                 各カードの中身（コントロール名・イベントハンドラー）は変更していない。 -->
             <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Spacing="14">
                     <TextBlock FontSize="20" FontWeight="SemiBold" Text="新しい講習プロジェクト" />
@@ -157,6 +111,55 @@
                         Click="CreateProject_Click"
                         Content="保存先を選んで作成"
                         Style="{StaticResource AccentButtonStyle}" />
+                </StackPanel>
+            </Border>
+
+            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                <StackPanel Spacing="14">
+                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="現在のプロジェクト" />
+                    <TextBlock x:Name="CurrentProjectTitle" FontSize="18" Text="プロジェクトは開かれていません" />
+                    <TextBlock x:Name="CurrentProjectPeriod" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock x:Name="CurrentProjectPath" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Click="OpenProject_Click" Content="既存プロジェクトを開く" />
+                        <Button Click="CloseProject_Click" Content="閉じる" />
+                        <Button Click="CreateBackup_Click" Content="バックアップを作成" />
+                        <Button Click="RestoreBackup_Click" Content="バックアップから復元" />
+                        <Button Click="SaveAs_Click" Content="複製して切り替え" />
+                    </StackPanel>
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="バックアップから復元する場合は、現在のプロジェクトが書き換えられますので、ご注意ください。"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                <StackPanel Spacing="12">
+                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="最近使ったプロジェクト" />
+                    <ListView x:Name="RecentProjectsList" IsItemClickEnabled="True" ItemClick="RecentProject_ItemClick">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="4" ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
+                                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{Binding Path}" TextWrapping="Wrap" />
+                                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" Text="{Binding LastModifiedText}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button Content="プロジェクトを開く" Tag="{Binding Path}" Click="OpenRecentProjectButton_Click" />
+                                        <Button Content="フォルダーを開く" Tag="{Binding Path}" Click="OpenRecentProjectFolder_Click" />
+                                        <Button Content="表示しない" Tag="{Binding Path}" Click="HideRecentProject_Click" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <TextBlock x:Name="NoRecentProjectsText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="最近使ったプロジェクトはありません。" />
                 </StackPanel>
             </Border>
         </StackPanel>

@@ -26,16 +26,16 @@ public sealed class RecentProjectServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task TouchAsync_KeepsAtMostTenEntries()
+    public async Task TouchAsync_KeepsAtMostFiveEntries()
     {
         var store = new MemorySettingsStore();
         var service = new RecentProjectService(store);
-        for (var index = 0; index < 12; index++)
+        for (var index = 0; index < 7; index++)
         {
             await service.TouchAsync(Path.Combine(_directory, $"{index}.jukuschedule"), $"Project {index}");
         }
 
-        Assert.Equal(10, (await service.GetAsync()).Count);
+        Assert.Equal(5, (await service.GetAsync()).Count);
     }
 
     [Fact]

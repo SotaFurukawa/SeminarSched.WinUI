@@ -7,7 +7,7 @@ namespace SeminarSched.Domain.GroupLessons;
 // （同じ学年で複数クラスを持てる、受講登録はクラス単位で1回で済む）。
 public sealed record GroupLessonClass
 {
-    public GroupLessonClass(long id, string name, string grade, string subject, bool allowOtherGrades = false, bool active = true, long? teacherId = null)
+    public GroupLessonClass(long id, string name, string grade, string subject, bool allowOtherGrades = false, bool active = true, long? teacherId = null, int minGapMinutes = 0)
     {
         if (id < 0) throw new ArgumentOutOfRangeException(nameof(id));
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -21,6 +21,7 @@ public sealed record GroupLessonClass
         AllowOtherGrades = allowOtherGrades;
         Active = active;
         TeacherId = teacherId;
+        MinGapMinutes = minGapMinutes;
     }
 
     public long Id { get; init; }
@@ -43,4 +44,13 @@ public sealed record GroupLessonClass
     // TeacherUnavailabilityが自動生成され、自動作成・手動配置の両方でブロックされる
     // （SqliteGroupLessonService.RecomputeTeacherBlocksForClassAsync参照）。
     public long? TeacherId { get; init; }
+
+    // ユーザー要望（checkpoint155）「集団授業と個別指導の間の空き時間の最小値を指定させる。負数も
+    // 入力可とする」への対応。担当講師（TeacherId）を割り当てた場合にだけ効果を持つ
+    // （RecomputeTeacherBlocksForClassAsync参照）。正の値＝開講時間の前後にこの分の空き時間を
+    // 要求する（ブロックする範囲を広げる）。負の値＝開講時間の前後この分までは個別指導との重なりを
+    // 許容する（ブロックする範囲を狭める。例えば個別指導の開始・終了を5分ずらせば参加できる程度の
+    // 重なりであれば、-5を設定することでその枠にも個別指導を配置できるようになる）。0＝開講時間
+    // そのままの重なりだけをブロックする（既定）。
+    public int MinGapMinutes { get; init; }
 }

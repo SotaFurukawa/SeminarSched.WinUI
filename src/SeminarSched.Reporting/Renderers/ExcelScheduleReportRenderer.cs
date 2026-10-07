@@ -480,14 +480,20 @@ public sealed class ExcelScheduleReportRenderer
     private static readonly XLColor OverviewOneToOneFill = XLColor.FromHtml("#FFF1CC");
     private static readonly XLColor OverviewLockedFill = XLColor.FromHtml("#DCEBFF");
     private static readonly XLColor OverviewManualFill = XLColor.FromHtml("#EADFFF");
-    private const string OverviewLegendText = "凡例　灰色: 勤務不可コマ　黒: 集団授業　[1対1] 1対1　[固定] ロック　[手] 手動変更";
+    // ユーザー要望（checkpoint155）「集団授業と個別指導の間の空き時間の最小値にマイナス値を設定し、
+    // 個別指導が集団授業の開講時間そのものと重なったまま配置された場合、excel/PDFに警告として
+    // 色付けする（黄色）」への対応。Python版のstyle_rules優先順位でも warning は最優先。
+    private static readonly XLColor OverviewWarningFill = XLColor.Yellow;
+    private const string OverviewLegendText = "凡例　灰色: 勤務不可コマ　黒: 集団授業　黄色: 集団授業との重なりに注意　[1対1] 1対1　[固定] ロック　[手] 手動変更";
     private const string OverviewFootnoteText = "日曜始まり・土曜終わりの週単位です。出勤予定の講師のみ表示します。";
     private const string OverviewDateHeaderFontName = "MS UI Gothic";
     private const string OverviewLabelFontName = "HGゴシックM";
     private const int RowsPerSlot = 5;
 
     /// <summary>Python版のstyle_rules優先順位（warning > closed > group > one_to_one > locked > manual）
-    /// のうち、本移植版が実際に持つ属性（1対1／ロック／手動）だけを同じ優先順で適用する。</summary>
+    /// のうち、本移植版が実際に持つ属性（1対1／ロック／手動）だけを同じ優先順で適用する。warning
+    /// （checkpoint155、集団授業との重なり警告）はセル単位の情報のためこの関数の外（呼び出し側で
+    /// cell.HasOverlapWarningを最優先判定）で適用する。</summary>
     private static XLColor? OverviewCardFill(OverviewCard card) =>
         card.OneToOneRequired ? OverviewOneToOneFill : card.IsLocked ? OverviewLockedFill : card.IsManual ? OverviewManualFill : null;
 
@@ -605,7 +611,8 @@ public sealed class ExcelScheduleReportRenderer
                                         var subjectCell = sheet.Cell(rowBase + 2, cardCol); subjectCell.Value = card.SubjectShortName; ApplyOverviewLabelFont(subjectCell, 11);
                                         var nameCell = sheet.Cell(rowBase + 3, cardCol); nameCell.Value = card.Student; ApplyOverviewLabelFont(nameCell, 11);
                                         nameCell.Style.Alignment.TextRotation = 255; nameCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                                        if (OverviewCardFill(card) is { } cardFill) sheet.Range(rowBase + 1, cardCol, rowBase + 3, cardCol).Style.Fill.BackgroundColor = cardFill;
+                                        var cardFill = cell.HasOverlapWarning ? OverviewWarningFill : OverviewCardFill(card);
+                                        if (cardFill is { } resolvedFill) sheet.Range(rowBase + 1, cardCol, rowBase + 3, cardCol).Style.Fill.BackgroundColor = resolvedFill;
                                     }
                                     else if (cell.Cards.Count == 0 && cell.Unavailable)
                                     {

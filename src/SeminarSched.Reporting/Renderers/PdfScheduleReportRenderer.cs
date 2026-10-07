@@ -33,8 +33,12 @@ public sealed class PdfScheduleReportRenderer
     private static readonly Color OverviewOneToOneFill = ParseColor("#FFF1CC");
     private static readonly Color OverviewLockedFill = ParseColor("#DCEBFF");
     private static readonly Color OverviewManualFill = ParseColor("#EADFFF");
+    // ユーザー要望（checkpoint155）「集団授業と個別指導の間の空き時間の最小値にマイナス値を設定し、
+    // 個別指導が集団授業の開講時間そのものと重なったまま配置された場合、黄色で警告表示する」への対応。
+    private static readonly Color OverviewWarningFill = Colors.Yellow;
 
-    /// <summary>Excel版OverviewCardFillと同じ優先順位（1対1＞ロック＞手動）。</summary>
+    /// <summary>Excel版OverviewCardFillと同じ優先順位（1対1＞ロック＞手動）。warning（cell.HasOverlapWarning）
+    /// はセル単位の情報のためこの関数の外（呼び出し側）で最優先判定する。</summary>
     private static Color? OverviewCardFill(OverviewCard card) =>
         card.OneToOneRequired ? OverviewOneToOneFill : card.IsLocked ? OverviewLockedFill : card.IsManual ? OverviewManualFill : null;
 
@@ -343,7 +347,10 @@ public sealed class PdfScheduleReportRenderer
                             studentPara.AddLineBreak();
                             studentPara.AddText(string.Join("、", cell.Cards.Skip(1).Select(c => $"{c.Grade}{c.SubjectShortName}{c.Student}")));
                         }
-                        if (OverviewCardFill(card) is { } cardFill) { gradeCell.Shading.Color = cardFill; subjectCell.Shading.Color = cardFill; studentCell.Shading.Color = cardFill; }
+                        // ユーザー要望（checkpoint155）「集団授業との重なりを黄色で警告」への対応。
+                        // cell.HasOverlapWarningはExcel版と同じ優先順位（warningが最優先）で適用する。
+                        var cardFill = cell.HasOverlapWarning ? OverviewWarningFill : OverviewCardFill(card);
+                        if (cardFill is { } resolvedFill) { gradeCell.Shading.Color = resolvedFill; subjectCell.Shading.Color = resolvedFill; studentCell.Shading.Color = resolvedFill; }
                     }
                     else if (cell.IsGroupLesson)
                     {
@@ -364,7 +371,7 @@ public sealed class PdfScheduleReportRenderer
                 }
             }
 
-            var legendPara = section.AddParagraph("凡例　灰色: 勤務不可コマ　黒: 集団授業　[1対1] 1対1　[固定] ロック　[手] 手動変更"); legendPara.Format.Font.Size = 8; legendPara.Format.SpaceBefore = Unit.FromCentimeter(0.1);
+            var legendPara = section.AddParagraph("凡例　灰色: 勤務不可コマ　黒: 集団授業　黄色: 集団授業との重なりに注意　[1対1] 1対1　[固定] ロック　[手] 手動変更"); legendPara.Format.Font.Size = 8; legendPara.Format.SpaceBefore = Unit.FromCentimeter(0.1);
             var footnotePara = section.AddParagraph("日曜始まり・土曜終わりの週単位です。出勤予定の講師のみ表示します。"); footnotePara.Format.Font.Size = 8;
         }
     }

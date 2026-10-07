@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using SeminarSched.Application.Scheduling;
 using SeminarSched.Domain.Scheduling;
@@ -102,81 +101,28 @@ public sealed partial class OptimizationPage : WorkflowPageBase
         QualityTickLabels.Margin = new Thickness(inset, 4, inset, 0);
     }
 
-    // ユーザー要望「両方（プロジェクトの既定値＋実行時に上書き可）」への対応。この画面を開いたときは
-    // プロジェクトに保存済みの方針をそのまま表示し（＝何も変更しなければ既定値通りに実行される）、
-    // ユーザーがこの画面だけで変更した内容は、実行時に一度だけ渡すoverrideとして使う
-    // （「①設定」側の保存済み既定値そのものは変更しない）。
-    // ユーザー要望（checkpoint126）「探索方針について、設定だけでなく、自動作成ページの一時的な
-    // ものでもできるようにしてほしい」への対応。優先度の並び順（PreferenceOrder）もRunPolicyRows
-    // として読み込み、この画面だけで一時的に並び替えられるようにした（「①設定」側は変更しない）。
-    // ユーザー報告（checkpoint129）「ラジオボタンで考慮するを押した後、別のページへ遷移すると、
-    // 元に戻ってしまう。ウィンドウを閉じたり、プロジェクトを変更しない限りはそのままにしておいて
-    // ほしい」への対応。同一プロジェクトでセッション内に保存済みの一時的な状態
-    // （OptimizationPolicyOverrideState）があればそちらを優先して復元し、無ければ従来どおり
-    // プロジェクトの保存済み既定値から読み込む。
+    // ユーザー要望（checkpoint155）「『この回だけ探索の方針を変更する』は設定と競合する場合がある
+    // ため削除し、変更できないようにして設定で決められた優先度を表示するようにする」への対応。
+    // 以前はこの画面だけの一時上書き（OptimizationPolicyOverrideState）を保持していたが、その
+    // 仕組みごと廃止し、「1 プロジェクト設定」の「スケジュール設定」タブに保存されている内容を
+    // そのまま読み取り専用で表示するだけにした。
     private async Task LoadRunPolicyAsync(string projectPath)
     {
-        if (OptimizationPolicyOverrideState.TryGet(projectPath, out var saved))
-        {
-            RunPolicyMaxStudentsPerTeacher.Value = saved.MaxStudentsPerTeacher;
-            _runPolicyController.LoadFromSaved(saved.Rows);
-            RunPolicyMaxConcurrentSeats.Value = saved.MaxConcurrentSeats;
-            RunPolicyContinueBeyondNominalTimeYes.IsChecked = saved.ContinueBeyondNominalTimeIfIncomplete;
-            RunPolicyContinueBeyondNominalTimeNo.IsChecked = !saved.ContinueBeyondNominalTimeIfIncomplete;
-            return;
-        }
-
         var policy = await App.SchedulingPolicy.GetAsync(projectPath);
-        RunPolicyMaxStudentsPerTeacher.Value = policy.MaxStudentsPerTeacher;
         _runPolicyController.Load(policy);
-        RunPolicyMaxConcurrentSeats.Value = policy.MaxConcurrentSeats;
-        RunPolicyContinueBeyondNominalTimeYes.IsChecked = policy.ContinueBeyondNominalTimeIfIncomplete;
-        RunPolicyContinueBeyondNominalTimeNo.IsChecked = !policy.ContinueBeyondNominalTimeIfIncomplete;
+        var seatsText = policy.MaxConcurrentSeats > 0 ? $"{policy.MaxConcurrentSeats}席" : "無制限";
+        var continueText = policy.ContinueBeyondNominalTimeIfIncomplete
+            ? "そのまま完成するまで（または中断するまで）継続する"
+            : "そこで打ち切る";
+        RunPolicySummaryText.Text =
+            $"一人の講師が同時に担当できる生徒数: {policy.MaxStudentsPerTeacher}人 / " +
+            $"同時に使える座席数上限: {seatsText} / " +
+            $"既定の時間（名目時間の2倍）になっても未配置が残っている場合: {continueText}";
     }
-
-    private void RunPolicyOption_Loaded(object sender, RoutedEventArgs e) => _runPolicyController.OptionLoaded(sender, e);
-
-    private void RunPolicyOption_Checked(object sender, RoutedEventArgs e) => _runPolicyController.OptionChecked(sender, e);
-
-    private void MoveRunPolicyRowUp_Click(object sender, RoutedEventArgs e) => _runPolicyController.MoveUp(sender, e);
-
-    private void MoveRunPolicyRowDown_Click(object sender, RoutedEventArgs e) => _runPolicyController.MoveDown(sender, e);
-
-    private void RunPolicyRowsList_DragItemsCompleted(object sender, DragItemsCompletedEventArgs e) => _runPolicyController.DragItemsCompleted(sender, e);
-
-    private void RunPolicyRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SchedulingPolicyRowsController.RowPointerEntered(sender, e);
-
-    private void RunPolicyRow_PointerExited(object sender, PointerRoutedEventArgs e) => SchedulingPolicyRowsController.RowPointerExited(sender, e);
-
-    private SchedulingPolicy BuildRunPolicyOverride() => SchedulingPolicyRowViewModel.BuildPolicy(
-        RunPolicyRows,
-        checked((int)RunPolicyMaxStudentsPerTeacher.Value),
-        checked((int)RunPolicyMaxConcurrentSeats.Value),
-        RunPolicyContinueBeyondNominalTimeNo.IsChecked != true);
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
         OptimizationRunState.Changed -= OnRunStateChanged;
-        SaveRunPolicyOverrideState();
-    }
-
-    // ページを離れる（別ページへ遷移する）たびに、その時点のフォーム内容をセッション内の一時状態へ
-    // 保存しておく。ウィンドウを閉じればstaticごと破棄され、プロジェクトを切り替えればパスの
-    // 不一致でLoadRunPolicyAsync側が無視するため、ユーザー要望どおり「ウィンドウを閉じたり、
-    // プロジェクトを変更しない限りはそのまま」という挙動になる。
-    private void SaveRunPolicyOverrideState()
-    {
-        if (!_isLoaded || App.ProjectService.Current is not { } project || RunPolicyRows.Count == 0)
-        {
-            return;
-        }
-
-        var rows = RunPolicyRows.Select(row => (row.Dimension, row.SelectedOptionIndex)).ToArray();
-        OptimizationPolicyOverrideState.Save(project.Path, new OptimizationPolicyOverrideState.SavedState(
-            checked((int)RunPolicyMaxStudentsPerTeacher.Value),
-            checked((int)RunPolicyMaxConcurrentSeats.Value),
-            RunPolicyContinueBeyondNominalTimeNo.IsChecked != true,
-            rows));
     }
 
     private void OnRunStateChanged() => DispatcherQueue.TryEnqueue(RefreshRunUi);
@@ -188,7 +134,7 @@ public sealed partial class OptimizationPage : WorkflowPageBase
             var path = App.ProjectService.Current!.Path;
             var profile = OptimizationProfileCatalog.Get(ViewModel.Level);
             ClearSwapSuggestions();
-            await OptimizationRunState.StartAsync(path, profile, UnrestrictedResourceUsageCheckBox.IsChecked == true, BuildRunPolicyOverride(), KeepExistingPlacementsCheckBox.IsChecked == true);
+            await OptimizationRunState.StartAsync(path, profile, UnrestrictedResourceUsageCheckBox.IsChecked == true, null, KeepExistingPlacementsCheckBox.IsChecked == true);
             RefreshRunUi();
         }
         catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)

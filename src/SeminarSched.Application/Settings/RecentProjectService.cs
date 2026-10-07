@@ -2,7 +2,8 @@ namespace SeminarSched.Application.Settings;
 
 public sealed class RecentProjectService
 {
-    private const int MaximumEntries = 10;
+    // ユーザー要望（checkpoint155）「最近使ったプロジェクトは5つまでに制限してほしい」への対応。
+    private const int MaximumEntries = 5;
     private readonly IAppSettingsStore _store;
     private readonly SemaphoreSlim _gate = new(1, 1);
 

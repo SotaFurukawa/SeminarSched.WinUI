@@ -8,9 +8,14 @@
     <Grid RowDefinitions="Auto,*">
         <InfoBar Grid.Row="0" x:Name="ProjectRequired" Margin="24,16,24,0" />
         <ScrollViewer Grid.Row="1" x:Name="ContentPanel">
-            <StackPanel MaxWidth="1040" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="16">
+            <!-- ユーザー要望（checkpoint155）「開校日程の追加について、もう少し横幅を広げてほしい。
+                 以前表の話をしたとき同様に、右端がウィンドウ右端より少し左側にくるくらい」への対応。
+                 このページ全体（クラスの登録・開校日程の追加の両カード）が1つのStackPanelを共有して
+                 いるため、ImportPage等の横に広いテーブルを持つページと同じ程度のMaxWidthへ広げた。 -->
+            <StackPanel MaxWidth="1400" Padding="24,16,24,32" HorizontalAlignment="Left" Spacing="16">
                 <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="3.1 集団授業クラス" />
-                <TextBlock Text="集団授業などのクラスを登録し、その開講日程をカレンダーで指定します。生徒と併せて登録しておくことで、その日時に個別指導が入ることを防ぎます。" TextWrapping="Wrap" />
+                <!-- ユーザー要望（checkpoint155）による文言変更。 -->
+                <TextBlock Text="集団授業などのクラスを登録し、その開講日程と属する生徒を指定しておくことで、その日時に個別指導が入ることを防ぎます。" TextWrapping="Wrap" />
                 <InfoBar x:Name="Status" IsClosable="True" />
 
                 <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
@@ -22,19 +27,27 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="140" />
                                 <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBox x:Name="GroupClassName" Header="クラス名" />
                             <TextBox x:Name="GroupClassSubject" Grid.Column="1" Header="科目" />
                             <ComboBox x:Name="GroupClassGrade" Grid.Column="2" Header="対象学年" IsEditable="True" />
-                            <CheckBox x:Name="GroupClassAllowOtherGrades" Grid.Column="3" Content="他学年の受講を許可" VerticalAlignment="Bottom" />
-                            <Button x:Name="SaveGroupClassButton" Grid.Column="4" VerticalAlignment="Bottom" Content="保存" Click="SaveGroupClass_Click" Style="{StaticResource AccentButtonStyle}" />
+                            <Button x:Name="SaveGroupClassButton" Grid.Column="3" VerticalAlignment="Bottom" Content="保存" Click="SaveGroupClass_Click" Style="{StaticResource AccentButtonStyle}" />
                         </Grid>
+                        <!-- ユーザー要望（checkpoint155）「他学年の受講を許可と担当講師を割り当てるの行を
+                             同じにしてほしい。他学年の受講を許可を担当講師の左側に持ってきて」への対応。 -->
                         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <CheckBox x:Name="GroupClassAllowOtherGrades" Content="他学年の受講を許可" VerticalAlignment="Center" />
                             <CheckBox x:Name="GroupClassHasTeacher" Content="担当講師を割り当てる（任意）" Checked="GroupClassHasTeacher_Changed" Unchecked="GroupClassHasTeacher_Changed" VerticalAlignment="Center" />
                             <ComboBox x:Name="GroupClassTeacher" Header="担当講師" DisplayMemberPath="Label" Visibility="Collapsed" MinWidth="240" />
                         </StackPanel>
                         <TextBlock x:Name="GroupClassTeacherHint" Text="担当講師を割り当てると、その講師はこのクラスの開講日程の時間帯に個別授業を配置できなくなり、全体時間割にはその時間が「集団」と表示されます。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" />
+                        <!-- ユーザー要望（checkpoint155）「集団授業と個別指導の間の空き時間の最小値を
+                             指定させる。集団授業クラスで設定できるようにしたい。数字のみ入力でき、
+                             負数も入力可とする」への対応。NumberBoxは元々数値専用入力で、Minimumを
+                             負の値にしておくことで負数も直接入力できる。担当講師を割り当てている
+                             場合にのみ意味を持つ設定のため、GroupClassTeacherHintと同じ表示条件にした。 -->
+                        <NumberBox x:Name="GroupClassMinGapMinutes" Header="集団授業と個別指導の間の空き時間の最小値（分）" Minimum="-180" Maximum="180" SmallChange="1" SpinButtonPlacementMode="Inline" Value="0" HorizontalAlignment="Left" Width="280" Visibility="Collapsed" />
+                        <TextBlock x:Name="GroupClassMinGapHint" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" Text="担当講師と個別指導の間に、最低限空けておきたい時間（分）です。正の値にすると、開講時間の前後にこの分の空きが無い個別指導は配置できなくなります。例えば、個別指導の開始・終了時刻を5分程度ずらせば集団授業に参加できるという場合は、マイナスの値（例: -5）を設定しておくと、その重なりの範囲内であれば個別指導を配置できるようになります。0（既定）は開講時間そのものとの重なりだけをブロックします。" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button Content="新規入力" Click="NewGroupClass_Click" />
                             <Button Content="選択したクラスを削除" Click="DeleteGroupClass_Click" />

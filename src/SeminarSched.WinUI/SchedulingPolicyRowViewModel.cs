@@ -55,6 +55,10 @@ public sealed class SchedulingPolicyRowViewModel(
 
     public int SelectedOptionValue => OptionValues[SelectedOptionIndex];
 
+    // ユーザー要望（checkpoint155）。OptimizationPageの読み取り専用表示で、選択中の選択肢ラベルを
+    // そのまま1列で表示するために追加（編集可能なSetupPage側は引き続きOption0/1/2Labelを使う）。
+    public string SelectedOptionLabel => OptionLabels[SelectedOptionIndex];
+
     // ユーザー指摘（checkpoint128）「探索方針のラジオボタンが揃っていない」への対応。WinUIの
     // RadioButtons（ItemsSource一括表示）は、各行ごとに独立してMaxColumnsの列幅を自前の内容量
     // から自動計算するため、行ごとにOptionLabelsの文字量が異なるとボタンの横位置が行間で揃わない。
@@ -118,28 +122,6 @@ public sealed class SchedulingPolicyRowViewModel(
             rows.Add(new SchedulingPolicyRowViewModel(dimension, metadata.Title, metadata.Labels, metadata.Values)
             {
                 SelectedOptionIndex = optionIndex,
-                DisplayNumber = position++,
-            });
-        }
-
-        return rows;
-    }
-
-    /// <summary>セッション内で保持した一時的な並び順・選択状態（<see cref="OptimizationPolicyOverrideState"/>）
-    /// から行を復元する。<see cref="BuildRows"/>と異なり、SchedulingPolicyオブジェクトではなく
-    /// 保存済みの(Dimension, SelectedOptionIndex)の並びをそのまま使う。</summary>
-    public static List<SchedulingPolicyRowViewModel> BuildRowsFromSaved(
-        IReadOnlyList<(SchedulingPolicyDimension Dimension, int SelectedOptionIndex)> saved)
-    {
-        var metadataByDimension = DimensionMetadata.ToDictionary(m => m.Dimension);
-        var rows = new List<SchedulingPolicyRowViewModel>();
-        var position = 1;
-        foreach (var (dimension, selectedOptionIndex) in saved)
-        {
-            var metadata = metadataByDimension[dimension];
-            rows.Add(new SchedulingPolicyRowViewModel(dimension, metadata.Title, metadata.Labels, metadata.Values)
-            {
-                SelectedOptionIndex = selectedOptionIndex,
                 DisplayNumber = position++,
             });
         }

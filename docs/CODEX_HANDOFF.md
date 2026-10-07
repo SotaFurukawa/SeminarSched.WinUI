@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-07（checkpoint154）
+最終更新: 2026-10-08（checkpoint155）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -15,9 +15,62 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 →`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-<version>.exe`）は
 例外なく毎回実行すること。
 
-Current Version: `v0.29.2 (beta)`（Draft Release作成予定。「少し時間を要しています」警告の
-表示条件を、経過時間と進捗割合の比較ベースへ変更する1件。checkpoint154を参照）
-Latest Development Checkpoint: checkpoint 154（ユーザーからの要望：「少し時間を要しています」の
+Current Version: `v0.30.0 (beta)`（Draft Release作成予定。集団授業と個別指導の間の空き時間の
+最小値（新機能）と、11件のUI・文言修正。checkpoint155を参照）
+Latest Development Checkpoint: checkpoint 155（ユーザーから1メッセージで多数の要望。
+①集団授業と個別指導の間の空き時間の最小値を集団授業クラスで指定できるようにし、負数も入力可とする
+（個別指導を数分ずらせば参加できる程度の重なりなら負数で許容する）。Excel/PDF出力でこの重なりを
+黄色で警告表示する。②時間割編集の「日別グリッド編集」の見出しと説明文を削除し、その内容をページ
+冒頭の説明文へ統合する。③ホームの「最近使ったプロジェクト」を5件までに制限する。④ホームのカード
+順を基本情報・現在・最近・新規から基本情報・新規・現在・最近へ変更する。⑤CPU使用率を制限しない
+の説明文を変更する。⑥「既に配置済みの授業は動かさない」のラベル内「作成」を「配置」に変更し
+説明文も変更する。⑦「この回だけ探索の方針を変更する」は設定と競合するため削除し、設定で決まった
+内容を読み取り専用で表示するよう変更する。⑧3.1集団授業クラスの説明文を変更する。⑨3.1の
+「他学年の受講を許可」と「担当講師を割り当てる」を同じ行にし、前者を左側に配置する。「開講日程の
+追加」の横幅を広げる。⑩3.2集団授業の受講登録の説明文を変更する。⑪設定のライセンス解除・
+アップデート確認ボタンの左右端を揃える、という指摘だった。
+
+**①集団授業と個別指導の間の空き時間の最小値（新機能）:** `GroupLessonClass`に`MinGapMinutes`
+（既定0、負数可）を追加（`GroupLessonClassPage`に数値専用の`NumberBox`、`Minimum="-180"`で
+負数も直接入力できる）。担当講師を割り当てている場合にのみ意味を持つため、既存の担当講師ヒントと
+同じ表示条件にした。効果は`SqliteGroupLessonService.RecomputeTeacherBlocksForClassAsync`の
+重なり判定にある: 従来は開講セッションの開始・終了時刻そのものとコマの時刻を比較していたが、
+`MinGapMinutes`分だけ前後に広げた（正の値）／狭めた（負の値）範囲で比較するよう変更した
+（分単位のint演算、`blockStart=session.Start-gap`・`blockEnd=session.End+gap`）。正の値は
+「開講時間の前後にこの分の空きが無い個別指導は配置できない」、負の値は「開講時間とこの分までの
+重なりは許容する（個別指導を数分ずらせば参加できる前提）」という意味になる。出力（Excel/PDF、
+全体時間割・講師配布ページ）側は、`OverviewGridLayout.Build`で「個別指導のカードがあり、かつ
+同じコマがこの講師の集団授業の開講時間そのもの（gap=0の文字通りの時間帯、`OverviewGroupLessonCell`）
+とも重なっている」状態を`OverviewCell.HasOverlapWarning`として検出し（これは負の`MinGapMinutes`
+設定によって配置が許可された場合にしか起こり得ない）、Excel・PDF両レンダラーでそのカードを黄色
+（Python版のstyle_rules優先順位にあった`warning`、本移植版で初めて実装）で塗る。凡例にも
+「黄色: 集団授業との重なりに注意」を追記した。
+
+**②〜⑪のUI・文言修正:** 詳細はコード内の該当コメント（`checkpoint155`で検索）を参照。
+②`ScheduleEditorPage.xaml`の見出し＋説明文2行を削除し、ページ冒頭の説明文へ出勤可否変更・
+「+講師を表示」の案内を統合。③`RecentProjectService.MaximumEntries`を10→5。④`HomePage.xaml`の
+Borderカードの並び順を変更（中身は変更なし）。⑤⑥`OptimizationPage.xaml`のチェックボックス
+ラベル・説明文を変更。⑦`OptimizationPage`の「この回だけ探索の方針を変更する」Expanderを、
+NumberBox・RadioButton・ドラッグ並び替え・`OptimizationPolicyOverrideState`（ファイルごと削除）
+を一切持たない読み取り専用表示へ置き換え、`SchedulingPolicyRowViewModel`に`SelectedOptionLabel`を
+追加、`Run_Click`は`policyOverride`に常に`null`を渡す（保存済み既定値をそのまま使う）。
+⑧`GroupLessonClassPage.xaml`の説明文を変更。⑨同ページの「他学年の受講を許可」チェックボックスを
+「担当講師を割り当てる（任意）」と同じ行・左側へ移動し、ページ全体のStackPanel幅を1040→1400へ
+拡大。⑩`GroupLessonEnrollmentPage.xaml`の説明文を変更。⑪`SettingsPage.xaml`のライセンス・
+アップデートの2つの独立したGridを1つへ統合し、ボタン列(column1)の幅を両方のボタンのうち最大の
+幅へ揃えた（Auto列は同じGrid内の全行の最大幅で決まるため、左端・右端とも自動的に一致する）。
+
+**検証:** 新規テスト5件（`MinGapMinutes`の永続化、負の空き時間設定が軽微な重なりをブロックしない
+こと、正の空き時間設定が文字通りには重ならないコマもブロックすること、`OverviewGridLayout`が
+重なり警告セルを正しく検出すること、「最近使ったプロジェクト」が5件に制限されること）を含む既存の
+全テスト（計256件）と合わせて計260件がすべて通過することを確認済み。UI変更（②〜⑪）・新機能の
+見た目（①のNumberBox表示、Excel/PDFの黄色警告）については、ビルド成功とコードレベルの確認
+（ロジックの手作業トレース、新規テストの通過）のみ行い、実機（dev-run）での画面確認はこの
+checkpointでも行っていない（引き続き、ユーザー自身による目視確認を依頼する必要がある）。新機能の
+ためminorを上げてv0.30.0（patchを0へ戻す）とした。詳細は
+[docs/releases/v0.30.0.md](releases/v0.30.0.md)。
+
+checkpoint 154（ユーザーからの要望：「少し時間を要しています」の
 画面は、所要時間の想定の最大値の66%が経過したときに、進捗が66%を超えていないときに表示してほしい。
 また、これ以降は、所要時間と進捗割合を比較して、進捗割合が所要時間を超えていない場合に表示する
 ようにしてほしい、という指摘だった。

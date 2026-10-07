@@ -93,6 +93,7 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
         GroupClassName.Text = row.Value.Name; GroupClassSubject.Text = row.Value.Subject; GroupClassGrade.Text = row.Value.Grade; GroupClassAllowOtherGrades.IsChecked = row.Value.AllowOtherGrades;
         GroupClassHasTeacher.IsChecked = row.Value.TeacherId is not null;
         GroupClassTeacher.SelectedItem = (GroupClassTeacher.ItemsSource as IEnumerable<TeacherOption>)?.FirstOrDefault(t => t.Id == row.Value.TeacherId);
+        GroupClassMinGapMinutes.Value = row.Value.MinGapMinutes;
     }
 
     private void GroupClassHasTeacher_Changed(object sender, RoutedEventArgs e)
@@ -100,6 +101,8 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
         var hasTeacher = GroupClassHasTeacher.IsChecked == true;
         GroupClassTeacher.Visibility = hasTeacher ? Visibility.Visible : Visibility.Collapsed;
         GroupClassTeacherHint.Visibility = hasTeacher ? Visibility.Visible : Visibility.Collapsed;
+        GroupClassMinGapMinutes.Visibility = hasTeacher ? Visibility.Visible : Visibility.Collapsed;
+        GroupClassMinGapHint.Visibility = hasTeacher ? Visibility.Visible : Visibility.Collapsed;
         if (!hasTeacher) GroupClassTeacher.SelectedItem = null;
     }
 
@@ -120,7 +123,8 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
             IsEnabled = false;
             var path = App.ProjectService.Current?.Path ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
             var id = _selectedGroupClass?.Id ?? 0;
-            var saved = await App.GroupLessons.SaveClassAsync(path, new GroupLessonClass(id, name, grade, subject, GroupClassAllowOtherGrades.IsChecked == true, teacherId: teacherId));
+            var minGapMinutes = teacherId is null ? 0 : checked((int)GroupClassMinGapMinutes.Value);
+            var saved = await App.GroupLessons.SaveClassAsync(path, new GroupLessonClass(id, name, grade, subject, GroupClassAllowOtherGrades.IsChecked == true, teacherId: teacherId, minGapMinutes: minGapMinutes));
             _selectedGroupClass = saved;
             await ReloadClassesAsync();
             await ReloadCalendarDataAsync();
@@ -136,7 +140,7 @@ public sealed partial class GroupLessonClassPage : WorkflowPageBase
     {
         GroupClasses.SelectedItem = null; _selectedGroupClass = null;
         GroupClassName.Text = ""; GroupClassSubject.Text = ""; GroupClassGrade.Text = ""; GroupClassAllowOtherGrades.IsChecked = false;
-        GroupClassHasTeacher.IsChecked = false; GroupClassTeacher.SelectedItem = null;
+        GroupClassHasTeacher.IsChecked = false; GroupClassTeacher.SelectedItem = null; GroupClassMinGapMinutes.Value = 0;
     }
 
     private async void DeleteGroupClass_Click(object sender, RoutedEventArgs e)

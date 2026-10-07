@@ -11,11 +11,11 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT Id,Name,Grade,Subject,AllowOtherGrades,Active,TeacherId FROM GroupLessonClass WHERE ProjectId=1 ORDER BY Grade,Name;";
+        command.CommandText = "SELECT Id,Name,Grade,Subject,AllowOtherGrades,Active,TeacherId,MinGapMinutes FROM GroupLessonClass WHERE ProjectId=1 ORDER BY Grade,Name;";
         var result = new List<GroupLessonClass>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            result.Add(new GroupLessonClass(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetBoolean(4), reader.GetBoolean(5), reader.IsDBNull(6) ? null : reader.GetInt64(6)));
+            result.Add(new GroupLessonClass(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetBoolean(4), reader.GetBoolean(5), reader.IsDBNull(6) ? null : reader.GetInt64(6), reader.GetInt32(7)));
         return result;
     }
 
@@ -34,14 +34,14 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
                 {
                     if (value.Id == 0)
                     {
-                        command.CommandText = "INSERT INTO GroupLessonClass(ProjectId,Name,Grade,Subject,AllowOtherGrades,Active,TeacherId) VALUES(1,$name,$grade,$subject,$allow,$active,$teacher); SELECT last_insert_rowid();";
-                        command.Parameters.AddWithValue("$name", value.Name); command.Parameters.AddWithValue("$grade", value.Grade); command.Parameters.AddWithValue("$subject", value.Subject); command.Parameters.AddWithValue("$allow", value.AllowOtherGrades); command.Parameters.AddWithValue("$active", value.Active); command.Parameters.AddWithValue("$teacher", (object?)value.TeacherId ?? DBNull.Value);
+                        command.CommandText = "INSERT INTO GroupLessonClass(ProjectId,Name,Grade,Subject,AllowOtherGrades,Active,TeacherId,MinGapMinutes) VALUES(1,$name,$grade,$subject,$allow,$active,$teacher,$gap); SELECT last_insert_rowid();";
+                        command.Parameters.AddWithValue("$name", value.Name); command.Parameters.AddWithValue("$grade", value.Grade); command.Parameters.AddWithValue("$subject", value.Subject); command.Parameters.AddWithValue("$allow", value.AllowOtherGrades); command.Parameters.AddWithValue("$active", value.Active); command.Parameters.AddWithValue("$teacher", (object?)value.TeacherId ?? DBNull.Value); command.Parameters.AddWithValue("$gap", value.MinGapMinutes);
                         id = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
                     }
                     else
                     {
-                        command.CommandText = "UPDATE GroupLessonClass SET Name=$name,Grade=$grade,Subject=$subject,AllowOtherGrades=$allow,Active=$active,TeacherId=$teacher WHERE Id=$id; SELECT changes();";
-                        command.Parameters.AddWithValue("$name", value.Name); command.Parameters.AddWithValue("$grade", value.Grade); command.Parameters.AddWithValue("$subject", value.Subject); command.Parameters.AddWithValue("$allow", value.AllowOtherGrades); command.Parameters.AddWithValue("$active", value.Active); command.Parameters.AddWithValue("$teacher", (object?)value.TeacherId ?? DBNull.Value); command.Parameters.AddWithValue("$id", value.Id);
+                        command.CommandText = "UPDATE GroupLessonClass SET Name=$name,Grade=$grade,Subject=$subject,AllowOtherGrades=$allow,Active=$active,TeacherId=$teacher,MinGapMinutes=$gap WHERE Id=$id; SELECT changes();";
+                        command.Parameters.AddWithValue("$name", value.Name); command.Parameters.AddWithValue("$grade", value.Grade); command.Parameters.AddWithValue("$subject", value.Subject); command.Parameters.AddWithValue("$allow", value.AllowOtherGrades); command.Parameters.AddWithValue("$active", value.Active); command.Parameters.AddWithValue("$teacher", (object?)value.TeacherId ?? DBNull.Value); command.Parameters.AddWithValue("$gap", value.MinGapMinutes); command.Parameters.AddWithValue("$id", value.Id);
                         var changed = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
                         if (changed != 1) throw new InvalidOperationException("更新対象のクラスが見つかりません。");
                         id = value.Id;
@@ -244,6 +244,18 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
         var target = new HashSet<(long TeacherId, long OpenDateId, long TimeSlotId)>();
         if (effectiveTeacherId is long teacherId)
         {
+            // ユーザー要望（checkpoint155）「集団授業と個別指導の間の空き時間の最小値を指定させる。
+            // 負数も入力可とする」への対応。この講師をブロックする時間帯は、開講時間そのものではなく
+            // MinGapMinutes分だけ前後に広げた（正の値）／狭めた（負の値）範囲で判定する。
+            int minGapMinutes;
+            await using (var read = connection.CreateCommand())
+            {
+                read.Transaction = transaction;
+                read.CommandText = "SELECT MinGapMinutes FROM GroupLessonClass WHERE Id=$class;";
+                read.Parameters.AddWithValue("$class", classId);
+                minGapMinutes = Convert.ToInt32(await read.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) ?? 0);
+            }
+
             var sessions = new List<(long OpenDateId, TimeOnly Start, TimeOnly End)>();
             await using (var read = connection.CreateCommand())
             {
@@ -268,8 +280,18 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
                 }
 
                 foreach (var session in sessions)
-                    foreach (var slot in slots.Where(s => s.OpenDateId == session.OpenDateId && s.Start < session.End && session.Start < s.End))
-                        target.Add((teacherId, slot.OpenDateId, slot.TimeSlotId));
+                {
+                    // TimeOnlyは0:00をまたぐ減算で例外にならないよう、分単位のint演算で前後へ広げる/狭める。
+                    var blockStartMinutes = session.Start.Hour * 60 + session.Start.Minute - minGapMinutes;
+                    var blockEndMinutes = session.End.Hour * 60 + session.End.Minute + minGapMinutes;
+                    foreach (var slot in slots.Where(s => s.OpenDateId == session.OpenDateId))
+                    {
+                        var slotStartMinutes = slot.Start.Hour * 60 + slot.Start.Minute;
+                        var slotEndMinutes = slot.End.Hour * 60 + slot.End.Minute;
+                        if (slotStartMinutes < blockEndMinutes && blockStartMinutes < slotEndMinutes)
+                            target.Add((teacherId, slot.OpenDateId, slot.TimeSlotId));
+                    }
+                }
             }
 
             var newlyBlocked = target.Except(previous).ToArray();
