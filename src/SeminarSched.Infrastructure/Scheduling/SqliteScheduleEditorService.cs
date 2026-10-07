@@ -174,6 +174,12 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
             }
         }
 
+        // ユーザー要望（checkpoint153）「その日にちで生徒を配置されている講師は左詰めにしてほしい」への
+        // 対応。その日何らかの配置がある講師を前方へ、無い講師を後方へ安定ソートする（同じグループ内は
+        // 従来通りExternalId順のまま、OrderByDescendingは安定ソートのため順序が保たれる）。
+        var teachersWithPlacementToday=cardsByCell.Keys.Select(k=>k.TeacherId).ToHashSet();
+        teachers=teachers.OrderByDescending(t=>teachersWithPlacementToday.Contains(t.TeacherId)).ToList();
+
         var cells=new List<BoardCell>();
         foreach(var slot in slots)
             foreach(var teacher in teachers)

@@ -36,7 +36,16 @@
              でき、隣の列と繋がって見えていたことによる。これらの列は見出し・データとも中央寄せに
              変更し、値が列の中央（＝見出しの真下）に来るようにした。生徒氏名・科目名・通常担当
              講師・第1〜3希望（氏名系で長さが揺れる列）は従来通り左寄せのまま維持する。 -->
-        <Grid ColumnSpacing="6" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="110"/><ColumnDefinition Width="55"/><ColumnDefinition Width="*" MinWidth="100"/><ColumnDefinition Width="55"/><ColumnDefinition Width="90"/><ColumnDefinition Width="45"/><ColumnDefinition Width="35"/><ColumnDefinition Width="105"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="92"/></Grid.ColumnDefinitions>
+        <!-- ユーザー報告（checkpoint153）「まだ隙間が大きすぎる。特に学年と生徒氏名の幅が大きい。
+             そのせいでカーソルを合わせたときに右に出てくる変更と削除により、左側に押されてしまい、
+             列がずれてしまう」への対応。生徒氏名・科目名の列だけがWidth="*"（残り幅を全て消費）に
+             なっていたため、ウィンドウが広いときにこの2列だけが実際の文字列よりはるかに広く伸び、
+             見た目上の余白になっていた。さらに、ホバー時だけ現れる末尾の変更/削除ボタン列
+             （下のデータ行側だけにあるAuto列。見出し側には存在しない）の有無で、Grid全体の残り幅が
+             増減するため、"*"列の実際の幅がホバーのたびに変化し、見出しとデータの列位置がずれて
+             見えていた。生徒氏名・科目名を固定幅（SetupPageの生徒・講師一覧と同じ、"*"を一切使わない
+             方式）に変更し、ホバー列の有無に関わらず他の列の幅が変わらないようにした。 -->
+        <Grid ColumnSpacing="6" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="55"/><ColumnDefinition Width="110"/><ColumnDefinition Width="55"/><ColumnDefinition Width="90"/><ColumnDefinition Width="45"/><ColumnDefinition Width="35"/><ColumnDefinition Width="105"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="92"/></Grid.ColumnDefinitions>
             <TextBlock FontWeight="SemiBold" Text="生徒氏名"/>
             <TextBlock Grid.Column="1" FontWeight="SemiBold" Text="学年" HorizontalAlignment="Center" TextAlignment="Center"/>
             <TextBlock Grid.Column="2" FontWeight="SemiBold" Text="科目名"/>
@@ -55,8 +64,8 @@
                 <DataTemplate x:DataType="local:LessonRequestRowViewModel">
                     <Grid Padding="4">
                         <Grid ColumnSpacing="6" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="LessonRequestRow_PointerEntered" PointerExited="LessonRequestRow_PointerExited">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="110"/><ColumnDefinition Width="55"/><ColumnDefinition Width="*" MinWidth="100"/><ColumnDefinition Width="55"/><ColumnDefinition Width="90"/><ColumnDefinition Width="45"/><ColumnDefinition Width="35"/><ColumnDefinition Width="105"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="92"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock Text="{x:Bind StudentName, Mode=OneWay}"/>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="55"/><ColumnDefinition Width="110"/><ColumnDefinition Width="55"/><ColumnDefinition Width="90"/><ColumnDefinition Width="45"/><ColumnDefinition Width="35"/><ColumnDefinition Width="105"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="92"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Bind StudentName, Mode=OneWay}" TextTrimming="CharacterEllipsis"/>
                             <TextBlock Grid.Column="1" Text="{x:Bind Grade, Mode=OneWay}" HorizontalAlignment="Center" TextAlignment="Center"/>
                             <TextBlock Grid.Column="2" Text="{x:Bind SubjectName, Mode=OneWay}"/>
                             <TextBlock Grid.Column="3" Text="{x:Bind Value.RequiredSessions, Mode=OneWay}" HorizontalAlignment="Center" TextAlignment="Center"/>

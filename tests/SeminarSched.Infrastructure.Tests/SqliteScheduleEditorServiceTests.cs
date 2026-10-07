@@ -138,6 +138,20 @@ public sealed class SqliteScheduleEditorServiceTests : IDisposable
         Assert.False(board.Cell(state.Slot1Id,state.Teacher1Id)!.Blocked);
     }
 
+    // ユーザー要望（checkpoint153）「時間割編集でその日にちで生徒を配置されている講師は左詰めに
+    // してほしい」への対応。Fixtureでは本来ExternalId順でTeacher1が先・Teacher2が後になるが、
+    // その日の配置をTeacher2側だけに作ることで、順序が入れ替わる（配置がある講師が前に来る）ことを
+    // 確認する。
+    [Fact]
+    public async Task GetBoardAsync_SortsTeachersWithPlacementOnThatDateFirst()
+    {
+        var state=await CreateBoardStateAsync();var editor=new SqliteScheduleEditorService();
+        await editor.AddManualAsync(state.Path,state.RequestId,state.Teacher2Id,state.DateId,state.Slot1Id,false);
+        var board=await editor.GetBoardAsync(state.Path,state.DateId,[]);
+        Assert.Equal(state.Teacher2Id,board.Teachers[0].TeacherId);
+        Assert.Equal(state.Teacher1Id,board.Teachers[1].TeacherId);
+    }
+
     [Fact]
     public async Task MoveAsync_RelocatesAssignmentAndMarksManual()
     {
