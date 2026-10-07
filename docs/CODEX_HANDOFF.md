@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-08（checkpoint155）
+最終更新: 2026-10-08（checkpoint156）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -15,9 +15,63 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 →`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-<version>.exe`）は
 例外なく毎回実行すること。
 
-Current Version: `v0.30.0 (beta)`（Draft Release作成予定。集団授業と個別指導の間の空き時間の
-最小値（新機能）と、11件のUI・文言修正。checkpoint155を参照）
-Latest Development Checkpoint: checkpoint 155（ユーザーから1メッセージで多数の要望。
+Current Version: `v0.31.0 (beta)`（Draft Release作成予定。集団授業と個別指導の間の空き時間の
+最小値を、講師側・生徒側で別々に設定できるようにする1件。checkpoint156を参照）
+Latest Development Checkpoint: checkpoint 156（ユーザーからの要望：「集団授業と個別指導の間の
+空き時間の最小値について、講師側と生徒側で分けてほしい」という指摘だった。
+
+**講師側・生徒側の分離（設計の背景）:** checkpoint155で追加した`MinGapMinutes`は、担当講師
+（`GroupLessonClass.TeacherId`）を割り当てた場合にしか効果が無かった（`TeacherUnavailability`
+経由の講師側ブロックのみ）。一方、このクラスへ受講登録した生徒（`GroupLessonEnrollment`）側は、
+元々このアプリには「生徒の個別指導が自分の受講中の集団授業と重なることを防ぐ」仕組み自体が
+存在しなかった（`GroupLessonEnrollment`はSqliteScheduleRunService・SqliteOptimization側の
+どこからも参照されていなかった）。そのため今回は、単なる名前分割ではなく、生徒側のブロック機構
+そのものを新設した。
+
+**生徒側ブロック機構（新規）:** 講師側の`TeacherUnavailability`/`GroupLessonTeacherBlock`と
+対になる`StudentUnavailability`（生徒の常時ブロックテーブル、`StudentAvailability`＝アンケート
+出欠・未回答なら既定で出席可、とは別物）・`GroupLessonStudentBlock`（どの(生徒,日時,コマ)ブロックが
+どのクラス由来かを記録する紐付けテーブル）をスキーマへ追加した。`SqliteGroupLessonService`に
+`RecomputeStudentBlocksForClassAsync`を新設し、受講登録されている生徒全員に対して
+`StudentMinGapMinutes`分だけ開講時間を前後に広げた／狭めた範囲でブロックするコマを計算する
+（重なり判定ロジック自体は`ResolveBlockedSlots`として講師側と共通化した）。受講登録・解除
+（`SetEnrollmentAsync`）のたびに再計算するようにした（従来はトランザクションも再計算も無い
+単純なINSERT/DELETEだったため、ここで初めてトランザクション化した）。生徒が既にその日時に
+個別指導の配置を持っている場合は、講師側と同様に丸ごと中止する。
+
+**StudentUnavailabilityを実際の判定へ反映:** `StudentAvailability`ベースの生徒利用可否チェックが
+存在した4箇所すべてに、`StudentUnavailability`のOR条件を追加した: ①
+`SqliteFixedLessonService.IsStudentAvailableAsync`（手動配置のプレビュー、`IsTeacherAvailableAsync`
+のTeacherUnavailabilityと対称な構成にした。メッセージ文言も「生徒がアンケートで出席不可にして
+います。」から、集団授業由来の可能性も含む文言へ変更した）、②
+`SqliteScheduleEditorService.GetAvailableSlotCodesForDateAsync`（④時間割編集の「配置可能」判定）・
+`GetStudentUnavailableSlotIdsAsync`（ドラッグ中の禁止マーク、UNIONで追加）、③
+`SqliteScheduleRunService.BuildProblemAsync`（ソルバーの候補生成、これが無いと自動作成が平気で
+違反する）・`ValidateDatabaseAsync`（保存前の独立validator、ソルバー出力を鵜呑みにせず再検証する
+AGENTS.mdの方針に従い、ここにも同じ条件を追加）、④`SqliteOutputPackageService`の未配置理由診断
+クエリ。
+
+**UI:** `GroupLessonClassPage.xaml`の`GroupClassMinGapMinutes`（1個）を、`GroupClassTeacherMinGapMinutes`
+（「講師側: ...」、担当講師を割り当てている場合のみ表示）と`GroupClassStudentMinGapMinutes`
+（「生徒側: ...」、受講登録した生徒全員に効果がありTeacherIdの有無と無関係なため常に表示）の
+2つへ分割した。
+
+**データ移行:** 旧`MinGapMinutes`列はそのまま残し（列削除はしない方針）、新規
+`TeacherMinGapMinutes`・`StudentMinGapMinutes`列を追加。既存プロジェクトで`MinGapMinutes`に
+値が入っていた場合、`TeacherMinGapMinutes`へ値を移し`MinGapMinutes`を0へ戻す一回限りの
+バックフィル（`BackfillTeacherMinGapMinutesAsync`）を追加した（v0.30.0は実配布前のため実データへの
+影響は無いはずだが、安全のため実装した）。
+
+**検証:** 新規・更新テスト（`TeacherMinGapMinutes`/`StudentMinGapMinutes`の個別永続化、生徒側の
+負の設定が軽微な重なりをブロックしないこと、生徒側の正の設定が文字通りには重ならないコマも
+ブロックすること、受講登録が既存の個別指導配置と衝突する場合に例外を投げてロールバックすること）を
+含む既存の全テスト（計260件）と合わせて計263件がすべて通過することを確認済み。UIの見た目・実機での
+自動作成/手動配置の実際の挙動については、ビルド成功とコードレベルの確認（ロジックの手作業トレース、
+新規テストの通過）のみ行い、実機（dev-run）での画面確認はこのcheckpointでも行っていない（引き続き、
+ユーザー自身による目視確認を依頼する必要がある）。新機能の拡張のためminorを上げてv0.31.0
+（patchを0へ戻す）とした。詳細は[docs/releases/v0.31.0.md](releases/v0.31.0.md)。
+
+checkpoint 155（ユーザーから1メッセージで多数の要望。
 ①集団授業と個別指導の間の空き時間の最小値を集団授業クラスで指定できるようにし、負数も入力可とする
 （個別指導を数分ずらせば参加できる程度の重なりなら負数で許容する）。Excel/PDF出力でこの重なりを
 黄色で警告表示する。②時間割編集の「日別グリッド編集」の見出しと説明文を削除し、その内容をページ

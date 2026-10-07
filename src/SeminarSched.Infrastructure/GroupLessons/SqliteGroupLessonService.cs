@@ -11,11 +11,11 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT Id,Name,Grade,Subject,AllowOtherGrades,Active,TeacherId,MinGapMinutes FROM GroupLessonClass WHERE ProjectId=1 ORDER BY Grade,Name;";
+        command.CommandText = "SELECT Id,Name,Grade,Subject,AllowOtherGrades,Active,TeacherId,TeacherMinGapMinutes,StudentMinGapMinutes FROM GroupLessonClass WHERE ProjectId=1 ORDER BY Grade,Name;";
         var result = new List<GroupLessonClass>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            result.Add(new GroupLessonClass(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetBoolean(4), reader.GetBoolean(5), reader.IsDBNull(6) ? null : reader.GetInt64(6), reader.GetInt32(7)));
+            result.Add(new GroupLessonClass(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetBoolean(4), reader.GetBoolean(5), reader.IsDBNull(6) ? null : reader.GetInt64(6), reader.GetInt32(7), reader.GetInt32(8)));
         return result;
     }
 
@@ -34,14 +34,14 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
                 {
                     if (value.Id == 0)
                     {
-                        command.CommandText = "INSERT INTO GroupLessonClass(ProjectId,Name,Grade,Subject,AllowOtherGrades,Active,TeacherId,MinGapMinutes) VALUES(1,$name,$grade,$subject,$allow,$active,$teacher,$gap); SELECT last_insert_rowid();";
-                        command.Parameters.AddWithValue("$name", value.Name); command.Parameters.AddWithValue("$grade", value.Grade); command.Parameters.AddWithValue("$subject", value.Subject); command.Parameters.AddWithValue("$allow", value.AllowOtherGrades); command.Parameters.AddWithValue("$active", value.Active); command.Parameters.AddWithValue("$teacher", (object?)value.TeacherId ?? DBNull.Value); command.Parameters.AddWithValue("$gap", value.MinGapMinutes);
+                        command.CommandText = "INSERT INTO GroupLessonClass(ProjectId,Name,Grade,Subject,AllowOtherGrades,Active,TeacherId,TeacherMinGapMinutes,StudentMinGapMinutes) VALUES(1,$name,$grade,$subject,$allow,$active,$teacher,$teacherGap,$studentGap); SELECT last_insert_rowid();";
+                        command.Parameters.AddWithValue("$name", value.Name); command.Parameters.AddWithValue("$grade", value.Grade); command.Parameters.AddWithValue("$subject", value.Subject); command.Parameters.AddWithValue("$allow", value.AllowOtherGrades); command.Parameters.AddWithValue("$active", value.Active); command.Parameters.AddWithValue("$teacher", (object?)value.TeacherId ?? DBNull.Value); command.Parameters.AddWithValue("$teacherGap", value.TeacherMinGapMinutes); command.Parameters.AddWithValue("$studentGap", value.StudentMinGapMinutes);
                         id = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
                     }
                     else
                     {
-                        command.CommandText = "UPDATE GroupLessonClass SET Name=$name,Grade=$grade,Subject=$subject,AllowOtherGrades=$allow,Active=$active,TeacherId=$teacher,MinGapMinutes=$gap WHERE Id=$id; SELECT changes();";
-                        command.Parameters.AddWithValue("$name", value.Name); command.Parameters.AddWithValue("$grade", value.Grade); command.Parameters.AddWithValue("$subject", value.Subject); command.Parameters.AddWithValue("$allow", value.AllowOtherGrades); command.Parameters.AddWithValue("$active", value.Active); command.Parameters.AddWithValue("$teacher", (object?)value.TeacherId ?? DBNull.Value); command.Parameters.AddWithValue("$gap", value.MinGapMinutes); command.Parameters.AddWithValue("$id", value.Id);
+                        command.CommandText = "UPDATE GroupLessonClass SET Name=$name,Grade=$grade,Subject=$subject,AllowOtherGrades=$allow,Active=$active,TeacherId=$teacher,TeacherMinGapMinutes=$teacherGap,StudentMinGapMinutes=$studentGap WHERE Id=$id; SELECT changes();";
+                        command.Parameters.AddWithValue("$name", value.Name); command.Parameters.AddWithValue("$grade", value.Grade); command.Parameters.AddWithValue("$subject", value.Subject); command.Parameters.AddWithValue("$allow", value.AllowOtherGrades); command.Parameters.AddWithValue("$active", value.Active); command.Parameters.AddWithValue("$teacher", (object?)value.TeacherId ?? DBNull.Value); command.Parameters.AddWithValue("$teacherGap", value.TeacherMinGapMinutes); command.Parameters.AddWithValue("$studentGap", value.StudentMinGapMinutes); command.Parameters.AddWithValue("$id", value.Id);
                         var changed = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
                         if (changed != 1) throw new InvalidOperationException("更新対象のクラスが見つかりません。");
                         id = value.Id;
@@ -53,6 +53,9 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
                 }
             }
             await RecomputeTeacherBlocksForClassAsync(connection, transaction, id, value.TeacherId, cancellationToken).ConfigureAwait(false);
+            // ユーザー要望（checkpoint156）。StudentMinGapMinutesがここで変わった可能性があるため、
+            // 既に受講登録済みの生徒がいれば再計算する（受講登録自体はこのメソッドでは変更しない）。
+            await RecomputeStudentBlocksForClassAsync(connection, transaction, id, cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return value with { Id = id };
         }
@@ -67,9 +70,18 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
         await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
-        // 担当講師由来のTeacherUnavailabilityはGroupLessonClassへの外部キーを持たないため、
-        // ON DELETE CASCADEでは消えない。行削除の前に「担当講師なし」相当まで復元してから削除する。
+        // 担当講師由来のTeacherUnavailability・受講生徒由来のStudentUnavailabilityは、どちらも
+        // GroupLessonClassへの外部キーを持たないため、ON DELETE CASCADEでは消えない。行削除の前に
+        // 「担当講師なし・受講生徒なし」相当まで復元してから削除する。
         await RecomputeTeacherBlocksForClassAsync(connection, transaction, classId, effectiveTeacherId: null, cancellationToken).ConfigureAwait(false);
+        await using (var command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = "DELETE FROM GroupLessonEnrollment WHERE ClassId=$class;";
+            command.Parameters.AddWithValue("$class", classId);
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        await RecomputeStudentBlocksForClassAsync(connection, transaction, classId, cancellationToken).ConfigureAwait(false);
         await using (var command = connection.CreateCommand())
         {
             command.Transaction = transaction;
@@ -126,10 +138,11 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
                 command.Parameters.AddWithValue("$class", classId); command.Parameters.AddWithValue("$date", openDateId); command.Parameters.AddWithValue("$start", startText); command.Parameters.AddWithValue("$end", endText);
                 await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
-            // 追加した開講日程が担当講師の既存の時間帯と重なる場合、その日時のブロックも増やす
-            // 必要があるため再計算する（担当講師が割り当てられていなければ何もしない）。
+            // 追加した開講日程が担当講師・受講生徒の既存の時間帯と重なる場合、その日時のブロックも
+            // 増やす必要があるため再計算する（担当講師未割り当て・受講生徒0人ならそれぞれ何もしない）。
             var teacherId = await ReadClassTeacherIdAsync(connection, transaction, classId, cancellationToken).ConfigureAwait(false);
             await RecomputeTeacherBlocksForClassAsync(connection, transaction, classId, teacherId, cancellationToken).ConfigureAwait(false);
+            await RecomputeStudentBlocksForClassAsync(connection, transaction, classId, cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
         catch
@@ -160,9 +173,10 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
             command.Parameters.AddWithValue("$id", sessionId);
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
-        // 削除した開講日程が担当講師のブロックの根拠だった可能性があるため再計算する。
+        // 削除した開講日程が担当講師・受講生徒のブロックの根拠だった可能性があるため再計算する。
         var teacherId = await ReadClassTeacherIdAsync(connection, transaction, classId, cancellationToken).ConfigureAwait(false);
         await RecomputeTeacherBlocksForClassAsync(connection, transaction, classId, teacherId, cancellationToken).ConfigureAwait(false);
+        await RecomputeStudentBlocksForClassAsync(connection, transaction, classId, cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -199,12 +213,29 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
     public async Task SetEnrollmentAsync(string projectPath, long classId, long studentId, bool enrolled, CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
-        await using var command = connection.CreateCommand();
-        command.CommandText = enrolled
-            ? "INSERT INTO GroupLessonEnrollment(ClassId,StudentId) VALUES($class,$student) ON CONFLICT(ClassId,StudentId) DO NOTHING;"
-            : "DELETE FROM GroupLessonEnrollment WHERE ClassId=$class AND StudentId=$student;";
-        command.Parameters.AddWithValue("$class", classId); command.Parameters.AddWithValue("$student", studentId);
-        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using (var command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = enrolled
+                    ? "INSERT INTO GroupLessonEnrollment(ClassId,StudentId) VALUES($class,$student) ON CONFLICT(ClassId,StudentId) DO NOTHING;"
+                    : "DELETE FROM GroupLessonEnrollment WHERE ClassId=$class AND StudentId=$student;";
+                command.Parameters.AddWithValue("$class", classId); command.Parameters.AddWithValue("$student", studentId);
+                await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+            // ユーザー要望（checkpoint156）「集団授業と個別指導の間の空き時間の最小値を講師側と生徒側で
+            // 分けてほしい」への対応。受講登録・解除のたびに、この生徒のStudentUnavailabilityを
+            // 再計算する（担当講師の割り当てと独立に効果を持つ）。
+            await RecomputeStudentBlocksForClassAsync(connection, transaction, classId, cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
     }
 
     private static async Task<long?> ReadClassTeacherIdAsync(SqliteConnection connection, SqliteTransaction transaction, long classId, CancellationToken cancellationToken)
@@ -215,6 +246,58 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
         command.Parameters.AddWithValue("$id", classId);
         var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
         return value is null or DBNull ? null : Convert.ToInt64(value);
+    }
+
+    private static async Task<List<(long OpenDateId, TimeOnly Start, TimeOnly End)>> ReadSessionsAsync(SqliteConnection connection, SqliteTransaction transaction, long classId, CancellationToken cancellationToken)
+    {
+        var sessions = new List<(long OpenDateId, TimeOnly Start, TimeOnly End)>();
+        await using var read = connection.CreateCommand();
+        read.Transaction = transaction;
+        read.CommandText = "SELECT OpenDateId,StartTime,EndTime FROM GroupLessonSession WHERE ClassId=$class;";
+        read.Parameters.AddWithValue("$class", classId);
+        await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            sessions.Add((reader.GetInt64(0), TimeOnly.ParseExact(reader.GetString(1), "HH:mm", System.Globalization.CultureInfo.InvariantCulture), TimeOnly.ParseExact(reader.GetString(2), "HH:mm", System.Globalization.CultureInfo.InvariantCulture)));
+        return sessions;
+    }
+
+    private static async Task<List<(long OpenDateId, long TimeSlotId, TimeOnly Start, TimeOnly End)>> ReadActiveSlotsAsync(SqliteConnection connection, SqliteTransaction transaction, CancellationToken cancellationToken)
+    {
+        var slots = new List<(long OpenDateId, long TimeSlotId, TimeOnly Start, TimeOnly End)>();
+        await using var read = connection.CreateCommand();
+        read.Transaction = transaction;
+        read.CommandText = "SELECT ds.OpenDateId,ts.Id,ts.StartTime,ts.EndTime FROM OpenDateTimeSlot ds JOIN TimeSlot ts ON ts.Id=ds.TimeSlotId WHERE ts.Active=1;";
+        await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            slots.Add((reader.GetInt64(0), reader.GetInt64(1), TimeOnly.ParseExact(reader.GetString(2), "HH:mm", System.Globalization.CultureInfo.InvariantCulture), TimeOnly.ParseExact(reader.GetString(3), "HH:mm", System.Globalization.CultureInfo.InvariantCulture)));
+        return slots;
+    }
+
+    // ユーザー要望（checkpoint155）「集団授業と個別指導の間の空き時間の最小値を指定させる。負数も
+    // 入力可とする」への対応。開講セッション（自由な開始・終了時刻）をgapMinutes分だけ前後に広げた
+    // （正の値）／狭めた（負の値）範囲として扱い、重なるTimeSlotの集合を返す。講師側・生徒側の両方の
+    // ブロック計算で共有する（checkpoint156でgapMinutesを講師側・生徒側それぞれ別の値にできるよう
+    // 分離した際、この重なり判定ロジック自体は完全に共通のため1箇所へ抽出した）。
+    private static HashSet<(long OpenDateId, long TimeSlotId)> ResolveBlockedSlots(
+        IReadOnlyList<(long OpenDateId, TimeOnly Start, TimeOnly End)> sessions,
+        IReadOnlyList<(long OpenDateId, long TimeSlotId, TimeOnly Start, TimeOnly End)> slots,
+        int gapMinutes)
+    {
+        var result = new HashSet<(long, long)>();
+        foreach (var session in sessions)
+        {
+            // TimeOnlyは0:00をまたぐ減算で例外にならないよう、分単位のint演算で前後へ広げる/狭める。
+            var blockStartMinutes = session.Start.Hour * 60 + session.Start.Minute - gapMinutes;
+            var blockEndMinutes = session.End.Hour * 60 + session.End.Minute + gapMinutes;
+            foreach (var slot in slots.Where(s => s.OpenDateId == session.OpenDateId))
+            {
+                var slotStartMinutes = slot.Start.Hour * 60 + slot.Start.Minute;
+                var slotEndMinutes = slot.End.Hour * 60 + slot.End.Minute;
+                if (slotStartMinutes < blockEndMinutes && blockStartMinutes < slotEndMinutes)
+                    result.Add((slot.OpenDateId, slot.TimeSlotId));
+            }
+        }
+        return result;
     }
 
     // ユーザー要望（checkpoint112）「集団授業のクラスに担当講師（任意）を割り当て...その講師はその
@@ -244,54 +327,21 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
         var target = new HashSet<(long TeacherId, long OpenDateId, long TimeSlotId)>();
         if (effectiveTeacherId is long teacherId)
         {
-            // ユーザー要望（checkpoint155）「集団授業と個別指導の間の空き時間の最小値を指定させる。
-            // 負数も入力可とする」への対応。この講師をブロックする時間帯は、開講時間そのものではなく
-            // MinGapMinutes分だけ前後に広げた（正の値）／狭めた（負の値）範囲で判定する。
-            int minGapMinutes;
+            int teacherMinGapMinutes;
             await using (var read = connection.CreateCommand())
             {
                 read.Transaction = transaction;
-                read.CommandText = "SELECT MinGapMinutes FROM GroupLessonClass WHERE Id=$class;";
+                read.CommandText = "SELECT TeacherMinGapMinutes FROM GroupLessonClass WHERE Id=$class;";
                 read.Parameters.AddWithValue("$class", classId);
-                minGapMinutes = Convert.ToInt32(await read.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) ?? 0);
+                teacherMinGapMinutes = Convert.ToInt32(await read.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) ?? 0);
             }
 
-            var sessions = new List<(long OpenDateId, TimeOnly Start, TimeOnly End)>();
-            await using (var read = connection.CreateCommand())
-            {
-                read.Transaction = transaction;
-                read.CommandText = "SELECT OpenDateId,StartTime,EndTime FROM GroupLessonSession WHERE ClassId=$class;";
-                read.Parameters.AddWithValue("$class", classId);
-                await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                    sessions.Add((reader.GetInt64(0), TimeOnly.ParseExact(reader.GetString(1), "HH:mm", System.Globalization.CultureInfo.InvariantCulture), TimeOnly.ParseExact(reader.GetString(2), "HH:mm", System.Globalization.CultureInfo.InvariantCulture)));
-            }
-
+            var sessions = await ReadSessionsAsync(connection, transaction, classId, cancellationToken).ConfigureAwait(false);
             if (sessions.Count > 0)
             {
-                var slots = new List<(long OpenDateId, long TimeSlotId, TimeOnly Start, TimeOnly End)>();
-                await using (var read = connection.CreateCommand())
-                {
-                    read.Transaction = transaction;
-                    read.CommandText = "SELECT ds.OpenDateId,ts.Id,ts.StartTime,ts.EndTime FROM OpenDateTimeSlot ds JOIN TimeSlot ts ON ts.Id=ds.TimeSlotId WHERE ts.Active=1;";
-                    await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                        slots.Add((reader.GetInt64(0), reader.GetInt64(1), TimeOnly.ParseExact(reader.GetString(2), "HH:mm", System.Globalization.CultureInfo.InvariantCulture), TimeOnly.ParseExact(reader.GetString(3), "HH:mm", System.Globalization.CultureInfo.InvariantCulture)));
-                }
-
-                foreach (var session in sessions)
-                {
-                    // TimeOnlyは0:00をまたぐ減算で例外にならないよう、分単位のint演算で前後へ広げる/狭める。
-                    var blockStartMinutes = session.Start.Hour * 60 + session.Start.Minute - minGapMinutes;
-                    var blockEndMinutes = session.End.Hour * 60 + session.End.Minute + minGapMinutes;
-                    foreach (var slot in slots.Where(s => s.OpenDateId == session.OpenDateId))
-                    {
-                        var slotStartMinutes = slot.Start.Hour * 60 + slot.Start.Minute;
-                        var slotEndMinutes = slot.End.Hour * 60 + slot.End.Minute;
-                        if (slotStartMinutes < blockEndMinutes && blockStartMinutes < slotEndMinutes)
-                            target.Add((teacherId, slot.OpenDateId, slot.TimeSlotId));
-                    }
-                }
+                var slots = await ReadActiveSlotsAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
+                foreach (var (openDateId, timeSlotId) in ResolveBlockedSlots(sessions, slots, teacherMinGapMinutes))
+                    target.Add((teacherId, openDateId, timeSlotId));
             }
 
             var newlyBlocked = target.Except(previous).ToArray();
@@ -343,6 +393,109 @@ public sealed class SqliteGroupLessonService : IGroupLessonService
             insertUnavailable.Transaction = transaction;
             insertUnavailable.CommandText = "INSERT INTO TeacherUnavailability(TeacherId,OpenDateId,TimeSlotId,Source) VALUES($teacher,$date,$slot,'group_lesson') ON CONFLICT(TeacherId,OpenDateId,TimeSlotId) DO NOTHING;";
             insertUnavailable.Parameters.AddWithValue("$teacher", addedTeacherId); insertUnavailable.Parameters.AddWithValue("$date", openDateId); insertUnavailable.Parameters.AddWithValue("$slot", timeSlotId);
+            await insertUnavailable.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    // ユーザー要望（checkpoint156）「集団授業と個別指導の間の空き時間の最小値について、講師側と
+    // 生徒側で分けてほしい」への対応。RecomputeTeacherBlocksForClassAsyncの生徒版。担当講師
+    // （単一・任意）と異なり、受講生徒は複数人いるため、受講登録されている全員へ同じブロックを適用
+    // する。StudentUnavailabilityはStudentAvailability（アンケート出欠、未回答なら既定で出席可）とは
+    // 別の常時ブロックテーブルのため、受講登録0人になった生徒・クラス削除時のクリアもここで行う。
+    private static async Task RecomputeStudentBlocksForClassAsync(
+        SqliteConnection connection, SqliteTransaction transaction, long classId, CancellationToken cancellationToken)
+    {
+        var previous = new HashSet<(long StudentId, long OpenDateId, long TimeSlotId)>();
+        await using (var read = connection.CreateCommand())
+        {
+            read.Transaction = transaction;
+            read.CommandText = "SELECT StudentId,OpenDateId,TimeSlotId FROM GroupLessonStudentBlock WHERE ClassId=$class;";
+            read.Parameters.AddWithValue("$class", classId);
+            await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                previous.Add((reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2)));
+        }
+
+        int studentMinGapMinutes;
+        await using (var read = connection.CreateCommand())
+        {
+            read.Transaction = transaction;
+            read.CommandText = "SELECT StudentMinGapMinutes FROM GroupLessonClass WHERE Id=$class;";
+            read.Parameters.AddWithValue("$class", classId);
+            studentMinGapMinutes = Convert.ToInt32(await read.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) ?? 0);
+        }
+
+        var enrolledStudentIds = new List<long>();
+        await using (var read = connection.CreateCommand())
+        {
+            read.Transaction = transaction;
+            read.CommandText = "SELECT StudentId FROM GroupLessonEnrollment WHERE ClassId=$class;";
+            read.Parameters.AddWithValue("$class", classId);
+            await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                enrolledStudentIds.Add(reader.GetInt64(0));
+        }
+
+        var target = new HashSet<(long StudentId, long OpenDateId, long TimeSlotId)>();
+        if (enrolledStudentIds.Count > 0)
+        {
+            var sessions = await ReadSessionsAsync(connection, transaction, classId, cancellationToken).ConfigureAwait(false);
+            if (sessions.Count > 0)
+            {
+                var slots = await ReadActiveSlotsAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
+                var blockedSlots = ResolveBlockedSlots(sessions, slots, studentMinGapMinutes);
+                foreach (var studentId in enrolledStudentIds)
+                    foreach (var (openDateId, timeSlotId) in blockedSlots)
+                        target.Add((studentId, openDateId, timeSlotId));
+            }
+
+            var newlyBlocked = target.Except(previous).ToArray();
+            foreach (var (blockedStudentId, openDateId, timeSlotId) in newlyBlocked)
+            {
+                await using var check = connection.CreateCommand();
+                check.Transaction = transaction;
+                check.CommandText = "SELECT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest r ON r.Id=a.LessonRequestId WHERE r.StudentId=$student AND a.OpenDateId=$date AND a.TimeSlotId=$slot);";
+                check.Parameters.AddWithValue("$student", blockedStudentId); check.Parameters.AddWithValue("$date", openDateId); check.Parameters.AddWithValue("$slot", timeSlotId);
+                if (Convert.ToInt64(await check.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) != 0)
+                    throw new InvalidOperationException("この生徒は受講登録しようとした開講日時に既に個別指導の配置があります。先に配置を移動または削除してください。");
+            }
+        }
+
+        foreach (var (removedStudentId, openDateId, timeSlotId) in previous.Except(target))
+        {
+            await using (var delete = connection.CreateCommand())
+            {
+                delete.Transaction = transaction;
+                delete.CommandText = "DELETE FROM GroupLessonStudentBlock WHERE ClassId=$class AND StudentId=$student AND OpenDateId=$date AND TimeSlotId=$slot;";
+                delete.Parameters.AddWithValue("$class", classId); delete.Parameters.AddWithValue("$student", removedStudentId); delete.Parameters.AddWithValue("$date", openDateId); delete.Parameters.AddWithValue("$slot", timeSlotId);
+                await delete.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+            await using var check = connection.CreateCommand();
+            check.Transaction = transaction;
+            check.CommandText = "SELECT EXISTS(SELECT 1 FROM GroupLessonStudentBlock WHERE StudentId=$student AND OpenDateId=$date AND TimeSlotId=$slot);";
+            check.Parameters.AddWithValue("$student", removedStudentId); check.Parameters.AddWithValue("$date", openDateId); check.Parameters.AddWithValue("$slot", timeSlotId);
+            var stillReferenced = Convert.ToInt64(await check.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) != 0;
+            if (stillReferenced) continue;
+            await using var removeUnavailable = connection.CreateCommand();
+            removeUnavailable.Transaction = transaction;
+            removeUnavailable.CommandText = "DELETE FROM StudentUnavailability WHERE StudentId=$student AND OpenDateId=$date AND TimeSlotId=$slot;";
+            removeUnavailable.Parameters.AddWithValue("$student", removedStudentId); removeUnavailable.Parameters.AddWithValue("$date", openDateId); removeUnavailable.Parameters.AddWithValue("$slot", timeSlotId);
+            await removeUnavailable.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        foreach (var (addedStudentId, openDateId, timeSlotId) in target.Except(previous))
+        {
+            await using (var insert = connection.CreateCommand())
+            {
+                insert.Transaction = transaction;
+                insert.CommandText = "INSERT INTO GroupLessonStudentBlock(ClassId,StudentId,OpenDateId,TimeSlotId) VALUES($class,$student,$date,$slot);";
+                insert.Parameters.AddWithValue("$class", classId); insert.Parameters.AddWithValue("$student", addedStudentId); insert.Parameters.AddWithValue("$date", openDateId); insert.Parameters.AddWithValue("$slot", timeSlotId);
+                await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+            await using var insertUnavailable = connection.CreateCommand();
+            insertUnavailable.Transaction = transaction;
+            insertUnavailable.CommandText = "INSERT INTO StudentUnavailability(StudentId,OpenDateId,TimeSlotId) VALUES($student,$date,$slot) ON CONFLICT(StudentId,OpenDateId,TimeSlotId) DO NOTHING;";
+            insertUnavailable.Parameters.AddWithValue("$student", addedStudentId); insertUnavailable.Parameters.AddWithValue("$date", openDateId); insertUnavailable.Parameters.AddWithValue("$slot", timeSlotId);
             await insertUnavailable.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
     }

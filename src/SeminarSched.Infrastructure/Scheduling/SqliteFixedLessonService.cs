@@ -90,7 +90,7 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
             warnings.Add(!studentAvailable && !teacherAvailable
                 ? "生徒と講師の両方がこの日時に参加できない設定になっています。"
                 : !studentAvailable
-                    ? "生徒がアンケートで出席不可にしています。"
+                    ? "生徒がこの日時に参加できない設定になっています（アンケートでの出欠、または集団授業の受講による可能性があります）。"
                     : "講師がこの日時に出勤できない設定になっています。");
             deltas.Add(new SoftMetricDelta("availability_override", "出勤・出席可否の設定", HigherIsBetter: false, 0, 1));
         }
@@ -407,9 +407,15 @@ public sealed class SqliteFixedLessonService : IFixedLessonService
     {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        // 生徒側は意図的な既定動作（未回答なら空き扱い）。
+        // 生徒側は意図的な既定動作（未回答なら空き扱い）。ユーザー要望（checkpoint156）「集団授業と
+        // 個別指導の間の空き時間の最小値を講師側と生徒側で分けてほしい」への対応で、
+        // StudentUnavailability（集団授業の受講登録から自動生成される常時ブロック、
+        // SqliteGroupLessonService.RecomputeStudentBlocksForClassAsync参照）もOR条件へ追加した
+        // （IsTeacherAvailableAsyncのTeacherUnavailabilityと同じ構成）。
         command.CommandText = """
-            SELECT NOT (EXISTS(SELECT 1 FROM StudentAvailability WHERE StudentId=$student) AND NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE StudentId=$student AND OpenDateId=$date AND TimeSlotId=$slot AND AvailabilityLevel>0));
+            SELECT NOT (
+              (EXISTS(SELECT 1 FROM StudentAvailability WHERE StudentId=$student) AND NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE StudentId=$student AND OpenDateId=$date AND TimeSlotId=$slot AND AvailabilityLevel>0))
+              OR EXISTS(SELECT 1 FROM StudentUnavailability WHERE StudentId=$student AND OpenDateId=$date AND TimeSlotId=$slot));
             """;
         command.Parameters.AddWithValue("$student", studentId);
         command.Parameters.AddWithValue("$date", openDateId);

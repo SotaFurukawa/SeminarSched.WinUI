@@ -263,6 +263,7 @@ public sealed class SqliteOutputPackageService:IOutputPackageService
             WHERE (NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE ProjectId=r.ProjectId AND StudentId=r.StudentId) OR COALESCE(sa.AvailabilityLevel,0)>0)
               AND (NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=r.ProjectId) OR COALESCE(ta.AvailabilityLevel,0)>0)
               AND NOT EXISTS(SELECT 1 FROM TeacherUnavailability u WHERE u.TeacherId=tq.TeacherId AND u.OpenDateId=ds.OpenDateId AND u.TimeSlotId=ds.TimeSlotId)
+              AND NOT EXISTS(SELECT 1 FROM StudentUnavailability su WHERE su.StudentId=r.StudentId AND su.OpenDateId=ds.OpenDateId AND su.TimeSlotId=ds.TimeSlotId)
               {(includeStudentCollisionCheck?"AND NOT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest ar ON ar.Id=a.LessonRequestId WHERE (a.IsLocked=1 OR a.IsManual=1) AND a.OpenDateId=ds.OpenDateId AND a.TimeSlotId=ds.TimeSlotId AND ar.StudentId=r.StudentId)":"")}
             ORDER BY r.Id,d.Date,ts.SortOrder;
             """;

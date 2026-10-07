@@ -39,6 +39,7 @@ internal static class SqliteProjectSchema
         command.CommandText = CompleteSchemaSql;
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         await EnsureColumnsAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
+        await BackfillTeacherMinGapMinutesAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await BackfillInvalidSubjectShortNamesAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await BackfillFamilyGivenNameAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await DowngradeRemovedPriorityAvailabilityLevelAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
@@ -257,6 +258,25 @@ internal static class SqliteProjectSchema
         // 集団授業の開講時間帯をこの分だけ前後に広げる（正の値）／狭める（負の値）ために使う。
         // 既存プロジェクトにも同じ理由でALTER TABLEで届ける。
         await AddColumnIfMissingAsync(connection, transaction, "GroupLessonClass", "MinGapMinutes", "INTEGER NOT NULL DEFAULT 0", cancellationToken);
+
+        // ユーザー要望（checkpoint156）「集団授業と個別指導の間の空き時間の最小値について、講師側と
+        // 生徒側で分けてほしい」への対応。checkpoint155のMinGapMinutes（講師側にしか効果が無かった）
+        // をTeacherMinGapMinutes（講師側）・StudentMinGapMinutes（生徒側、新規）へ分割する。
+        // 既存プロジェクトにも同じ理由でALTER TABLEで届ける。
+        await AddColumnIfMissingAsync(connection, transaction, "GroupLessonClass", "TeacherMinGapMinutes", "INTEGER NOT NULL DEFAULT 0", cancellationToken);
+        await AddColumnIfMissingAsync(connection, transaction, "GroupLessonClass", "StudentMinGapMinutes", "INTEGER NOT NULL DEFAULT 0", cancellationToken);
+    }
+
+    // 旧MinGapMinutes（checkpoint155、講師側にしか効果が無かった）に値が入ったまま運用していた
+    // 既存プロジェクトのための自己修復バックフィル。TeacherMinGapMinutesへ値を移し、旧列は0へ
+    // 戻して以後は未使用の列として残す（列削除は行わない。他の列と同じ既定の移行方針）。
+    // MinGapMinutes<>0の行だけを対象にするため、一度移行すれば再実行されない。
+    private static async Task BackfillTeacherMinGapMinutesAsync(SqliteConnection connection, SqliteTransaction transaction, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "UPDATE GroupLessonClass SET TeacherMinGapMinutes=MinGapMinutes, MinGapMinutes=0 WHERE MinGapMinutes<>0;";
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     // ユーザー要望（checkpoint145）「姓と名を分けて保存」で追加したFamilyName/GivenName列を、
@@ -358,6 +378,28 @@ internal static class SqliteProjectSchema
             TimeSlotId INTEGER NOT NULL REFERENCES TimeSlot(Id) ON DELETE CASCADE,
             AvailabilityLevel INTEGER NOT NULL CHECK(AvailabilityLevel BETWEEN 0 AND 1),
             PRIMARY KEY(ProjectId,StudentId,OpenDateId,TimeSlotId)
+        );
+        -- ユーザー要望（checkpoint156）「集団授業と個別指導の間の空き時間の最小値を講師側と生徒側で
+        -- 分けてほしい」への対応。TeacherUnavailabilityの生徒版。StudentAvailability（アンケート出欠、
+        -- 未回答なら既定で出席可の緩い規約）とは別の、常に絶対的にブロックするテーブルとして新設する
+        -- （TeacherAvailability/TeacherUnavailabilityの関係と同じ設計。詳細はSqliteGroupLessonService.
+        -- RecomputeStudentBlocksForClassAsync参照）。
+        CREATE TABLE IF NOT EXISTS StudentUnavailability (
+            StudentId INTEGER NOT NULL REFERENCES Student(Id) ON DELETE CASCADE,
+            OpenDateId INTEGER NOT NULL REFERENCES OpenDate(Id) ON DELETE CASCADE,
+            TimeSlotId INTEGER NOT NULL REFERENCES TimeSlot(Id) ON DELETE CASCADE,
+            Source TEXT NOT NULL DEFAULT 'group_lesson' CHECK(Source IN('group_lesson')),
+            PRIMARY KEY(StudentId,OpenDateId,TimeSlotId)
+        );
+        -- GroupLessonTeacherBlockの生徒版。どの(生徒,日時,コマ)ブロックがどのクラス由来かを記録し、
+        -- 受講登録解除・開講日程削除・空き時間設定変更時に、このクラス由来の分だけ正しく取り消せる
+        -- ようにする。
+        CREATE TABLE IF NOT EXISTS GroupLessonStudentBlock (
+            ClassId INTEGER NOT NULL REFERENCES GroupLessonClass(Id) ON DELETE CASCADE,
+            StudentId INTEGER NOT NULL REFERENCES Student(Id) ON DELETE CASCADE,
+            OpenDateId INTEGER NOT NULL REFERENCES OpenDate(Id) ON DELETE CASCADE,
+            TimeSlotId INTEGER NOT NULL REFERENCES TimeSlot(Id) ON DELETE CASCADE,
+            PRIMARY KEY(ClassId,StudentId,OpenDateId,TimeSlotId)
         );
         CREATE TABLE IF NOT EXISTS TeacherAvailability (
             ProjectId INTEGER NOT NULL REFERENCES CourseProject(Id) ON DELETE CASCADE,
@@ -470,6 +512,8 @@ internal static class SqliteProjectSchema
             Active INTEGER NOT NULL DEFAULT 1 CHECK(Active IN(0,1)),
             TeacherId INTEGER REFERENCES Teacher(Id) ON DELETE SET NULL,
             MinGapMinutes INTEGER NOT NULL DEFAULT 0,
+            TeacherMinGapMinutes INTEGER NOT NULL DEFAULT 0,
+            StudentMinGapMinutes INTEGER NOT NULL DEFAULT 0,
             UNIQUE(ProjectId,Name)
         );
         CREATE TABLE IF NOT EXISTS GroupLessonSession (

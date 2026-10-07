@@ -203,6 +203,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
                 WHERE (NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE ProjectId=r.ProjectId AND StudentId=r.StudentId) OR COALESCE(sa.AvailabilityLevel,0)>0)
                   AND (NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=r.ProjectId) OR COALESCE(ta.AvailabilityLevel,0)>0)
                   AND NOT EXISTS(SELECT 1 FROM TeacherUnavailability u WHERE u.TeacherId=tq.TeacherId AND u.OpenDateId=ds.OpenDateId AND u.TimeSlotId=ds.TimeSlotId)
+                  AND NOT EXISTS(SELECT 1 FROM StudentUnavailability su WHERE su.StudentId=r.StudentId AND su.OpenDateId=ds.OpenDateId AND su.TimeSlotId=ds.TimeSlotId)
                   AND NOT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest ar ON ar.Id=a.LessonRequestId WHERE {fixedFilter} AND a.OpenDateId=ds.OpenDateId AND a.TimeSlotId=ds.TimeSlotId AND ar.StudentId=r.StudentId);
                 """;
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -378,6 +379,7 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
                WHERE NOT EXISTS(SELECT 1 FROM OpenDateTimeSlot ds JOIN OpenDate d ON d.Id=ds.OpenDateId WHERE ds.OpenDateId=a.OpenDateId AND ds.TimeSlotId=a.TimeSlotId AND d.IsOpen=1)
                   OR NOT EXISTS(SELECT 1 FROM TeacherQualification tq WHERE tq.TeacherId=a.TeacherId AND tq.SubjectId=r.SubjectId AND tq.CanTeach=1)
                   OR EXISTS(SELECT 1 FROM TeacherUnavailability u WHERE u.TeacherId=a.TeacherId AND u.OpenDateId=a.OpenDateId AND u.TimeSlotId=a.TimeSlotId)
+                  OR EXISTS(SELECT 1 FROM StudentUnavailability su WHERE su.StudentId=r.StudentId AND su.OpenDateId=a.OpenDateId AND su.TimeSlotId=a.TimeSlotId)
                   OR EXISTS(SELECT 1 FROM StudentAvailability sa WHERE sa.StudentId=r.StudentId AND sa.OpenDateId=a.OpenDateId AND sa.TimeSlotId=a.TimeSlotId AND sa.AvailabilityLevel=0)
                   OR EXISTS(SELECT 1 FROM TeacherAvailability ta WHERE ta.TeacherId=a.TeacherId AND ta.OpenDateId=a.OpenDateId AND ta.TimeSlotId=a.TimeSlotId AND ta.AvailabilityLevel=0))
             + (SELECT COUNT(*) FROM (SELECT r.Id FROM LessonRequest r LEFT JOIN Assignment a ON a.LessonRequestId=r.Id GROUP BY r.Id,r.RequiredSessions HAVING COUNT(a.Id)>r.RequiredSessions));

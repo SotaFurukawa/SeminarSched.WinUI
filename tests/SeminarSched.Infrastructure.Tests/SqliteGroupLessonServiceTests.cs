@@ -161,22 +161,22 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
     }
 
     // ユーザー要望（checkpoint155）「集団授業と個別指導の間の空き時間の最小値を指定させる。負数も
-    // 入力可とする」の検証。
+    // 入力可とする」、および続く要望（checkpoint156）「講師側と生徒側で分けてほしい」の検証。
     [Fact]
-    public async Task SaveClassAsync_PersistsMinGapMinutesIncludingNegativeValues()
+    public async Task SaveClassAsync_PersistsTeacherAndStudentMinGapMinutesSeparatelyIncludingNegativeValues()
     {
         var state=await CreateStateAsync();var service=new SqliteGroupLessonService();
-        var created=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学",minGapMinutes:-5));
-        Assert.Equal(-5,created.MinGapMinutes);
+        var created=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学",teacherMinGapMinutes:-5,studentMinGapMinutes:10));
+        Assert.Equal(-5,created.TeacherMinGapMinutes);Assert.Equal(10,created.StudentMinGapMinutes);
         var listed=Assert.Single(await service.GetClassesAsync(state.Path));
-        Assert.Equal(-5,listed.MinGapMinutes);
+        Assert.Equal(-5,listed.TeacherMinGapMinutes);Assert.Equal(10,listed.StudentMinGapMinutes);
     }
 
     [Fact]
-    public async Task SaveClassAsync_NegativeMinGapMinutes_AllowsSlightOverlapToRemainUnblocked()
+    public async Task SaveClassAsync_NegativeTeacherMinGapMinutes_AllowsSlightOverlapToRemainUnblocked()
     {
         var state=await CreateStateWithSlotAsync();var service=new SqliteGroupLessonService();
-        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学",teacherId:state.Teacher1Id,minGapMinutes:-5));
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学",teacherId:state.Teacher1Id,teacherMinGapMinutes:-5));
         // コマは9:00-10:00。開講セッションは9:55-11:00で、gap=0なら5分重なりブロックされるはず
         // だが、-5分の設定で実効ブロック範囲が[10:00,10:55]へ狭まり、コマの終了(10:00)と
         // 接するだけで重ならなくなる。
@@ -185,14 +185,64 @@ public sealed class SqliteGroupLessonServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveClassAsync_PositiveMinGapMinutes_BlocksANearbySlotThatDoesNotLiterallyOverlap()
+    public async Task SaveClassAsync_PositiveTeacherMinGapMinutes_BlocksANearbySlotThatDoesNotLiterallyOverlap()
     {
         var state=await CreateStateWithSlotAsync();var service=new SqliteGroupLessonService();
-        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学",teacherId:state.Teacher1Id,minGapMinutes:10));
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学",teacherId:state.Teacher1Id,teacherMinGapMinutes:10));
         // コマは9:00-10:00。開講セッションは10:05-11:00で、gap=0なら重ならずブロックされないはず
         // だが、+10分の設定で実効ブロック範囲が[9:55,11:10]へ広がり、コマの終了(10:00)と重なる。
         await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(10,5),new TimeOnly(11,0));
         Assert.True(await IsTeacherUnavailableAsync(state.Path,state.Teacher1Id,state.DateId,state.SlotId));
+    }
+
+    // ユーザー要望（checkpoint156）「講師側と生徒側で分けてほしい」の検証（生徒側）。担当講師を
+    // 割り当てずに（教師側のブロックは発生しない）、受講登録した生徒側だけがStudentMinGapMinutesの
+    // 効果でブロックされる／されないことを確認する。
+    [Fact]
+    public async Task SetEnrollmentAsync_NegativeStudentMinGapMinutes_AllowsSlightOverlapToRemainUnblocked()
+    {
+        var state=await CreateStateWithSlotAsync();var service=new SqliteGroupLessonService();
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学",studentMinGapMinutes:-5));
+        await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(9,55),new TimeOnly(11,0));
+
+        await service.SetEnrollmentAsync(state.Path,cls.Id,state.Student1Id,true);
+        Assert.False(await IsStudentUnavailableAsync(state.Path,state.Student1Id,state.DateId,state.SlotId));
+    }
+
+    [Fact]
+    public async Task SetEnrollmentAsync_PositiveStudentMinGapMinutes_BlocksANearbySlotThatDoesNotLiterallyOverlap()
+    {
+        var state=await CreateStateWithSlotAsync();var service=new SqliteGroupLessonService();
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学",studentMinGapMinutes:10));
+        await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(10,5),new TimeOnly(11,0));
+
+        await service.SetEnrollmentAsync(state.Path,cls.Id,state.Student1Id,true);
+        Assert.True(await IsStudentUnavailableAsync(state.Path,state.Student1Id,state.DateId,state.SlotId));
+
+        await service.SetEnrollmentAsync(state.Path,cls.Id,state.Student1Id,false);
+        Assert.False(await IsStudentUnavailableAsync(state.Path,state.Student1Id,state.DateId,state.SlotId));
+    }
+
+    [Fact]
+    public async Task SetEnrollmentAsync_RejectsWhenStudentAlreadyHasAnOccupyingIndividualAssignment()
+    {
+        var state=await CreateStateWithSlotAsync();var service=new SqliteGroupLessonService();
+        var cls=await service.SaveClassAsync(state.Path,new GroupLessonClass(0,"中2A","中2","数学",studentMinGapMinutes:0));
+        await service.AddSessionsAsync(state.Path,cls.Id,[state.DateId],new TimeOnly(9,30),new TimeOnly(10,30));
+        await OccupyIndividualAssignmentAsync(state.Path,state.Teacher1Id,state.Student1Id,state.DateId,state.SlotId);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>service.SetEnrollmentAsync(state.Path,cls.Id,state.Student1Id,true));
+        Assert.False(await IsStudentUnavailableAsync(state.Path,state.Student1Id,state.DateId,state.SlotId));
+        Assert.False((await service.GetEnrollmentCandidatesAsync(state.Path,cls.Id)).Single(c=>c.StudentId==state.Student1Id).Enrolled);
+    }
+
+    private static async Task<bool> IsStudentUnavailableAsync(string path,long studentId,long openDateId,long timeSlotId)
+    {
+        await using var connection=new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False");
+        await connection.OpenAsync();await using var command=connection.CreateCommand();
+        command.CommandText="SELECT EXISTS(SELECT 1 FROM StudentUnavailability WHERE StudentId=$student AND OpenDateId=$date AND TimeSlotId=$slot);";
+        command.Parameters.AddWithValue("$student",studentId);command.Parameters.AddWithValue("$date",openDateId);command.Parameters.AddWithValue("$slot",timeSlotId);
+        return Convert.ToInt64(await command.ExecuteScalarAsync())!=0;
     }
 
     private static async Task<bool> IsTeacherUnavailableAsync(string path,long teacherId,long openDateId,long timeSlotId)

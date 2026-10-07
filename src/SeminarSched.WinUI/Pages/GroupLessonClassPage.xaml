@@ -43,11 +43,16 @@
                         <TextBlock x:Name="GroupClassTeacherHint" Text="担当講師を割り当てると、その講師はこのクラスの開講日程の時間帯に個別授業を配置できなくなり、全体時間割にはその時間が「集団」と表示されます。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" />
                         <!-- ユーザー要望（checkpoint155）「集団授業と個別指導の間の空き時間の最小値を
                              指定させる。集団授業クラスで設定できるようにしたい。数字のみ入力でき、
-                             負数も入力可とする」への対応。NumberBoxは元々数値専用入力で、Minimumを
-                             負の値にしておくことで負数も直接入力できる。担当講師を割り当てている
-                             場合にのみ意味を持つ設定のため、GroupClassTeacherHintと同じ表示条件にした。 -->
-                        <NumberBox x:Name="GroupClassMinGapMinutes" Header="集団授業と個別指導の間の空き時間の最小値（分）" Minimum="-180" Maximum="180" SmallChange="1" SpinButtonPlacementMode="Inline" Value="0" HorizontalAlignment="Left" Width="280" Visibility="Collapsed" />
-                        <TextBlock x:Name="GroupClassMinGapHint" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" Text="担当講師と個別指導の間に、最低限空けておきたい時間（分）です。正の値にすると、開講時間の前後にこの分の空きが無い個別指導は配置できなくなります。例えば、個別指導の開始・終了時刻を5分程度ずらせば集団授業に参加できるという場合は、マイナスの値（例: -5）を設定しておくと、その重なりの範囲内であれば個別指導を配置できるようになります。0（既定）は開講時間そのものとの重なりだけをブロックします。" />
+                             負数も入力可とする」、および続く要望（checkpoint156）「講師側と生徒側で
+                             分けてほしい」への対応。NumberBoxは元々数値専用入力で、Minimumを負の値に
+                             しておくことで負数も直接入力できる。講師側は担当講師を割り当てている
+                             場合にのみ意味を持つ設定のため、GroupClassTeacherHintと同じ表示条件にした
+                             一方、生徒側は受講登録された生徒全員に効果があり担当講師の有無とは無関係
+                             なため、常に表示する。 -->
+                        <NumberBox x:Name="GroupClassStudentMinGapMinutes" Header="生徒側: 集団授業と個別指導の間の空き時間の最小値（分）" Minimum="-180" Maximum="180" SmallChange="1" SpinButtonPlacementMode="Inline" Value="0" HorizontalAlignment="Left" Width="320" />
+                        <TextBlock TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="このクラスへ受講登録した生徒全員について、開講時間と個別指導の間に最低限空けておきたい時間（分）です。正の値にすると、開講時間の前後にこの分の空きが無い個別指導は配置できなくなります。例えば、個別指導の開始・終了時刻を5分程度ずらせば集団授業に参加できるという場合は、マイナスの値（例: -5）を設定しておくと、その重なりの範囲内であれば個別指導を配置できるようになります。0（既定）は開講時間そのものとの重なりだけをブロックします。" />
+                        <NumberBox x:Name="GroupClassTeacherMinGapMinutes" Header="講師側: 集団授業と個別指導の間の空き時間の最小値（分）" Minimum="-180" Maximum="180" SmallChange="1" SpinButtonPlacementMode="Inline" Value="0" HorizontalAlignment="Left" Width="320" Visibility="Collapsed" />
+                        <TextBlock x:Name="GroupClassTeacherMinGapHint" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" Text="担当講師について、開講時間と個別指導の間に最低限空けておきたい時間（分）です。正の値にすると、開講時間の前後にこの分の空きが無い個別指導は配置できなくなります。マイナスの値（例: -5）を設定しておくと、その重なりの範囲内であれば個別指導を配置できるようになります。0（既定）は開講時間そのものとの重なりだけをブロックします。" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button Content="新規入力" Click="NewGroupClass_Click" />
                             <Button Content="選択したクラスを削除" Click="DeleteGroupClass_Click" />

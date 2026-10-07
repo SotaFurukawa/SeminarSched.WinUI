@@ -7,7 +7,7 @@ namespace SeminarSched.Domain.GroupLessons;
 // （同じ学年で複数クラスを持てる、受講登録はクラス単位で1回で済む）。
 public sealed record GroupLessonClass
 {
-    public GroupLessonClass(long id, string name, string grade, string subject, bool allowOtherGrades = false, bool active = true, long? teacherId = null, int minGapMinutes = 0)
+    public GroupLessonClass(long id, string name, string grade, string subject, bool allowOtherGrades = false, bool active = true, long? teacherId = null, int teacherMinGapMinutes = 0, int studentMinGapMinutes = 0)
     {
         if (id < 0) throw new ArgumentOutOfRangeException(nameof(id));
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -21,7 +21,8 @@ public sealed record GroupLessonClass
         AllowOtherGrades = allowOtherGrades;
         Active = active;
         TeacherId = teacherId;
-        MinGapMinutes = minGapMinutes;
+        TeacherMinGapMinutes = teacherMinGapMinutes;
+        StudentMinGapMinutes = studentMinGapMinutes;
     }
 
     public long Id { get; init; }
@@ -46,11 +47,18 @@ public sealed record GroupLessonClass
     public long? TeacherId { get; init; }
 
     // ユーザー要望（checkpoint155）「集団授業と個別指導の間の空き時間の最小値を指定させる。負数も
-    // 入力可とする」への対応。担当講師（TeacherId）を割り当てた場合にだけ効果を持つ
-    // （RecomputeTeacherBlocksForClassAsync参照）。正の値＝開講時間の前後にこの分の空き時間を
-    // 要求する（ブロックする範囲を広げる）。負の値＝開講時間の前後この分までは個別指導との重なりを
-    // 許容する（ブロックする範囲を狭める。例えば個別指導の開始・終了を5分ずらせば参加できる程度の
-    // 重なりであれば、-5を設定することでその枠にも個別指導を配置できるようになる）。0＝開講時間
-    // そのままの重なりだけをブロックする（既定）。
-    public int MinGapMinutes { get; init; }
+    // 入力可とする」、および続く要望（checkpoint156）「講師側と生徒側で分けてほしい」への対応。
+    // 正の値＝開講時間の前後にこの分の空き時間を要求する（ブロックする範囲を広げる）。負の値＝
+    // 開講時間の前後この分までは個別指導との重なりを許容する（ブロックする範囲を狭める。例えば
+    // 個別指導の開始・終了を5分ずらせば参加できる程度の重なりであれば、-5を設定することでその枠にも
+    // 個別指導を配置できるようになる）。0＝開講時間そのままの重なりだけをブロックする（既定）。
+    //
+    // TeacherMinGapMinutesは担当講師（TeacherId）を割り当てた場合にだけ効果を持ち、その講師の
+    // TeacherUnavailabilityへ反映される（RecomputeTeacherBlocksForClassAsync参照）。
+    public int TeacherMinGapMinutes { get; init; }
+
+    // StudentMinGapMinutesは担当講師の割り当てに関わらず、このクラスへ受講登録（GroupLessonEnrollment）
+    // された生徒全員に効果を持ち、各生徒のStudentUnavailabilityへ反映される
+    // （RecomputeStudentBlocksForClassAsync参照）。
+    public int StudentMinGapMinutes { get; init; }
 }

@@ -219,7 +219,9 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
     // ユーザー要望（checkpoint151）「未配置に残っているものを移そうとしてドラッグしているときに、
     // 生徒が出席不可にしているコマに禁止マークをつけるようにしておく」への対応。明示的に
     // AvailabilityLevel=0の行だけを対象にする（未回答＝行が無い場合は出席可として扱う、
-    // このファイルの他クエリと同じ既定値の慣習）。
+    // このファイルの他クエリと同じ既定値の慣習）。ユーザー要望（checkpoint156）への対応で、
+    // StudentUnavailability（集団授業の受講登録から自動生成される常時ブロック）が示すコマも
+    // UNIONで追加し、集団授業と重なるコマにも同じ禁止マークが付くようにした。
     public async Task<IReadOnlyList<long>> GetStudentUnavailableSlotIdsAsync(string projectPath,long lessonRequestId,long openDateId,CancellationToken cancellationToken=default)
     {
         await using var connection=await OpenAsync(projectPath,cancellationToken).ConfigureAwait(false);await SqliteProjectSchema.EnsureCurrentAsync(connection,cancellationToken).ConfigureAwait(false);
@@ -228,7 +230,12 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
             SELECT sa.TimeSlotId
             FROM StudentAvailability sa
             JOIN LessonRequest r ON r.StudentId=sa.StudentId
-            WHERE r.Id=$request AND sa.OpenDateId=$date AND sa.AvailabilityLevel=0;
+            WHERE r.Id=$request AND sa.OpenDateId=$date AND sa.AvailabilityLevel=0
+            UNION
+            SELECT su.TimeSlotId
+            FROM StudentUnavailability su
+            JOIN LessonRequest r ON r.StudentId=su.StudentId
+            WHERE r.Id=$request AND su.OpenDateId=$date;
             """;
         command.Parameters.AddWithValue("$request",lessonRequestId);
         command.Parameters.AddWithValue("$date",openDateId);
@@ -265,6 +272,7 @@ public sealed class SqliteScheduleEditorService : IScheduleEditorService
             WHERE (NOT EXISTS(SELECT 1 FROM StudentAvailability WHERE ProjectId=r.ProjectId AND StudentId=r.StudentId) OR COALESCE(sa.AvailabilityLevel,0)>0)
               AND (NOT EXISTS(SELECT 1 FROM TeacherAvailability WHERE ProjectId=r.ProjectId) OR COALESCE(ta.AvailabilityLevel,0)>0)
               AND NOT EXISTS(SELECT 1 FROM TeacherUnavailability u WHERE u.TeacherId=tq.TeacherId AND u.OpenDateId=ds.OpenDateId AND u.TimeSlotId=ds.TimeSlotId)
+              AND NOT EXISTS(SELECT 1 FROM StudentUnavailability su WHERE su.StudentId=r.StudentId AND su.OpenDateId=ds.OpenDateId AND su.TimeSlotId=ds.TimeSlotId)
               AND NOT EXISTS(SELECT 1 FROM Assignment a JOIN LessonRequest ar ON ar.Id=a.LessonRequestId WHERE (a.IsLocked=1 OR a.IsManual=1) AND a.OpenDateId=ds.OpenDateId AND a.TimeSlotId=ds.TimeSlotId AND ar.StudentId=r.StudentId)
             ORDER BY r.Id,ts.SortOrder;
             """;
