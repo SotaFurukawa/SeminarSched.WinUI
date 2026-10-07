@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-07（checkpoint153）
+最終更新: 2026-10-07（checkpoint154）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -15,9 +15,35 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 →`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-<version>.exe`）は
 例外なく毎回実行すること。
 
-Current Version: `v0.29.1 (beta)`（Draft Release作成予定。時間割編集の講師列の並び替えと、
-アンケート取込の受講希望一覧の列幅・ずれ修正の2件。checkpoint153を参照）
-Latest Development Checkpoint: checkpoint 153（ユーザーから2件の要望。①時間割編集で、その日にちで
+Current Version: `v0.29.2 (beta)`（Draft Release作成予定。「少し時間を要しています」警告の
+表示条件を、経過時間と進捗割合の比較ベースへ変更する1件。checkpoint154を参照）
+Latest Development Checkpoint: checkpoint 154（ユーザーからの要望：「少し時間を要しています」の
+画面は、所要時間の想定の最大値の66%が経過したときに、進捗が66%を超えていないときに表示してほしい。
+また、これ以降は、所要時間と進捗割合を比較して、進捗割合が所要時間を超えていない場合に表示する
+ようにしてほしい、という指摘だった。
+
+**「少し時間を要しています」警告の表示条件変更:** `OptimizationPage.xaml.cs`の`RefreshRunUi`は
+従来、ソルバー側の`OptimizationProgress.IsExtending`（名目時間を100%使い切った後の延長フェーズ
+中かどうかを示すbool、`ScheduleOptimizer`が設定）だけを見て`ExtendingInfoBar.IsOpen`を決めて
+いたため、警告が出るタイミングがかなり遅かった（名目時間を完全に使い切るまで一切出ない）。
+`OptimizationRunState.MaximumDuration`（品質プロファイルの名目時間の上限）に対する経過時間の
+割合（elapsedRatio = elapsed ÷ MaximumDuration）を計算し、「elapsedRatioが66%に達して以降、
+現在の進捗割合（percent/100）がそのelapsedRatioを下回っている間」warningを表示するよう変更した。
+elapsedRatioは時間経過とともに66%から連続的に増え続けるため、「66%時点でのちょうど66%という
+固定比較」と「それ以降の動的な比較」を同じ1つの式（`elapsedRatio>=0.66 && percent/100<elapsedRatio`）
+でまかなえる。ソルバー側の`IsExtending`フラグ自体（および`OptimizationStageKind.Extension`・
+`ScheduleRunSummary.WasExtended`）は、名目時間を使い切っても未完成な場合に実際に延長探索を行う
+という本来の動作にはそのまま使われ続けており、削除していない（今回変更したのはWinUI側の表示
+判定だけ）。
+
+**検証:** 既存の全テスト（計256件）がすべて通過することを確認済み。バックエンド（`ScheduleOptimizer`・
+`OptimizationProgress`）には手を入れていないため`SeminarSched.Optimization.Tests`への影響は無い。
+表示タイミングについては、ビルド成功とコードレベルの確認のみ行い、実機（dev-run）での画面確認は
+このcheckpointでも行っていない（引き続き、ユーザー自身による目視確認を依頼する必要がある）。
+UI挙動の修正のためpatchを上げてv0.29.2とした。詳細は
+[docs/releases/v0.29.2.md](releases/v0.29.2.md)。
+
+checkpoint 153（ユーザーから2件の要望。①時間割編集で、その日にちで
 生徒が配置されている講師を左詰めにしてほしい。②アンケート取込の受講希望一覧で、まだ隙間が大きすぎる
 （特に学年と生徒氏名の幅）。カーソルを合わせたときに右に出てくる「変更」「削除」ボタンにより、
 列が左へ押されてずれてしまう。幅を確認してほしい、という指摘だった。

@@ -250,7 +250,20 @@ public sealed partial class OptimizationPage : WorkflowPageBase
             RunStageText.Text = !running ? "完了しました。"
                 : OptimizationRunState.IsPaused ? $"一時停止中（{stageLabel}：{strategyLabel}）"
                 : $"{stageLabel}：{strategyLabel}（{progress.StrategiesCompleted}/{progress.StrategiesTotal}戦略）";
-            ExtendingInfoBar.IsOpen = running && progress.IsExtending;
+            // ユーザー要望（checkpoint154）「少し時間を要していますの画面は、所要時間の想定の最大値の
+            // 66%が経過したときに、進捗が66%を超えていないときに表示してください。これ以降は、所要
+            // 時間と進捗割合を比較して、進捗割合が所要時間を超えていない場合に表示するように」への
+            // 対応。従来はソルバー側のIsExtending（名目時間を100%使い切った後の延長フェーズ中か）
+            // だけを見ていたため、警告が出るのがかなり遅かった。経過時間の想定最大値
+            // （OptimizationRunState.MaximumDuration、品質プロファイルの名目上限）に対する経過割合
+            // （elapsedRatio）を計算し、これが66%に達して以降、現在の進捗割合（percent/100）が
+            // その時点のelapsedRatioを下回っている間ずっと表示し続ける（elapsedRatioは時間が進むに
+            // つれ66%から連続的に増えていくため、「66%時点での固定比較」と「それ以降の動的な比較」を
+            // 同じ1つの式でまかなえる）。
+            var elapsedRatio = OptimizationRunState.MaximumDuration > TimeSpan.Zero
+                ? elapsed.TotalSeconds / OptimizationRunState.MaximumDuration.TotalSeconds
+                : 0.0;
+            ExtendingInfoBar.IsOpen = running && elapsedRatio >= 0.66 && percent / 100.0 < elapsedRatio;
         }
 
         var outcome = OptimizationRunState.ConsumeLastOutcome();
