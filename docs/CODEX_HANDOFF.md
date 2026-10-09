@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-08（checkpoint156）
+最終更新: 2026-10-09（checkpoint157）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -15,9 +15,37 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 →`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-<version>.exe`）は
 例外なく毎回実行すること。
 
-Current Version: `v0.31.0 (beta)`（Draft Release作成予定。集団授業と個別指導の間の空き時間の
-最小値を、講師側・生徒側で別々に設定できるようにする1件。checkpoint156を参照）
-Latest Development Checkpoint: checkpoint 156（ユーザーからの要望：「集団授業と個別指導の間の
+Current Version: `v0.31.1 (beta)`（Draft Release作成予定。生徒・講師等の一覧行でホバー時に行が
+伸縮してズレる不具合の修正。checkpoint157を参照）
+Latest Development Checkpoint: checkpoint 157（ユーザー報告「生徒の行にカーソルを合わせたときに、
+少し上にズレる仕様がありますが、そうではなくその枠を少し濃いグレーに変えて、ずれをなくすことは
+できますか」。
+
+**原因:** `SetupPage.xaml`（生徒・講師・通常授業担当設定・科目の4タブ）・`ImportPage.xaml`
+（受講希望一覧）の行は、ホバー時だけ「変更」「削除」ボタン（`ChangeDeletePanel`/`ChangeButton`）を
+`Visibility="Collapsed"→"Visible"`で表示する作り（checkpoint142・148）。これらのボタンは既定の
+WinUIボタン（高さ約32px以上）で、通常のTextBlock（高さ約20px）より背が高いため、ホバーでボタンが
+現れるたびに、そのボタンを含むAuto列の必要な高さが増え、行（表示用Grid）自体のAuto高さが
+伸び縮みしていた。これが「カーソルを合わせると少し上にズレる」という報告の原因（行が伸びる際、
+後続の行も含めてリスト全体が再レイアウトされ、視覚的にズレて見える）。
+
+**対応:** 5箇所すべての表示用Gridに`Height="36"`を固定で設定し、ホバーの有無に関わらず行の高さが
+一切変化しないようにした。見た目のホバーの合図は、`VisualTreeHelpers`に新設した
+`SetRowHoverBackground`（黒の半透明オーバーレイ`#1A000000`相当、ライト/ダークどちらのテーマでも
+「常に今より少し暗くなる」ため個別のThemeResource切り替えが不要）で、表示用Grid自身の
+`Background`をホバー中だけ少し濃いグレーへ切り替えることで代替した（ボタンの表示/非表示切り替え
+自体はそのまま維持）。生徒・講師・通常授業担当設定・科目（SetupPage）・受講希望一覧（ImportPage）の
+5箇所すべてに同じ対応を適用した（ユーザー報告は生徒の行についてだったが、同じ仕組みを使う他の
+一覧も同じ不具合を抱えていたため、一括で修正した）。探索の方針（▲▼の小さいボタン、
+`PolicyRow_PointerEntered`）は、ボタン自体が既にFontSize10・Padding「6,2」の小型スタイルで
+TextBlockと高さがほぼ変わらないため対象外とした。
+
+**検証:** 既存の全テスト（計263件）がすべて通過することを確認済み（このcheckpointはUIの見た目
+だけの修正のため新規テストは追加していない）。実機（dev-run）での画面確認はこのcheckpointでも
+行っていない（引き続き、ユーザー自身による目視確認を依頼する必要がある）。UI修正のためpatchを
+上げてv0.31.1とした。詳細は[docs/releases/v0.31.1.md](releases/v0.31.1.md)。
+
+checkpoint 156（ユーザーからの要望：「集団授業と個別指導の間の
 空き時間の最小値について、講師側と生徒側で分けてほしい」という指摘だった。
 
 **講師側・生徒側の分離（設計の背景）:** checkpoint155で追加した`MinGapMinutes`は、担当講師

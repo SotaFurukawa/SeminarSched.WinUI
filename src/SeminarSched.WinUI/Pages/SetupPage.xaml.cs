@@ -367,12 +367,23 @@ public sealed partial class SetupPage : WorkflowPageBase
     private void SubjectRow_PointerEntered(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, true);
     private void SubjectRow_PointerExited(object sender, PointerRoutedEventArgs e) => SetChangeButtonVisible((Grid)sender, false);
 
-    private static void SetChangeButtonVisible(Grid displayRow, bool visible) => VisualTreeHelpers.SetNamedChildVisible(displayRow, "ChangeButton", visible);
+    private static void SetChangeButtonVisible(Grid displayRow, bool visible)
+    {
+        VisualTreeHelpers.SetNamedChildVisible(displayRow, "ChangeButton", visible);
+        VisualTreeHelpers.SetRowHoverBackground(displayRow, visible);
+    }
 
     // ユーザー要望（checkpoint148）「変更の右に削除を入れてほしい」への対応。生徒・講師タブは
     // 変更・削除の2ボタンをStackPanel（x:Name="ChangeDeletePanel"、ImportPageの受講希望一覧と
     // 同じ命名）へまとめたため、SetChangeButtonVisibleとは別の名前でホバー表示を切り替える。
-    private static void SetActionPanelVisible(Grid displayRow, bool visible) => VisualTreeHelpers.SetNamedChildVisible(displayRow, "ChangeDeletePanel", visible);
+    // ユーザー報告「生徒の行にカーソルを合わせたときに、少し上にズレる」への対応で、ホバー時の
+    // 合図としてVisualTreeHelpers.SetRowHoverBackgroundも合わせて呼ぶようにした（行の高さ自体は
+    // XAML側でHeightを固定し、伸縮しないようにした）。
+    private static void SetActionPanelVisible(Grid displayRow, bool visible)
+    {
+        VisualTreeHelpers.SetNamedChildVisible(displayRow, "ChangeDeletePanel", visible);
+        VisualTreeHelpers.SetRowHoverBackground(displayRow, visible);
+    }
 
     // ユーザー要望（checkpoint142）「それを押すと、生徒一覧の最下部に移動する」への対応。この
     // ページのListView（生徒・講師・科目）は、外側のページ全体を包むScrollViewer内のStackPanelに

@@ -208,8 +208,16 @@ public sealed partial class ImportPage : WorkflowPageBase
         ApplyLessonRequestFilter();
     }
 
-    private void LessonRequestRow_PointerEntered(object sender, PointerRoutedEventArgs e) => VisualTreeHelpers.SetNamedChildVisible((Grid)sender, "ChangeDeletePanel", true);
-    private void LessonRequestRow_PointerExited(object sender, PointerRoutedEventArgs e) => VisualTreeHelpers.SetNamedChildVisible((Grid)sender, "ChangeDeletePanel", false);
+    private void LessonRequestRow_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        VisualTreeHelpers.SetNamedChildVisible((Grid)sender, "ChangeDeletePanel", true);
+        VisualTreeHelpers.SetRowHoverBackground((Grid)sender, true);
+    }
+    private void LessonRequestRow_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        VisualTreeHelpers.SetNamedChildVisible((Grid)sender, "ChangeDeletePanel", false);
+        VisualTreeHelpers.SetRowHoverBackground((Grid)sender, false);
+    }
 
     // ユーザー要望（checkpoint142）「受講希望一覧の『選択した行を削除』は、行にカーソルを合わせたら
     // 『変更』の隣に『削除』も表示」への対応（ユーザー確認済み）。削除は取り消せないため、

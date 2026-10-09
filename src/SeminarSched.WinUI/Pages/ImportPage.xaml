@@ -63,7 +63,12 @@
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="local:LessonRequestRowViewModel">
                     <Grid Padding="4">
-                        <Grid ColumnSpacing="6" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="LessonRequestRow_PointerEntered" PointerExited="LessonRequestRow_PointerExited">
+                        <!-- ユーザー報告「生徒の行にカーソルを合わせたときに、少し上にズレる」への対応。
+                             ChangeDeletePanelのボタンはTextBlockより背が高いため、ホバーで表示される
+                             たびにAuto列の必要な高さが増え、行自体の高さが伸び縮みしていた。Heightを
+                             固定してこの伸縮自体を無くし、代わりにVisualTreeHelpers.SetRowHoverBackground
+                             でBackgroundを少し濃いグレーへ切り替える。 -->
+                        <Grid Height="36" ColumnSpacing="6" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="LessonRequestRow_PointerEntered" PointerExited="LessonRequestRow_PointerExited">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="55"/><ColumnDefinition Width="110"/><ColumnDefinition Width="55"/><ColumnDefinition Width="90"/><ColumnDefinition Width="45"/><ColumnDefinition Width="35"/><ColumnDefinition Width="105"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="92"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <TextBlock Text="{x:Bind StudentName, Mode=OneWay}" TextTrimming="CharacterEllipsis"/>
                             <TextBlock Grid.Column="1" Text="{x:Bind Grade, Mode=OneWay}" HorizontalAlignment="Center" TextAlignment="Center"/>

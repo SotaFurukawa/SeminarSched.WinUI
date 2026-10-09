@@ -42,7 +42,13 @@
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="local:StudentRowViewModel">
                             <Grid Padding="4">
-                                <Grid ColumnSpacing="8" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="StudentRow_PointerEntered" PointerExited="StudentRow_PointerExited">
+                                <!-- ユーザー報告「生徒の行にカーソルを合わせたときに、少し上にズレる」への対応。
+                                     ChangeDeletePanelのボタンはTextBlockより背が高いため、ホバーで表示
+                                     されるたびにAuto列の必要な高さが増え、行自体の高さが伸び縮みして
+                                     いた。Heightを固定してこの伸縮自体を無くし、代わりに
+                                     VisualTreeHelpers.SetRowHoverBackground（SetActionPanelVisible経由）
+                                     でBackgroundを少し濃いグレーへ切り替える。 -->
+                                <Grid Height="36" ColumnSpacing="8" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="StudentRow_PointerEntered" PointerExited="StudentRow_PointerExited">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="110"/><ColumnDefinition Width="110"/><ColumnDefinition Width="100"/><ColumnDefinition Width="110"/><ColumnDefinition Width="90"/><ColumnDefinition Width="80"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="{x:Bind ExternalIdText, Mode=OneWay}"/>
                                     <TextBlock Grid.Column="1" Text="{x:Bind Value.FamilyName, Mode=OneWay}"/>
@@ -82,7 +88,7 @@
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="local:TeacherRowViewModel">
                             <Grid Padding="4">
-                                <Grid ColumnSpacing="8" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="TeacherRow_PointerEntered" PointerExited="TeacherRow_PointerExited">
+                                <Grid Height="36" ColumnSpacing="8" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="TeacherRow_PointerEntered" PointerExited="TeacherRow_PointerExited">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="110"/><ColumnDefinition Width="110"/><ColumnDefinition Width="90"/><ColumnDefinition Width="80"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="{x:Bind ExternalIdText, Mode=OneWay}"/>
                                     <TextBlock Grid.Column="1" Text="{x:Bind Value.FamilyName, Mode=OneWay}"/>
@@ -161,7 +167,7 @@
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="local:RegularLessonRowViewModel">
                             <Grid Padding="4">
-                                <Grid ColumnSpacing="8" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="RegularLessonRow_PointerEntered" PointerExited="RegularLessonRow_PointerExited">
+                                <Grid Height="36" ColumnSpacing="8" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="RegularLessonRow_PointerEntered" PointerExited="RegularLessonRow_PointerExited">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="140"/><ColumnDefinition Width="160"/><ColumnDefinition Width="80"/><ColumnDefinition Width="80"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="{x:Bind StudentName, Mode=OneWay}"/>
                                     <TextBlock Grid.Column="1" Text="{x:Bind SubjectName, Mode=OneWay}"/>
@@ -333,7 +339,7 @@
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="local:SubjectRowViewModel">
                             <Grid Padding="4">
-                                <Grid ColumnSpacing="8" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="SubjectRow_PointerEntered" PointerExited="SubjectRow_PointerExited">
+                                <Grid Height="36" ColumnSpacing="8" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="SubjectRow_PointerEntered" PointerExited="SubjectRow_PointerExited">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="130"/><ColumnDefinition Width="180"/><ColumnDefinition Width="80"/><ColumnDefinition Width="120"/><ColumnDefinition Width="80"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="{x:Bind Value.SortOrder, Mode=OneWay}"/>
                                     <TextBlock Grid.Column="1" Text="{x:Bind Value.Code, Mode=OneWay}"/>

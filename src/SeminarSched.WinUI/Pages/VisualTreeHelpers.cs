@@ -1,6 +1,8 @@
+using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Windows.UI;
 
 namespace SeminarSched_WinUI.Pages;
 
@@ -38,4 +40,18 @@ internal static class VisualTreeHelpers
         if (container.Children.OfType<FrameworkElement>().FirstOrDefault(c => c.Name == name) is { } element)
             element.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
     }
+
+    // ユーザー報告「生徒の行にカーソルを合わせたときに、少し上にズレる」への対応。原因は、
+    // ChangeDeletePanel（またはChangeButton）のボタンがTextBlockより背が高いため、ホバーで
+    // Visibility=Visibleへ切り替わるたびにAuto列の必要な高さが増え、行（Grid）自体の高さが
+    // 伸び縮みしていたこと。SetupPage.xaml／ImportPage.xaml側で表示用Gridに固定のHeightを
+    // 設定し行の伸縮自体を無くした上で、ホバーの合図としてこのGridのBackgroundを少し濃い
+    // グレーへ切り替える（「ずれをなくして、枠を少し濃いグレーに変える」というユーザー要望への
+    // 対応）。テーマに関わらず常に「今より少し暗くなる」ことだけが目的のため、黒の半透明
+    // オーバーレイを使う（ThemeResourceの明暗切り替えを気にせず済む）。
+    private static readonly SolidColorBrush RowHoverBackground = new(Color.FromArgb(26, 0, 0, 0));
+    private static readonly SolidColorBrush RowHoverTransparent = new(Colors.Transparent);
+
+    public static void SetRowHoverBackground(Panel displayRow, bool hovered) =>
+        displayRow.Background = hovered ? RowHoverBackground : RowHoverTransparent;
 }
