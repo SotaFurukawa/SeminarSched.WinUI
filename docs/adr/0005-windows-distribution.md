@@ -1,7 +1,9 @@
 # ADR 0005: Windows配布方式
 
 - Status: Accepted for v0.1.0。v0.3.1でSetup.exeラッパー方式を追記（Amended 2026-09-20）。
-  v0.13.2でPackage.appxmanifestのバージョン同期漏れを追記（Amended 2026-09-28）
+  v0.13.2でPackage.appxmanifestのバージョン同期漏れを追記（Amended 2026-09-28）。
+  v1.0.1でCurrentUser\TrustedPeopleが不十分だった件を追記・PrivilegesRequiredをadminへ変更
+  （Amended 2026-10-13）
 - Date: 2026-09-17
 
 ## Decision
@@ -15,9 +17,14 @@
   - `New-SigningCertificate.ps1` — 証明書が無ければ生成し、`.pfx`（ローカルのみ）と`.cer`（`dist\`）を作る。既にあれば再利用する。
   - `New-MsixPackage.ps1` — 証明書を`Cert:\CurrentUser\My`から（無ければ`.pfx`から再import して）取得し、そのthumbprintで`dotnet build -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=true -p:PackageCertificateThumbprint=... -p:UapAppxPackageBuildMode=SideloadOnly`を実行して署名付き`.msix`を作る。
 
-## 利用者側のインストール手順
+## 利用者側のインストール手順（v1.0.1以降、Setup.exe経由）
 
-初回のみ、管理者権限で1回だけ証明書を信頼させる必要がある（`Add-AppxPackage`はマシン単位の信頼ストアを見るため、`CurrentUser\TrustedPeople`や`CurrentUser\Root`だけでは不足することを実機で確認した）。
+v1.0.1以降、Setup.exeは管理者権限を要求し（`PrivilegesRequired=admin`、Windows起動時にUAC
+プロンプトが出る）、内部で証明書を`LocalMachine\TrustedPeople`へ自動登録してからインストールする
+ため、利用者が手動で`certutil`等を実行する必要はない。UACプロンプトで「はい」を選ぶだけでよい
+（詳細は本ページ末尾のAmendment参照）。
+
+## （参考）Setup.exeを使わず手動でインストールする場合の手順
 
 1. 設定 → システム → 開発者向け → 「開発者モード」を有効化（既存の手順のまま）。
 2. 管理者としてPowerShellまたはコマンドプロンプトを開き、以下を実行する:
@@ -78,3 +85,32 @@
 - **実機確認:** 開発機の`dotnet run`由来の開発モード登録を削除した上で、修正後にビルドした
   v0.13.2の`.msix`を`Add-AppxPackage`し、`Get-AppxPackage`でVersionが正しく`0.13.2.0`になって
   いることを確認した。
+
+## Amendment（v1.0.1、2026-10-13）: CurrentUser\TrustedPeopleでは不十分だったことの確定
+
+v1.0.0をユーザーの明示指示により公開Release（Draftではない）としてGitHubへ公開した直後、ユーザーが
+開発機とは別のWindows PCでSetup.exeを実行したところ、`PrivilegesRequired=lowest`のまま
+インストールに失敗し、`Install-Package.ps1`が書き出すログに次の内容が記録された:
+
+```
+次の HRESULT で展開に失敗しました: 0x800B0109、証明書チェーンは処理されましたが、信頼プロバイダーが
+信頼していないルート証明書で強制終了しました。
+```
+
+これは本ADR冒頭および「Amendment（v0.3.1）」で繰り返し記載していた「未解決の疑問」
+（`CurrentUser\TrustedPeople`だけで`Add-AppxPackage`の信頼として足りるかどうかを、この証明書を
+一度も信頼していない機体で切り分け検証できていなかった）に、初めて実際の答えが出た事例である。
+
+- **切り分け:** ユーザーに、対象PCで「設定 → プライバシーとセキュリティ → 開発者向け →
+  開発者モード」を有効化した上で再度Setup.exeを実行してもらったが、同じエラーのまま変化しなかった。
+  これにより、原因がDeveloper Mode未有効化ではなく、`CurrentUser\TrustedPeople`への登録そのものが
+  `Add-AppxPackage`の信頼として不足していることが確定した（ADR冒頭の「検証状況」に記載のあった
+  当初の懸念が正しかったことになる）。
+- **対応:** `installer\SeminarSched.WinUI.iss`の`PrivilegesRequired`を`lowest`から`admin`へ変更し、
+  `installer\Install-Package.ps1`の`Import-Certificate -CertStoreLocation`を`Cert:\CurrentUser\
+  TrustedPeople`から`Cert:\LocalMachine\TrustedPeople`へ変更した。これにより、Setup.exe実行時に
+  UACプロンプトが表示されるようになる（「管理者権限不要」という従来の利点は失われるが、
+  インストールが実際に成立することを優先した）。
+- **未検証:** この修正版（v1.0.1）を、実際に問題が発生した別PCで再度実行してインストールが成功する
+  ことは、本Amendment記載時点ではまだ確認できていない。次にこの対応を引き継ぐ場合、まずこの確認を
+  優先すること。

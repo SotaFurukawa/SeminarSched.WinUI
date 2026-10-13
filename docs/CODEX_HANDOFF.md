@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-13（checkpoint160）
+最終更新: 2026-10-13（checkpoint161）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -15,9 +15,37 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 →`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-<version>.exe`）は
 例外なく毎回実行すること。
 
-Current Version: `v1.0.0`（Publicに公開するRelease。開発版表記「-beta」を外した最初の正式版。
-checkpoint160を参照）
-Latest Development Checkpoint: checkpoint 160（ユーザーからの明示指示：「ありがとう。今回完成品
+Current Version: `v1.0.1`（Publicに公開するRelease。v1.0.0公開直後に判明したインストーラーの
+不具合を修正。checkpoint161を参照）
+Latest Development Checkpoint: checkpoint 161（v1.0.0を公開した直後、ユーザーが開発機とは別の
+Windows PCでSetup.exeを実行したところ「エラーコード1」で失敗。調査の結果、
+`%TEMP%\SeminarSched.WinUI-install-error.log`に記録された実際の原因は次のとおりだった:
+
+```
+次の HRESULT で展開に失敗しました: 0x800B0109、証明書チェーンは処理されましたが、信頼プロバイダーが
+信頼していないルート証明書で強制終了しました。
+```
+
+**原因（docs/adr/0005-windows-distribution.mdのAmendment v1.0.1に詳細を記録済み）:**
+`installer\Install-Package.ps1`は、同梱の`.cer`を`Cert:\CurrentUser\TrustedPeople`へ登録してから
+`Add-AppxPackage`していたが、この登録先だけでは信頼として不足しており、この証明書を一度も信頼
+していない機体では`Add-AppxPackage`が失敗する。これは本ADRの冒頭（2026-09-17時点）から
+「未解決の疑問」として記載されていた懸念（`CurrentUser\TrustedPeople`だけで足りるかどうかを
+クリーンな機体で切り分け検証できていなかった）が、v1.0.0の公開によって初めて実際に露呈した
+形になる。ユーザーに対象PCで「設定→開発者向け→開発者モード」を有効化してもらってから再試行
+してもらったが変化せず、Developer Mode未有効化が原因ではないことも切り分けた。
+
+**対応:** `installer\SeminarSched.WinUI.iss`の`PrivilegesRequired`を`lowest`から`admin`へ変更し、
+`installer\Install-Package.ps1`の証明書登録先を`Cert:\LocalMachine\TrustedPeople`へ変更した
+（登録に管理者権限が必要なため、Setup.exe実行時にUACプロンプトが表示されるようになる。
+「管理者権限不要」という従来の利点はこの修正でトレードオフとして失われる）。`README.md`の
+インストール手順の記載も合わせて更新した。
+
+**未検証:** この修正版（v1.0.1）を、実際に問題が発生した別PCで再度実行してインストールが成功する
+ことは、本checkpoint時点ではまだ確認できていない。次にこの対応を引き継ぐ場合、まずこの確認を
+優先すること。
+
+checkpoint 160（ユーザーからの明示指示：「ありがとう。今回完成品
 として一度提出するので、V1.0.0としてリリース。また、ドラフトではなく、完全に見えるようにして
 ください。」）
 

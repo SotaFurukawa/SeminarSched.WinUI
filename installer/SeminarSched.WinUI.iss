@@ -1,9 +1,16 @@
 ; Python版(seminarSched)のinstaller\SummerCourseScheduler.issと同じ体裁(日本語ウィザード、
-; 管理者権限不要、任意のデスクトップアイコン、インストール後に起動)を踏襲した、MSIXサイドロードの
-; ラッパーインストーラ。実体はPackage.appxmanifestで定義された署名済み.msixであり、Setup.exeは
-; 「.cerをCurrentUser\TrustedPeopleへ信頼登録 → Add-AppxPackageでインストール」を裏側で行う。
-; CurrentUserストアへの登録・per-userインストールはいずれも管理者権限なしで動作することを
-; 実機で確認済み（PrivilegesRequired=lowestが成立する）。
+; 任意のデスクトップアイコン、インストール後に起動)を踏襲した、MSIXサイドロードのラッパー
+; インストーラ。実体はPackage.appxmanifestで定義された署名済み.msixであり、Setup.exeは
+; 「.cerをLocalMachine\TrustedPeopleへ信頼登録 → Add-AppxPackageでインストール」を裏側で行う。
+; ユーザー報告（v1.0.0公開直後、別マシンでの実機インストールで判明。docs/adr/0005-windows-
+; distribution.mdのAmendment参照）: CurrentUser\TrustedPeopleへの登録だけでは
+; Add-AppxPackageが証明書を信頼せず「0x800B0109 証明書チェーンは処理されましたが、信頼
+; プロバイダーが信頼していないルート証明書で強制終了しました」で失敗することが、この
+; プロジェクトで初めて検証が取れたクリーンな実機で確認された（ADR 0005に以前から記載が
+; あった「CurrentUserだけでは不足する見込み」という未検証の懸念が的中した）。
+; LocalMachine\TrustedPeopleへの登録には管理者権限が必要なため、PrivilegesRequiredをadminへ
+; 変更した（以前の「管理者権限不要」という設計上の利点は、この修正によりトレードオフとして
+; 失われる）。
 #define MyAppName "ShikiWari"
 #define MyAppPublisher "SotaFurukawa"
 #define MyIdentityName "F70149DC-0D08-4E3F-B67F-189A3A5E1C51"
@@ -34,7 +41,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={localappdata}\Programs\SeminarSched.WinUI
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-PrivilegesRequired=lowest
+PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0

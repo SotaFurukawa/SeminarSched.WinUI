@@ -22,7 +22,7 @@ dotnet test SeminarSched.WinUI.sln --configuration Release --no-build
 
 配布はMicrosoft Storeを使わないMSIXのサイドロードです（詳細は[ADR 0005](docs/adr/0005-windows-distribution.md)）。GitHub Releaseには`SeminarSched.WinUI-Setup-<version>.exe`（推奨）と、その中身である`.msix`/`.cer`を単独でも添付しています。
 
-- **利用者側（推奨）:** `SeminarSched.WinUI-Setup-<version>.exe`をダブルクリックする。証明書の信頼登録・インストールを自動で行い、Setup完了後にそのままアプリを起動できる。管理者権限は不要（Python版のPortable Setup同様`PrivilegesRequired=lowest`）。アンインストールは通常のWindowsアプリと同じく「アプリと機能」から行える。
+- **利用者側（推奨）:** `SeminarSched.WinUI-Setup-<version>.exe`をダブルクリックする。証明書の信頼登録・インストールを自動で行い、Setup完了後にそのままアプリを起動できる。実行時にUAC（管理者権限の確認）プロンプトが表示されるので「はい」を選ぶ（v1.0.1より。証明書をマシン全体の信頼ストアへ登録する必要があるため。詳細は[ADR 0005](docs/adr/0005-windows-distribution.md)のAmendment参照）。アンインストールは通常のWindowsアプリと同じく「アプリと機能」から行える。
 - 開発側（Setup.exeを作る場合）: `powershell -File scripts\New-Installer.ps1` を実行すると、必要なら先に`.msix`/`.cer`を生成した上で`dist\SeminarSched.WinUI-Setup-<version>.exe`を作る（内部的にInno Setupを`build\`配下へポータブル導入して使う。Python版と同じ`scripts\install_inno_setup_ci.ps1`方式）。
 - 上級者向け（Setup.exeを使わない場合）: `powershell -File scripts\New-MsixPackage.ps1` で`.msix`/`.cer`だけを生成し、`.cer`を`certutil -addstore -f TrustedPeople`等で信頼させた上で`.msix`を直接インストールすることもできる。
 

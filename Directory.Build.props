@@ -1,17 +1,20 @@
 <Project>
   <PropertyGroup>
     <!-- ユーザーの明示指示（「今回完成品として一度提出するので、V1.0.0としてリリース」）により、
-         AGENTS.mdの既定運用（開発版はv0.x.x、明示指示なしにv1.0.0へ上げない）を離れ、このversionを
-         v1.0.0として確定する。VersionSuffixを空にし、「-beta」の付かない正式versionにした。 -->
-    <VersionPrefix>1.0.0</VersionPrefix>
+         AGENTS.mdの既定運用（開発版はv0.x.x、明示指示なしにv1.0.0へ上げない）を離れ、v1.0.0を
+         確定した。VersionSuffixを空にし、「-beta」の付かない正式versionにした。
+         v1.0.1は、公開直後に判明したインストーラーの不具合（証明書の信頼登録先がCurrentUser\
+         TrustedPeopleのままでは不十分で、別マシンで0x800B0109エラーが発生）を修正したbug fix。
+         docs/adr/0005-windows-distribution.mdのAmendment（v1.0.1）参照。 -->
+    <VersionPrefix>1.0.1</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <AssemblyVersion>1.0.1.0</AssemblyVersion>
+    <FileVersion>1.0.1.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.0.0.0</AppxPackageVersion>
+    <AppxPackageVersion>1.0.1.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
