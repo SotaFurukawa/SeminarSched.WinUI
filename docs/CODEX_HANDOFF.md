@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-13（checkpoint159）
+最終更新: 2026-10-13（checkpoint160）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -15,9 +15,31 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 →`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-<version>.exe`）は
 例外なく毎回実行すること。
 
-Current Version: `v0.31.3 (beta)`（Draft Release作成予定。受講希望一覧の列幅再調整、可用性の
-手動編集の名称変更、設定のライセンス・アップデートボタンの位置調整の3件。checkpoint159を参照）
-Latest Development Checkpoint: checkpoint 159（ユーザーから3件の要望。①受講希望一覧について
+Current Version: `v1.0.0`（Publicに公開するRelease。開発版表記「-beta」を外した最初の正式版。
+checkpoint160を参照）
+Latest Development Checkpoint: checkpoint 160（ユーザーからの明示指示：「ありがとう。今回完成品
+として一度提出するので、V1.0.0としてリリース。また、ドラフトではなく、完全に見えるようにして
+ください。」）
+
+**v1.0.0への格上げ（AGENTS.mdの例外対応）:** AGENTS.mdの既定運用は「開発版はv0.x.xとし、ユーザーの
+明示指示なしにv1.0.0へ上げない」「ユーザーの明示指示なしにReleaseを公開しない。開発中は必ずDraft
+とする」の2点だが、どちらも今回ユーザーから明示の指示があったため、例外として適用した。
+`Directory.Build.props`の`VersionPrefix`を`1.0.0`、`VersionSuffix`を空文字列へ変更し（これまで
+`$(VersionPrefix)-$(VersionSuffix)`で固定結合していた`Version`を、VersionSuffixが空なら
+ハイフン無しになるよう条件分岐へ変更した。今後ベータ開発へ戻す場合はVersionSuffixへ"beta"等を
+戻すだけでよい）、`RepositoryPolicyTests`のバージョン一致テストも合わせて更新した。GitHub
+Releaseは`--draft`を付けずに作成し、公開状態（Draftではない）にした。
+
+**重要（このcheckpointでの申し送り）: v1.0.0としてリリースしたこのversionまで、
+checkpoint152（v0.29.0）以降のすべてのUI変更・新機能（集団授業の空き時間設定、入れ替え提案機能、
+行の取消ボタン、各種列幅・文言調整等）は、ビルド成功とユニットテストの通過のみで確認しており、
+実機（dev-run）での目視確認を一度も行っていない。** ユーザーから「完成品として提出する」という
+明示指示を受けて今回v1.0.0として公開したが、これは開発側の判断ではなく、ユーザー自身の判断で
+あることを明記しておく。次にこのプロジェクトを引き継ぐ場合、実機での動作確認（特に集団授業の
+空き時間設定・入れ替え提案・設定画面のボタン位置など、見た目に関わる変更）を優先的に行うことを
+推奨する。
+
+checkpoint 159（ユーザーから3件の要望。①受講希望一覧について
 「やはりまだ生徒氏名と学年の隙間が空きすぎている。科目名も長いものがあるせいで右側にスペースが
 なくなっている。生徒氏名の横幅は今の半分くらい、科目名も同様に半分くらいにして、あふれる場合は
 『...』で表示」。②「可用性の手動編集」を「出席・出勤不可日程の編集」という名前に変更。③設定の

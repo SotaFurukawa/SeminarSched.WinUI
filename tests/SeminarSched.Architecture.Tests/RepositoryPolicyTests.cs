@@ -6,13 +6,16 @@ public sealed class RepositoryPolicyTests
 {
     private static readonly string RepositoryRoot = FindRepositoryRoot();
 
+    // ユーザーの明示指示により、このcheckpointでv1.0.0（VersionSuffix無し）としてリリースした。
+    // 以前はテスト名・アサーションとも「ベータ版の値と一致するか」だけを見ていたが、v1.0.0では
+    // VersionSuffixが空文字列になるため、それに合わせて更新した。
     [Fact]
-    public void CentralVersion_IsCurrentBetaVersion()
+    public void CentralVersion_MatchesCurrentRelease()
     {
         var document = XDocument.Load(Path.Combine(RepositoryRoot, "Directory.Build.props"));
 
-        Assert.Equal("0.31.3", document.Descendants("VersionPrefix").Single().Value);
-        Assert.Equal("beta", document.Descendants("VersionSuffix").Single().Value);
+        Assert.Equal("1.0.0", document.Descendants("VersionPrefix").Single().Value);
+        Assert.Equal("", document.Descendants("VersionSuffix").Single().Value);
     }
 
     // ユーザー報告バグ修正（checkpoint113）: Package.appxmanifestのIdentity/Versionは単なる静的な
