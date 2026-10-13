@@ -19,8 +19,12 @@ public sealed class SharedRosterStoreTests : IDisposable
         Assert.True(File.Exists(path));
         using (var workbook = new XLWorkbook(path))
         {
-            Assert.Equal(["生徒", "講師", "科目", "講師対応科目", "通常授業"], workbook.Worksheets.Select(sheet => sheet.Name));
-            Assert.Equal(1, workbook.Worksheet("生徒").LastRowUsed()?.RowNumber());
+            Assert.Equal(["生徒", "講師", "科目", "講師対応科目", "通常授業", "_入力補助"], workbook.Worksheets.Select(sheet => sheet.Name));
+            Assert.Equal(XLWorksheetVisibility.VeryHidden, workbook.Worksheet("_入力補助").Visibility);
+            // ユーザー指示により、空白の新規作成テンプレートでも在籍チェック・ID自動入力・氏名確認・
+            // 既定値の数式をPython版・実運用ファイルと同じ1000行分あらかじめ用意するため、
+            // データが無くてもLastRowUsedは1000行目になる。
+            Assert.Equal(1000, workbook.Worksheet("生徒").LastRowUsed()?.RowNumber());
         }
 
         // Simulate the user editing the file; EnsureWorkbookAsync must not clobber it on a second call.
@@ -153,7 +157,10 @@ public sealed class SharedRosterStoreTests : IDisposable
         Assert.True(regular.Cell(3, 1).HasDataValidation); // まだ値の無い3行目にもドロップダウンがある
         Assert.True(regular.Cell(3, 2).HasFormula); // 3行目のIDは選択列から自動算出する数式
         Assert.Contains("MATCH", regular.Cell(3, 2).FormulaA1);
-        Assert.True(regular.Cell(3, 6).HasFormula); // 通常担当講師ID（任意）も同様
+        Assert.True(regular.Cell(3, 7).HasFormula); // 通常担当講師ID（任意、学年列が増えた分1列右へ移動）も同様
+        // ユーザー指示: 通常授業シートに生徒IDの隣（3列目）へ、その生徒の学年を表示する列を追加する。
+        Assert.True(regular.Cell(2, 3).HasFormula);
+        Assert.Contains("生徒", regular.Cell(2, 3).FormulaA1);
 
         var qualification = workbook.Worksheet("講師対応科目");
         Assert.True(qualification.Cell(2, 1).HasDataValidation);
