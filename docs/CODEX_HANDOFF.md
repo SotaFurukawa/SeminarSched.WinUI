@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-14（checkpoint164）
+最終更新: 2026-10-14（checkpoint165）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,9 +16,38 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.0.4`（Release・公開済み。「新規で基本情報を作成」の保存直後にExcelを自動的に
-開くようにしたUI微調整。checkpoint164参照）
-Latest Development Checkpoint: checkpoint 164（2件のユーザー指示。
+Current Version: `v1.1.0`（Release・公開済み。アップデート確認で新しいバージョンが見つかった場合、
+アプリ内からインストーラーを直接ダウンロード・起動する「アップデートを行う」ボタンへ置き換えた
+新機能。checkpoint165参照）
+Latest Development Checkpoint: checkpoint 165（ユーザー指示「今現状ではアップデートがあった場合、
+ダウンロードページへ誘導する形になりますが、自動的にアップデートを行うようにしたい。ダウンロード
+ページを開くのボタンを作るのではなく、アップデートを行うのボタンを作る感じで、それが押されたら
+自動的にアップデート。」への対応。
+
+**実装:** ADR0007（自動アップデート確認）の「Deferred: アプリ内からの自動ダウンロード・自動
+インストール」を実装した。詳細はdocs/adr/0007-auto-update-check.mdのAmendment（v1.1.0）を参照。
+要点のみ記す。
+- `GitHubReleaseParser.Parse`がGitHub Releases APIレスポンスの`assets[]`から拡張子`.exe`の資産
+  （Setup.exe）を探し、`UpdateCheckResult.InstallerDownloadUrl`として返すようにした。
+- 新しい`IUpdateInstaller`/`GitHubUpdateInstaller`が、そのURLを一時フォルダーへダウンロード
+  （進捗通知付き）し、`UseShellExecute=true`で起動する。Setup.exeは`PrivilegesRequired=admin`
+  のため起動時にWindowsが自動的にUACの昇格を要求し、その先のインストール（証明書信頼・この
+  アプリの強制終了・Add-AppxPackage）は既存のSetup.exe側の仕組み（`-ForceApplicationShutdown`）
+  がそのまま行う。
+- `SettingsPage`の「ダウンロードページを開く」ボタンを「アップデートを行う」へ置き換え、
+  `MainWindow`の週次自動チェックダイアログも同じ流れ（Deferralでダイアログを開いたまま進捗を
+  表示）に統一した。インストーラー資産が見つからない場合のみ、従来のブラウザでの
+  リリースページ表示へフォールバックする。
+
+**未検証:** 実際のダウンロード→UAC昇格→インストール完了までの一連の流れは、次に正式な公開
+releaseを跨いでアップデート通知を受け取る際に実機で確認する必要がある。本checkpoint時点では
+`GitHubReleaseParser`のURL抽出ロジックのユニットテストのみで検証しており、
+`GitHubUpdateInstaller`自体（実際のHTTP通信・プロセス起動）は`GitHubUpdateCheckService`と同様に
+直接のユニットテストを設けていない（本リポジトリの一貫した方針）。
+
+---
+
+checkpoint 164（2件のユーザー指示。
 ①「これからは毎回ドラフトリリースではなく、本番のリリースをしてください」:
 AGENTS.mdの「バージョンとRelease」節を更新し、「ユーザーの明示指示なしにReleaseを公開しない。
 開発中は必ずDraftとする」という既定を撤回し、以降は毎回公開（Publish）することを既定にした。

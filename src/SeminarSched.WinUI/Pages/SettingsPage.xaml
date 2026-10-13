@@ -54,7 +54,7 @@
                 <Button Grid.Row="2" Grid.Column="1" Margin="0,16,0,0" x:Name="CheckUpdateButton" Content="アップデートを確認" Click="CheckUpdate_Click" />
                 <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8">
                     <TextBlock x:Name="UpdateStatusTextBlock" MaxWidth="500" TextWrapping="Wrap" VerticalAlignment="Center" />
-                    <Button x:Name="OpenReleaseButton" Content="ダウンロードページを開く" Click="OpenRelease_Click" Visibility="Collapsed" />
+                    <Button x:Name="PerformUpdateButton" Content="アップデートを行う" Click="PerformUpdate_Click" Visibility="Collapsed" />
                 </StackPanel>
             </Grid>
         </StackPanel>

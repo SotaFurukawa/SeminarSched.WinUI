@@ -43,6 +43,33 @@ public static class GitHubReleaseParser
         var htmlUrl = root.TryGetProperty("html_url", out var urlProperty) ? urlProperty.GetString() : null;
         return UpdateCheckResult.Available(
             latest,
-            htmlUrl ?? $"https://github.com/SotaFurukawa/SeminarSched.WinUI/releases/tag/{tagName}");
+            htmlUrl ?? $"https://github.com/SotaFurukawa/SeminarSched.WinUI/releases/tag/{tagName}",
+            FindInstallerAssetUrl(root));
+    }
+
+    // Setup.exe（Inno Setup）資産を探す。ファイル名の規約（SeminarSched.WinUI-Setup-<version>.exe）を
+    // 決め打ちせず、拡張子が.exeの資産を探すことで、命名規則が将来変わっても壊れないようにする。
+    private static string? FindInstallerAssetUrl(JsonElement root)
+    {
+        if (!root.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        foreach (var asset in assets.EnumerateArray())
+        {
+            var name = asset.TryGetProperty("name", out var nameProperty) ? nameProperty.GetString() : null;
+            if (name is null || !name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (asset.TryGetProperty("browser_download_url", out var downloadUrlProperty))
+            {
+                return downloadUrlProperty.GetString();
+            }
+        }
+
+        return null;
     }
 }

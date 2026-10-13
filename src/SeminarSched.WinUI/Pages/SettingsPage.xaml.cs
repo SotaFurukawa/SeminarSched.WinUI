@@ -13,6 +13,7 @@ namespace SeminarSched_WinUI.Pages;
 public sealed partial class SettingsPage : Page
 {
     private string? _latestReleaseUrl;
+    private string? _latestInstallerDownloadUrl;
 
     public SettingsPage()
     {
@@ -58,7 +59,7 @@ public sealed partial class SettingsPage : Page
     private async void CheckUpdate_Click(object sender, RoutedEventArgs e)
     {
         CheckUpdateButton.IsEnabled = false;
-        OpenReleaseButton.Visibility = Visibility.Collapsed;
+        PerformUpdateButton.Visibility = Visibility.Collapsed;
         UpdateStatusTextBlock.Text = "確認しています…";
         try
         {
@@ -77,7 +78,8 @@ public sealed partial class SettingsPage : Page
             {
                 UpdateStatusTextBlock.Text = $"新しいバージョン（{result.LatestVersion.DisplayVersion}）が利用可能です。現在のバージョン: {currentVersion.DisplayVersion}";
                 _latestReleaseUrl = result.ReleaseUrl;
-                OpenReleaseButton.Visibility = Visibility.Visible;
+                _latestInstallerDownloadUrl = result.InstallerDownloadUrl;
+                PerformUpdateButton.Visibility = Visibility.Visible;
             }
             else
             {
@@ -90,11 +92,44 @@ public sealed partial class SettingsPage : Page
         }
     }
 
-    private async void OpenRelease_Click(object sender, RoutedEventArgs e)
+    // ユーザー指示（「ダウンロードページを開くボタンを作るのではなく、アップデートを行うボタンを
+    // 作る感じで、それが押されたら自動的にアップデート」）への対応。インストーラーをアプリ内で
+    // ダウンロードし、そのまま起動する。Setup.exeはPrivilegesRequired=adminのため、起動時に
+    // WindowsがUACの昇格プロンプトを表示する。その先のインストール本体（証明書信頼・このアプリの
+    // 強制終了・Add-AppxPackage）はSetup.exe側が行うため、起動後はユーザーの操作を待つだけでよい。
+    private async void PerformUpdate_Click(object sender, RoutedEventArgs e)
     {
-        if (_latestReleaseUrl is not null)
+        if (_latestInstallerDownloadUrl is null)
         {
-            await Windows.System.Launcher.LaunchUriAsync(new Uri(_latestReleaseUrl));
+            // インストーラー資産が見つからない場合の保険。通常はここへ来ない想定。
+            if (_latestReleaseUrl is not null)
+            {
+                UpdateStatusTextBlock.Text = "自動更新用のインストーラーが見つからなかったため、リリースページを開きます。";
+                await Windows.System.Launcher.LaunchUriAsync(new Uri(_latestReleaseUrl));
+            }
+            return;
+        }
+
+        PerformUpdateButton.IsEnabled = false;
+        CheckUpdateButton.IsEnabled = false;
+        try
+        {
+            var progress = new Progress<double>(ratio => UpdateStatusTextBlock.Text = $"ダウンロード中…（{ratio:P0}）");
+            var installerPath = await App.UpdateInstaller.DownloadAsync(_latestInstallerDownloadUrl, progress);
+            UpdateStatusTextBlock.Text = "インストーラーを起動しています…";
+            var started = App.UpdateInstaller.Launch(installerPath);
+            UpdateStatusTextBlock.Text = started
+                ? "インストーラーを起動しました。表示される画面の案内に従って更新を進めてください（このアプリは更新の途中で自動的に終了します）。"
+                : "インストーラーを起動できませんでした。";
+        }
+        catch (Exception exception) when (exception is IOException or HttpRequestException or TaskCanceledException or System.ComponentModel.Win32Exception)
+        {
+            UpdateStatusTextBlock.Text = $"アップデートに失敗しました: {exception.Message}";
+        }
+        finally
+        {
+            CheckUpdateButton.IsEnabled = true;
+            PerformUpdateButton.IsEnabled = true;
         }
     }
 }

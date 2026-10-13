@@ -5,14 +5,15 @@ public sealed record UpdateCheckResult(
     bool IsUpdateAvailable,
     ApplicationVersion? LatestVersion,
     string? ReleaseUrl,
+    string? InstallerDownloadUrl,
     string? ErrorMessage)
 {
-    public static UpdateCheckResult Failure(string errorMessage) => new(false, false, null, null, errorMessage);
+    public static UpdateCheckResult Failure(string errorMessage) => new(false, false, null, null, null, errorMessage);
 
-    public static UpdateCheckResult UpToDate() => new(true, false, null, null, null);
+    public static UpdateCheckResult UpToDate() => new(true, false, null, null, null, null);
 
-    public static UpdateCheckResult Available(ApplicationVersion latestVersion, string releaseUrl) =>
-        new(true, true, latestVersion, releaseUrl, null);
+    public static UpdateCheckResult Available(ApplicationVersion latestVersion, string releaseUrl, string? installerDownloadUrl) =>
+        new(true, true, latestVersion, releaseUrl, installerDownloadUrl, null);
 }
 
 public interface IUpdateCheckService

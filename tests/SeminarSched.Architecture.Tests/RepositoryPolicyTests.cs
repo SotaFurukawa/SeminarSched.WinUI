@@ -14,7 +14,7 @@ public sealed class RepositoryPolicyTests
     {
         var document = XDocument.Load(Path.Combine(RepositoryRoot, "Directory.Build.props"));
 
-        Assert.Equal("1.0.4", document.Descendants("VersionPrefix").Single().Value);
+        Assert.Equal("1.1.0", document.Descendants("VersionPrefix").Single().Value);
         Assert.Equal("", document.Descendants("VersionSuffix").Single().Value);
     }
 

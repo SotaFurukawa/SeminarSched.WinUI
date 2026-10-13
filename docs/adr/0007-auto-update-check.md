@@ -53,9 +53,41 @@ publicへ切り替え済みのため、GitHub Releases APIの読み取り専用�
 
 ## Deferred
 
-- アプリ内からの自動ダウンロード・自動インストール（サイドロードMSIXのため、現状は
-  ブラウザでダウンロードページを開くところまで。インストールはユーザー自身が行う）。
 - 実際に公開releaseを1件作成した後の、「アップデートが見つかった場合」のUIの実機確認
   （次に正式な公開リリースを行う際に確認する）。
 - レート制限対策（無認証のGitHub APIは60回/時/IPの制限があるが、週1回＋手動確認程度の
   頻度では問題にならない想定。必要になれば見直す）。
+
+## Amendment（v1.1.0、2026-10-14）: アプリ内からの自動ダウンロード・自動インストール
+
+当初Deferredとしていた「アプリ内からの自動ダウンロード・自動インストール」を実装した。
+ユーザー指示：「今現状ではアップデートがあった場合、ダウンロードページへ誘導する形になりますが、
+自動的にアップデートを行うようにしたい。ダウンロードページを開くのボタンを作るのではなく、
+アップデートを行うのボタンを作る感じで、それが押されたら自動的にアップデート。」
+
+- **`GitHubReleaseParser.Parse`** が、GitHub Releases APIレスポンスの`assets[]`から
+  拡張子`.exe`の資産（Setup.exe）を探し、その`browser_download_url`を
+  `UpdateCheckResult.InstallerDownloadUrl`として返すようにした（ファイル名の命名規則を
+  決め打ちにせず、拡張子だけで探すことで将来の命名変更に耐える）。
+- **新しい`IUpdateInstaller`**（`SeminarSched.Application.Updates`）を追加し、
+  `GitHubUpdateInstaller`（`SeminarSched.Infrastructure.Updates`）で実装した。
+  `DownloadAsync`が`InstallerDownloadUrl`を一時フォルダーへストリーミングダウンロードし
+  （`IProgress<double>`で進捗を通知）、`Launch`がダウンロードしたSetup.exeを
+  `UseShellExecute=true`で起動する。Setup.exeは`PrivilegesRequired=admin`
+  （[ADR 0005](0005-windows-distribution.md)のAmendment参照）のため、起動時に
+  WindowsがUACの昇格プロンプトを自動的に表示する。その先の実際のインストール
+  （証明書信頼・このアプリの強制終了・Add-AppxPackage）はSetup.exe自身
+  （`installer/Install-Package.ps1`の`-ForceApplicationShutdown`）が行うため、
+  本クラスはダウンロードと起動だけを担う。
+- **UI側**: `SettingsPage`の「ダウンロードページを開く」ボタンを「アップデートを行う」へ
+  置き換え、押すとダウンロード進捗（%）→起動中→起動完了のメッセージへ本文が切り替わる。
+  `MainWindow`の週次自動チェックダイアログも同様に、ダイアログを閉じずに
+  （`ContentDialogButtonClickDeferral`）ダウンロード・起動まで行うよう変更した。
+  `InstallerDownloadUrl`が取得できなかった場合（releaseにexe資産が無い等）のみ、
+  従来どおりリリースページをブラウザで開く動作へフォールバックする。
+- **検証**: `GitHubReleaseParser`の新しいテスト（assetsからexeを見つける／assetsが無い／
+  exeが無い、の3パターン）で、URL抽出ロジックを確認した。`GitHubUpdateInstaller`自体は
+  実際のHTTP通信・プロセス起動を伴うため、`GitHubUpdateCheckService`と同様に直接の
+  ユニットテストは設けていない（本リポジトリの一貫した方針）。実機での
+  ダウンロード→UAC昇格→インストール完了までの一連の流れは、次の正式公開リリースの際に
+  実際にアップデート通知を受けて確認する（現時点では未検証）。

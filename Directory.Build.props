@@ -16,16 +16,20 @@
          シート）、氏名（確認）の常時数式化、標準最大連続コマ数・空きコマ許可等の既定値数式、各種
          必須列のallowBlank化、通常授業シートへの学年列追加を行った。
          v1.0.4は、「新規で基本情報を作成」で保存したExcelを、既存の「Excelで編集」と同じく
-         保存直後に既定のアプリで自動的に開くようにしたUI微調整（ユーザー指示）。 -->
-    <VersionPrefix>1.0.4</VersionPrefix>
+         保存直後に既定のアプリで自動的に開くようにしたUI微調整（ユーザー指示）。
+         v1.1.0（新機能のためminorを上げてpatchを0へ戻した）は、アップデート確認で新しい
+         バージョンが見つかった場合、ブラウザでダウンロードページを開くだけだった動作を、
+         アプリ内でインストーラーを直接ダウンロード・起動する「アップデートを行う」ボタンへ
+         置き換えた（ユーザー指示）。docs/adr/0007-auto-update-check.mdのAmendment（v1.1.0）参照。 -->
+    <VersionPrefix>1.1.0</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.0.4.0</AssemblyVersion>
-    <FileVersion>1.0.4.0</FileVersion>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.0.4.0</AppxPackageVersion>
+    <AppxPackageVersion>1.1.0.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>

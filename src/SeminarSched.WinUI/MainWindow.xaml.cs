@@ -227,23 +227,67 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    // ユーザー指示（「ダウンロードページを開くボタンを作るのではなく、アップデートを行うボタンを
+    // 作る感じで、それが押されたら自動的にアップデート」）への対応。インストーラーをアプリ内で
+    // ダウンロード・起動するところまでをこのダイアログの中で行う（Deferralでダイアログを開いた
+    // ままにし、進捗に応じて本文を差し替える。パターンはCheckLicenseAsyncの成功画面差し替えと同じ）。
     private async Task ShowUpdateAvailableDialogAsync(ApplicationVersion currentVersion, UpdateCheckResult result)
     {
+        var bodyText = new TextBlock
+        {
+            Text = $"現在のバージョン: {currentVersion.DisplayVersion}\n最新バージョン: {result.LatestVersion!.DisplayVersion}\n\nアップデートを行いますか？",
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 420,
+        };
+        var canAutoInstall = result.InstallerDownloadUrl is not null;
         var dialog = new ContentDialog
         {
             XamlRoot = Content.XamlRoot,
             Title = "新しいバージョンがあります",
-            Content = $"現在のバージョン: {currentVersion.DisplayVersion}\n最新バージョン: {result.LatestVersion!.DisplayVersion}\n\nダウンロードページを開きますか？",
-            PrimaryButtonText = "ダウンロードページを開く",
+            Content = bodyText,
+            PrimaryButtonText = canAutoInstall ? "アップデートを行う" : "リリースページを開く",
             CloseButtonText = "後で",
             DefaultButton = ContentDialogButton.Primary,
         };
 
-        var dialogResult = await dialog.ShowAsync();
-        if (dialogResult == ContentDialogResult.Primary && result.ReleaseUrl is not null)
+        dialog.PrimaryButtonClick += async (_, args) =>
         {
-            await Windows.System.Launcher.LaunchUriAsync(new Uri(result.ReleaseUrl));
-        }
+            if (!canAutoInstall)
+            {
+                if (result.ReleaseUrl is not null)
+                {
+                    await Windows.System.Launcher.LaunchUriAsync(new Uri(result.ReleaseUrl));
+                }
+                return;
+            }
+
+            args.Cancel = true;
+            var deferral = args.GetDeferral();
+            try
+            {
+                dialog.PrimaryButtonText = string.Empty;
+                dialog.CloseButtonText = string.Empty;
+                var progress = new Progress<double>(ratio => bodyText.Text = $"ダウンロード中…（{ratio:P0}）");
+                var installerPath = await App.UpdateInstaller.DownloadAsync(result.InstallerDownloadUrl!, progress);
+                bodyText.Text = "インストーラーを起動しています…";
+                var started = App.UpdateInstaller.Launch(installerPath);
+                bodyText.Text = started
+                    ? "インストーラーを起動しました。表示される画面の案内に従って更新を進めてください（このアプリは更新の途中で自動的に終了します）。"
+                    : "インストーラーを起動できませんでした。";
+                dialog.CloseButtonText = "閉じる";
+            }
+            catch (Exception exception) when (exception is IOException or HttpRequestException or TaskCanceledException or System.ComponentModel.Win32Exception)
+            {
+                bodyText.Text = $"アップデートに失敗しました: {exception.Message}";
+                dialog.CloseButtonText = "閉じる";
+            }
+            finally
+            {
+                deferral.Complete();
+            }
+        };
+
+        await dialog.ShowAsync();
     }
 
     private bool _syncingSetupNav;
