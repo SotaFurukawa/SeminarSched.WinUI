@@ -79,9 +79,10 @@ public sealed partial class HomePage : Page
             if (file is null) return;
             SetBusy(true);
             await App.SharedRosterStore.ExportBlankTemplateAsync(file.Path);
-            ShowStatus(InfoBarSeverity.Success, "新しい基本情報テンプレートを保存しました", file.Path);
+            var started = Process.Start(new ProcessStartInfo(file.Path) { UseShellExecute = true });
+            ShowStatus(started is null ? InfoBarSeverity.Warning : InfoBarSeverity.Success, started is null ? "既定のアプリで開けませんでした" : "新しい基本情報テンプレートを保存しました", file.Path);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
         {
             ShowStatus(InfoBarSeverity.Error, "テンプレートを保存できませんでした", exception.Message);
         }

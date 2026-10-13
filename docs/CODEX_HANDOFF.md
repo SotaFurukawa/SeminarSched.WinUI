@@ -1,23 +1,39 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-14（checkpoint163）
+最終更新: 2026-10-14（checkpoint164）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
 ## 0. WinUI版の現在地点
 
-**重要（checkpoint147で再確認）: バージョンごとのDraft Release作成とインストーラー添付は1つの
-不可分な作業として扱うこと。** v0.24.0〜v0.26.0の3バージョンを連続リリースした際、インストーラー
-のbuild・添付を毎回のサイクルから漏らしてしまい、ユーザーから「毎回githubでインストーラーを
-作ってください」と指摘されて初めて気づき、3バージョン分を事後的に`git checkout <sha>`で各
-バージョンのコミットへ戻って作り直した（タグは付けていないため、バージョンとコミットの対応は
-`git log`のコミットメッセージで確認する）。Draft Release作成の手順（`scripts/New-Installer.ps1`
-→`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-<version>.exe`）は
-例外なく毎回実行すること。
+**重要（checkpoint147で再確認、checkpoint164でDraft→公開へ更新）: バージョンごとのGitHub Release
+作成とインストーラー添付は1つの不可分な作業として扱うこと。** v0.24.0〜v0.26.0の3バージョンを
+連続リリースした際、インストーラーのbuild・添付を毎回のサイクルから漏らしてしまい、ユーザーから
+「毎回githubでインストーラーを作ってください」と指摘されて初めて気づき、3バージョン分を事後的に
+`git checkout <sha>`で各バージョンのコミットへ戻って作り直した（タグは付けていないため、バージョンと
+コミットの対応は`git log`のコミットメッセージで確認する）。Release作成の手順
+（`scripts/New-Installer.ps1`→`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-
+<version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
+毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.0.3`（Draft Release。生徒・講師_基本情報.xlsxの在籍チェック・ID自動入力・
-氏名確認の自動入力・必須列のallowBlank・通常授業の学年列を復元/追加したbug fix。checkpoint163参照）
-Latest Development Checkpoint: checkpoint 163（ユーザーからの指摘「先ほどのxlsxについて、生徒タブの
+Current Version: `v1.0.4`（Release・公開済み。「新規で基本情報を作成」の保存直後にExcelを自動的に
+開くようにしたUI微調整。checkpoint164参照）
+Latest Development Checkpoint: checkpoint 164（2件のユーザー指示。
+①「これからは毎回ドラフトリリースではなく、本番のリリースをしてください」:
+AGENTS.mdの「バージョンとRelease」節を更新し、「ユーザーの明示指示なしにReleaseを公開しない。
+開発中は必ずDraftとする」という既定を撤回し、以降は毎回公開（Publish）することを既定にした。
+v1.0.3は本checkpoint作成時点で既にDraftとして存在していたため、`gh release edit v1.0.3
+--draft=false`で公開した（過去の未公開バージョン v1.0.2 はそのままDraftとして残してある。
+再確認や削除が必要な場合はユーザーへ確認する）。
+②「新規でxlsxを作成した後、それを自動的に開くようにしてほしい」:
+`HomePage.xaml.cs`の`NewSharedRosterTemplate_Click`で、`ExportBlankTemplateAsync`による保存後に
+`Process.Start(new ProcessStartInfo(file.Path) { UseShellExecute = true })`を呼ぶよう変更した。
+既存の「Excelで編集」（`EditSharedRoster_Click`）が同じ保存先を開く際に使っているのと全く同じ
+パターン（`started is null`時は警告表示、`Win32Exception`も捕捉）にそろえた。
+
+---
+
+checkpoint 163（ユーザーからの指摘「先ほどのxlsxについて、生徒タブの
 在籍のチェックボックスや生徒IDの自動入力が消えていますので、こちらも確認してください。氏名(確認)
 などの自動入力も消えています。講師タブも同様です。必須が入力された段階で自動入力されるもの、
 デフォルト値などが入力されている部分には、自動入力されるようにしてください。必須列の部分に

@@ -14,16 +14,18 @@
          学年を表示する列がほしい」に対応。実運用ファイル（生徒・講師_基本情報(夏期).xlsx）を参照し、
          在籍列を真偽値セル化＋ドロップダウン化、生徒ID・講師IDの新規行自動採番（非表示の"_入力補助"
          シート）、氏名（確認）の常時数式化、標準最大連続コマ数・空きコマ許可等の既定値数式、各種
-         必須列のallowBlank化、通常授業シートへの学年列追加を行った。 -->
-    <VersionPrefix>1.0.3</VersionPrefix>
+         必須列のallowBlank化、通常授業シートへの学年列追加を行った。
+         v1.0.4は、「新規で基本情報を作成」で保存したExcelを、既存の「Excelで編集」と同じく
+         保存直後に既定のアプリで自動的に開くようにしたUI微調整（ユーザー指示）。 -->
+    <VersionPrefix>1.0.4</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.0.3.0</AssemblyVersion>
-    <FileVersion>1.0.3.0</FileVersion>
+    <AssemblyVersion>1.0.4.0</AssemblyVersion>
+    <FileVersion>1.0.4.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.0.3.0</AppxPackageVersion>
+    <AppxPackageVersion>1.0.4.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
