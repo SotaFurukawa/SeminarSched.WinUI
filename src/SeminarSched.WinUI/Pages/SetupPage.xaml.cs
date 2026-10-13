@@ -203,6 +203,11 @@ public sealed partial class SetupPage : WorkflowPageBase
         }, "生徒を保存しました");
     }
 
+    // ユーザー要望「保存せずに取消できるようにしてほしい」への対応。編集中の行をどれか1つに
+    // 絞る役目で既にあったCancelStudentEditing（新規行は削除、既存行は編集終了）を、そのまま
+    // 「取消」ボタンからも呼び出す。
+    private void StudentRow_CancelEdit_Click(object sender, RoutedEventArgs e) => CancelStudentEditing();
+
     private void CancelStudentEditing()
     {
         var editing = _studentRows.FirstOrDefault(r => r.IsEditing);
@@ -280,6 +285,8 @@ public sealed partial class SetupPage : WorkflowPageBase
         }, "講師を保存しました");
     }
 
+    private void TeacherRow_CancelEdit_Click(object sender, RoutedEventArgs e) => CancelTeacherEditing();
+
     private void CancelTeacherEditing()
     {
         var editing = _teacherRows.FirstOrDefault(r => r.IsEditing);
@@ -355,6 +362,8 @@ public sealed partial class SetupPage : WorkflowPageBase
                 row.DraftSchoolLevel, checked((int)row.DraftSortOrder), row.DraftActive));
         }, "科目を保存しました");
     }
+
+    private void SubjectRow_CancelEdit_Click(object sender, RoutedEventArgs e) => CancelSubjectEditing();
 
     private void CancelSubjectEditing()
     {
@@ -721,6 +730,8 @@ public sealed partial class SetupPage : WorkflowPageBase
                 row.DraftTeacher?.Value?.Id, checked((int)row.DraftPriority), row.DraftOneToOneIndex == 1, row.DraftNote));
         }, "通常授業の担当設定を保存しました");
     }
+
+    private void RegularLessonRow_CancelEdit_Click(object sender, RoutedEventArgs e) => CancelRegularLessonEditing();
 
     private void CancelRegularLessonEditing()
     {

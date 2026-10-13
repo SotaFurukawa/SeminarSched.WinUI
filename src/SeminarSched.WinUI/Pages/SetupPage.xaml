@@ -63,7 +63,7 @@
                                     </StackPanel>
                                 </Grid>
                                 <Grid ColumnSpacing="8" Visibility="{x:Bind EditVisibility, Mode=OneWay}">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="80"/><ColumnDefinition Width="80"/><ColumnDefinition Width="80"/><ColumnDefinition Width="90"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="160"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="80"/><ColumnDefinition Width="80"/><ColumnDefinition Width="80"/><ColumnDefinition Width="90"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="160"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="{x:Bind ExternalIdText, Mode=OneWay}" VerticalAlignment="Center"/>
                                     <TextBox x:Name="StudentRowNameBox" Grid.Column="1" PlaceholderText="姓" Text="{x:Bind DraftFamilyName, Mode=TwoWay}" Loaded="StudentRowNameBox_Loaded"/>
                                     <TextBox Grid.Column="2" PlaceholderText="名" Text="{x:Bind DraftGivenName, Mode=TwoWay}"/>
@@ -73,6 +73,8 @@
                                     <CheckBox Grid.Column="6" Content="在籍中" IsChecked="{x:Bind DraftActive, Mode=TwoWay}"/>
                                     <TextBox Grid.Column="7" PlaceholderText="備考" Text="{x:Bind DraftNote, Mode=TwoWay}"/>
                                     <Button Grid.Column="8" Content="保存" Click="SaveStudentRow_Click"/>
+                                    <!-- ユーザー要望「保存せずに取消できるようにしてほしい。右側に取消ボタンを追加」への対応。 -->
+                                    <Button Grid.Column="9" Content="取消" Click="StudentRow_CancelEdit_Click"/>
                                 </Grid>
                             </Grid>
                         </DataTemplate>
@@ -101,7 +103,7 @@
                                     </StackPanel>
                                 </Grid>
                                 <Grid ColumnSpacing="8" Visibility="{x:Bind EditVisibility, Mode=OneWay}">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="110"/><ColumnDefinition Width="110"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="160"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="110"/><ColumnDefinition Width="110"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="160"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="{x:Bind ExternalIdText, Mode=OneWay}" VerticalAlignment="Center"/>
                                     <TextBox x:Name="TeacherRowNameBox" Grid.Column="1" PlaceholderText="姓" Text="{x:Bind DraftFamilyName, Mode=TwoWay}" Loaded="TeacherRowNameBox_Loaded"/>
                                     <TextBox Grid.Column="2" PlaceholderText="名" Text="{x:Bind DraftGivenName, Mode=TwoWay}"/>
@@ -109,6 +111,7 @@
                                     <CheckBox Grid.Column="4" Content="在籍中" IsChecked="{x:Bind DraftActive, Mode=TwoWay}"/>
                                     <TextBox Grid.Column="5" PlaceholderText="備考" Text="{x:Bind DraftNote, Mode=TwoWay}"/>
                                     <Button Grid.Column="6" Content="保存" Click="SaveTeacherRow_Click"/>
+                                    <Button Grid.Column="7" Content="取消" Click="TeacherRow_CancelEdit_Click"/>
                                 </Grid>
                             </Grid>
                         </DataTemplate>
@@ -177,7 +180,7 @@
                                     <Button x:Name="ChangeButton" Grid.Column="5" Content="変更" Visibility="Collapsed" Click="RegularLessonRow_Change_Click"/>
                                 </Grid>
                                 <Grid ColumnSpacing="12" Visibility="{x:Bind EditVisibility, Mode=OneWay}">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <ComboBox x:Name="RegularLessonStudentBox" Header="生徒" Width="200" IsEnabled="{x:Bind IsNew}" ItemsSource="{x:Bind StudentOptions}" SelectedItem="{x:Bind DraftStudent, Mode=TwoWay}" Loaded="RegularLessonStudentBox_Loaded"/>
                                     <ComboBox Grid.Column="1" Header="科目" Width="160" IsEnabled="{x:Bind IsNew}" ItemsSource="{x:Bind SubjectOptions}" SelectedItem="{x:Bind DraftSubject, Mode=TwoWay}"/>
                                     <ComboBox Grid.Column="2" Header="通常担当講師（任意）" Width="220" ItemsSource="{x:Bind TeacherOptions}" SelectedItem="{x:Bind DraftTeacher, Mode=TwoWay}"/>
@@ -185,6 +188,7 @@
                                     <ComboBox Grid.Column="4" Header="1対1必須" Width="100" SelectedIndex="{x:Bind DraftOneToOneIndex, Mode=TwoWay}"><ComboBoxItem Content="いいえ"/><ComboBoxItem Content="はい"/></ComboBox>
                                     <TextBox Grid.Column="5" Header="備考" Width="200" Text="{x:Bind DraftNote, Mode=TwoWay}"/>
                                     <Button Grid.Column="6" VerticalAlignment="Bottom" Content="保存" Click="SaveRegularLessonRow_Click"/>
+                                    <Button Grid.Column="7" VerticalAlignment="Bottom" Content="取消" Click="RegularLessonRow_CancelEdit_Click"/>
                                 </Grid>
                             </Grid>
                         </DataTemplate>
@@ -350,7 +354,7 @@
                                     <Button x:Name="ChangeButton" Grid.Column="6" Content="変更" Visibility="Collapsed" Click="SubjectRow_Change_Click"/>
                                 </Grid>
                                 <Grid ColumnSpacing="8" Visibility="{x:Bind EditVisibility, Mode=OneWay}">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="140"/><ColumnDefinition Width="160"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="140"/><ColumnDefinition Width="160"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <NumberBox Minimum="1" Value="{x:Bind DraftSortOrder, Mode=TwoWay}"/>
                                     <TextBox x:Name="SubjectRowCodeBox" Grid.Column="1" PlaceholderText="コード" Text="{x:Bind DraftCode, Mode=TwoWay}" Loaded="SubjectRowCodeBox_Loaded"/>
                                     <TextBox Grid.Column="2" PlaceholderText="科目名" Text="{x:Bind DraftName, Mode=TwoWay}"/>
@@ -358,6 +362,7 @@
                                     <ComboBox Grid.Column="4" IsEditable="True" PlaceholderText="校種" Text="{x:Bind DraftSchoolLevel, Mode=TwoWay}"><ComboBoxItem Content="小学校"/><ComboBoxItem Content="中学校"/><ComboBoxItem Content="高等学校"/></ComboBox>
                                     <CheckBox Grid.Column="5" Content="有効" IsChecked="{x:Bind DraftActive, Mode=TwoWay}"/>
                                     <Button Grid.Column="6" Content="保存" Click="SaveSubjectRow_Click"/>
+                                    <Button Grid.Column="7" Content="取消" Click="SubjectRow_CancelEdit_Click"/>
                                 </Grid>
                             </Grid>
                         </DataTemplate>

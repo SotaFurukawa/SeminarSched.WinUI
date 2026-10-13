@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-09（checkpoint157）
+最終更新: 2026-10-13（checkpoint158）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -15,9 +15,27 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 →`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-<version>.exe`）は
 例外なく毎回実行すること。
 
-Current Version: `v0.31.1 (beta)`（Draft Release作成予定。生徒・講師等の一覧行でホバー時に行が
-伸縮してズレる不具合の修正。checkpoint157を参照）
-Latest Development Checkpoint: checkpoint 157（ユーザー報告「生徒の行にカーソルを合わせたときに、
+Current Version: `v0.31.2 (beta)`（Draft Release作成予定。行内編集に「取消」ボタンを追加する1件。
+checkpoint158を参照）
+Latest Development Checkpoint: checkpoint 158（ユーザーから生徒一覧の編集行（姓・名・学年・最大
+連続コマ数・空きコマ許可・在籍中・備考・保存のスクリーンショット付き）について「保存せずに取消
+できるようにしてほしい」、続けて「右側に取消ボタンを追加」という要望だった。
+
+**対応:** `EditableRowViewModel`の行内編集パターンを使う5箇所（`SetupPage.xaml`の生徒・講師・
+通常授業担当設定・科目の4タブ、`ImportPage.xaml`の受講希望一覧）すべてに「取消」ボタンを「保存」の
+右側へ追加した。いずれも、編集を1行に絞るために既に存在していた`Cancel*Editing()`ヘルパー
+（新規追加行ならリストから削除、既存行の編集ならIsEditing=falseへ戻してDraft*の変更を破棄する、
+checkpoint142から存在）をそのままボタンのClickハンドラーから呼ぶだけで実現できた（新しいロジックの
+追加は不要、既存の「他の行の編集を開始する前に前の編集を打ち切る」仕組みと完全に同じ処理）。
+
+**検証:** 既存の全テスト（計263件）がすべて通過することを確認済み（UIのみの変更のため新規テストは
+追加していない。1回だけ`QuestionnaireKitServiceTests`がOneDrive環境特有と思われる一時的な
+ファイルロックで失敗したが、単体では即座に成功し、再実行後の全体テストも成功したため、今回の
+変更とは無関係なフレーキーな失敗と判断した）。実機（dev-run）での画面確認はこのcheckpointでも
+行っていない（引き続き、ユーザー自身による目視確認を依頼する必要がある）。UI追加のためpatchを
+上げてv0.31.2とした。詳細は[docs/releases/v0.31.2.md](releases/v0.31.2.md)。
+
+checkpoint 157（ユーザー報告「生徒の行にカーソルを合わせたときに、
 少し上にズレる仕様がありますが、そうではなくその枠を少し濃いグレーに変えて、ずれをなくすことは
 できますか」。
 

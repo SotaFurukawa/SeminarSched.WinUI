@@ -200,6 +200,8 @@ public sealed partial class ImportPage : WorkflowPageBase
         finally { IsEnabled = true; }
     }
 
+    private void LessonRequestRow_CancelEdit_Click(object sender, RoutedEventArgs e) => CancelLessonRequestEditing();
+
     private void CancelLessonRequestEditing()
     {
         var editing = _lessonRequestRows.FirstOrDefault(r => r.IsEditing);

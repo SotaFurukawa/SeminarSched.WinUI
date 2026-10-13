@@ -108,7 +108,11 @@
                                 <ComboBox Grid.Column="2" Header="空きコマ許可" SelectedIndex="{x:Bind DraftAllowGapOverrideIndex, Mode=TwoWay}"><ComboBoxItem Content="指定なし"/><ComboBoxItem Content="許可"/><ComboBoxItem Content="不許可"/></ComboBox>
                             </Grid>
                             <TextBox Header="備考" Text="{x:Bind DraftNote, Mode=TwoWay}"/>
-                            <Button Content="保存" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Left" Click="SaveLessonRequestRow_Click"/>
+                            <!-- ユーザー要望「保存せずに取消できるようにしてほしい。右側に取消ボタンを追加」への対応。 -->
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="保存" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Left" Click="SaveLessonRequestRow_Click"/>
+                                <Button Content="取消" HorizontalAlignment="Left" Click="LessonRequestRow_CancelEdit_Click"/>
+                            </StackPanel>
                         </StackPanel>
                     </Grid>
                 </DataTemplate>
