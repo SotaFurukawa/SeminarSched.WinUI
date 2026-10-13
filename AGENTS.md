@@ -48,10 +48,14 @@
 
 - 開発版は`v0.x.x`とし、ユーザーの明示指示なしに`v1.0.0`へ上げない。
 - 初期versionは`v0.0.0 (beta)`。bug fix・文言・UI微調整等はpatchを、新機能はminorを上げてpatchを0へ戻す。
-- 原則として変更単位ごとにversionを更新し、公開済みまたはDraft Release作成済みのversionを使い回さない。
+- 原則として変更単位ごとにversionを更新し、公開済みのversionを使い回さない。
 - versionの正本はルート`Directory.Build.props`とし、アプリ表示、assembly、build、GitHub Releaseへ反映する。
-- versionごとにbuild/test、commit、push、GitHub Draft Release、`docs/CODEX_HANDOFF.md`更新を行う。
+- versionごとにbuild/test、commit、push、GitHub Release、`docs/CODEX_HANDOFF.md`更新を行う。
 - Release Notesは`docs/releases/`にも保存し、何が変わったか追跡可能にする。
-- ユーザーの明示指示なしにReleaseを公開しない。開発中は必ずDraftとする。
+- **2026-10-14、ユーザーの明示指示により変更:** 以前は「ユーザーの明示指示なしにReleaseを
+  公開しない。開発中は必ずDraftとする」が既定だったが、ユーザーから「これからは毎回ドラフト
+  リリースではなく、本番のリリースをしてください」と明示指示があったため、これ以降は
+  **Draftを作らず、versionごとに毎回Releaseを公開（Publish）することを既定動作とする**。
+  以前のDraft優先の既定へ戻す場合は、ユーザーからの明示指示を必要とする。
 - push/Release操作は受理と即時errorの有無だけ確認し、GitHub Actionsやuploadを長時間pollしない。
 - 長時間監視より実装、build、test、commit、HANDOFF更新を優先する。
