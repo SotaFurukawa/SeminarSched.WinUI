@@ -5,16 +5,19 @@
          確定した。VersionSuffixを空にし、「-beta」の付かない正式versionにした。
          v1.0.1は、公開直後に判明したインストーラーの不具合（証明書の信頼登録先がCurrentUser\
          TrustedPeopleのままでは不十分で、別マシンで0x800B0109エラーが発生）を修正したbug fix。
-         docs/adr/0005-windows-distribution.mdのAmendment（v1.0.1）参照。 -->
-    <VersionPrefix>1.0.1</VersionPrefix>
+         docs/adr/0005-windows-distribution.mdのAmendment（v1.0.1）参照。
+         v1.0.2は、「生徒・講師基本情報を新規で作成」のExcelテンプレート（SharedRosterWorkbookWriter）
+         に、Python版shared_roster.pyと同じ見出し・必須列・退籍行の配色・枠線・列幅・ウィンドウ枠の
+         固定・オートフィルターを復元したUI微調整（ユーザー指示「以前のデザイン」「カラムなどの色なども」）。 -->
+    <VersionPrefix>1.0.2</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.0.1.0</AssemblyVersion>
-    <FileVersion>1.0.1.0</FileVersion>
+    <AssemblyVersion>1.0.2.0</AssemblyVersion>
+    <FileVersion>1.0.2.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.0.1.0</AppxPackageVersion>
+    <AppxPackageVersion>1.0.2.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>

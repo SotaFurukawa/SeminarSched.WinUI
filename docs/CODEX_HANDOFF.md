@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-13（checkpoint161）
+最終更新: 2026-10-13（checkpoint162）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -15,9 +15,44 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 →`gh release upload <tag> dist/...msix dist/...cer dist/...Setup-<version>.exe`）は
 例外なく毎回実行すること。
 
-Current Version: `v1.0.1`（Publicに公開するRelease。v1.0.0公開直後に判明したインストーラーの
-不具合を修正。checkpoint161を参照）
-Latest Development Checkpoint: checkpoint 161（v1.0.0を公開した直後、ユーザーが開発機とは別の
+Current Version: `v1.0.2`（Draft Release。「生徒・講師基本情報を新規で作成」のExcelテンプレートの
+デザインをPython版と同じ配色へ戻したUI微調整。checkpoint162を参照）
+Latest Development Checkpoint: checkpoint 162（ユーザーからの指示「生徒講師基本情報を新規で作成
+するときのデザインを以前のものを使ってください。カラムなどの色なども」への対応。
+
+**調査:** `SharedRosterWorkbookWriter.cs`（共通名簿Excelの5シートを書き出す処理）は、在籍=falseの
+行をグレー塗りする以外、見出し・必須列に一切の配色・罫線・列幅・ウィンドウ枠固定が無い状態
+だった。git履歴を遡っても、この書き出し処理自体が配色を持っていた時期は無く（データ列の増減の
+みの変更履歴）、「以前のデザイン」はこのWinUI版ではなく、参照実装であるPython版
+`shared_roster.py`の`write_shared_roster`/`_xlsx_formats`を指していると判断した（AGENTS.mdの
+「仕様の正本は実装コードとテスト…の順に確認する」に従い、Python側の実装コードを直接確認した）。
+
+**実装:** Python版の配色定数をそのままWinUI版（ClosedXML）へ移植した。
+- 見出し: `#1F4E78`地に白太字・中央揃え・折り返し、行の高さ34pt。
+- 「…ID（自動・入力不要）」見出しだけは`#5B9BD5`（薄い青）にして補助列であることを示す
+  （Python版の`helper_columns`と同じ列位置: 講師対応科目のID・コード列、通常授業のID・コード・
+  講師ID列）。
+- 必須列（生徒の姓・学年、講師の姓）は`#FFF2CC`（淡黄色）。講師対応科目・通常授業の「…名から
+  選択」列も、まだ値の無い空白テンプレート行に限り同様に淡黄色にした（Python版の
+  `_prepare_*_input_rows`が未入力行だけ`required`書式にしていたのと同じ区別）。
+- 在籍=falseの行は`#E7E6E6`（薄灰色）。Python版と同じく、値を書き込む代わりに条件付き書式
+  （`AND($C2<>"",$A2="FALSE")`、範囲は2〜10000行）にした。WinUI版は在籍セルを文字列"TRUE"/"FALSE"
+  で保存しているため、Python版のブール比較（`$A2=FALSE`）ではなく文字列比較に書き換えている。
+- 通常データ行は上揃え・折り返し・下罫線`#D9DEE7`。見出し行の固定（`FreezeRows(1)`）、グリッド線
+  非表示、列幅（Python版と同じ値）、オートフィルターも追加した。
+- 見出しセルのコメント（入力ヒント）は移植しなかった。Python版の一部のコメント文言
+  （生徒・講師ID見出しの自動採番ヒント）は、WinUI版には存在しない数式ベースの自動ID採番機能
+  を前提にしており、そのまま移植すると実態と異なる説明になるため、今回のスコープ（配色の復元）
+  からは意図的に除外した。
+
+**検証:** 既存テスト266件がすべて通過。実際に生成したxlsxをClosedXMLで読み戻し、見出し・必須列・
+在籍条件付き書式の色（RGB）、罫線色、行高、列幅、グリッド線非表示、ウィンドウ枠固定行、
+オートフィルターの各プロパティがPython版の配色・レイアウトと一致することを確認した
+（テスト専用の一時Factを追加して検証後、コミット前に削除する手順を踏んだ）。実機Excelでの
+目視確認を試みたが、この開発環境のスクリーンショット手段が意図しないセッションの画面を捉えて
+しまい有効な確認ができなかったため、上記のプログラム的な検証のみで完了扱いとした。
+
+checkpoint 161（v1.0.0を公開した直後、ユーザーが開発機とは別の
 Windows PCでSetup.exeを実行したところ「エラーコード1」で失敗。調査の結果、
 `%TEMP%\SeminarSched.WinUI-install-error.log`に記録された実際の原因は次のとおりだった:
 
