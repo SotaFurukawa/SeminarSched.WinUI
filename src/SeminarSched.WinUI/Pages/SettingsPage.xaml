@@ -31,9 +31,14 @@
                  いたため、見出しの文字数が違う分だけボタンの開始位置がずれていた。1つのGridへ統合し、
                  column1の幅をライセンス・アップデート両方のボタンのうち最大の幅に揃える（Auto列は
                  同じGrid内の全行の最大幅で決まるため、自動的に左端・右端とも一致する）。 -->
+            <!-- ユーザー要望「ボタンの左端をそろえるように。今のところから5cm程度ボタンが右にずれる
+                 ようにして、左端をそろえる」への対応。column0（見出し列）をAuto（見出し文字幅だけ）
+                 から固定幅へ変更し、見出しとボタンの間に意図的な余白を作ることで、ボタン列全体を
+                 右へ押し出した（5cm≈189epx相当を目安に、元のAuto幅(約110px)へ加算した300pxとした）。
+                 column1自体は変わらずAutoのままのため、左端・右端の揃いは維持される。 -->
             <Grid Margin="0,16,0,0" ColumnSpacing="16" RowSpacing="8">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="300" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>

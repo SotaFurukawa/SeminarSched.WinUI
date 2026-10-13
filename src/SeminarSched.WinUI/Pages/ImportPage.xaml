@@ -25,7 +25,7 @@
              横スクロール可能にした（講師指導可能科目タブの表と同じ「幅が足りなければ横スクロール」
              という考え方）。 -->
         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="8" MinWidth="1020">
+        <StackPanel Spacing="8" MinWidth="890">
         <!-- ユーザー報告（checkpoint150）「氏名と学年がくっついて表示されているように見えます。
              別の列にしてください」への対応。生徒氏名セルに全角スペース区切りで学年を連結していたのを
              やめ、学年専用の列を生徒氏名の右に追加した。また「隙間が大きい・ずれている」という
@@ -45,7 +45,10 @@
              増減するため、"*"列の実際の幅がホバーのたびに変化し、見出しとデータの列位置がずれて
              見えていた。生徒氏名・科目名を固定幅（SetupPageの生徒・講師一覧と同じ、"*"を一切使わない
              方式）に変更し、ホバー列の有無に関わらず他の列の幅が変わらないようにした。 -->
-        <Grid ColumnSpacing="6" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="55"/><ColumnDefinition Width="110"/><ColumnDefinition Width="55"/><ColumnDefinition Width="90"/><ColumnDefinition Width="45"/><ColumnDefinition Width="35"/><ColumnDefinition Width="105"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="92"/></Grid.ColumnDefinitions>
+        <!-- ユーザー報告「やはりまだ生徒氏名と学年の隙間が空きすぎている。科目名も長いものがある
+             せいで右側にスペースがなくなっている」への対応。生徒氏名・科目名をそれぞれ元の約半分の
+             幅へ縮め、あふれる場合は「...」で省略表示する（TextTrimming="CharacterEllipsis"）。 -->
+        <Grid ColumnSpacing="6" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="55"/><ColumnDefinition Width="55"/><ColumnDefinition Width="55"/><ColumnDefinition Width="90"/><ColumnDefinition Width="45"/><ColumnDefinition Width="35"/><ColumnDefinition Width="105"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="92"/></Grid.ColumnDefinitions>
             <TextBlock FontWeight="SemiBold" Text="生徒氏名"/>
             <TextBlock Grid.Column="1" FontWeight="SemiBold" Text="学年" HorizontalAlignment="Center" TextAlignment="Center"/>
             <TextBlock Grid.Column="2" FontWeight="SemiBold" Text="科目名"/>
@@ -69,10 +72,10 @@
                              固定してこの伸縮自体を無くし、代わりにVisualTreeHelpers.SetRowHoverBackground
                              でBackgroundを少し濃いグレーへ切り替える。 -->
                         <Grid Height="36" ColumnSpacing="6" Background="Transparent" Visibility="{x:Bind DisplayVisibility, Mode=OneWay}" PointerEntered="LessonRequestRow_PointerEntered" PointerExited="LessonRequestRow_PointerExited">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="55"/><ColumnDefinition Width="110"/><ColumnDefinition Width="55"/><ColumnDefinition Width="90"/><ColumnDefinition Width="45"/><ColumnDefinition Width="35"/><ColumnDefinition Width="105"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="92"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="55"/><ColumnDefinition Width="55"/><ColumnDefinition Width="55"/><ColumnDefinition Width="90"/><ColumnDefinition Width="45"/><ColumnDefinition Width="35"/><ColumnDefinition Width="105"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="70"/><ColumnDefinition Width="92"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <TextBlock Text="{x:Bind StudentName, Mode=OneWay}" TextTrimming="CharacterEllipsis"/>
                             <TextBlock Grid.Column="1" Text="{x:Bind Grade, Mode=OneWay}" HorizontalAlignment="Center" TextAlignment="Center"/>
-                            <TextBlock Grid.Column="2" Text="{x:Bind SubjectName, Mode=OneWay}"/>
+                            <TextBlock Grid.Column="2" Text="{x:Bind SubjectName, Mode=OneWay}" TextTrimming="CharacterEllipsis"/>
                             <TextBlock Grid.Column="3" Text="{x:Bind Value.RequiredSessions, Mode=OneWay}" HorizontalAlignment="Center" TextAlignment="Center"/>
                             <TextBlock Grid.Column="4" Text="{x:Bind RegularTeacherName, Mode=OneWay}"/>
                             <TextBlock Grid.Column="5" Text="{x:Bind Value.RegularTeacherPriority, Mode=OneWay}" HorizontalAlignment="Center" TextAlignment="Center"/>
@@ -124,7 +127,8 @@
 </Border>
 <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
     <StackPanel Spacing="12">
-        <TextBlock FontSize="20" FontWeight="SemiBold" Text="可用性の手動編集"/>
+        <!-- ユーザー要望「可用性の手動編集について、出席・出勤不可日程の編集という名前に変更」への対応。 -->
+        <TextBlock FontSize="20" FontWeight="SemiBold" Text="出席・出勤不可日程の編集"/>
         <TextBlock Text="生徒または講師を1名選び、カレンダーで日ごとの参加可否をそのまま編集できます。チェックを入れると参加可能（緑）、外すと参加不可（赤）になり、保存操作なしですぐに反映されます。取込済みの回答も上書きされます。" TextWrapping="Wrap"/>
         <StackPanel Orientation="Horizontal" Spacing="16">
             <RadioButton x:Name="MatrixStudentKind" Content="生徒" IsChecked="True" Checked="MatrixKind_Changed"/>
