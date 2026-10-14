@@ -38,6 +38,8 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
         Assert.Contains("\"A 17:10～18:30\"", studentScript);
         Assert.Contains("\"算数\"", studentScript);
         Assert.DoesNotContain("小学校・算数", studentScript);
+        Assert.Contains("【2026夏期講習】個別指導コースの受講申し込みのフォームです。", studentScript);
+        Assert.Contains("申し込み締め切りは7/6(月)です", studentScript);
 
         Assert.Contains("function createTeacherQuestionnaire()", teacherScript);
         Assert.Contains("出勤不可日時（チェックしたコマは出勤不可）", teacherScript);
@@ -98,6 +100,45 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
         Assert.Contains("\"算数（中学受験以外）\"", studentScript);
         Assert.Contains("\"国語（中学受験）\"", studentScript);
         Assert.Contains("\"国語（中学受験以外）\"", studentScript);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_AskEntranceExamQuestionOn_ShowsEntranceExamQuestionBeforeOtherGradeOptInOnElementaryPage()
+    {
+        var path = Path.Combine(_directory, "project.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
+        var course = new SqliteCourseSettingsRepository();
+        var master = new SqliteMasterDataRepository();
+        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH", "小学校・算数", "算", "小学校", 1));
+        await master.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "中学校・数学", "数", "中学校", 2));
+        await master.SaveSubjectAsync(path, new Subject(0, "HS_MATH", "高校・数学IA", "数", "高校", 3));
+
+        var output = await new QuestionnaireKitService(course, master).GenerateAsync(path, _directory, "2026夏期講習", "生徒用", "講師用", "2026-07-06", "2026-07-10", "問い合わせ先", askEntranceExamQuestion: true);
+
+        var studentScript = await File.ReadAllTextAsync(Path.Combine(output, "create_student_questionnaire.gs"));
+
+        // ユーザー要望: 「中学受験をしますか？」は、小学校の学年を選んだ場合だけ、他学年の
+        // 受講意思を尋ねる設問（他学年オプトイン）より前に表示する。
+        // 「（学校区分）」付きのタイトルはGoogle Apps Script実行時にテンプレートリテラルが
+        // 評価されて初めて生成される文字列のため、生成されたソースコード自体には
+        // addOtherGradeOptIn_(form, "小学校") という呼び出しの形で現れる。
+        var elementaryPageIndex = studentScript.IndexOf("受講教科・回数（小学校）", StringComparison.Ordinal);
+        var juniorHighPageIndex = studentScript.IndexOf("受講教科・回数（中学校）", StringComparison.Ordinal);
+        var entranceExamIndex = studentScript.IndexOf("中学受験をしますか？（必須）", StringComparison.Ordinal);
+        var elementaryOtherGradeIndex = studentScript.IndexOf("addOtherGradeOptIn_(form, \"小学校\")", StringComparison.Ordinal);
+        Assert.True(elementaryPageIndex >= 0 && juniorHighPageIndex > elementaryPageIndex);
+        Assert.InRange(entranceExamIndex, elementaryPageIndex, juniorHighPageIndex);
+        Assert.InRange(elementaryOtherGradeIndex, elementaryPageIndex, juniorHighPageIndex);
+        Assert.True(entranceExamIndex < elementaryOtherGradeIndex, "中学受験をしますか？は他学年オプトインより前に表示する必要がある。");
+
+        // 他学年オプトインは学校段階ごとに複製される（小学校・中学校・高校）。
+        Assert.Contains("addOtherGradeOptIn_(form, \"小学校\")", studentScript);
+        Assert.Contains("addOtherGradeOptIn_(form, \"中学校\")", studentScript);
+        Assert.Contains("addOtherGradeOptIn_(form, \"高校\")", studentScript);
+
+        // 不具合修正: 小学校ページは今まで明示的な遷移先指定が無く、Googleフォームの既定動作
+        // （次のページへそのまま進む＝誤って中学校ページの設問を続けて表示してしまう）に依存していた。
+        Assert.Contains("elementaryPage.setGoToPage(availabilityPage);", studentScript);
     }
 
     [Fact]

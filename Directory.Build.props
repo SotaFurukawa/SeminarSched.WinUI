@@ -46,16 +46,26 @@
          取り消しの指示があり、配置だけをv1.4.0の設計（②アンケート作成ページのその場限りの
          チェックボックス）へ戻した（git revertで取り消し）。v1.4.2は、その取り消し後の状態
          （挙動はv1.4.0と同一）を新しいversionとして正式にリリースしたもの。公開済みの
-         versionを使い回さない方針のため、内容がv1.4.0と同じでもversionは独立して払い出す。 -->
-    <VersionPrefix>1.4.2</VersionPrefix>
+         versionを使い回さない方針のため、内容がv1.4.0と同じでもversionは独立して払い出す。
+         v1.4.3は、v1.4.xの「中学受験と中学受験以外を分ける」オプションに関する追加のユーザー
+         指摘3件への対応。①「中学受験をしますか？」を、小学校の学年を選んだ場合だけ「他学年の
+         受講」欄より前に表示するよう、Googleフォームの分岐構造を見直した（ページ単位でしか
+         分岐できないため、他学年チェックを学校段階ごとのページへ複製し、見出しの衝突を避ける
+         付記を付けた）。あわせて、この過程で見つかった既存の不具合（小学校ページに遷移先指定が
+         無く、既定動作で誤って中学校ページへ連続表示されていた）も修正した。②生徒用フォームの
+         説明文を「【年度・講習区分】…申し込み締め切りはM/D(曜)です」の簡潔な書式へ変更した。
+         ③「作成手順」ガイドの手順2に紐付いていた画像が、実際には無関係な古いモックアップ
+         だったため、正しい画像を用意できるまでの間、画像を外して文章の説明のみにした。
+         docs/adr/0010-questionnaire-entrance-exam-question-toggle.mdのAmendment（v1.4.3）参照。 -->
+    <VersionPrefix>1.4.3</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.4.2.0</AssemblyVersion>
-    <FileVersion>1.4.2.0</FileVersion>
+    <AssemblyVersion>1.4.3.0</AssemblyVersion>
+    <FileVersion>1.4.3.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.4.2.0</AppxPackageVersion>
+    <AppxPackageVersion>1.4.3.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
