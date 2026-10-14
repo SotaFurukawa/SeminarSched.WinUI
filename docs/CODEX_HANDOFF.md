@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-14（checkpoint167）
+最終更新: 2026-10-14（checkpoint168）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,9 +16,16 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.3.0`（Release・公開済み。通常授業担当設定で、同じ生徒・科目でも通常担当講師
-が違えば複数登録できるようにした新機能。あわせて科目の略称の文字数制約を撤廃。checkpoint167参照）
-Latest Development Checkpoint: checkpoint 167（ユーザーからの一連の指示・質問への対応。
+Current Version: `v1.3.1`（Release・公開済み。ユーザー指示「V1.3.1を中身を変えずリリースして
+ください」によるバージョンのみの更新。v1.3.0からコード・挙動の変更は無い。checkpoint168参照）
+Latest Development Checkpoint: checkpoint 168（ユーザー指示「V1.3.1を中身を変えずリリースして
+ください」への対応。コード変更は無く、Directory.Build.props・Package.appxmanifest・
+RepositoryPolicyTestsのバージョン表記のみ1.3.0→1.3.1へ更新し、通常のbuild/test→commit/push→
+インストーラー作成→Release公開のサイクルを実行した。
+
+---
+
+checkpoint 167（ユーザーからの一連の指示・質問への対応。
 
 ①ユーザー質問「通常授業について、複数の行で同じ氏名、科目があった場合、エラーがでますが、重複
 することもあるので、重複を許してください。日本語でなにが起きているのか教えてください。」への
