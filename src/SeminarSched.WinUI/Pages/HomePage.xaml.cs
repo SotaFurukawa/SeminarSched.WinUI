@@ -529,9 +529,8 @@ public sealed partial class HomePage : Page
             (CourseSeason)seasonValue,
             DateOnly.FromDateTime(start.DateTime),
             DateOnly.FromDateTime(end.DateTime),
-            considerGroupLessons: ConsiderGroupLessonsCheck.IsChecked == true,
-            askEntranceExamQuestion: AskEntranceExamQuestionCheck.IsChecked == true,
-            customSeasonName: OtherSeasonNameBox.Text);
+            ConsiderGroupLessonsCheck.IsChecked==true,
+            OtherSeasonNameBox.Text);
     }
 
     private void RefreshGeneratedTitle()

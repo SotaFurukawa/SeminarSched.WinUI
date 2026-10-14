@@ -40,23 +40,16 @@
          アプリへ取り込まれる受講希望の内容（整形済み回答シートの列・値）はオプションの
          有無に関わらず同じになるよう、復元はGoogle Apps Script側の正規化処理
          （writeCompactStudentResponse_）で行い、CourseSurveyImportService.csは無改修。
-         docs/adr/0010-questionnaire-entrance-exam-question-toggle.md参照。
-         v1.4.1は、v1.4.0の「中学受験と中学受験以外を分ける」オプションの置き場所を修正した
-         （ユーザー指示「チェックボックスはここに作ってほしいです」、ホーム画面「新しい講習
-         プロジェクト」の「オプション機能」パネルのスクリーンショット付き）。②アンケート作成
-         ページのその場限りのチェックボックスから、ホーム画面の「一人の講師が同時に担当できる
-         生徒数」の下にあるプロジェクト作成時の永続設定（CourseProject.AskEntranceExamQuestion、
-         ConsiderGroupLessonsと同じ自己修復ALTER TABLEパターン）へ変更した。
-         docs/adr/0010-questionnaire-entrance-exam-question-toggle.mdのAmendment参照。 -->
-    <VersionPrefix>1.4.1</VersionPrefix>
+         docs/adr/0010-questionnaire-entrance-exam-question-toggle.md参照。 -->
+    <VersionPrefix>1.4.0</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.4.1.0</AssemblyVersion>
-    <FileVersion>1.4.1.0</FileVersion>
+    <AssemblyVersion>1.4.0.0</AssemblyVersion>
+    <FileVersion>1.4.0.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.4.1.0</AppxPackageVersion>
+    <AppxPackageVersion>1.4.0.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>

@@ -17,9 +17,6 @@ public sealed partial class QuestionnairePage : WorkflowPageBase
         var defaultDeadline = new DateTimeOffset(current.StartDate.AddDays(-14).ToDateTime(TimeOnly.MinValue));
         StudentDeadlinePicker.Date ??= defaultDeadline;
         TeacherDeadlinePicker.Date ??= defaultDeadline;
-        EntranceExamOptionNote.Text = current.AskEntranceExamQuestion
-            ? "「中学受験と中学受験以外を分ける」がオンのプロジェクトです。小学生の回答者にだけ「中学受験をしますか？」という質問が追加されます。この設定はホーム画面のプロジェクト作成時だけで決まり、後から変更できません。"
-            : "「中学受験と中学受験以外を分ける」はオフです（算数・国語は今まで通り科目名で選択します）。この設定はホーム画面のプロジェクト作成時だけで決まり、後から変更できません。";
     }
 
     private async void Generate_Click(object sender, RoutedEventArgs e)
@@ -38,7 +35,8 @@ public sealed partial class QuestionnairePage : WorkflowPageBase
             var current = App.ProjectService.Current!;
             var studentDeadline = StudentDeadlinePicker.Date.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             var teacherDeadline = TeacherDeadlinePicker.Date.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var path = await App.QuestionnaireKit.GenerateAsync(current.Path, WorkspacePaths.Forms, current.Title, studentTitle, teacherTitle, studentDeadline, teacherDeadline, contact, current.AskEntranceExamQuestion);
+            var askEntranceExamQuestion = AskEntranceExamQuestionCheckBox.IsChecked ?? false;
+            var path = await App.QuestionnaireKit.GenerateAsync(current.Path, WorkspacePaths.Forms, current.Title, studentTitle, teacherTitle, studentDeadline, teacherDeadline, contact, askEntranceExamQuestion);
             _lastOutputDirectory = path;
             ResultPanel.Visibility = Visibility.Visible;
             ToastNotificationState.ShowSuccess("作成キットを保存しました");

@@ -8,7 +8,6 @@ public sealed record CourseProjectDefinition
         DateOnly startDate,
         DateOnly endDate,
         bool considerGroupLessons,
-        bool askEntranceExamQuestion,
         string? customSeasonName)
     {
         AcademicYear = academicYear;
@@ -16,7 +15,6 @@ public sealed record CourseProjectDefinition
         StartDate = startDate;
         EndDate = endDate;
         ConsiderGroupLessons = considerGroupLessons;
-        AskEntranceExamQuestion = askEntranceExamQuestion;
         CustomSeasonName = customSeasonName;
     }
 
@@ -32,12 +30,6 @@ public sealed record CourseProjectDefinition
     // オンの場合のみ③アンケート取込みに3.1/3.2（集団授業クラスの登録・受講登録）を表示する。
     public bool ConsiderGroupLessons { get; }
 
-    // ホーム画面「新しい講習プロジェクト」の「中学受験と中学受験以外を分ける」チェックボックス由来。
-    // オンの場合、②アンケート作成で生成する生徒用フォームの小学校ページに「中学受験をしますか？」
-    // という専用の質問を追加し、算数・国語の選択肢は中学受験の有無で分けず単一にする
-    // （QuestionnaireKitService.GenerateAsync参照）。
-    public bool AskEntranceExamQuestion { get; }
-
     // Season==Otherのときだけ意味を持つ、ホーム画面で入力する講習区分の名称。それ以外はnull。
     public string? CustomSeasonName { get; }
 
@@ -49,7 +41,6 @@ public sealed record CourseProjectDefinition
         DateOnly startDate,
         DateOnly endDate,
         bool considerGroupLessons = false,
-        bool askEntranceExamQuestion = false,
         string? customSeasonName = null)
     {
         if (academicYear is < 2000 or > 2200)
@@ -77,6 +68,6 @@ public sealed record CourseProjectDefinition
             throw new ArgumentException("A course project cannot span more than 181 days.", nameof(endDate));
         }
 
-        return new CourseProjectDefinition(academicYear, season, startDate, endDate, considerGroupLessons, askEntranceExamQuestion, season == CourseSeason.Other ? customSeasonName!.Trim() : null);
+        return new CourseProjectDefinition(academicYear, season, startDate, endDate, considerGroupLessons, season == CourseSeason.Other ? customSeasonName!.Trim() : null);
     }
 }

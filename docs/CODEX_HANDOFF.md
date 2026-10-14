@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-14（checkpoint170）
+最終更新: 2026-10-14（checkpoint169）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,36 +16,9 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.4.1`（Release・公開済み。v1.4.0の「中学受験と中学受験以外を分ける」
-オプションの置き場所を、ユーザー指摘により②アンケート作成ページのその場限りのチェックボックス
-から、ホーム画面のプロジェクト作成時の永続設定へ修正した。checkpoint170参照）
-Latest Development Checkpoint: checkpoint 170（v1.4.0で追加した「中学受験と中学受験以外を
-分ける」オプションについて、ユーザーからホーム画面「新しい講習プロジェクト」の「オプション
-機能」パネル（「集団授業の日程を考慮する」「一人の講師が同時に担当できる生徒数」がある場所）の
-スクリーンショットとともに「チェックボックスはここに作ってほしいです」という指摘があった。
-- 「2 アンケート作成」ページのその場限りのチェックボックスを削除し、`AskEntranceExamQuestion`を
-  `CourseProjectDefinition`・`ProjectSummary`の新しいプロパティ（既定false）とした。
-  `CourseProject`テーブルへは`ConsiderGroupLessons`と全く同じ自己修復ALTER TABLEパターン
-  （`SqliteProjectSchema.EnsureCurrentAsync`）で列を追加し、`SqliteProjectRepository.CreateAsync`
-  も同じ「CREATE TABLE後にUPDATEで既定値から上書きする」手順にした。
-- ホーム画面`HomePage.xaml`の「オプション機能」パネルの「一人の講師が同時に担当できる生徒数」の
-  直後へチェックボックスを追加し、`ConsiderGroupLessons`と同様**プロジェクト作成時だけで決まり
-  後から変更できない**設定にした（配布済みフォームとの一貫性を壊さないため）。
-- `QuestionnairePage`はプロジェクトの設定値を読み取って`GenerateAsync`へ渡すだけにし、現在の
-  設定を表示する案内文を追加した。`QuestionnaireKitService.GenerateAsync`自体のシグネチャは
-  変更していない（呼び出し元が変わっただけ）。
-- 副産物として、`HomePage.xaml.cs`の`BuildDefinition()`で新しい引数を挿入する際、既存の
-  `OtherSeasonNameBox.Text`（講習区分の名称）が位置引数のままだと誤った引数位置へずれてしまう
-  （講習区分名がbool判定される）潜在的な事故を発見し、名前付き引数へ修正した。
-- `SqliteProjectRepositoryTests`に、`AskEntranceExamQuestion`がtrue/falseそれぞれで
-  作成→再読込しても値が保たれることを確認するテストを2件追加。既存273件＋新規2件＝合計275件が
-  すべて通過。
-- 詳細はdocs/adr/0010-questionnaire-entrance-exam-question-toggle.mdのAmendment参照。
-- v1.4.1として通常のbuild/test→commit/push→インストーラー作成→Release公開のサイクルを実行。
-
----
-
-checkpoint 169（クライアント側のアンケート生成エラー調査報告と、
+Current Version: `v1.4.0`（Release・公開済み。アンケート作成に「中学受験と中学受験以外を
+分ける」オプションを追加した新機能。checkpoint169参照）
+Latest Development Checkpoint: checkpoint 169（クライアント側のアンケート生成エラー調査報告と、
 アンケート作成の「中学受験と中学受験以外を分ける」オプション追加への対応。
 
 ①クライアント報告「生徒用フォームに必要な小学校・中学校・高校の使用中科目が不足しています。

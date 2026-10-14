@@ -254,11 +254,6 @@ internal static class SqliteProjectSchema
         // オンの場合のみ③アンケート取込みに3.1/3.2（集団授業クラスの登録・受講登録）を表示する。
         await AddColumnIfMissingAsync(connection, transaction, "CourseProject", "ConsiderGroupLessons", "INTEGER NOT NULL DEFAULT 0 CHECK(ConsiderGroupLessons IN(0,1))", cancellationToken);
 
-        // ホーム画面「新しい講習プロジェクト」の「中学受験と中学受験以外を分ける」チェックボックス
-        // （既定オフ）。オンの場合、②アンケート作成で生成する生徒用フォームの小学校ページに
-        // 「中学受験をしますか？」という専用の質問を追加する（QuestionnaireKitService参照）。
-        await AddColumnIfMissingAsync(connection, transaction, "CourseProject", "AskEntranceExamQuestion", "INTEGER NOT NULL DEFAULT 0 CHECK(AskEntranceExamQuestion IN(0,1))", cancellationToken);
-
         // クラスは科目も持つ（①設定のSubjectマスタとは独立した自由入力）。既存行は空文字列のままになるが、
         // ドメイン型（GroupLessonClass）は空文字列を許容するため読み戻しでは壊れず、3.1画面での保存時に
         // 入力を促す。

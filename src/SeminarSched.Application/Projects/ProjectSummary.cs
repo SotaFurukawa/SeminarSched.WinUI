@@ -10,5 +10,4 @@ public sealed record ProjectSummary(
     DateOnly StartDate,
     DateOnly EndDate,
     int WorkflowCompletedStep,
-    bool ConsiderGroupLessons = false,
-    bool AskEntranceExamQuestion = false);
+    bool ConsiderGroupLessons = false);

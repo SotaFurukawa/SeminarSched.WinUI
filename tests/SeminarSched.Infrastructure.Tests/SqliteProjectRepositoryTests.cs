@@ -39,43 +39,6 @@ public sealed class SqliteProjectRepositoryTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateAsync_AskEntranceExamQuestionTrue_PersistsAndReloadsAsTrue()
-    {
-        var repository = new SqliteProjectRepository();
-        var path = Path.Combine(_directory, "entrance-exam.jukuschedule");
-        var definition = CourseProjectDefinition.Create(
-            2026,
-            CourseSeason.Summer,
-            new DateOnly(2026, 7, 20),
-            new DateOnly(2026, 7, 22),
-            askEntranceExamQuestion: true);
-
-        var created = await repository.CreateAsync(path, definition);
-        Assert.True(created.AskEntranceExamQuestion);
-
-        var reopened = await repository.OpenAsync(path);
-        Assert.True(reopened.AskEntranceExamQuestion);
-    }
-
-    [Fact]
-    public async Task CreateAsync_AskEntranceExamQuestionDefault_PersistsAndReloadsAsFalse()
-    {
-        var repository = new SqliteProjectRepository();
-        var path = Path.Combine(_directory, "no-entrance-exam.jukuschedule");
-        var definition = CourseProjectDefinition.Create(
-            2026,
-            CourseSeason.Summer,
-            new DateOnly(2026, 7, 20),
-            new DateOnly(2026, 7, 22));
-
-        var created = await repository.CreateAsync(path, definition);
-        Assert.False(created.AskEntranceExamQuestion);
-
-        var reopened = await repository.OpenAsync(path);
-        Assert.False(reopened.AskEntranceExamQuestion);
-    }
-
-    [Fact]
     public async Task RepeatedRepositoryCalls_OnTheSameUnchangedFile_StillPersistDataCorrectly()
     {
         // 性能対策（低速PC向け）: SqliteProjectSchema.EnsureCurrentAsyncは同一ファイルパス・
