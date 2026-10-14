@@ -45,22 +45,37 @@
                         <FontIcon Glyph="&#xE80F;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <!-- ユーザー要望（「生徒・講師・講師指導可能科目・通常授業担当設定・科目を
+                     プロジェクトごとの管理ではなく一括管理にしたい。ホームと1プロジェクト設定の
+                     間に0基本情報設定を作っておき、プロジェクトを開いていなくても触れるように
+                     する」）への対応。SetupPage（下のTag="setup"）と同じPageクラス・インスタンスを
+                     共有し、ActivateMode(isBasicInfoMode:true, tabIndex)でモード切替する
+                     （SetupPage.xaml.csのApplyModeVisibility/ActivateModeAsync参照）。子項目の
+                     タグはSetupPage.xamlのTabView絶対インデックス（生徒=0,講師=1,講師指導可能科目=2,
+                     通常授業担当設定=3,科目=6）をそのまま使う。 -->
+                <NavigationViewItem x:Name="BasicInfoNavItem" Content="0 基本情報設定" Tag="basicInfo">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE779;" /></NavigationViewItem.Icon>
+                    <NavigationViewItem.MenuItems>
+                        <NavigationViewItem Content="0.1 生徒" Tag="basicInfoTab:0"/>
+                        <NavigationViewItem Content="0.2 講師" Tag="basicInfoTab:1"/>
+                        <NavigationViewItem Content="0.3 講師指導可能科目" Tag="basicInfoTab:2"/>
+                        <NavigationViewItem Content="0.4 通常授業担当設定" Tag="basicInfoTab:3"/>
+                        <NavigationViewItem Content="0.5 科目" Tag="basicInfoTab:6"/>
+                    </NavigationViewItem.MenuItems>
+                </NavigationViewItem>
                 <!-- ユーザー要望（checkpoint122）「上側のタブだけでなく、左側のタブにもこれらを
                      選択できるようにしておきたい。設定を開いている間は右側に1.1, 1.2...のような
                      ボタンを設置する。設定が開かれていないときはこれを表示しない」への対応。
-                     子項目はSetupPage.xamlのTabViewと同じ並び順（1.1〜1.8）にし、表示/選択状態の
-                     同期はSetupPageNavStateとMainWindow.xaml.csのRefreshSetupNavState()で行う。 -->
+                     子項目はSetupPage.xamlのTabViewと同じ並び順（コマ・開校日=4,スケジュール設定=5,
+                     出力設定=7）にし、表示/選択状態の同期はSetupPageNavStateとMainWindow.xaml.csの
+                     RefreshSetupNavState()で行う。生徒・講師・講師指導可能科目・通常授業担当設定・
+                     科目は「0 基本情報設定」へ移したため、ここには含めない。 -->
                 <NavigationViewItem x:Name="SetupNavItem" Content="1 プロジェクト設定" Tag="setup">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xEBD2;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.MenuItems>
-                        <NavigationViewItem Content="1.1 生徒" Tag="setupTab:0"/>
-                        <NavigationViewItem Content="1.2 講師" Tag="setupTab:1"/>
-                        <NavigationViewItem Content="1.3 講師指導可能科目" Tag="setupTab:2"/>
-                        <NavigationViewItem Content="1.4 通常授業担当設定" Tag="setupTab:3"/>
-                        <NavigationViewItem Content="1.5 コマ・開校日" Tag="setupTab:4"/>
-                        <NavigationViewItem Content="1.6 スケジュール設定" Tag="setupTab:5"/>
-                        <NavigationViewItem Content="1.7 科目" Tag="setupTab:6"/>
-                        <NavigationViewItem Content="1.8 出力設定" Tag="setupTab:7"/>
+                        <NavigationViewItem Content="1.1 コマ・開校日" Tag="setupTab:4"/>
+                        <NavigationViewItem Content="1.2 スケジュール設定" Tag="setupTab:5"/>
+                        <NavigationViewItem Content="1.3 出力設定" Tag="setupTab:7"/>
                     </NavigationViewItem.MenuItems>
                 </NavigationViewItem>
                 <NavigationViewItem Content="2 アンケート作成" Tag="questionnaire">

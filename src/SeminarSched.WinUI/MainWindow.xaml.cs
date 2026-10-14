@@ -296,10 +296,13 @@ public sealed partial class MainWindow : Window
 
     private void RefreshSetupNavState()
     {
-        SetupNavItem.IsExpanded = SetupPageNavState.IsActive;
+        SetupNavItem.IsExpanded = SetupPageNavState.IsActive && !SetupPageNavState.IsBasicInfoMode;
+        BasicInfoNavItem.IsExpanded = SetupPageNavState.IsActive && SetupPageNavState.IsBasicInfoMode;
         if (!SetupPageNavState.IsActive) return;
-        var tag = $"setupTab:{SetupPageNavState.SelectedTabIndex}";
-        foreach (var child in SetupNavItem.MenuItems.OfType<NavigationViewItem>())
+        var parent = SetupPageNavState.IsBasicInfoMode ? BasicInfoNavItem : SetupNavItem;
+        var tagPrefix = SetupPageNavState.IsBasicInfoMode ? "basicInfoTab:" : "setupTab:";
+        var tag = $"{tagPrefix}{SetupPageNavState.SelectedTabIndex}";
+        foreach (var child in parent.MenuItems.OfType<NavigationViewItem>())
         {
             if (child.Tag as string != tag) continue;
             _syncingSetupNav = true;
@@ -370,15 +373,25 @@ public sealed partial class MainWindow : Window
         }
         else if (args.SelectedItem is NavigationViewItem item)
         {
-            if (item.Tag is string tabTag && tabTag.StartsWith("setupTab:", StringComparison.Ordinal))
+            // ユーザー要望（「0 基本情報設定」の新設）への対応。SetupPageは「0 基本情報設定」
+            // （共通正本DB対象）と「1 プロジェクト設定」（プロジェクトDB対象）の2モードを1つの
+            // インスタンスで共有するため、親項目（setup/basicInfo）・子項目（setupTab:N/
+            // basicInfoTab:N）のどちらも同じ経路で処理する。既にSetupPageが開かれている場合は
+            // Frame.Navigateを経由せずActivateMode()を直接呼ぶ（同じPage型へのFrame.Navigateは
+            // 何も起きないため、RequestedTabIndex経由のPage_Loaded消費では届かない）。
+            if (item.Tag is string setupTag && (setupTag is "setup" or "basicInfo" || setupTag.StartsWith("setupTab:", StringComparison.Ordinal) || setupTag.StartsWith("basicInfoTab:", StringComparison.Ordinal)))
             {
-                var tabIndex = int.Parse(tabTag.AsSpan("setupTab:".Length));
+                var isBasicInfo = setupTag is "basicInfo" || setupTag.StartsWith("basicInfoTab:", StringComparison.Ordinal);
+                int? tabIndex = setupTag.StartsWith("setupTab:", StringComparison.Ordinal) ? int.Parse(setupTag.AsSpan("setupTab:".Length))
+                    : setupTag.StartsWith("basicInfoTab:", StringComparison.Ordinal) ? int.Parse(setupTag.AsSpan("basicInfoTab:".Length))
+                    : null;
                 if (NavFrame.Content is SetupPage setupPage)
                 {
-                    setupPage.SelectTab(tabIndex);
+                    setupPage.ActivateMode(isBasicInfo, tabIndex);
                 }
                 else
                 {
+                    SetupPageNavState.RequestedBasicInfoMode = isBasicInfo;
                     SetupPageNavState.RequestedTabIndex = tabIndex;
                     NavFrame.Navigate(typeof(SetupPage));
                 }
@@ -394,9 +407,6 @@ public sealed partial class MainWindow : Window
                     break;
                 case "optimization":
                     NavFrame.Navigate(typeof(OptimizationPage));
-                    break;
-                case "setup":
-                    NavFrame.Navigate(typeof(SetupPage));
                     break;
                 case "questionnaire":
                     NavFrame.Navigate(typeof(QuestionnairePage));

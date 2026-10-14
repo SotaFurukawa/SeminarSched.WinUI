@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using SeminarSched.Domain.MasterData;
 using SeminarSched.Domain.Projects;
 using SeminarSched.Infrastructure.MasterData;
 using SeminarSched.Infrastructure.Projects;
@@ -8,6 +9,40 @@ namespace SeminarSched.Infrastructure.Tests;
 public sealed class SharedRosterStoreTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "SeminarSched.Tests", Guid.NewGuid().ToString("N"));
+
+    // ユーザー要望「0 基本情報設定」画面での直接編集（共通正本DBを直接触る）を、保存の都度すぐに
+    // 共通名簿Excelへ反映できるようにするための土台。DatabasePathで直接DBを編集したあと、
+    // EnsureWorkbookAsync（既存ファイルがあれば触らない）では反映されず、RefreshWorkbookAsync
+    // （無条件に再生成）でのみ反映されることを確認する。
+    [Fact]
+    public async Task RefreshWorkbookAsync_OverwritesExistingWorkbookWithCurrentDatabaseContent()
+    {
+        var storeDirectory = Path.Combine(_directory, "storeRefresh");
+        var store = new SharedRosterStore(new SharedRosterImportService(), new SqliteMasterDataRepository(), storeDirectory);
+
+        var sourcePath = Path.Combine(_directory, "source_refresh.xlsx");
+        BuildRosterWorkbookWithGrades(sourcePath, [("S-0001", "架空 太郎", "中2", "TRUE")]);
+        var preview = await store.PreviewImportAsync(sourcePath);
+        Assert.False(preview.HasErrors, string.Join(Environment.NewLine, preview.Issues.Select(i => i.Message)));
+        await store.ApplyImportAsync(preview);
+        var path = await store.EnsureWorkbookAsync();
+        Assert.True(File.Exists(path));
+
+        // 「0 基本情報設定」画面が行うのと同じく、共通正本DBをExcel経由ではなく直接編集する。
+        var master = new SqliteMasterDataRepository();
+        var existing = (await master.GetStudentsAsync(store.DatabasePath)).Single();
+        await master.SaveStudentAsync(store.DatabasePath, new Student(existing.Id, existing.ExternalId, existing.FamilyName, existing.GivenName,
+            existing.Grade, existing.DefaultMaxConsecutiveSlots, existing.AllowGap, "直接編集で更新", existing.Active));
+
+        // EnsureWorkbookAsyncは「無ければ作る」だけなので、既存ファイルはまだ古いまま。
+        await store.EnsureWorkbookAsync();
+        using (var stale = new XLWorkbook(path))
+            Assert.Equal("", stale.Worksheet("生徒").Cell(2, 9).GetString());
+
+        await store.RefreshWorkbookAsync();
+        using var refreshed = new XLWorkbook(path);
+        Assert.Equal("直接編集で更新", refreshed.Worksheet("生徒").Cell(2, 9).GetString());
+    }
 
     [Fact]
     public async Task EnsureWorkbookAsync_CreatesBlankTemplateOnceAndDoesNotRegenerate()

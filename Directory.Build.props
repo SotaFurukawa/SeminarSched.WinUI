@@ -20,18 +20,32 @@
          v1.1.0（新機能のためminorを上げてpatchを0へ戻した）は、アップデート確認で新しい
          バージョンが見つかった場合、ブラウザでダウンロードページを開くだけだった動作を、
          アプリ内でインストーラーを直接ダウンロード・起動する「アップデートを行う」ボタンへ
-         置き換えた（ユーザー指示）。docs/adr/0007-auto-update-check.mdのAmendment（v1.1.0）参照。 -->
-    <VersionPrefix>1.1.0</VersionPrefix>
+         置き換えた（ユーザー指示）。docs/adr/0007-auto-update-check.mdのAmendment（v1.1.0）参照。
+         v1.2.0（新機能）は、生徒・講師・講師指導可能科目・通常授業担当設定・科目の管理を
+         プロジェクトごとから一括管理へ変更し、新しい左ナビ「0 基本情報設定」（プロジェクトを
+         開かなくても使える）を追加した。保存すると共通名簿Excelへ即座に反映される（逆方向の
+         反映）。docs/adr/0008-centralized-basic-info.md参照。 -->
+    <VersionPrefix>1.2.0</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.1.0.0</AssemblyVersion>
-    <FileVersion>1.1.0.0</FileVersion>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <FileVersion>1.2.0.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.1.0.0</AppxPackageVersion>
+    <AppxPackageVersion>1.2.0.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
+
+  <!-- ClosedXML・Microsoft.WindowsAppSDKが推移的に引き込むSystem.Security.Cryptography.Pkcs 8.0.1に
+       既知の脆弱性（GHSA-2fmv-rv2c-59x7・GHSA-846f-f764-76mx）があり、NuGetAuditがビルドをエラーで
+       止めるため、全プロジェクト共通で修正済みバージョンへ直接参照で引き上げる（今回の機能追加とは
+       無関係の環境側の問題。2026-10-14、ClosedXMLを参照するInfrastructure/Reporting/Infrastructure.
+       Tests、およびMicrosoft.WindowsAppSDKを参照するWinUIで同時に発生したため、個別のcsprojでは
+       なくここへ集約した）。 -->
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="8.0.2" />
+  </ItemGroup>
 </Project>

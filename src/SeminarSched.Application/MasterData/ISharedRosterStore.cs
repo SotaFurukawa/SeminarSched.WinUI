@@ -9,6 +9,12 @@ public interface ISharedRosterStore
 {
     string WorkbookPath { get; }
 
+    /// <summary>共通正本のデータベースファイルパス。生徒・講師・科目・講師指導可能科目・通常授業担当設定を
+    /// プロジェクトを開かずに直接編集する「0 基本情報設定」画面が、共通名簿Excelと同じデータへ直接
+    /// アクセスするために使う（既存のGetStudentsAsync等、プロジェクトパスを受け取る既存のMasterData
+    /// リポジトリのメソッドを、プロジェクトパスの代わりにこのパスで呼び出せる）。</summary>
+    string DatabasePath { get; }
+
     /// <summary>共通名簿Excelが無ければ現在の内容（未反映なら空）から新規作成し、パスを返す。
     /// 既に存在する場合は再生成せず、そのまま返す（編集中の内容を上書きしないため）。</summary>
     Task<string> EnsureWorkbookAsync(CancellationToken cancellationToken = default);
@@ -27,6 +33,12 @@ public interface ISharedRosterStore
     /// <summary>新しい季節講習を迎える際に、在籍中の生徒全員の学年をまとめて1つ繰り上げる。
     /// 高3だった生徒は既卒として在籍を停止する（グレー表示・使用しない扱いになる）。</summary>
     Task<GradeAdvancementSummary> AdvanceStudentGradesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>共通正本の現在の内容から、共通名簿Excelを無条件に（既存ファイルの有無に関わらず）
+    /// 再生成する。「0 基本情報設定」画面で生徒・講師等を直接編集した変更を、保存の都度すぐに
+    /// Excelへ反映するために使う（EnsureWorkbookAsyncと異なり、既存ファイルを編集中でも常に
+    /// 最新の内容で上書きする）。</summary>
+    Task RefreshWorkbookAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>学年繰り上げ操作の結果件数。</summary>

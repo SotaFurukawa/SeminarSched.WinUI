@@ -13,6 +13,8 @@ public sealed class SharedRosterStore : ISharedRosterStore
 
     public string WorkbookPath { get; }
 
+    public string DatabasePath => _databasePath;
+
     public SharedRosterStore(ISharedRosterImportService importService, IMasterDataRepository masterData, string? directory = null)
     {
         _importService = importService;
@@ -92,6 +94,16 @@ public sealed class SharedRosterStore : ISharedRosterStore
         // 次に「Excelで編集」を開いたとき、繰り上げ後の最新の内容から再生成させる。
         if (File.Exists(WorkbookPath)) File.Delete(WorkbookPath);
         return new GradeAdvancementSummary(advanced, graduated);
+    }
+
+    // ユーザー要望「0 基本情報設定」画面での直接編集を、保存の都度すぐに共通名簿Excelへ反映する
+    // ための無条件再生成。EnsureWorkbookAsyncは「無ければ作る」だけで既存ファイルは触らないが、
+    // こちらは常に最新のDB内容でWorkbookPathを上書きする。
+    public async Task RefreshWorkbookAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureDatabaseAsync(cancellationToken).ConfigureAwait(false);
+        var (students, teachers, subjects, qualifications, regularLessons) = await LoadAsync(cancellationToken).ConfigureAwait(false);
+        SharedRosterWorkbookWriter.Write(WorkbookPath, students, teachers, subjects, qualifications, regularLessons);
     }
 
     private async Task EnsureDatabaseAsync(CancellationToken cancellationToken)

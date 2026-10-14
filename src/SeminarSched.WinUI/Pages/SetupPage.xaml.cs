@@ -54,6 +54,13 @@ public sealed partial class SetupPage : WorkflowPageBase
 
     private readonly SchedulingPolicyRowsController _policyController;
 
+    // ユーザー要望（「生徒・講師・講師指導可能科目・通常授業担当設定・科目をプロジェクトごとの
+    // 管理ではなく一括管理にしたい。ホームと1プロジェクト設定の間に0基本情報設定を作る」）への
+    // 対応。このPage1つで「0 基本情報設定」（共通正本DB、プロジェクト不要）と「1 プロジェクト設定」
+    // （開校日・コマ・スケジュール・出力、プロジェクトのDB）の2モードを共有する。対象タブの切替は
+    // ApplyModeVisibility、保存先の切替はResolvePathに集約した。
+    private bool _isBasicInfoMode;
+
     public SetupPage()
     {
         InitializeComponent();
@@ -65,15 +72,83 @@ public sealed partial class SetupPage : WorkflowPageBase
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         // ユーザー要望（checkpoint122）「左側のタブにもこれらを選択できるようにしておきたい」
-        // への対応。ナビゲーションペインの子項目（1.1〜1.8）から遷移してきた場合は、先に
-        // 希望タブへ切り替えてからSetupPageNavState.Activate()で左ナビへ現在のタブを知らせる。
+        // への対応。ナビゲーションペインの子項目から遷移してきた場合は、先に希望タブ・モードへ
+        // 切り替えてからSetupPageNavState.Activate()で左ナビへ現在の状態を知らせる。
         // プロジェクト未選択でTabs.IsEnabled=falseになる場合でも、左ナビの子項目自体は表示する。
+        if (SetupPageNavState.RequestedBasicInfoMode is { } requestedMode)
+        {
+            SetupPageNavState.RequestedBasicInfoMode = null;
+            _isBasicInfoMode = requestedMode;
+        }
         if (SetupPageNavState.RequestedTabIndex is { } requestedTabIndex)
         {
             SetupPageNavState.RequestedTabIndex = null;
             Tabs.SelectedIndex = requestedTabIndex;
         }
-        SetupPageNavState.Activate(Tabs.SelectedIndex);
+        ApplyModeVisibility();
+        SetupPageNavState.Activate(Tabs.SelectedIndex, _isBasicInfoMode);
+        await ActivateModeAsync();
+    }
+
+    private void Page_Unloaded(object sender, RoutedEventArgs e) => SetupPageNavState.Deactivate();
+
+    private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        SetupPageNavState.SetSelectedTabIndex(Tabs.SelectedIndex, _isBasicInfoMode);
+        if (ReferenceEquals(Tabs.SelectedItem, QualificationTabItem)) DispatcherQueue.TryEnqueue(UpdateQualificationMatrixAvailableHeight);
+    }
+
+    // MainWindowがナビゲーションペインの子項目（0.1〜0.5・1.1〜1.3）をクリックしたとき、既に
+    // SetupPageが開かれている場合はFrame.Navigateを経由せずここを直接呼ぶ（同じPage型への
+    // Frame.Navigateは何も起きないため、RequestedTabIndex経由のPage_Loaded消費では届かない）。
+    // モードが切り替わる場合（「0 基本情報設定」⇔「1 プロジェクト設定」を行き来した場合）は、
+    // 対象タブの表示・読み込み元を切り替えるためActivateModeAsyncをやり直す。
+    public async void ActivateMode(bool isBasicInfoMode, int? tabIndex)
+    {
+        var modeChanged = _isBasicInfoMode != isBasicInfoMode;
+        _isBasicInfoMode = isBasicInfoMode;
+        if (modeChanged) ApplyModeVisibility();
+        Tabs.SelectedIndex = tabIndex ?? FirstVisibleTabIndex;
+        SetupPageNavState.Activate(Tabs.SelectedIndex, _isBasicInfoMode);
+        if (modeChanged) await ActivateModeAsync();
+    }
+
+    private int FirstVisibleTabIndex => _isBasicInfoMode ? 0 : 4;
+
+    // 「0 基本情報設定」（生徒・講師・講師指導可能科目・通常授業担当設定・科目、共通正本DB対象）と
+    // 「1 プロジェクト設定」（コマ・開校日・スケジュール設定・出力設定、プロジェクトDB対象）とで
+    // 表示するタブを切り替える。TabViewItem自体は8個とも常に存在させ、Visibilityだけを
+    // 切り替える（TabViewのインデックスがモードで変わらないようにするため）。
+    private void ApplyModeVisibility()
+    {
+        PageTitle.Text = _isBasicInfoMode ? "0 基本情報設定" : "1 プロジェクト設定";
+        PageDescription.Text = _isBasicInfoMode
+            ? "プロジェクトを問わず共通で使う生徒・講師・講師指導可能科目・通常授業担当設定・科目を管理します。保存すると共通名簿Excel（生徒・講師_基本情報.xlsx）へすぐに反映されます。"
+            : "このプロジェクトだけで使う開校日・コマ・スケジュール探索方針・出力の設定をします。生徒・講師・科目等は「0 基本情報設定」で管理します。";
+        StudentTabItem.Visibility = When(_isBasicInfoMode);
+        TeacherTabItem.Visibility = When(_isBasicInfoMode);
+        QualificationTabItem.Visibility = When(_isBasicInfoMode);
+        RegularLessonTabItem.Visibility = When(_isBasicInfoMode);
+        SubjectTabItem.Visibility = When(_isBasicInfoMode);
+        TimeSlotTabItem.Visibility = When(!_isBasicInfoMode);
+        SchedulingPolicyTabItem.Visibility = When(!_isBasicInfoMode);
+        OutputSettingsTabItem.Visibility = When(!_isBasicInfoMode);
+        if (Tabs.SelectedItem is TabViewItem { Visibility: Visibility.Collapsed })
+            Tabs.SelectedIndex = FirstVisibleTabIndex;
+    }
+
+    // Page_Loaded・ActivateMode（モード変更時）の両方から呼ぶ、モードごとの初期化処理。
+    private async Task ActivateModeAsync()
+    {
+        if (_isBasicInfoMode)
+        {
+            // 「0 基本情報設定」はプロジェクトを開いていなくても使えるため、プロジェクト要求の
+            // 警告は出さない。
+            ProjectRequired.IsOpen = false;
+            Tabs.IsEnabled = true;
+            await ReloadAsync();
+            return;
+        }
 
         var current = App.ProjectService.Current;
         if (!EnsureProject(ProjectRequired) || current is null) { Tabs.IsEnabled = false; return; }
@@ -88,18 +163,29 @@ public sealed partial class SetupPage : WorkflowPageBase
         await LoadSchedulingPolicyAsync(current.Path);
     }
 
-    private void Page_Unloaded(object sender, RoutedEventArgs e) => SetupPageNavState.Deactivate();
+    // 「0 基本情報設定」モードでは共通正本DB（App.SharedRosterStore.DatabasePath）、「1 プロジェクト
+    // 設定」モードでは開いているプロジェクトのDBを対象にする。ExecuteAsync・ReloadAsync・各種
+    // 削除ハンドラーはすべてこれ経由で対象パスを決める。
+    private string ResolvePath() => _isBasicInfoMode
+        ? App.SharedRosterStore.DatabasePath
+        : App.ProjectService.Current?.Path ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
 
-    private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    // ユーザー要望「書き戻すときに、変更されたものは即座にexcelに反映するようにしてください」への
+    // 対応。「0 基本情報設定」での保存・削除が成功した直後に呼び、共通名簿Excelを無条件で再生成する。
+    // Excel側が開いていて上書きできない場合はIOException/UnauthorizedAccessExceptionになるため、
+    // 保存自体（DBへの反映）は成功済みである旨が伝わるよう、Warningとして別出しする。
+    private async Task RefreshSharedRosterWorkbookIfBasicInfoAsync()
     {
-        SetupPageNavState.SetSelectedTabIndex(Tabs.SelectedIndex);
-        if (ReferenceEquals(Tabs.SelectedItem, QualificationTabItem)) DispatcherQueue.TryEnqueue(UpdateQualificationMatrixAvailableHeight);
+        if (!_isBasicInfoMode) return;
+        try
+        {
+            await App.SharedRosterStore.RefreshWorkbookAsync();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Show(InfoBarSeverity.Warning, "共通名簿Excelへの反映に失敗しました", $"変更自体は保存されています。Excelで開いている場合は閉じてから、もう一度保存し直してください。（{exception.Message}）");
+        }
     }
-
-    // MainWindowがナビゲーションペインの子項目（1.1〜1.8）をクリックしたとき、既にSetupPageが
-    // 開かれている場合はFrame.Navigateを経由せずここを直接呼ぶ（同じPage型へのFrame.Navigateは
-    // 何も起きないため、RequestedTabIndex経由のPage_Loaded消費では届かない）。
-    public void SelectTab(int index) => Tabs.SelectedIndex = index;
 
     private async Task LoadOutputSettingsAsync(string path)
     {
@@ -229,10 +315,11 @@ public sealed partial class SetupPage : WorkflowPageBase
         try
         {
             IsEnabled = false;
-            var path = App.ProjectService.Current?.Path ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
+            var path = ResolvePath();
             await App.MasterData.DeleteStudentAsync(path, row.Value.Id);
             await ReloadAsync();
             Show(InfoBarSeverity.Success, "生徒を削除しました", "");
+            await RefreshSharedRosterWorkbookIfBasicInfoAsync();
         }
         catch (SqliteException exception)
         {
@@ -306,10 +393,11 @@ public sealed partial class SetupPage : WorkflowPageBase
         try
         {
             IsEnabled = false;
-            var path = App.ProjectService.Current?.Path ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
+            var path = ResolvePath();
             await App.MasterData.DeleteTeacherAsync(path, row.Value.Id);
             await ReloadAsync();
             Show(InfoBarSeverity.Success, "講師を削除しました", "");
+            await RefreshSharedRosterWorkbookIfBasicInfoAsync();
         }
         catch (SqliteException exception)
         {
@@ -467,7 +555,7 @@ public sealed partial class SetupPage : WorkflowPageBase
         try
         {
             IsEnabled=false;
-            var path=App.ProjectService.Current?.Path??throw new InvalidOperationException("プロジェクトが開かれていません。");
+            var path=ResolvePath();
             await App.CourseSettings.DeleteTimeSlotAsync(path,slotId);
             await ReloadAsync();
             Show(InfoBarSeverity.Success,"コマを削除しました","");
@@ -937,9 +1025,10 @@ public sealed partial class SetupPage : WorkflowPageBase
         try
         {
             IsEnabled = false;
-            var path = App.ProjectService.Current?.Path ?? throw new InvalidOperationException("プロジェクトが開かれていません。");
+            var path = ResolvePath();
             await action(path); await ReloadAsync();
             Show(InfoBarSeverity.Success, success, "");
+            await RefreshSharedRosterWorkbookIfBasicInfoAsync();
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or SqliteException or OverflowException or FormatException)
         {
@@ -950,7 +1039,7 @@ public sealed partial class SetupPage : WorkflowPageBase
 
     private async Task ReloadAsync()
     {
-        var path = App.ProjectService.Current!.Path;
+        var path = ResolvePath();
         {
             var studentValues=await App.MasterData.GetStudentsAsync(path);var teacherValues=await App.MasterData.GetTeachersAsync(path);var subjectValues=await App.MasterData.GetSubjectsAsync(path);
             var studentItems=studentValues.Select(x => new MasterItem<Student>(x,$"{(x.Active?"":"[卒業・無効] ")}{x.ExternalId}　{x.FullName}　{x.Grade}",x.Active,"在籍中","卒業・無効")).ToArray();

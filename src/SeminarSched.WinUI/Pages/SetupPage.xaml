@@ -9,10 +9,10 @@
     Unloaded="Page_Unloaded"
     SizeChanged="Page_SizeChanged">
     <ScrollViewer><StackPanel Padding="24" Spacing="16">
-        <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="1 プロジェクト設定"/>
+        <TextBlock x:Name="PageTitle" Style="{StaticResource TitleTextBlockStyle}" Text="1 プロジェクト設定"/>
         <InfoBar x:Name="ProjectRequired"/>
         <InfoBar x:Name="Status" IsClosable="True"/>
-        <TextBlock Text="プロジェクト、開校日、コマ、科目、生徒・講師の共通基本情報を設定します。" TextWrapping="Wrap"/>
+        <TextBlock x:Name="PageDescription" Text="プロジェクト、開校日、コマ、科目、生徒・講師の共通基本情報を設定します。" TextWrapping="Wrap"/>
         <!-- ユーザー指摘（checkpoint122）「個々のボタンの幅をもう少し広げてほしい」「ボタンの文字を
              改行してもらいましたが、やはり1行で表示したい。そうすると少し右側にはみ出るかもしれないが、
              Excelのシートを選べるような感じで右側に移動できるようにしておいてほしい」への対応。
@@ -28,7 +28,7 @@
                     <Setter Property="MinWidth" Value="120"/>
                 </Style>
             </TabView.Resources>
-            <TabViewItem Header="生徒"><StackPanel Padding="16" Spacing="10">
+            <TabViewItem x:Name="StudentTabItem" Header="生徒"><StackPanel Padding="16" Spacing="10">
                 <!-- ユーザー要望（checkpoint142）「生徒・講師について、上側で入力させる形式ではない
                      ようにしたい」への対応。常時表示の入力フォームを廃止し、「生徒追加」ボタンで
                      一覧の最下部に新規行を、既存行は一覧にカーソルを合わせたときだけ現れる「変更」
@@ -81,7 +81,7 @@
                     </ListView.ItemTemplate>
                 </ListView>
             </StackPanel></TabViewItem>
-            <TabViewItem Header="講師"><StackPanel Padding="16" Spacing="10">
+            <TabViewItem x:Name="TeacherTabItem" Header="講師"><StackPanel Padding="16" Spacing="10">
                 <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="新規で通期の講師を追加できます。ホームの「Excelで基本情報を編集」からでも追加できます。"/>
                 <TextBlock Text="「講師追加」で一覧の最下部に新しい行が追加されます。既存の行は、カーソルを合わせたときに表示される「変更」ボタンで編集できます。講師IDは自動的に割り振られ、変更できません。"/>
                 <StackPanel Orientation="Horizontal" Spacing="8"><TextBox x:Name="TeacherSearch" PlaceholderText="ID・氏名で検索" TextChanged="TeacherSearch_TextChanged" Width="320"/><Button Content="講師追加" Click="AddTeacherRow_Click"/></StackPanel>
@@ -155,7 +155,7 @@
                     </ScrollViewer>
                 </Grid>
             </StackPanel></TabViewItem>
-            <TabViewItem Header="通常授業担当設定"><StackPanel Padding="16" Spacing="12">
+            <TabViewItem x:Name="RegularLessonTabItem" Header="通常授業担当設定"><StackPanel Padding="16" Spacing="12">
                 <!-- ユーザー要望（checkpoint145/146で承認されたPlanのStage 3）「通常授業担当設定とコマ
                      についても、生徒・講師ページと同様の仕様にしてほしい」への対応。常時表示の入力
                      フォームを廃止し、生徒・講師・科目タブと同じ行内編集方式へ変更した。削除機能は
@@ -195,7 +195,7 @@
                     </ListView.ItemTemplate>
                 </ListView>
             </StackPanel></TabViewItem>
-            <TabViewItem Header="コマ・開校日"><StackPanel Padding="16" Spacing="12">
+            <TabViewItem x:Name="TimeSlotTabItem" Header="コマ・開校日"><StackPanel Padding="16" Spacing="12">
                 <TextBlock FontSize="18" FontWeight="SemiBold" Text="コマ設定"/>
                 <!-- ユーザー要望（checkpoint145/146で承認されたPlanのStage 3）「コマについても、
                      生徒・講師ページと同様の仕様にしてほしい」への対応。常時表示の入力フォーム＋
@@ -264,7 +264,7 @@
                 <Grid x:Name="CalendarWeekdayHeader" ColumnSpacing="2"/>
                 <Grid x:Name="CourseDayCalendar" ColumnSpacing="2" RowSpacing="2"/>
             </StackPanel></TabViewItem>
-            <TabViewItem Header="スケジュール設定">
+            <TabViewItem x:Name="SchedulingPolicyTabItem" Header="スケジュール設定">
                 <StackPanel Padding="16" Spacing="12">
                     <TextBlock FontSize="18" FontWeight="SemiBold" Text="7 最適化探索の方針設定"/>
                     <TextBlock Text="ここで保存した内容がこのプロジェクトの既定値になります。5 時間割自動作成の画面でも、その回だけの一時的な変更ができます。" TextWrapping="Wrap"/>
@@ -335,7 +335,7 @@
                     <Button Content="保存" Click="SaveSchedulingPolicy_Click" HorizontalAlignment="Left"/>
                 </StackPanel>
             </TabViewItem>
-            <TabViewItem Header="科目"><StackPanel Padding="16" Spacing="10">
+            <TabViewItem x:Name="SubjectTabItem" Header="科目"><StackPanel Padding="16" Spacing="10">
                 <TextBlock Text="「科目追加」で一覧の最下部に新しい行が追加されます。既存の行は、カーソルを合わせたときに表示される「変更」ボタンで編集できます。"/>
                 <StackPanel Orientation="Horizontal" Spacing="8"><TextBox x:Name="SubjectSearch" PlaceholderText="コード・科目名・校種で検索" TextChanged="SubjectSearch_TextChanged" Width="320"/><Button Content="科目追加" Click="AddSubjectRow_Click"/></StackPanel>
                 <Grid ColumnSpacing="8" Padding="4,0"><Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="130"/><ColumnDefinition Width="180"/><ColumnDefinition Width="80"/><ColumnDefinition Width="120"/><ColumnDefinition Width="80"/></Grid.ColumnDefinitions><TextBlock FontWeight="SemiBold" Text="順序"/><TextBlock Grid.Column="1" FontWeight="SemiBold" Text="コード"/><TextBlock Grid.Column="2" FontWeight="SemiBold" Text="科目名"/><TextBlock Grid.Column="3" FontWeight="SemiBold" Text="略称"/><TextBlock Grid.Column="4" FontWeight="SemiBold" Text="校種"/><TextBlock Grid.Column="5" FontWeight="SemiBold" Text="状態"/></Grid>
@@ -369,7 +369,7 @@
                     </ListView.ItemTemplate>
                 </ListView>
             </StackPanel></TabViewItem>
-            <TabViewItem Header="出力設定">
+            <TabViewItem x:Name="OutputSettingsTabItem" Header="出力設定">
                 <StackPanel Padding="16" Spacing="12">
                     <TextBlock FontSize="18" FontWeight="SemiBold" Text="6 出力の書式設定"/>
                     <TextBlock Text="PDFの用紙サイズ・向き・余白、出力ファイル名の規則（{project}=プロジェクト名、{report}=帳票名、{date}=出力日）、主な塗り色を設定します。" TextWrapping="Wrap"/>
