@@ -321,25 +321,6 @@ public sealed class QuestionnaireKitService
           logQuestionnaireUrls_(form, spreadsheet.getId());
         }
 
-        const OTHER_GRADE_OPT_IN_TITLE =
-          "中高一貫などで他学年の授業を受講される際はこちらにチェックを入れてください";
-
-        // 中高一貫などで他学年の授業を受講される場合のオプトインチェックボックス。askEntranceExamQuestion
-        // がオンのときは学校段階ごとのページへ複製して配置する。Googleフォームの回答スプレッドシートは
-        // 設問のタイトルをそのまま列見出しにするため、同じタイトルの設問が複数あると列を区別できない。
-        // schoolLevelLabelを渡したときだけ見出しへ付記し、responseValue_側（writeCompactStudentResponse_）
-        // でも同じ付記ルールを使って該当する列だけを読み分ける。
-        function addOtherGradeOptIn_(form, schoolLevelLabel) {
-          const title = schoolLevelLabel
-            ? `${OTHER_GRADE_OPT_IN_TITLE}（${schoolLevelLabel}）`
-            : OTHER_GRADE_OPT_IN_TITLE;
-          return form
-            .addMultipleChoiceItem()
-            .setTitle(title)
-            .setHelpText("他学年の科目も選ぶ場合だけ選択してください。該当しない場合は未回答のまま進んでください。")
-            .setRequired(false);
-        }
-
         function addStudentQuestions_(form) {
           const gradeItem = form
             .addListItem()
@@ -350,22 +331,16 @@ public sealed class QuestionnaireKitService
             .setTitle("在籍区分（必須）")
             .setChoiceValues(QUESTIONNAIRE_CONFIG.enrollmentTypes)
             .setRequired(true);
-
-          // ユーザー要望「中学受験をしますか？を、他学年の受講の欄より前（小学校の学年を選んだ
-          // 場合だけ）表示したい」への対応。Googleフォームの分岐はページ単位でしか行えず、学年選択
-          // 直後の共通ページへ条件付きで質問を挟むことはできないため、askEntranceExamQuestionが
-          // オンのときは「他学年を受講しますか」チェックを学年選択直後の共通ページから外し、
-          // 学校段階ごとのページの先頭（小学校だけは「中学受験をしますか？」の直後）へ複製して
-          // 個別に配置する。オフのときは今まで通り学年選択の直後に1つだけ置く。
-          const otherGradeItems = [];
-          if (!QUESTIONNAIRE_CONFIG.askEntranceExamQuestion) {
-            otherGradeItems.push(addOtherGradeOptIn_(form));
-          }
+          const otherGradeItem = form
+            .addMultipleChoiceItem()
+            .setTitle("中高一貫などで他学年の授業を受講される際はこちらにチェックを入れてください")
+            .setHelpText("他学年の科目も選ぶ場合だけ選択してください。該当しない場合は未回答のまま進んでください。")
+            .setRequired(false);
 
           const elementaryPage = form
             .addPageBreakItem()
             .setTitle("受講教科・回数（小学校）")
-            .setHelpText("最大4教科まで回答してください。学校区分は小学校として自動的に扱います。");
+            .setHelpText("最大4教科まで回答してください。");
           if (QUESTIONNAIRE_CONFIG.askEntranceExamQuestion) {
             form
               .addMultipleChoiceItem()
@@ -373,7 +348,6 @@ public sealed class QuestionnaireKitService
               .setHelpText("算数・国語の出題範囲の目安にします。")
               .setChoiceValues(["する", "しない"])
               .setRequired(true);
-            otherGradeItems.push(addOtherGradeOptIn_(form, "小学校"));
           }
           addSubjectRequestSection_(
             form,
@@ -384,8 +358,7 @@ public sealed class QuestionnaireKitService
           const juniorHighPage = form
             .addPageBreakItem()
             .setTitle("受講教科・回数（中学校）")
-            .setHelpText("最大4教科まで回答してください。学校区分は中学校として自動的に扱います。");
-          if (QUESTIONNAIRE_CONFIG.askEntranceExamQuestion) otherGradeItems.push(addOtherGradeOptIn_(form, "中学校"));
+            .setHelpText("最大4教科まで回答してください。");
           addSubjectRequestSection_(
             form,
             QUESTIONNAIRE_CONFIG.subjectsBySchoolLevel.juniorHigh,
@@ -395,8 +368,7 @@ public sealed class QuestionnaireKitService
           const highSchoolPage = form
             .addPageBreakItem()
             .setTitle("受講教科・回数（高校）")
-            .setHelpText("最大4教科まで回答してください。学校区分は高校として自動的に扱います。");
-          if (QUESTIONNAIRE_CONFIG.askEntranceExamQuestion) otherGradeItems.push(addOtherGradeOptIn_(form, "高校"));
+            .setHelpText("最大4教科まで回答してください。");
           addSubjectRequestSection_(
             form,
             QUESTIONNAIRE_CONFIG.subjectsBySchoolLevel.highSchool,
@@ -431,6 +403,9 @@ public sealed class QuestionnaireKitService
             .setRequired(false);
 
           // 各PageBreakItemは直前のページの遷移先を設定する。
+          // 不具合修正: elementaryPageには遷移先指定が無く、Googleフォームの既定動作（次に
+          // 定義されたページへそのまま進む＝juniorHighPage）に落ちて、小学校の回答者が誤って
+          // 中学校ページの設問まで続けて見てしまっていたため、明示的に指定する。
           elementaryPage.setGoToPage(availabilityPage);
           juniorHighPage.setGoToPage(availabilityPage);
           highSchoolPage.setGoToPage(availabilityPage);
@@ -446,11 +421,10 @@ public sealed class QuestionnaireKitService
               gradeItem.createChoice(grade, highSchoolPage),
             ),
           ]);
-          // 他学年チェックが選択されたときだけ、そのページの既定の遷移先より優先して
-          // 全校種ページへ進める（askEntranceExamQuestionがオンのときは複数個所に配置される）。
-          otherGradeItems.forEach((item) =>
-            item.setChoices([item.createChoice("他学年の授業を受講する", otherGradePage)]),
-          );
+          // 同じページの最後のナビゲーション質問を優先し、選択時だけ全校種ページへ進める。
+          otherGradeItem.setChoices([
+            otherGradeItem.createChoice("他学年の授業を受講する", otherGradePage),
+          ]);
         }
 
         function addTeacherQuestions_(form) {
@@ -635,15 +609,11 @@ public sealed class QuestionnaireKitService
             .getRange(1, 1, 1, rawSheet.getLastColumn())
             .getDisplayValues()[0];
           const values = event.range.getValues()[0];
+          const otherGradeTitle =
+            "中高一貫などで他学年の授業を受講される際はこちらにチェックを入れてください";
+          const otherGradeAnswer = responseValue_(headers, values, [otherGradeTitle]);
           const grade = String(responseValue_(headers, values, ["学年（必須）"])).trim();
           const automaticSchoolLevel = schoolLevelForStudentGrade_(grade);
-          // addOtherGradeOptIn_と同じ付記ルール。askEntranceExamQuestionがオンのときは学校段階
-          // ごとに複製された設問のうち、この回答者の学年に対応する1つだけを読み取る。
-          const otherGradeTitle =
-            QUESTIONNAIRE_CONFIG.askEntranceExamQuestion && automaticSchoolLevel
-              ? `${OTHER_GRADE_OPT_IN_TITLE}（${automaticSchoolLevel}）`
-              : OTHER_GRADE_OPT_IN_TITLE;
-          const otherGradeAnswer = responseValue_(headers, values, [otherGradeTitle]);
           const entranceExamAnswer = QUESTIONNAIRE_CONFIG.askEntranceExamQuestion
             ? responseValue_(headers, values, ["中学受験をしますか？（必須）"])
             : "";

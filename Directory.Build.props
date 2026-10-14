@@ -56,16 +56,24 @@
          説明文を「【年度・講習区分】…申し込み締め切りはM/D(曜)です」の簡潔な書式へ変更した。
          ③「作成手順」ガイドの手順2に紐付いていた画像が、実際には無関係な古いモックアップ
          だったため、正しい画像を用意できるまでの間、画像を外して文章の説明のみにした。
-         docs/adr/0010-questionnaire-entrance-exam-question-toggle.mdのAmendment（v1.4.3）参照。 -->
-    <VersionPrefix>1.4.3</VersionPrefix>
+         docs/adr/0010-questionnaire-entrance-exam-question-toggle.mdのAmendment（v1.4.3）参照。
+         v1.4.4は、実際に生成したGoogleフォームを見たユーザーから3件の指摘を受けた対応。
+         ①手順1-2枚目（保存後）の画像を、ユーザー提供の実際のスクリーンショットへ差し替えた。
+         ②v1.4.3の並び順修正（他学年チェックを学校段階ごとに複製し付記を付けた変更）は、実際の
+         フォームでは不自然に見えるとして差し戻した（「中学受験をしますか？」はelementaryPageに
+         残るため、結果的に他学年チェックより後に表示される状態へ戻る）。elementaryPageの
+         遷移先指定漏れの不具合修正は差し戻し対象外として維持した。③「学校区分は...として
+         自動的に扱います。」という、お客様向けには不自然な実装説明文をhelpTextから削除した。
+         docs/adr/0010-questionnaire-entrance-exam-question-toggle.mdのAmendment（v1.4.4）参照。 -->
+    <VersionPrefix>1.4.4</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.4.3.0</AssemblyVersion>
-    <FileVersion>1.4.3.0</FileVersion>
+    <AssemblyVersion>1.4.4.0</AssemblyVersion>
+    <FileVersion>1.4.4.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.4.3.0</AppxPackageVersion>
+    <AppxPackageVersion>1.4.4.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>

@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-15（checkpoint172）
+最終更新: 2026-10-15（checkpoint173）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,8 +16,41 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.4.3`（Release・公開済み。checkpoint172参照）
-Latest Development Checkpoint: checkpoint 172（v1.4.xの「中学受験と中学受験以外を分ける」
+Current Version: `v1.4.4`（Release・公開済み。checkpoint173参照）
+Latest Development Checkpoint: checkpoint 173（v1.4.3公開後、ユーザーから実際に生成した
+Googleフォームのスクリーンショット（②アンケート作成の保存後の画面）とともに3件の指示が
+あった。
+
+①送られてきたスクリーンショットが「作成手順」ガイドの手順1-2枚目（保存後）に該当するとの
+指示だったため、`01_save_kit_b.png`をこの実際の画像へ差し替えた（v1.4.0で追加した
+「中学受験と中学受験以外を分ける」チェックボックスが写った、現行仕様に即した内容）。
+
+②「やはりアンケートは前のものにしてください。」という取り消し指示。AskUserQuestionでどこまで
+戻すか確認したところ、「v1.4.3の並び順修正だけを差し戻す」（「他学年の受講」チェックを学校
+段階ごとに複製し「（小学校）」等を付記した変更を取り消し、v1.4.2以前の単一の共通設問へ戻す。
+「中学受験をしますか？」自体はelementaryPageに残り、結果的に他学年チェックより後に表示される
+状態を許容する）という意図だった。
+- `addOtherGradeOptIn_`関数と`OTHER_GRADE_OPT_IN_TITLE`定数を削除し、`otherGradeItem`を
+  学年選択直後の共通ページに置く単一設問へ戻した（v1.4.0時点のコードと同一）。
+  `writeCompactStudentResponse_`の`otherGradeTitle`の読み取りも付記無しの固定文字列へ戻した。
+- v1.4.3で見つけて修正した`elementaryPage.setGoToPage(availabilityPage)`の不具合修正
+  （遷移先指定漏れで中学校ページへ連続表示されていた）は、今回の差し戻しと無関係な独立した
+  修正のため維持した。
+- 並び順の検証テストは削除し、`elementaryPage.setGoToPage(availabilityPage)`の存在確認
+  テストへ置き換えた。
+
+③「『学校区分は小学校として自動的に扱います。』こういった文言は削除する。お客様相手に見えて
+いておかしくない状態にすること。」への対応。`elementaryPage`・`juniorHighPage`・
+`highSchoolPage`のhelpTextから、この実装説明の一文を削除した（v1.4.3以前から存在していた
+既存の文言で、今回初めて指摘を受けた）。
+
+- 既存の全テスト＋新規・更新分、合計274件がすべて通過。
+- 詳細はdocs/adr/0010-questionnaire-entrance-exam-question-toggle.mdのAmendment（v1.4.4）参照。
+- v1.4.4として通常のbuild/test→commit/push→インストーラー作成→Release公開のサイクルを実行。
+
+---
+
+checkpoint 172（v1.4.xの「中学受験と中学受験以外を分ける」
 オプションについて、実際に生成したGoogleフォームのスクリーンショットをもとにユーザーから3件の
 指摘があった。
 
