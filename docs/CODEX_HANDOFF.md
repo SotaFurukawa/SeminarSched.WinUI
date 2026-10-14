@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-14（checkpoint169）
+最終更新: 2026-10-14（checkpoint171）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,9 +16,26 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.4.0`（Release・公開済み。アンケート作成に「中学受験と中学受験以外を
-分ける」オプションを追加した新機能。checkpoint169参照）
-Latest Development Checkpoint: checkpoint 169（クライアント側のアンケート生成エラー調査報告と、
+Current Version: `v1.4.2`（Release・公開済み。v1.4.0と挙動は完全に同一。checkpoint171参照）
+Latest Development Checkpoint: checkpoint 171（v1.4.0の「中学受験と中学受験以外を分ける」
+オプションについて、一度はホーム画面のプロジェクト作成時設定へ置き場所を移す変更を行った
+（v1.4.1としてcommit・push済み、GitHub Release未公開の段階）が、ユーザーから直後に
+「あ！やっぱりやめます！元のままでいいです！」と取り消しの指示があった。
+- どこまで戻すかを確認したところ（AskUserQuestion）、「配置だけ戻す」（「中学受験と中学受験
+  以外を分ける」機能自体は維持する）という意図だった。
+- 該当commit（v1.4.1、7898c0e）は`git revert`で取り消した。pushed済みのcommitだったため、
+  historyの書き換え（reset --hard・force push等）は行わず、安全な追加commitで取り消している。
+  結果、v1.4.0の設計（②アンケート作成ページのその場限りのチェックボックス）がそのまま最終形
+  になった。
+- 公開済みのversionは使い回さない方針のため、取り消し後の状態（挙動はv1.4.0と完全に同一）を
+  新しいversion v1.4.2として改めてリリースした（v1.4.1自体はGitHub Releaseを作成していない
+  ため欠番のまま残る）。
+- 詳細はdocs/adr/0010-questionnaire-entrance-exam-question-toggle.mdのAmendment（v1.4.1→
+  取り消し、v1.4.2）参照。
+
+---
+
+checkpoint 169（クライアント側のアンケート生成エラー調査報告と、
 アンケート作成の「中学受験と中学受験以外を分ける」オプション追加への対応。
 
 ①クライアント報告「生徒用フォームに必要な小学校・中学校・高校の使用中科目が不足しています。

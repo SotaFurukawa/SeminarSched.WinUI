@@ -40,16 +40,22 @@
          アプリへ取り込まれる受講希望の内容（整形済み回答シートの列・値）はオプションの
          有無に関わらず同じになるよう、復元はGoogle Apps Script側の正規化処理
          （writeCompactStudentResponse_）で行い、CourseSurveyImportService.csは無改修。
-         docs/adr/0010-questionnaire-entrance-exam-question-toggle.md参照。 -->
-    <VersionPrefix>1.4.0</VersionPrefix>
+         docs/adr/0010-questionnaire-entrance-exam-question-toggle.md参照。
+         v1.4.1は、v1.4.0のオプションの置き場所をホーム画面のプロジェクト作成時設定へ
+         移す変更だったが、ユーザーから直後に「やっぱりやめます！元のままでいいです！」と
+         取り消しの指示があり、配置だけをv1.4.0の設計（②アンケート作成ページのその場限りの
+         チェックボックス）へ戻した（git revertで取り消し）。v1.4.2は、その取り消し後の状態
+         （挙動はv1.4.0と同一）を新しいversionとして正式にリリースしたもの。公開済みの
+         versionを使い回さない方針のため、内容がv1.4.0と同じでもversionは独立して払い出す。 -->
+    <VersionPrefix>1.4.2</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.4.0.0</AssemblyVersion>
-    <FileVersion>1.4.0.0</FileVersion>
+    <AssemblyVersion>1.4.2.0</AssemblyVersion>
+    <FileVersion>1.4.2.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.4.0.0</AppxPackageVersion>
+    <AppxPackageVersion>1.4.2.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
