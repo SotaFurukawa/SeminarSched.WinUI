@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using SeminarSched.Application.Questionnaires;
 using SeminarSched.Domain.CourseSettings;
 using SeminarSched.Domain.MasterData;
@@ -45,6 +46,58 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
         Assert.DoesNotContain("addTeacherSubjectQuestions_", teacherScript);
 
         Assert.Empty(Directory.GetDirectories(_directory, "*.tmp-*"));
+    }
+
+    [Fact]
+    public async Task GenerateAsync_AskEntranceExamQuestionOff_KeepsSplitElementarySubjectChoicesUnchanged()
+    {
+        var path = Path.Combine(_directory, "project.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
+        var course = new SqliteCourseSettingsRepository();
+        var master = new SqliteMasterDataRepository();
+        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH_ENTRANCE", "小学校・算数（中学受験）", "算", "小学校", 1));
+        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH", "小学校・算数（中学受験以外なら可能）", "算", "小学校", 2));
+        await master.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "中学校・数学", "数", "中学校", 3));
+        await master.SaveSubjectAsync(path, new Subject(0, "HS_MATH", "高校・数学IA", "数", "高校", 4));
+
+        var output = await new QuestionnaireKitService(course, master).GenerateAsync(path, _directory, "2026夏期講習", "生徒用", "講師用", "2026-07-06", "2026-07-10", "問い合わせ先");
+
+        var studentScript = await File.ReadAllTextAsync(Path.Combine(output, "create_student_questionnaire.gs"));
+        Assert.Contains("\"算数（中学受験）\"", studentScript);
+        Assert.Contains("\"算数（中学受験以外）\"", studentScript);
+        Assert.Contains("\"askEntranceExamQuestion\": false", studentScript);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_AskEntranceExamQuestionOn_CombinesElementaryMathAndJapaneseAndAddsDedicatedQuestion()
+    {
+        var path = Path.Combine(_directory, "project.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
+        var course = new SqliteCourseSettingsRepository();
+        var master = new SqliteMasterDataRepository();
+        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH_ENTRANCE", "小学校・算数（中学受験）", "算", "小学校", 1));
+        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH", "小学校・算数（中学受験以外なら可能）", "算", "小学校", 2));
+        await master.SaveSubjectAsync(path, new Subject(0, "ES_JPN_ENTRANCE", "小学校・国語（中学受験）", "国", "小学校", 3));
+        await master.SaveSubjectAsync(path, new Subject(0, "ES_JPN", "小学校・国語（中学受験以外なら可能）", "国", "小学校", 4));
+        await master.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "中学校・数学", "数", "中学校", 5));
+        await master.SaveSubjectAsync(path, new Subject(0, "HS_MATH", "高校・数学IA", "数", "高校", 6));
+
+        var output = await new QuestionnaireKitService(course, master).GenerateAsync(path, _directory, "2026夏期講習", "生徒用", "講師用", "2026-07-06", "2026-07-10", "問い合わせ先", askEntranceExamQuestion: true);
+
+        var studentScript = await File.ReadAllTextAsync(Path.Combine(output, "create_student_questionnaire.gs"));
+        Assert.Contains("\"askEntranceExamQuestion\": true", studentScript);
+        Assert.Contains("中学受験をしますか？（必須）", studentScript);
+        // 自動判定される小学校ページの選択肢は分割前の「算数」「国語」だけにまとまる
+        // （「算数（中学受験）」は他学年ページ用のstudentSubjectChoicesにだけ残るので1回だけ出現する）。
+        Assert.Contains("\"算数\",", studentScript);
+        Assert.Contains("\"国語\"", studentScript);
+        Assert.Single(Regex.Matches(studentScript, Regex.Escape("\"算数（中学受験）\"")));
+        Assert.Single(Regex.Matches(studentScript, Regex.Escape("\"算数（中学受験以外）\"")));
+        // 「他学年を含む」ページ用の一覧は、このオプションの影響を受けず分割済みのままにする。
+        Assert.Contains("\"算数（中学受験）\"", studentScript);
+        Assert.Contains("\"算数（中学受験以外）\"", studentScript);
+        Assert.Contains("\"国語（中学受験）\"", studentScript);
+        Assert.Contains("\"国語（中学受験以外）\"", studentScript);
     }
 
     [Fact]

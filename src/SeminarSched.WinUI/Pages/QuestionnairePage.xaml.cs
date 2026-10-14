@@ -35,7 +35,8 @@ public sealed partial class QuestionnairePage : WorkflowPageBase
             var current = App.ProjectService.Current!;
             var studentDeadline = StudentDeadlinePicker.Date.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             var teacherDeadline = TeacherDeadlinePicker.Date.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var path = await App.QuestionnaireKit.GenerateAsync(current.Path, WorkspacePaths.Forms, current.Title, studentTitle, teacherTitle, studentDeadline, teacherDeadline, contact);
+            var askEntranceExamQuestion = AskEntranceExamQuestionCheckBox.IsChecked ?? false;
+            var path = await App.QuestionnaireKit.GenerateAsync(current.Path, WorkspacePaths.Forms, current.Title, studentTitle, teacherTitle, studentDeadline, teacherDeadline, contact, askEntranceExamQuestion);
             _lastOutputDirectory = path;
             ResultPanel.Visibility = Visibility.Visible;
             ToastNotificationState.ShowSuccess("作成キットを保存しました");

@@ -32,16 +32,24 @@
          （IME変換途中の入力がMaxLengthで打ち切られる不具合への対応）。docs/adr/
          0009-regular-lesson-profile-allows-duplicates.md参照。
          v1.3.1は、ユーザーの明示指示（「V1.3.1を中身を変えずリリースしてください」）による
-         バージョンのみの更新。v1.3.0からコード・挙動の変更は無い。 -->
-    <VersionPrefix>1.3.1</VersionPrefix>
+         バージョンのみの更新。v1.3.0からコード・挙動の変更は無い。
+         v1.4.0（新機能）は、②アンケート作成に「中学受験と中学受験以外を分ける」オプション
+         （既定はオフ＝現状維持）を追加した。オンのときだけ、小学生の回答者に「中学受験を
+         しますか？」という専用の質問を追加し、算数・国語の選択肢は中学受験の有無で分けず
+         単一にする。「他学年を含む」ページの選択肢は対象外（常に分割済みのまま）。
+         アプリへ取り込まれる受講希望の内容（整形済み回答シートの列・値）はオプションの
+         有無に関わらず同じになるよう、復元はGoogle Apps Script側の正規化処理
+         （writeCompactStudentResponse_）で行い、CourseSurveyImportService.csは無改修。
+         docs/adr/0010-questionnaire-entrance-exam-question-toggle.md参照。 -->
+    <VersionPrefix>1.4.0</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.3.1.0</AssemblyVersion>
-    <FileVersion>1.3.1.0</FileVersion>
+    <AssemblyVersion>1.4.0.0</AssemblyVersion>
+    <FileVersion>1.4.0.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.3.1.0</AppxPackageVersion>
+    <AppxPackageVersion>1.4.0.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>

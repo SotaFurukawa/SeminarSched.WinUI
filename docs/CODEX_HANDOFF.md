@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-14（checkpoint168）
+最終更新: 2026-10-14（checkpoint169）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,12 +16,50 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.3.1`（Release・公開済み。ユーザー指示「V1.3.1を中身を変えずリリースして
-ください」によるバージョンのみの更新。v1.3.0からコード・挙動の変更は無い。checkpoint168参照）
-Latest Development Checkpoint: checkpoint 168（ユーザー指示「V1.3.1を中身を変えずリリースして
-ください」への対応。コード変更は無く、Directory.Build.props・Package.appxmanifest・
-RepositoryPolicyTestsのバージョン表記のみ1.3.0→1.3.1へ更新し、通常のbuild/test→commit/push→
-インストーラー作成→Release公開のサイクルを実行した。
+Current Version: `v1.4.0`（Release・公開済み。アンケート作成に「中学受験と中学受験以外を
+分ける」オプションを追加した新機能。checkpoint169参照）
+Latest Development Checkpoint: checkpoint 169（クライアント側のアンケート生成エラー調査報告と、
+アンケート作成の「中学受験と中学受験以外を分ける」オプション追加への対応。
+
+①クライアント報告「生徒用フォームに必要な小学校・中学校・高校の使用中科目が不足しています。
+①の科目を確認してください。」という警告について、以前のアンケート修正（v1.2.0〜v1.3.1）の
+regressionかどうかを調査した。結論: regressionではない。
+- `生徒・講師_基本情報.xlsx`の科目シートを直接確認したところ、26件すべて有効で3校種（小学校・
+  中学校・高校）を網羅しており、ファイル自体に問題は無かった。
+- `QuestionnaireKitService.GenerateAsync`は共通名簿Excelやroster.dbを直接読まず、**アンケートを
+  作成したプロジェクト自身のDB**から有効科目を読む設計であり、このロジックはこのセッションの
+  過去の変更の影響を受けていない。
+- 最も可能性が高い原因は、共通名簿Excelへ科目を追加した後、該当プロジェクトへ「共通名簿を
+  取込む」操作がまだ行われていないワークフロー上の問題。警告文中の「①」案内も、v1.2.0で
+  科目タブが「0 基本情報設定」へ移動した今では古い表記のままだが、今回は指摘範囲外として
+  修正していない。
+
+②独立した機能要望「アンケートで中学受験かどうかを科目選択ではなく、小学生向けの専用の質問で
+尋ねられるようにしたい。ただし既定はオフ（現状維持）とし、新しいオプションとして追加したい」
+への対応。詳細はdocs/adr/0010-questionnaire-entrance-exam-question-toggle.mdを参照。要点のみ記す。
+- `QuestionnairePage.xaml`（2 アンケート作成）にチェックボックス「中学受験と中学受験以外を
+  分ける」を追加（既定オフ）。`QuestionnaireKitService.GenerateAsync`に
+  `bool askEntranceExamQuestion = false`を追加し、`studentConfig`のJSON経由で生成される
+  Google Apps Script本体（生徒用・講師用で共通のテンプレート）へ埋め込んだ。
+- スクリプト本体は常に同一のまま、`QUESTIONNAIRE_CONFIG.askEntranceExamQuestion`による
+  実行時分岐にした（C#生成時にJSコードを出し分けるのではなく）。
+- オンのときだけ、小学校ページに「中学受験をしますか？（必須）」を追加し、算数・国語の
+  選択肢を単一の「算数」「国語」へまとめる。「他学年を含む」ページ用の一覧
+  （`studentSubjectChoices`）は対象外で常に分割済みのまま。
+- 回答正規化（`writeCompactStudentResponse_`、フォーム送信時にGoogle Apps Script側で動く）で、
+  専用の質問の回答から元の「算数（中学受験）」「算数（中学受験以外なら可能）」へ復元してから
+  整形済み回答シートへ書き込むため、`CourseSurveyImportService.cs`（受講希望アンケート取込み）
+  は無改修。
+- `QuestionnaireKitServiceTests`に2件追加（オプションOFF/ON双方の生成結果を検証）。既存
+  271件＋新規2件＝合計273件がすべて通過。
+- v1.4.0として通常のbuild/test→commit/push→インストーラー作成→Release公開のサイクルを実行。
+
+---
+
+checkpoint 168（ユーザー指示「V1.3.1を中身を変えずリリースしてください」への対応。コード変更は
+無く、Directory.Build.props・Package.appxmanifest・RepositoryPolicyTestsのバージョン表記のみ
+1.3.0→1.3.1へ更新し、通常のbuild/test→commit/push→インストーラー作成→Release公開の
+サイクルを実行した。
 
 ---
 

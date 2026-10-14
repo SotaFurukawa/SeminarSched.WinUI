@@ -26,7 +26,7 @@ public sealed class QuestionnaireKitService
     public QuestionnaireKitService(ICourseSettingsRepository courseSettings, IMasterDataRepository masterData)
     { _courseSettings = courseSettings; _masterData = masterData; }
 
-    public async Task<string> GenerateAsync(string projectPath, string parentDirectory, string projectTitle, string studentTitle, string teacherTitle, string studentDeadline, string teacherDeadline, string contact, CancellationToken cancellationToken = default)
+    public async Task<string> GenerateAsync(string projectPath, string parentDirectory, string projectTitle, string studentTitle, string teacherTitle, string studentDeadline, string teacherDeadline, string contact, bool askEntranceExamQuestion = false, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectTitle);
         ArgumentException.ThrowIfNullOrWhiteSpace(studentTitle);
@@ -53,13 +53,27 @@ public sealed class QuestionnaireKitService
         if (elementary.Length == 0 || juniorHigh.Length == 0 || highSchool.Length == 0)
             throw new InvalidOperationException("生徒用フォームに必要な小学校・中学校・高校の使用中科目が不足しています。①の「科目」を確認してください。");
 
-        var studentSubjectsBySchoolLevel = new Dictionary<string, string[]>
+        var rawSubjectsBySchoolLevel = new Dictionary<string, string[]>
         {
             ["elementary"] = elementary.Select(x => StudentSubjectLabel(x.DisplayName)).ToArray(),
             ["juniorHigh"] = juniorHigh.Select(x => StudentSubjectLabel(x.DisplayName)).ToArray(),
             ["highSchool"] = highSchool.Select(x => StudentSubjectLabel(x.DisplayName)).ToArray(),
         };
-        var studentSubjectChoices = studentSubjectsBySchoolLevel.Values.SelectMany(x => x).Distinct().ToArray();
+        // 「他学年を含む」ページは学校区分を明示的に回答させるため、ここで使う一覧は
+        // askEntranceExamQuestionの影響を受けず常に分割済みの科目名のままにする。
+        var studentSubjectChoices = rawSubjectsBySchoolLevel.Values.SelectMany(x => x).Distinct().ToArray();
+        // ユーザー要望（中学受験の有無を科目選択ではなく専用の質問で尋ねたい）への対応。
+        // オンのときだけ、自動判定される小学校ページの算数・国語の選択肢を「算数（中学受験）」
+        // 「算数（中学受験以外）」の2択から単一の「算数」へまとめ、代わりに専用の質問
+        // （「中学受験をしますか？」）をそのページに追加する（addStudentQuestions_参照）。
+        // 実際にアプリへ取り込まれる受講希望科目は、writeCompactStudentResponse_が専用の質問の
+        // 回答から元の科目名へ復元するため、オフのときと完全に同じになる。
+        var studentSubjectsBySchoolLevel = askEntranceExamQuestion
+            ? new Dictionary<string, string[]>(rawSubjectsBySchoolLevel)
+            {
+                ["elementary"] = rawSubjectsBySchoolLevel["elementary"].Select(StripEntranceExamDistinction).Distinct().ToArray(),
+            }
+            : rawSubjectsBySchoolLevel;
 
         var target = AvailableDirectory(Path.Combine(Path.GetFullPath(parentDirectory), $"Googleフォーム_{SafeFileName(projectTitle)}_{DateTime.Now:yyyyMMdd_HHmmss}"));
         var temporary = target + ".tmp-" + Guid.NewGuid().ToString("N");
@@ -84,6 +98,7 @@ public sealed class QuestionnaireKitService
                 studentSubjectChoices,
                 sessionCounts = Enumerable.Range(1, 20).Select(x => x.ToString(CultureInfo.InvariantCulture)).ToArray(),
                 summerTestChoices = new[] { "夏期学力テストを受験する", "夏期学力テストを受験しない", "対象外（小1～小3・高校生）" },
+                askEntranceExamQuestion,
             };
             var teacherConfig = new
             {
@@ -131,6 +146,11 @@ public sealed class QuestionnaireKitService
             if (label.StartsWith(prefix, StringComparison.Ordinal)) { label = label[prefix.Length..]; break; }
         return label.Replace("（中学受験以外なら可能）", "（中学受験以外）");
     }
+
+    // askEntranceExamQuestionがオンのとき、小学校の算数・国語を「算数（中学受験）」
+    // 「算数（中学受験以外）」の2択ではなく単一の選択肢にまとめるための補助。
+    private static string StripEntranceExamDistinction(string label) =>
+        label.Replace("（中学受験以外）", "", StringComparison.Ordinal).Replace("（中学受験）", "", StringComparison.Ordinal);
 
     private static string RenderScript(object config, JsonSerializerOptions jsonOptions, string formIdProperty, string sheetIdProperty, string createFunction, string showFunction, string replacementFunction, string kindLabel)
     {
@@ -312,6 +332,14 @@ public sealed class QuestionnaireKitService
             .addPageBreakItem()
             .setTitle("受講教科・回数（小学校）")
             .setHelpText("最大4教科まで回答してください。学校区分は小学校として自動的に扱います。");
+          if (QUESTIONNAIRE_CONFIG.askEntranceExamQuestion) {
+            form
+              .addMultipleChoiceItem()
+              .setTitle("中学受験をしますか？（必須）")
+              .setHelpText("算数・国語の出題範囲の目安にします。")
+              .setChoiceValues(["する", "しない"])
+              .setRequired(true);
+          }
           addSubjectRequestSection_(
             form,
             QUESTIONNAIRE_CONFIG.subjectsBySchoolLevel.elementary,
@@ -574,6 +602,9 @@ public sealed class QuestionnaireKitService
           const otherGradeAnswer = responseValue_(headers, values, [otherGradeTitle]);
           const grade = String(responseValue_(headers, values, ["学年（必須）"])).trim();
           const automaticSchoolLevel = schoolLevelForStudentGrade_(grade);
+          const entranceExamAnswer = QUESTIONNAIRE_CONFIG.askEntranceExamQuestion
+            ? responseValue_(headers, values, ["中学受験をしますか？（必須）"])
+            : "";
           const compactValues = [
             responseValue_(headers, values, ["Timestamp", "タイムスタンプ"]),
             responseValue_(headers, values, ["Email Address", "メールアドレス"]),
@@ -587,11 +618,21 @@ public sealed class QuestionnaireKitService
 
           for (let index = 1; index <= 4; index += 1) {
             const prefix = otherGradeAnswer ? "" : `${automaticSchoolLevel}・`;
-            const subject = responseValueStartingWith_(
+            let subject = responseValueStartingWith_(
               headers,
               values,
               `受講教科（${prefix}${index}教科目）`,
             );
+            if (
+              QUESTIONNAIRE_CONFIG.askEntranceExamQuestion &&
+              !otherGradeAnswer &&
+              automaticSchoolLevel === "小学校" &&
+              (subject === "算数" || subject === "国語")
+            ) {
+              // 専用の質問の回答から、アプリが取り込む科目名を元の2択表記へ復元する。
+              subject =
+                subject + (entranceExamAnswer === "する" ? "（中学受験）" : "（中学受験以外なら可能）");
+            }
             const count = responseValueStartingWith_(
               headers,
               values,
