@@ -106,6 +106,11 @@
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="一人の講師が担当する生徒の人数を設定できます。後から「1 プロジェクト設定」の「スケジュール設定」タブでも変更できます。"
                         TextWrapping="Wrap" />
+                    <CheckBox x:Name="AskEntranceExamQuestionCheck" Content="中学受験と中学受験以外を分ける" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="オンにすると、②アンケート作成で生成する生徒用フォームで、小学生の回答者にだけ「中学受験をしますか？」という質問を追加し、算数・国語の選択肢は中学受験の有無で分けずに1つにまとめます。アプリに取り込まれる受講希望の内容はこの設定に関わらず同じです。"
+                        TextWrapping="Wrap" />
                     <Button
                         HorizontalAlignment="Right"
                         Click="CreateProject_Click"

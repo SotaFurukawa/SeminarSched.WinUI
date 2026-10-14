@@ -38,12 +38,11 @@
 
 ### UI
 
-`QuestionnairePage.xaml`（2 アンケート作成）に、他の作成オプション（フォーム名・締切・
-問い合わせ先）と同じ並びでチェックボックス`AskEntranceExamQuestionCheckBox`
-（ラベル「中学受験と中学受験以外を分ける」）を追加した。既定値は未チェック
-（＝現状維持）。このページの他の入力項目同様、DBへは永続化せず、`GenerateAsync`呼び出し時に
-その場で渡すだけのその場限りの設定とした（このページ自体がそもそも何も永続化していないため、
-既存の設計と揃えた）。
+当初は`QuestionnairePage.xaml`（2 アンケート作成）へその場限りのチェックボックスとして追加したが、
+ユーザーから「チェックボックスはここに作ってほしい」と、ホーム画面「新しい講習プロジェクト」の
+「オプション機能」パネル（既存の「集団授業の日程を考慮する」「一人の講師が同時に担当できる
+生徒数」の並び）を示す指摘があり、設計をプロジェクト作成時の永続設定へ変更した
+（下記Amendment参照）。
 
 ### `QuestionnaireKitService`
 
@@ -91,3 +90,35 @@ Code.gsを直接見ても構造が一貫していて分かりやすいため。
 - 生成されたスクリプトは実際にGoogle Apps Script上で実行してフォームの見た目を確認する手段が
   このセッションの環境には無いため、生成されたコード文字列の内容検証に留めている（既存の
   同種のテストと同じ方針）。
+
+## Amendment（同日）: プロジェクト作成時の永続設定へ変更
+
+ユーザーから、ホーム画面「新しい講習プロジェクト」の「オプション機能」パネルのスクリーンショットと
+ともに「チェックボックスはここに作ってほしいです」という指摘があった。これは既存の
+「集団授業の日程を考慮する」（`ConsiderGroupLessons`、プロジェクト作成時だけで決まり後から
+変更不可）・「一人の講師が同時に担当できる生徒数」のすぐ下の位置を指している。
+
+これに合わせ、設計を以下へ変更した:
+
+- `QuestionnairePage.xaml`のチェックボックスは削除した。
+- `AskEntranceExamQuestion`を`CourseProjectDefinition`・`ProjectSummary`の新しいプロパティ
+  （既定false）とし、`CourseProject`テーブルへ`ConsiderGroupLessons`と同じ
+  自己修復ALTER TABLEパターン（`SqliteProjectSchema.EnsureCurrentAsync`）で列を追加した。
+  `SqliteProjectRepository.CreateAsync`も`ConsiderGroupLessons`と同じ「CREATE TABLE後にUPDATEで
+  既定値から上書きする」手順を踏襲している。
+- ホーム画面`HomePage.xaml`の「オプション機能」パネルに、「一人の講師が同時に担当できる生徒数」の
+  直後へチェックボックス`AskEntranceExamQuestionCheck`（ラベル「中学受験と中学受験以外を分ける」）
+  を追加した。`ConsiderGroupLessons`と同様、**プロジェクト作成時だけで決まり、後から変更できない**
+  設定とした（生成済みで既に配布済みのフォームとの一貫性を壊さないため）。
+- `QuestionnairePage`は、チェックボックスの代わりに`App.ProjectService.Current!.
+  AskEntranceExamQuestion`を読み取って`GenerateAsync`へそのまま渡す。あわせて、このプロジェクトの
+  設定値をそのまま表示するだけの読み取り専用の案内文（`EntranceExamOptionNote`）を追加した。
+- `QuestionnaireKitService.GenerateAsync`自体のシグネチャ（`bool askEntranceExamQuestion = false`
+  引数）は変更していない。呼び出し元が変わっただけである。
+- 回帰防止のため`SqliteProjectRepositoryTests`に、`AskEntranceExamQuestion`がtrue/false
+  それぞれで作成→再読込しても値が保たれることを確認するテストを2件追加した。
+- `HomePage.xaml.cs`の`BuildDefinition()`で、新しい引数を`CourseProjectDefinition.Create`の
+  途中（`customSeasonName`の手前）へ挿入したことに伴い、既存の`OtherSeasonNameBox.Text`
+  引数が位置引数のままだと誤って新しい`askEntranceExamQuestion`引数の位置へずれてしまう
+  （講習区分名がtrue/false判定される）事故になりかねなかったため、該当呼び出しは名前付き引数
+  （`considerGroupLessons:`・`askEntranceExamQuestion:`・`customSeasonName:`）へ修正した。

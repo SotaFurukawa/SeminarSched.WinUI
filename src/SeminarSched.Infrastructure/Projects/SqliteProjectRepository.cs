@@ -65,7 +65,7 @@ public sealed class SqliteProjectRepository : IProjectRepository
 
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT cp.Title, cp.AcademicYear, cp.Season, cp.StartDate, cp.EndDate, cp.WorkflowCompletedStep, cp.ConsiderGroupLessons
+            SELECT cp.Title, cp.AcademicYear, cp.Season, cp.StartDate, cp.EndDate, cp.WorkflowCompletedStep, cp.ConsiderGroupLessons, cp.AskEntranceExamQuestion
             FROM CourseProject AS cp
             INNER JOIN ApplicationMetadata AS am ON am.Id = 1
             WHERE cp.Id = 1 AND am.Product = $product AND am.SchemaVersion = $schemaVersion;
@@ -88,7 +88,8 @@ public sealed class SqliteProjectRepository : IProjectRepository
             DateOnly.ParseExact(reader.GetString(3), "yyyy-MM-dd", CultureInfo.InvariantCulture),
             DateOnly.ParseExact(reader.GetString(4), "yyyy-MM-dd", CultureInfo.InvariantCulture),
             reader.GetInt32(5),
-            reader.GetBoolean(6));
+            reader.GetBoolean(6),
+            reader.GetBoolean(7));
     }
 
     public async Task<ProjectIntegrityResult> CheckIntegrityAsync(
@@ -431,6 +432,13 @@ public sealed class SqliteProjectRepository : IProjectRepository
             await using var groupLessonFlag = connection.CreateCommand();
             groupLessonFlag.CommandText = "UPDATE CourseProject SET ConsiderGroupLessons=1 WHERE Id=1;";
             await groupLessonFlag.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        if (definition.AskEntranceExamQuestion)
+        {
+            // AskEntranceExamQuestion列も同様にEnsureCurrentAsyncが追加するため、ここで更新する。
+            await using var entranceExamFlag = connection.CreateCommand();
+            entranceExamFlag.CommandText = "UPDATE CourseProject SET AskEntranceExamQuestion=1 WHERE Id=1;";
+            await entranceExamFlag.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
         await using var checkpoint = connection.CreateCommand();
         checkpoint.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";

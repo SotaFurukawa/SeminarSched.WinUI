@@ -9,8 +9,7 @@
         <TextBox x:Name="TeacherTitleBox" Header="講師用フォーム名（勤務可能日時）"/>
         <CalendarDatePicker x:Name="TeacherDeadlinePicker" Header="講師用 回答締切"/>
         <TextBox x:Name="ContactBox" Header="問い合わせ先" Text="校舎へお問い合わせください"/>
-        <CheckBox x:Name="AskEntranceExamQuestionCheckBox" Content="中学受験と中学受験以外を分ける"/>
-        <TextBlock Text="チェックすると、小学生の回答者にだけ「中学受験をしますか？」という質問を追加し、算数・国語の選択肢は中学受験の有無で分けずに1つにまとめます。アプリに取り込まれる受講希望の内容はチェックの有無に関わらず同じです。" TextWrapping="Wrap" Opacity="0.7"/>
+        <TextBlock x:Name="EntranceExamOptionNote" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
         <StackPanel Orientation="Horizontal" Spacing="8">
             <Button x:Name="GenerateButton" Content="作成キットを保存" Click="Generate_Click" Style="{StaticResource AccentButtonStyle}"/>
             <Button Content="作成手順" Click="Guide_Click"/>
