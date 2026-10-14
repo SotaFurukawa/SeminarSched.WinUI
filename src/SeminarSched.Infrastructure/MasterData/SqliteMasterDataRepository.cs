@@ -115,16 +115,27 @@ public sealed class SqliteMasterDataRepository : IMasterDataRepository
         await using var connection=await OpenAsync(projectPath,cancellationToken);await EnsureSchemaAsync(connection,cancellationToken);await using var command=connection.CreateCommand();command.CommandText="SELECT TeacherId,SubjectId,CanTeach,Note FROM TeacherQualification ORDER BY TeacherId,SubjectId;";var result=new List<TeacherQualification>();await using var reader=await command.ExecuteReaderAsync(cancellationToken);while(await reader.ReadAsync(cancellationToken))result.Add(new TeacherQualification(reader.GetInt64(0),reader.GetInt64(1),reader.GetBoolean(2),reader.GetString(3)));return result;
     }
 
+    // ユーザー指示「通常授業について、複数の行で同じ氏名、科目があった場合、重複を許してください」
+    // （週2回同じ科目を受講するが、通常担当講師が曜日で異なる生徒がいるため）への対応。以前は
+    // (StudentId,SubjectId)をキーにしたUPSERTのみで、Idは常に0（未使用）で呼ばれていたため、
+    // 生徒・科目が同じ行は常に1行へ上書きされていた。既存行の更新（profile.Id>0）はIdで対象行を
+    // 特定してUPDATEし、新規行（profile.Id==0）はINSERTする（(StudentId,SubjectId,RegularTeacherId)
+    // が完全一致する場合だけ、誤った二重登録を防ぐため既存行へ上書きする）。
     public async Task SaveRegularLessonAsync(string projectPath, RegularLessonProfile profile, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(profile); await using var connection = await OpenAsync(projectPath, cancellationToken); await EnsureSchemaAsync(connection, cancellationToken);
-        await using var command = connection.CreateCommand(); command.CommandText = "INSERT INTO RegularLessonProfile (ProjectId, StudentId, SubjectId, RegularTeacherId, RegularTeacherPriority, OneToOneRequired, Note) VALUES (1, @student, @subject, @teacher, @priority, @one, @note) ON CONFLICT(ProjectId, StudentId, SubjectId) DO UPDATE SET RegularTeacherId=excluded.RegularTeacherId, RegularTeacherPriority=excluded.RegularTeacherPriority, OneToOneRequired=excluded.OneToOneRequired, Note=excluded.Note;";
+        await using var command = connection.CreateCommand();
+        if (profile.Id > 0)
+            command.CommandText = "UPDATE RegularLessonProfile SET StudentId=@student, SubjectId=@subject, RegularTeacherId=@teacher, RegularTeacherPriority=@priority, OneToOneRequired=@one, Note=@note WHERE Id=@id;";
+        else
+            command.CommandText = "INSERT INTO RegularLessonProfile (ProjectId, StudentId, SubjectId, RegularTeacherId, RegularTeacherPriority, OneToOneRequired, Note) VALUES (1, @student, @subject, @teacher, @priority, @one, @note) ON CONFLICT(ProjectId, StudentId, SubjectId, RegularTeacherId) DO UPDATE SET RegularTeacherPriority=excluded.RegularTeacherPriority, OneToOneRequired=excluded.OneToOneRequired, Note=excluded.Note;";
+        command.Parameters.AddWithValue("@id", profile.Id);
         command.Parameters.AddWithValue("@student", profile.StudentId); command.Parameters.AddWithValue("@subject", profile.SubjectId); command.Parameters.AddWithValue("@teacher", (object?)profile.RegularTeacherId ?? DBNull.Value); command.Parameters.AddWithValue("@priority", profile.RegularTeacherPriority); command.Parameters.AddWithValue("@one", profile.OneToOneRequired); command.Parameters.AddWithValue("@note", profile.Note); await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<RegularLessonProfile>> GetRegularLessonsAsync(string projectPath, CancellationToken cancellationToken = default)
     {
-        await using var connection=await OpenAsync(projectPath,cancellationToken);await EnsureSchemaAsync(connection,cancellationToken);await using var command=connection.CreateCommand();command.CommandText="SELECT Id,StudentId,SubjectId,RegularTeacherId,RegularTeacherPriority,OneToOneRequired,Note FROM RegularLessonProfile WHERE ProjectId=1 ORDER BY StudentId,SubjectId;";var result=new List<RegularLessonProfile>();await using var reader=await command.ExecuteReaderAsync(cancellationToken);while(await reader.ReadAsync(cancellationToken))result.Add(new RegularLessonProfile(reader.GetInt64(0),reader.GetInt64(1),reader.GetInt64(2),reader.IsDBNull(3)?null:reader.GetInt64(3),reader.GetInt32(4),reader.GetBoolean(5),reader.GetString(6)));return result;
+        await using var connection=await OpenAsync(projectPath,cancellationToken);await EnsureSchemaAsync(connection,cancellationToken);await using var command=connection.CreateCommand();command.CommandText="SELECT Id,StudentId,SubjectId,RegularTeacherId,RegularTeacherPriority,OneToOneRequired,Note FROM RegularLessonProfile WHERE ProjectId=1 ORDER BY StudentId,SubjectId,RegularTeacherPriority DESC,Id;";var result=new List<RegularLessonProfile>();await using var reader=await command.ExecuteReaderAsync(cancellationToken);while(await reader.ReadAsync(cancellationToken))result.Add(new RegularLessonProfile(reader.GetInt64(0),reader.GetInt64(1),reader.GetInt64(2),reader.IsDBNull(3)?null:reader.GetInt64(3),reader.GetInt32(4),reader.GetBoolean(5),reader.GetString(6)));return result;
     }
 
     public async Task SaveLessonRequestAsync(string projectPath, LessonRequest request, CancellationToken cancellationToken = default)

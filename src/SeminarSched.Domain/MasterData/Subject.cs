@@ -9,10 +9,12 @@ public sealed record Subject
         ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
         ArgumentException.ThrowIfNullOrWhiteSpace(schoolLevel);
         if (sortOrder < 1) throw new ArgumentOutOfRangeException(nameof(sortOrder));
-        // Python版domain/validation.pyのvalidate_subjectと同じ制約: 略称は未入力か、ちょうど1文字。
-        // 時間割の科目表記が常に一文字に収まることを保証するための不変条件（SubjectAbbreviation参照）。
-        if ((shortName ?? "").Trim() is { Length: > 0 } trimmedShortName && trimmedShortName.Length != 1)
-            throw new ArgumentException("科目略称は1文字で入力してください。", nameof(shortName));
+        // 当初はPython版domain/validation.pyのvalidate_subjectと同じ「略称は未入力か、ちょうど1文字」
+        // という制約だった（時間割の科目表記を一文字に収める想定、SubjectAbbreviation参照）。
+        // ユーザー指示（「基本一文字だが、2文字以上でも大丈夫なようにしてください」、続けて
+        // 「4文字の制約ではなく制約をつけないでください」）により、文字数の制約自体を撤廃した
+        // （Python版からの意図的な逸脱。IME変換途中のひらがな2文字以上がMaxLengthで打ち切られ、
+        // 漢字1文字へすら変換できなかった問題への対応）。
         Id = id; Code = code.Trim(); DisplayName = displayName.Trim(); ShortName = shortName?.Trim() ?? "";
         SchoolLevel = schoolLevel.Trim(); SortOrder = sortOrder; Active = active;
     }

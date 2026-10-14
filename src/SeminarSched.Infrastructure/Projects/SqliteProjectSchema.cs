@@ -44,6 +44,7 @@ internal static class SqliteProjectSchema
         await BackfillFamilyGivenNameAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await DowngradeRemovedPriorityAvailabilityLevelAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await DropRemovedGroupLessonTeacherTableAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
+        await RelaxRegularLessonProfileUniqueConstraintAsync(connection, (SqliteTransaction)transaction, cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
         if (TryGetFingerprint(path) is { } verified)
@@ -123,6 +124,55 @@ internal static class SqliteProjectSchema
         drop.Transaction = transaction;
         drop.CommandText = "DROP TABLE IF EXISTS GroupLessonTeacher;";
         await drop.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    // ユーザー指示「通常授業について、複数の行で同じ氏名、科目があった場合、重複を許してください」
+    // （週に2回同じ科目を受講するが、曜日によって通常担当講師が異なる生徒がいるため）への対応。
+    // 当初はUNIQUE(ProjectId,StudentId,SubjectId)で「生徒・科目につき1行だけ」という制約だったが、
+    // UNIQUE(ProjectId,StudentId,SubjectId,RegularTeacherId)へ緩和し、同じ生徒・科目でも通常担当
+    // 講師が異なれば複数行を許すようにした（優先度が複数行の中での使用順。
+    // CourseSurveyImportService.LoadRegularLessonProfilesが、優先度の高い行を「通常担当講師」、
+    // 次点以下を「第1〜3希望講師」として新規LessonRequestへ割り当てる）。SQLiteはテーブル内蔵の
+    // UNIQUE制約を直接変更できないため、既存プロジェクトファイルに対してはテーブルを作り直して
+    // 移行する自己修復（他テーブルからRegularLessonProfileへの外部キー参照は無いため、
+    // RENAME→作り直し→コピー→DROPで安全に行える）。
+    private static async Task RelaxRegularLessonProfileUniqueConstraintAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        string? currentSql;
+        await using (var select = connection.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText = "SELECT sql FROM sqlite_master WHERE type='table' AND name='RegularLessonProfile';";
+            currentSql = (string?)await select.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+        }
+        if (currentSql is null || currentSql.Contains("StudentId, SubjectId, RegularTeacherId", StringComparison.Ordinal))
+        {
+            return; // テーブルが無い（新規作成前）、または既に新しい制約へ移行済み。
+        }
+
+        await using var rebuild = connection.CreateCommand();
+        rebuild.Transaction = transaction;
+        rebuild.CommandText = """
+            ALTER TABLE RegularLessonProfile RENAME TO RegularLessonProfile_old;
+            CREATE TABLE RegularLessonProfile (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ProjectId INTEGER NOT NULL REFERENCES CourseProject(Id) ON DELETE CASCADE,
+                StudentId INTEGER NOT NULL REFERENCES Student(Id) ON DELETE CASCADE,
+                SubjectId INTEGER NOT NULL REFERENCES Subject(Id) ON DELETE CASCADE,
+                RegularTeacherId INTEGER REFERENCES Teacher(Id) ON DELETE SET NULL,
+                RegularTeacherPriority INTEGER NOT NULL DEFAULT 3 CHECK (RegularTeacherPriority BETWEEN 1 AND 5),
+                OneToOneRequired INTEGER NOT NULL DEFAULT 0 CHECK (OneToOneRequired IN (0, 1)),
+                Note TEXT NOT NULL DEFAULT '',
+                UNIQUE (ProjectId, StudentId, SubjectId, RegularTeacherId)
+            );
+            INSERT INTO RegularLessonProfile (Id, ProjectId, StudentId, SubjectId, RegularTeacherId, RegularTeacherPriority, OneToOneRequired, Note)
+                SELECT Id, ProjectId, StudentId, SubjectId, RegularTeacherId, RegularTeacherPriority, OneToOneRequired, Note FROM RegularLessonProfile_old;
+            DROP TABLE RegularLessonProfile_old;
+            """;
+        await rebuild.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     internal static async Task<int> ReadVersionAsync(

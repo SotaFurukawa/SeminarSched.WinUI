@@ -814,7 +814,11 @@ public sealed partial class SetupPage : WorkflowPageBase
         await ExecuteAsync(async path =>
         {
             if (row.DraftStudent is null || row.DraftSubject is null) throw new ArgumentException("生徒と科目を選択してください。");
-            await App.MasterData.SaveRegularLessonAsync(path, new RegularLessonProfile(0, row.DraftStudent.Value.Id, row.DraftSubject.Value.Id,
+            // ユーザー指示「同じ生徒・科目でも重複を許してください（通常担当講師が異なる場合がある
+            // ため）」への対応。以前はIdを常に0で渡し(生徒,科目)で上書きしていたため、同じ生徒・科目の
+            // 行は常に1行に集約されていた。既存行の変更時は実際のIdを渡し、その行だけを更新する。
+            var id = row.IsNew ? 0 : row.Value!.Id;
+            await App.MasterData.SaveRegularLessonAsync(path, new RegularLessonProfile(id, row.DraftStudent.Value.Id, row.DraftSubject.Value.Id,
                 row.DraftTeacher?.Value?.Id, checked((int)row.DraftPriority), row.DraftOneToOneIndex == 1, row.DraftNote));
         }, "通常授業の担当設定を保存しました");
     }

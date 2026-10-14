@@ -90,8 +90,8 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
                 foreach (var (subjectName, requiredSessions) in response.Requests)
                 {
                     var subject = subjectByName[TextKey(subjectName)];
-                    profiles.TryGetValue((student.Id, subject.Id), out var profile);
-                    InsertLessonRequest(connection, transaction, student.Id, subject.Id, requiredSessions, profile, response.Note);
+                    profiles.TryGetValue((student.Id, subject.Id), out var profileList);
+                    InsertLessonRequest(connection, transaction, student.Id, subject.Id, requiredSessions, profileList, response.Note);
                     requestCount++;
                 }
                 InsertStudentAvailability(connection, transaction, student.Id, openDates, slots, response.Unavailable);
@@ -431,13 +431,24 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
         return result;
     }
 
-    private static Dictionary<(long StudentId, long SubjectId), RegularProfile> LoadRegularLessonProfiles(SqliteConnection connection, SqliteTransaction? transaction = null)
+    // ユーザー指示「通常授業について、複数の行で同じ生徒・科目があった場合、重複を許してください
+    // （優先度の高い方をできるだけ使う、週2回同じ科目を見てほしいが同じ講師でない場合がある）」
+    // への対応。同じ(生徒,科目)に対してRegularLessonProfileが複数行（通常担当講師違い）あり得る
+    // ため、単一値ではなく優先度降順（RegularTeacherPriorityは数値が大きいほど強い希望）のリストで
+    // 返す。呼び出し側（InsertLessonRequest）が先頭を通常担当講師、残りを第1〜3希望講師として
+    // LessonRequestへ割り当てる。
+    private static Dictionary<(long StudentId, long SubjectId), List<RegularProfile>> LoadRegularLessonProfiles(SqliteConnection connection, SqliteTransaction? transaction = null)
     {
-        using var command = connection.CreateCommand(); command.Transaction = transaction; command.CommandText = "SELECT StudentId,SubjectId,RegularTeacherId,RegularTeacherPriority,OneToOneRequired,Note FROM RegularLessonProfile WHERE ProjectId=1;";
+        using var command = connection.CreateCommand(); command.Transaction = transaction; command.CommandText = "SELECT StudentId,SubjectId,RegularTeacherId,RegularTeacherPriority,OneToOneRequired,Note FROM RegularLessonProfile WHERE ProjectId=1 ORDER BY StudentId,SubjectId,RegularTeacherPriority DESC,Id;";
         using var reader = command.ExecuteReader();
-        var result = new Dictionary<(long, long), RegularProfile>();
+        var result = new Dictionary<(long, long), List<RegularProfile>>();
         while (reader.Read())
-            result[(reader.GetInt64(0), reader.GetInt64(1))] = new RegularProfile(reader.IsDBNull(2) ? null : reader.GetInt64(2), reader.GetInt32(3), reader.GetInt32(4) == 1, reader.GetString(5));
+        {
+            var key = (reader.GetInt64(0), reader.GetInt64(1));
+            var profile = new RegularProfile(reader.IsDBNull(2) ? null : reader.GetInt64(2), reader.GetInt32(3), reader.GetInt32(4) == 1, reader.GetString(5));
+            if (!result.TryGetValue(key, out var list)) result[key] = list = [];
+            list.Add(profile);
+        }
         return result;
     }
 
@@ -481,14 +492,28 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
         Bind(command, "$id", studentId); command.ExecuteNonQuery();
     }
 
-    private static void InsertLessonRequest(SqliteConnection connection, SqliteTransaction transaction, long studentId, long subjectId, int requiredSessions, RegularProfile? profile, string responseNote)
+    // ユーザー指示「通常授業について、複数行で同じ生徒・科目があった場合、重複を許してください。
+    // 優先度の高い方をできるだけ使う、週に2回同じ科目を見てほしいが同じ講師でない場合がある」への
+    // 対応。同じ(生徒,科目)に対するRegularLessonProfileが複数（通常担当講師違い）ある場合、
+    // 優先度が最も高い行をLessonRequest.RegularTeacherId（通常担当講師）に、残りを優先度順で
+    // PreferredTeacher1〜3Id（第1〜3希望講師）へ割り当てる。時間割自動作成（SqliteScheduleRunService）
+    // はこれら全てを候補としてスコアリングし、必要コマ数（RequiredSessions）ぶんの配置それぞれで
+    // 最もスコアの高い空き講師を使おうとするため、「通常担当講師をできるだけ使い、必要に応じて
+    // 希望講師へフォールバックする」という挙動が自然に実現される（コマごとに異なる講師になることもある）。
+    private static void InsertLessonRequest(SqliteConnection connection, SqliteTransaction transaction, long studentId, long subjectId, int requiredSessions, IReadOnlyList<RegularProfile>? profiles, string responseNote)
     {
+        var regular = profiles is { Count: > 0 } ? profiles[0] : null;
+        var preferred1 = profiles is { Count: > 1 } ? profiles[1].RegularTeacherId : null;
+        var preferred2 = profiles is { Count: > 2 } ? profiles[2].RegularTeacherId : null;
+        var preferred3 = profiles is { Count: > 3 } ? profiles[3].RegularTeacherId : null;
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = "INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions,RegularTeacherId,RegularTeacherPriority,OneToOneRequired,Note) VALUES(1,$student,$subject,$count,$teacher,$priority,$one,$note);";
+        command.CommandText = "INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions,RegularTeacherId,RegularTeacherPriority,PreferredTeacher1Id,PreferredTeacher2Id,PreferredTeacher3Id,OneToOneRequired,Note) VALUES(1,$student,$subject,$count,$teacher,$priority,$p1,$p2,$p3,$one,$note);";
         Bind(command, "$student", studentId); Bind(command, "$subject", subjectId); Bind(command, "$count", requiredSessions);
-        Bind(command, "$teacher", profile?.RegularTeacherId); Bind(command, "$priority", profile?.Priority ?? 3); Bind(command, "$one", profile?.OneToOne ?? false);
-        Bind(command, "$note", JoinedNote(profile?.Note, responseNote));
+        Bind(command, "$teacher", regular?.RegularTeacherId); Bind(command, "$priority", regular?.Priority ?? 3);
+        Bind(command, "$p1", preferred1); Bind(command, "$p2", preferred2); Bind(command, "$p3", preferred3);
+        Bind(command, "$one", regular?.OneToOne ?? false);
+        Bind(command, "$note", JoinedNote(regular?.Note, responseNote));
         command.ExecuteNonQuery();
     }
 

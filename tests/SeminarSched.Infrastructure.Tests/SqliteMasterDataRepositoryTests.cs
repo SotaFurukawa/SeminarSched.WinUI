@@ -35,6 +35,43 @@ public sealed class SqliteMasterDataRepositoryTests : IDisposable
         Assert.True((await new SqliteProjectRepository().CheckIntegrityAsync(path)).IsValid);
     }
 
+    // ユーザー指示「通常授業について、複数の行で同じ氏名、科目があった場合、重複を許してください。
+    // 優先度の高い方をできるだけ使う、週に2回同じ科目を見てほしいが同じ講師でない場合がある」への
+    // 対応。同じ(生徒,科目)でも通常担当講師が異なれば複数行を許すこと、既存行の更新（Idを渡す）は
+    // 別の新しい行を作らずその行だけを書き換えることを確認する。
+    [Fact]
+    public async Task SaveRegularLessonAsync_AllowsMultipleRowsForSameStudentAndSubjectWithDifferentTeachers()
+    {
+        var path = Path.Combine(_directory, "regular-duplicate.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(
+            2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 22)));
+        var repository = new SqliteMasterDataRepository();
+
+        var student = await repository.SaveStudentAsync(path, new Student(0, "S-001", "架空", "生徒", "中2"));
+        var subject = await repository.SaveSubjectAsync(path, new Subject(0, "JH_ENGLISH", "英語", "英", "中学", 1));
+        var teacherA = await repository.SaveTeacherAsync(path, new Teacher(0, "T-001", "架空", "講師A"));
+        var teacherB = await repository.SaveTeacherAsync(path, new Teacher(0, "T-002", "架空", "講師B"));
+
+        // 同じ生徒・科目で、通常担当講師が異なる2行を登録する（週2回、曜日ごとに担当が違うケース）。
+        await repository.SaveRegularLessonAsync(path, new RegularLessonProfile(0, student.Id, subject.Id, teacherA.Id, 5, false));
+        await repository.SaveRegularLessonAsync(path, new RegularLessonProfile(0, student.Id, subject.Id, teacherB.Id, 3, false));
+
+        var rows = await repository.GetRegularLessonsAsync(path);
+        Assert.Equal(2, rows.Count);
+        // GetRegularLessonsAsyncは優先度の高い順（数値が大きいほど優先）に並ぶ。
+        Assert.Equal(teacherA.Id, rows[0].RegularTeacherId);
+        Assert.Equal(teacherB.Id, rows[1].RegularTeacherId);
+
+        // 既存行（teacherAの行）の変更は、別の新しい行を作らずその行だけを書き換える。
+        var existing = rows[0];
+        await repository.SaveRegularLessonAsync(path, new RegularLessonProfile(existing.Id, existing.StudentId, existing.SubjectId,
+            existing.RegularTeacherId, existing.RegularTeacherPriority, existing.OneToOneRequired, "更新済み"));
+        var afterUpdate = await repository.GetRegularLessonsAsync(path);
+        Assert.Equal(2, afterUpdate.Count);
+        Assert.Contains(afterUpdate, r => r.RegularTeacherId == teacherA.Id && r.Note == "更新済み");
+        Assert.Contains(afterUpdate, r => r.RegularTeacherId == teacherB.Id);
+    }
+
     [Fact]
     public async Task SaveGetDeleteLessonRequest_RoundTripsAllFieldsAndUpsertsOnConflict()
     {

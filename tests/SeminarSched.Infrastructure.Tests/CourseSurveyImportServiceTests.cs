@@ -72,6 +72,38 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
             $"SELECT COUNT(*) FROM LessonRequest WHERE StudentId={state.StudentId} AND SubjectId={state.SubjectId} AND RegularTeacherPriority=5 AND RegularTeacherId={state.TeacherId}"));
     }
 
+    // ユーザー指示「通常授業について、複数の行で同じ氏名、科目があった場合、重複を許してください。
+    // 優先度の高い方をできるだけ使う、週に2回同じ科目を見てほしいが同じ講師でない場合がある」への
+    // 対応。同じ(生徒,科目)に対してRegularLessonProfileが2行（通常担当講師違い）ある場合、優先度が
+    // 高い方がLessonRequest.RegularTeacherId（通常担当講師）へ、優先度が低い方がPreferredTeacher1Id
+    // （第1希望講師）へ引き継がれることを確認する。
+    [Fact]
+    public async Task ApplyAsync_MultipleRegularLessonProfilesForSameStudentAndSubject_HighestPriorityBecomesRegularAndRestBecomePreferred()
+    {
+        var state = await CreateStateAsync();
+        var master = new SqliteMasterDataRepository();
+        var secondTeacher = await master.SaveTeacherAsync(state.Path, new Teacher(0, "T-0002", "架空", "次郎"));
+        await master.SaveRegularLessonAsync(state.Path, new RegularLessonProfile(0, state.StudentId, state.SubjectId, state.TeacherId, 5, false, ""));
+        await master.SaveRegularLessonAsync(state.Path, new RegularLessonProfile(0, state.StudentId, state.SubjectId, secondTeacher.Id, 3, false, ""));
+
+        var studentPath = Path.Combine(_directory, "student.csv");
+        var teacherPath = Path.Combine(_directory, "teacher.csv");
+        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "在籍生", "中学校", "英語", "2", "",
+            [(state.Date1, ""), (state.Date2, "")]);
+        WriteTeacherCsv(teacherPath, "架空", "花子", "", [(state.Date1, ""), (state.Date2, "")]);
+
+        var service = new CourseSurveyImportService();
+        var preview = await service.PreviewAsync(state.Path, studentPath, teacherPath);
+        Assert.False(preview.HasErrors, string.Join(Environment.NewLine, preview.Issues.Select(issue => issue.Message)));
+        await service.ApplyAsync(state.Path, preview);
+
+        await using var connection = new SqliteConnection($"Data Source={state.Path};Pooling=False");
+        await connection.OpenAsync();
+        Assert.Equal(1L, await ScalarAsync(connection,
+            $"SELECT COUNT(*) FROM LessonRequest WHERE StudentId={state.StudentId} AND SubjectId={state.SubjectId} " +
+            $"AND RegularTeacherId={state.TeacherId} AND RegularTeacherPriority=5 AND PreferredTeacher1Id={secondTeacher.Id}"));
+    }
+
     [Fact]
     public async Task Apply_TrialStudentNotInRoster_CreatesTrialStudentWithWarning()
     {

@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-14（checkpoint166）
+最終更新: 2026-10-14（checkpoint167）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,10 +16,56 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.2.0`（Release・公開済み。生徒・講師・講師指導可能科目・通常授業担当設定・
-科目の管理をプロジェクトごとから一括管理へ変更し、新しい左ナビ「0 基本情報設定」を追加した新機能。
-checkpoint166参照）
-Latest Development Checkpoint: checkpoint 166（ユーザーからの一連の指示・質問への対応。
+Current Version: `v1.3.0`（Release・公開済み。通常授業担当設定で、同じ生徒・科目でも通常担当講師
+が違えば複数登録できるようにした新機能。あわせて科目の略称の文字数制約を撤廃。checkpoint167参照）
+Latest Development Checkpoint: checkpoint 167（ユーザーからの一連の指示・質問への対応。
+
+①ユーザー質問「通常授業について、複数の行で同じ氏名、科目があった場合、エラーがでますが、重複
+することもあるので、重複を許してください。日本語でなにが起きているのか教えてください。」への
+対応。詳細はdocs/adr/0009-regular-lesson-profile-allows-duplicates.mdを参照。要点のみ記す。
+- 調査の結果、エラーは共通名簿Excelの「通常授業」シート取込み時の重複チェック
+  （`SharedRosterImportService.AddDuplicateIssues`）が原因と判明。根本には
+  `RegularLessonProfile`テーブルの`UNIQUE(ProjectId,StudentId,SubjectId)`と、保存処理が
+  このキーでUPSERTしていた（Idを常に0で呼んでいた）設計があった。
+- まず日本語で仕組みを説明し、「重複を許すには何が必要か（スケジューラーが複数の通常担当講師
+  候補をどう扱うべきか、ユーザー自身の判断が必要）」を尋ねたところ、「優先度の高い方をできる
+  だけ使う。週2回同じ科目だが同じ講師でない場合がある」という回答を得た。
+- 調査の結果、`RegularLessonProfile`自体は最適化から直接は読まれず、受講希望アンケート取込み時に
+  `LessonRequest`の既定値を埋めるテンプレートとしてのみ使われていることが判明。一方
+  `LessonRequest`には`RegularTeacherId`/`RegularTeacherPriority`に加えて、`PreferredTeacher1〜3Id`
+  （第1〜3希望講師）という列が既にあり、`SqliteScheduleRunService`は既にこれら5つの講師候補を
+  重み付けスコアでランキングし、必要コマ数ぶんそれぞれで最もスコアの高い空き講師を使おうとする
+  仕組みを持っていた（ただしPreferredTeacher1〜3Idはこれまでどこからも書き込まれておらず、
+  常にNULLのまま眠っていた）。この既存の仕組みにそのまま乗せる形で実装した：
+  `RegularLessonProfile`の一意制約を`UNIQUE(...,RegularTeacherId)`へ緩和（同じ生徒・科目でも
+  講師が異なれば複数行可）し、`CourseSurveyImportService`が優先度順の先頭を通常担当講師、
+  残りを第1〜3希望講師へ割り当てるようにした。最適化ロジック自体は一切変更していない。
+- 既存プロジェクトファイルは`SqliteProjectSchema.RelaxRegularLessonProfileUniqueConstraintAsync`
+  という自己修復マイグレーション（テーブルをRENAME→再作成→コピー→DROP）で自動的に移行される。
+- `SetupPage.xaml.cs`の通常授業担当設定の保存も、既存行の変更時は実際のIdを渡すよう修正した
+  （以前は常に0で呼んでおり、(生徒,科目)キーのUPSERTだけに頼っていた）。
+- 新規テスト4件（`SqliteMasterDataRepositoryTests`・`SqliteProjectSchemaTests`・
+  `CourseSurveyImportServiceTests`・`SharedRosterImportServiceTests`）を追加。実機UIでの
+  「0 基本情報設定」画面での複数行登録確認は、スクリーンショット手段の問題（下記③と同じ理由）
+  によりまだ行えていない。
+
+②ユーザー指摘「基本情報設定について、科目を設定するときに、略称を設定できるが、そこで１文字だけ
+入力したら、それ以上入力できないようになっているかげんで、ひらがなしか入力できない。基本一文字
+だが、に文字以上でも大丈夫なようにしてください」、続けて「4文字の制約ではなく制約をつけないで
+ください」への対応。`Subject.cs`の「略称は空欄かちょうど1文字」という制約（Python版
+validate_subjectと同じ、時間割出力の科目表記を1文字に収める想定）と、`SetupPage.xaml`の
+TextBox`MaxLength="1"`が原因だった。IME変換途中のひらがな2文字以上がMaxLengthで打ち切られ、
+漢字1文字へすら変換できなくなっていた。一度4文字まで緩和する案を出したが、最終的にユーザーの
+指示により文字数制約自体を完全に撤廃した（Python版からの意図的な逸脱）。
+
+③過去の会話（checkpoint165〜166）で発生していた、ClosedXML・Microsoft.WindowsAppSDKが推移的に
+引き込む`System.Security.Cryptography.Pkcs` 8.0.1の既知の脆弱性によるNuGetAuditビルドエラーを、
+全プロジェクト共通で`Directory.Build.props`から8.0.2へ引き上げることで解消した（今回の機能とは
+無関係の環境側の問題）。
+
+---
+
+checkpoint 166（ユーザーからの一連の指示・質問への対応。
 
 ①「プロジェクト設定から講師指導可能科目を変更した場合、Excelの方にも反映されますか？」への回答:
 反映されない（共通名簿Excel↔プロジェクトDBはExcel→DBの一方向のみ）ことを調査して回答した。

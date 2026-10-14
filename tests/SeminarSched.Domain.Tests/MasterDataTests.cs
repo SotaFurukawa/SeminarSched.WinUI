@@ -19,13 +19,13 @@ public sealed class MasterDataTests
     public void Subject_RequiresPositiveSortOrderAndShortAbbreviation()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new Subject(0, "MATH", "数学", "数", "中学", 0));
-        Assert.Throws<ArgumentException>(() => new Subject(0, "MATH", "数学", "12345678901", "中学", 1));
-        // 略称は空欄か、ちょうど1文字でなければならない（Python版validate_subjectと同じ制約）。
-        // 過去にSharedRosterImportService等が「表示名をそのまま」略称へ入れてしまうバグがあり、
-        // それにより時間割出力の科目表記が一文字にならない不具合が発生していたための回帰防止。
-        Assert.Throws<ArgumentException>(() => new Subject(0, "MATH", "数学", "数学", "中学", 1));
+        // 略称は当初、Python版validate_subjectと同じ「空欄か、ちょうど1文字」という制約だったが、
+        // ユーザー指摘（IME変換途中のひらがな2文字以上がMaxLengthで打ち切られ、漢字1文字へすら
+        // 変換できなかった）→いったん4文字までに緩和→「4文字の制約ではなく制約をつけないで
+        // ください」という指示を経て、文字数の制約自体を撤廃した（Python版からの意図的な逸脱）。
         _ = new Subject(0, "MATH", "数学", "", "中学", 1);
         _ = new Subject(0, "MATH", "数学", "数", "中学", 1);
+        _ = new Subject(0, "MATH", "数学", "数学（中学受験）", "中学", 1);
     }
 
     [Fact]

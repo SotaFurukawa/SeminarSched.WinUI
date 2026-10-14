@@ -358,7 +358,11 @@
                                     <NumberBox Minimum="1" Value="{x:Bind DraftSortOrder, Mode=TwoWay}"/>
                                     <TextBox x:Name="SubjectRowCodeBox" Grid.Column="1" PlaceholderText="コード" Text="{x:Bind DraftCode, Mode=TwoWay}" Loaded="SubjectRowCodeBox_Loaded"/>
                                     <TextBox Grid.Column="2" PlaceholderText="科目名" Text="{x:Bind DraftName, Mode=TwoWay}"/>
-                                    <TextBox Grid.Column="3" PlaceholderText="略称" MaxLength="1" Text="{x:Bind DraftShortName, Mode=TwoWay}"/>
+                                    <!-- ユーザー指摘「略称が1文字しか入力できない。IME変換途中のひらがな2文字以上が
+                                         入力できない」、続けて「4文字の制約ではなく制約をつけないでください」への
+                                         対応。MaxLength=1だとIMEの変換前の下書き文字列まで1文字で打ち切られてしまい、
+                                         漢字1文字への変換すらできなかった。MaxLength自体を付けず文字数を制限しない。 -->
+                                    <TextBox Grid.Column="3" PlaceholderText="略称" Text="{x:Bind DraftShortName, Mode=TwoWay}"/>
                                     <ComboBox Grid.Column="4" IsEditable="True" PlaceholderText="校種" Text="{x:Bind DraftSchoolLevel, Mode=TwoWay}"><ComboBoxItem Content="小学校"/><ComboBoxItem Content="中学校"/><ComboBoxItem Content="高等学校"/></ComboBox>
                                     <CheckBox Grid.Column="5" Content="有効" IsChecked="{x:Bind DraftActive, Mode=TwoWay}"/>
                                     <Button Grid.Column="6" Content="保存" Click="SaveSubjectRow_Click"/>

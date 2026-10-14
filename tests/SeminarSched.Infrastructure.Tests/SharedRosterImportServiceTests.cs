@@ -10,6 +10,71 @@ public sealed class SharedRosterImportServiceTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "SeminarSched.Tests", Guid.NewGuid().ToString("N"));
 
+    // ユーザー指示「通常授業について、複数の行で同じ氏名、科目があった場合、重複を許してください」
+    // への対応。以前は「通常授業」シートで同じ生徒・科目の組が2行あると取込みエラーで止まっていた
+    // （週2回同じ科目を受講するが、通常担当講師が曜日で異なる生徒を表現できなかった）。通常担当
+    // 講師が異なれば、同じ生徒・科目の行が複数あっても取込みが成功し、両方とも保存されることを
+    // 確認する。
+    [Fact]
+    public async Task PreviewAndApply_DuplicateStudentAndSubjectWithDifferentRegularTeachers_ImportsBothRows()
+    {
+        var project = await CreateProjectAsync();
+        var workbookPath = Path.Combine(_directory, "duplicate_regular_lesson.xlsx");
+        using (var workbook = new XLWorkbook())
+        {
+            var student = workbook.AddWorksheet("生徒");
+            string[] studentHeaders = ["在籍", "生徒ID（自動・入力不要）", "姓（必須）", "名", "氏名（確認）", "学年（必須）", "標準最大連続コマ数（デフォルトは2）", "空きコマ許可（デフォルトはなし）", "備考"];
+            for (var i = 0; i < studentHeaders.Length; i++) student.Cell(1, i + 1).Value = studentHeaders[i];
+            object[] studentRow = ["TRUE", "S-0001", "架空", "太郎", "架空 太郎", "J2", 2, "なし", ""];
+            for (var i = 0; i < studentRow.Length; i++) student.Cell(2, i + 1).Value = XLCellValue.FromObject(studentRow[i]);
+
+            var teacher = workbook.AddWorksheet("講師");
+            string[] teacherHeaders = ["在籍", "講師ID（自動・入力不要）", "姓（必須）", "名", "氏名（確認）", "空きコマ許可（デフォルトはなし）", "備考"];
+            for (var i = 0; i < teacherHeaders.Length; i++) teacher.Cell(1, i + 1).Value = teacherHeaders[i];
+            object[] teacherRow1 = ["TRUE", "T-0001", "架空", "花子", "架空 花子", "なし", ""];
+            for (var i = 0; i < teacherRow1.Length; i++) teacher.Cell(2, i + 1).Value = XLCellValue.FromObject(teacherRow1[i]);
+            object[] teacherRow2 = ["TRUE", "T-0002", "架空", "次郎", "架空 次郎", "なし", ""];
+            for (var i = 0; i < teacherRow2.Length; i++) teacher.Cell(3, i + 1).Value = XLCellValue.FromObject(teacherRow2[i]);
+
+            var subject = workbook.AddWorksheet("科目");
+            string[] subjectHeaders = ["科目コード（必須）", "表示名（必須）", "学校段階（必須）", "並び順（必須）", "有効"];
+            for (var i = 0; i < subjectHeaders.Length; i++) subject.Cell(1, i + 1).Value = subjectHeaders[i];
+            object[] subjectRow = ["JH_MATH", "中学校・数学", "中学校", 1, "はい"];
+            for (var i = 0; i < subjectRow.Length; i++) subject.Cell(2, i + 1).Value = XLCellValue.FromObject(subjectRow[i]);
+
+            var qualification = workbook.AddWorksheet("講師対応科目");
+            string[] qualificationHeaders = ["講師名から選択", "講師ID（自動・入力不要）", "科目名から選択", "科目コード（自動・入力不要）", "指導可能（デフォルトははい）", "備考"];
+            for (var i = 0; i < qualificationHeaders.Length; i++) qualification.Cell(1, i + 1).Value = qualificationHeaders[i];
+            object[] qualificationRow = ["架空 花子", "T-0001", "中学校・数学", "JH_MATH", "はい", ""];
+            for (var i = 0; i < qualificationRow.Length; i++) qualification.Cell(2, i + 1).Value = XLCellValue.FromObject(qualificationRow[i]);
+
+            var regular = workbook.AddWorksheet("通常授業");
+            string[] regularHeaders = ["生徒名から選択", "生徒ID（自動・入力不要）", "科目名から選択", "科目コード（自動・入力不要）", "通常担当講師名から選択", "通常担当講師ID（自動・入力不要）", "担当講師優先度（デフォルトは3）", "1対1必須（デフォルトはいいえ）", "備考"];
+            for (var i = 0; i < regularHeaders.Length; i++) regular.Cell(1, i + 1).Value = regularHeaders[i];
+            // 同じ生徒・科目だが、通常担当講師が異なる2行（週2回、曜日ごとに担当が違うケース）。
+            object[] regularRow1 = ["架空 太郎", "S-0001", "中学校・数学", "JH_MATH", "架空 花子", "T-0001", 5, "いいえ", ""];
+            for (var i = 0; i < regularRow1.Length; i++) regular.Cell(2, i + 1).Value = XLCellValue.FromObject(regularRow1[i]);
+            object[] regularRow2 = ["架空 太郎", "S-0001", "中学校・数学", "JH_MATH", "架空 次郎", "T-0002", 3, "いいえ", ""];
+            for (var i = 0; i < regularRow2.Length; i++) regular.Cell(3, i + 1).Value = XLCellValue.FromObject(regularRow2[i]);
+
+            workbook.SaveAs(workbookPath);
+        }
+
+        var service = new SharedRosterImportService();
+        var preview = await service.PreviewAsync(project, workbookPath);
+        Assert.False(preview.HasErrors, string.Join(Environment.NewLine, preview.Issues.Select(i => i.Message)));
+        Assert.Equal(2, preview.RegularLessonCount);
+
+        var result = await service.ApplyAsync(project, preview);
+        Assert.Equal(7, result.ImportedRows); // 生徒1+講師2+科目1+講師対応科目1+通常授業2
+
+        await using var connection = new SqliteConnection($"Data Source={project};Pooling=False");
+        await connection.OpenAsync();
+        Assert.Equal(2L, await ScalarAsync(connection, "SELECT COUNT(*) FROM RegularLessonProfile"));
+        Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM RegularLessonProfile r JOIN Teacher t ON t.Id=r.RegularTeacherId WHERE t.ExternalId='T-0001' AND r.RegularTeacherPriority=5"));
+        Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM RegularLessonProfile r JOIN Teacher t ON t.Id=r.RegularTeacherId WHERE t.ExternalId='T-0002' AND r.RegularTeacherPriority=3"));
+    }
+
     [Fact]
     public async Task PreviewAndApply_PythonSharedRosterFormat_ImportsAllFiveSheetsWithGradeConversion()
     {

@@ -358,7 +358,12 @@ public sealed class SqliteProjectRepository : IProjectRepository
                     RegularTeacherPriority INTEGER NOT NULL DEFAULT 3 CHECK (RegularTeacherPriority BETWEEN 1 AND 5),
                     OneToOneRequired INTEGER NOT NULL DEFAULT 0 CHECK (OneToOneRequired IN (0, 1)),
                     Note TEXT NOT NULL DEFAULT '',
-                    UNIQUE (ProjectId, StudentId, SubjectId)
+                    -- ユーザー指示「通常授業について、複数の行で同じ氏名、科目があった場合、重複を
+                    -- 許してください」（週2回同じ科目だが通常担当講師が曜日で異なる生徒がいるため）
+                    -- への対応。生徒・科目だけでなく通常担当講師も含めた組み合わせでのみ一意にし、
+                    -- 同じ生徒・科目でも通常担当講師が異なれば複数行を許す（優先度は複数行の中での
+                    -- 使用順。SqliteProjectSchema.RelaxRegularLessonProfileUniqueConstraintAsync参照）。
+                    UNIQUE (ProjectId, StudentId, SubjectId, RegularTeacherId)
                 );
                 PRAGMA user_version = 1;
                 """;

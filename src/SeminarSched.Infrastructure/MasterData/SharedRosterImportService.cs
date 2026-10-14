@@ -108,7 +108,7 @@ public sealed class SharedRosterImportService : ISharedRosterImportService
         AddDuplicateIssues(result.Teachers, row => row.ExternalId, "講師", "講師ID", result.Issues);
         AddDuplicateIssues(result.Subjects, row => row.Code, "科目", "科目コード", result.Issues);
         AddDuplicateIssues(result.Qualifications, row => $"{row.TeacherExternalId}{row.SubjectCode}", "講師対応科目", "講師ID・科目コード", result.Issues);
-        AddDuplicateIssues(result.RegularLessons, row => $"{row.StudentExternalId}{row.SubjectCode}", "通常授業", "生徒ID・科目コード", result.Issues);
+        AddDuplicateIssues(result.RegularLessons, row => $"{row.StudentExternalId}{row.SubjectCode}{row.RegularTeacherExternalId}", "通常授業", "生徒ID・科目コード・通常担当講師ID", result.Issues); // ユーザー指示: 生徒・科目が同じでも通常担当講師が異なれば複数行を許す
         return result;
     }
 
@@ -276,7 +276,11 @@ public sealed class SharedRosterImportService : ISharedRosterImportService
         {
             await using var command = connection.CreateCommand();
             command.Transaction = transaction;
-            command.CommandText = "INSERT INTO RegularLessonProfile(ProjectId,StudentId,SubjectId,RegularTeacherId,RegularTeacherPriority,OneToOneRequired,Note) VALUES(1,$student,$subject,$teacher,$priority,$one,$note) ON CONFLICT(ProjectId,StudentId,SubjectId) DO UPDATE SET RegularTeacherId=excluded.RegularTeacherId,RegularTeacherPriority=excluded.RegularTeacherPriority,OneToOneRequired=excluded.OneToOneRequired,Note=excluded.Note;";
+            // ユーザー指示「同じ生徒・科目でも重複を許してください」への対応。以前は(ProjectId,
+            // StudentId,SubjectId)だけで一意にしていたため、同じ生徒・科目の行は常に1行へ集約されて
+            // いた。通常担当講師も含めた組み合わせで一意にし、生徒・科目が同じでも通常担当講師が
+            // 異なれば別行として取り込めるようにする（講師まで完全一致する行だけ上書きする）。
+            command.CommandText = "INSERT INTO RegularLessonProfile(ProjectId,StudentId,SubjectId,RegularTeacherId,RegularTeacherPriority,OneToOneRequired,Note) VALUES(1,$student,$subject,$teacher,$priority,$one,$note) ON CONFLICT(ProjectId,StudentId,SubjectId,RegularTeacherId) DO UPDATE SET RegularTeacherPriority=excluded.RegularTeacherPriority,OneToOneRequired=excluded.OneToOneRequired,Note=excluded.Note;";
             Bind(command, "$student", students[row.StudentExternalId]); Bind(command, "$subject", subjects[row.SubjectCode]);
             Bind(command, "$teacher", row.RegularTeacherExternalId is null ? null : teachers[row.RegularTeacherExternalId]);
             Bind(command, "$priority", row.Priority); Bind(command, "$one", row.OneToOne); Bind(command, "$note", row.Note);
