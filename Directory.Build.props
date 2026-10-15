@@ -95,16 +95,29 @@
          同じｘｌｓｘになるようにしてください」）。付記を前提にv1.5.1で入れた学校区分の空欄許容
          （検証緩和）も、その前提ごと差し戻した。v1.5.1で見つけたもう1件の不具合修正
          （automaticRequestNumbersの簡略化）は付記と無関係なためそのまま維持している。
-         docs/adr/0010-questionnaire-entrance-exam-question-toggle.mdのAmendment（v1.5.2）参照。 -->
-    <VersionPrefix>1.5.2</VersionPrefix>
+         docs/adr/0010-questionnaire-entrance-exam-question-toggle.mdのAmendment（v1.5.2）参照。
+         v1.5.3は、ユーザー報告「②アンケート作成の『保存先を開く』を押してもエクスプローラーが
+         起動しない（クライアント環境、Windows 11）」への対応。原因として、既存のコードが
+         Process.Start(UseShellExecute: true)（Win32のShellExecuteEx経由）でフォルダーを開いて
+         おり、MSIXパッケージ化されたアプリのAppContainerから呼び出したときの挙動が実行環境
+         （Windowsのバージョン・ビルド・ポリシー設定）によって不安定になりうることが疑われる。
+         既にOutputPage.OpenOutputFolder_Clickで使われ正常に動いているWindows.System.Launcher
+         （パッケージ化アプリ向けに設計されたWinRTのランチャーAPI）へ、フォルダーを開く全ての
+         箇所（②アンケート作成・ホーム画面の「最近使ったプロジェクト」）を統一し、フォルダー
+         不在時や起動失敗時にも明確なエラーメッセージ（実際のパスを含む）を表示するようにした。
+         ファイルを開く箇所（共通名簿Excel関連の2箇所）も、同じ理由でWindows.System.Launcherへ
+         統一した。あわせてユーザー要望「保存先を開けてもいいものがいくつかある」への対応として、
+         ホーム画面に「保存先フォルダーを開く」（共通名簿Excel）・「フォルダーを開く」（現在の
+         プロジェクト）・「バックアップフォルダーを開く」の3つのボタンを追加した。 -->
+    <VersionPrefix>1.5.3</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.5.2.0</AssemblyVersion>
-    <FileVersion>1.5.2.0</FileVersion>
+    <AssemblyVersion>1.5.3.0</AssemblyVersion>
+    <FileVersion>1.5.3.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.5.2.0</AppxPackageVersion>
+    <AppxPackageVersion>1.5.3.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>

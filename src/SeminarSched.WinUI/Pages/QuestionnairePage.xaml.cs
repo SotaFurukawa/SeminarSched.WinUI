@@ -1,8 +1,9 @@
-using System.Diagnostics;
 using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using SeminarSched.Domain.Projects;
+using Windows.Storage;
+using Windows.System;
 namespace SeminarSched_WinUI.Pages;
 public sealed partial class QuestionnairePage : WorkflowPageBase
 {
@@ -55,11 +56,28 @@ public sealed partial class QuestionnairePage : WorkflowPageBase
 
     private async void Guide_Click(object sender, RoutedEventArgs e) => await GoogleFormsGuide.ShowAsync(XamlRoot);
 
-    private void OpenFolder_Click(object sender, RoutedEventArgs e)
+    // ユーザー報告「2 アンケート作成で保存先を開こうとしてもエクスプローラーが起動しない
+    // （クライアント環境、Windows 11）」への対応。Process.Start(UseShellExecute: true)は
+    // Win32のShellExecuteEx経由で、MSIXパッケージ化されたアプリのAppContainerから呼び出した
+    // ときの挙動が実行環境（Windowsのバージョン・ビルド、ポリシー設定）によって不安定になりうる。
+    // OutputPage.OpenOutputFolder_Clickが既に使っているWindows.System.Launcher（WinRTの
+    // ランチャーAPI。パッケージ化アプリ向けに設計されており、こちらの方が確実に動く）へ統一した。
+    private async void OpenFolder_Click(object sender, RoutedEventArgs e)
     {
         if (_lastOutputDirectory is null) return;
-        try { Process.Start(new ProcessStartInfo(_lastOutputDirectory) { UseShellExecute = true }); }
-        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or IOException)
+        try
+        {
+            if (!Directory.Exists(_lastOutputDirectory))
+            {
+                Status.Severity = InfoBarSeverity.Error; Status.Title = "保存先を開けませんでした"; Status.Message = $"フォルダーが見つかりません: {_lastOutputDirectory}"; Status.IsOpen = true;
+                return;
+            }
+            var folder = await StorageFolder.GetFolderFromPathAsync(_lastOutputDirectory);
+            var opened = await Launcher.LaunchFolderAsync(folder);
+            if (!opened)
+            { Status.Severity = InfoBarSeverity.Error; Status.Title = "保存先を開けませんでした"; Status.Message = $"エクスプローラーを起動できませんでした。手動で次のフォルダーを開いてください: {_lastOutputDirectory}"; Status.IsOpen = true; }
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or UnauthorizedAccessException)
         { Status.Severity = InfoBarSeverity.Error; Status.Title = "保存先を開けませんでした"; Status.Message = exception.Message; Status.IsOpen = true; }
     }
 }

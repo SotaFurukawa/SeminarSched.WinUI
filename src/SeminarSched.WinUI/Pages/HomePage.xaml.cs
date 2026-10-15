@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.Data.Sqlite;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
@@ -9,6 +8,8 @@ using SeminarSched.Application.Projects;
 using SeminarSched.Application.Settings;
 using SeminarSched.Domain.Projects;
 using SeminarSched.Domain.Scheduling;
+using Windows.Storage;
+using Windows.System;
 using WinRT.Interop;
 
 namespace SeminarSched_WinUI.Pages;
@@ -59,14 +60,22 @@ public sealed partial class HomePage : Page
             var path = await App.SharedRosterStore.EnsureWorkbookAsync();
             SharedRosterPathText.Text = $"保存先: {path}";
             SharedRosterLastModifiedText.Text = BuildLastModifiedText(path);
-            var started = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
-            ShowStatus(started is null ? InfoBarSeverity.Warning : InfoBarSeverity.Success, started is null ? "既定のアプリで開けませんでした" : "共通名簿Excelを開きました", path);
+            var opened = await Launcher.LaunchFileAsync(await StorageFile.GetFileFromPathAsync(path));
+            ShowStatus(opened ? InfoBarSeverity.Success : InfoBarSeverity.Warning, opened ? "共通名簿Excelを開きました" : "既定のアプリで開けませんでした", path);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SqliteException or InvalidDataException or System.ComponentModel.Win32Exception)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SqliteException or InvalidDataException or FileNotFoundException)
         {
             ShowStatus(InfoBarSeverity.Error, "共通名簿Excelを開けませんでした", exception.Message);
         }
         finally { SetBusy(false); }
+    }
+
+    // ユーザー要望「基本情報の保存先excelなど、保存先を開けてもいいものがいくつかある。
+    // そういった箇所にフォルダを開くのボタンをさらに増やしてほしい」への対応。
+    private async void OpenSharedRosterFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var directory = Path.GetDirectoryName(App.SharedRosterStore.WorkbookPath);
+        if (directory is not null) await OpenFolderAsync(directory);
     }
 
     private async void NewSharedRosterTemplate_Click(object sender, RoutedEventArgs e)
@@ -79,10 +88,10 @@ public sealed partial class HomePage : Page
             if (file is null) return;
             SetBusy(true);
             await App.SharedRosterStore.ExportBlankTemplateAsync(file.Path);
-            var started = Process.Start(new ProcessStartInfo(file.Path) { UseShellExecute = true });
-            ShowStatus(started is null ? InfoBarSeverity.Warning : InfoBarSeverity.Success, started is null ? "既定のアプリで開けませんでした" : "新しい基本情報テンプレートを保存しました", file.Path);
+            var opened = await Launcher.LaunchFileAsync(await StorageFile.GetFileFromPathAsync(file.Path));
+            ShowStatus(opened ? InfoBarSeverity.Success : InfoBarSeverity.Warning, opened ? "新しい基本情報テンプレートを保存しました" : "既定のアプリで開けませんでした", file.Path);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FileNotFoundException)
         {
             ShowStatus(InfoBarSeverity.Error, "テンプレートを保存できませんでした", exception.Message);
         }
@@ -291,6 +300,14 @@ public sealed partial class HomePage : Page
         App.Logger.Info("Project closed");
     }
 
+    private async void OpenCurrentProjectFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var current = App.ProjectService.Current;
+        if (current is null) { ShowStatus(InfoBarSeverity.Warning, "フォルダーを開けません", "先にプロジェクトを開いてください。"); return; }
+        var directory = Path.GetDirectoryName(current.Path);
+        if (directory is not null) await OpenFolderAsync(directory);
+    }
+
     private async void RecentProject_ItemClick(object sender, ItemClickEventArgs e)
     {
         if (e.ClickedItem is not RecentProjectRow row) return;
@@ -344,16 +361,34 @@ public sealed partial class HomePage : Page
         }
     }
 
-    private void OpenRecentProjectFolder_Click(object sender, RoutedEventArgs e)
+    private async void OpenRecentProjectFolder_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string path }) return;
         var directory = Path.GetDirectoryName(path);
         if (directory is null) return;
+        await OpenFolderAsync(directory);
+    }
+
+    // ユーザー報告「2 アンケート作成で保存先を開こうとしてもエクスプローラーが起動しない
+    // （クライアント環境、Windows 11）」への対応。Process.Start(UseShellExecute: true)は
+    // Win32のShellExecuteEx経由で、MSIXパッケージ化されたアプリのAppContainerから呼び出した
+    // ときの挙動が実行環境によって不安定になりうる。OutputPage.OpenOutputFolder_Clickが既に
+    // 使っているWindows.System.Launcher（パッケージ化アプリ向けのWinRT API）へ統一し、全ての
+    // 「フォルダーを開く」ボタンで共有する。
+    private async Task OpenFolderAsync(string directory)
+    {
         try
         {
-            Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+            if (!Directory.Exists(directory))
+            {
+                ShowStatus(InfoBarSeverity.Error, "フォルダーを開けませんでした", $"フォルダーが見つかりません: {directory}");
+                return;
+            }
+            var folder = await StorageFolder.GetFolderFromPathAsync(directory);
+            var opened = await Launcher.LaunchFolderAsync(folder);
+            if (!opened) ShowStatus(InfoBarSeverity.Error, "フォルダーを開けませんでした", $"エクスプローラーを起動できませんでした。手動で次のフォルダーを開いてください: {directory}");
         }
-        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or IOException)
+        catch (Exception exception) when (exception is FileNotFoundException or UnauthorizedAccessException)
         {
             ShowStatus(InfoBarSeverity.Error, "フォルダーを開けませんでした", exception.Message);
         }
@@ -423,6 +458,8 @@ public sealed partial class HomePage : Page
             SetBusy(false);
         }
     }
+
+    private async void OpenBackupFolder_Click(object sender, RoutedEventArgs e) => await OpenFolderAsync(ProjectService.DefaultBackupDirectory);
 
     private async void RestoreBackup_Click(object sender, RoutedEventArgs e)
     {

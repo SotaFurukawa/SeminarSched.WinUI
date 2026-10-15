@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-15（checkpoint176）
+最終更新: 2026-10-16（checkpoint177）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,8 +16,45 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.5.2`（Release・公開済み。checkpoint176参照）
-Latest Development Checkpoint: checkpoint 176（v1.5.0で追加した「他学年を含む」ページの科目名
+Current Version: `v1.5.3`（Release・公開済み。checkpoint177参照）
+Latest Development Checkpoint: checkpoint 177（ユーザー報告「クライアント環境（Windows 11）で、
+②アンケート作成の『保存先を開く』を押してもエクスプローラーが起動しない」への対応、および
+ユーザー要望「保存先を開けてもいいものがいくつかある。そういった箇所にフォルダを開くのボタンを
+さらに増やしてほしい」への対応。
+
+①調査の結果、フォルダーを開く既存のコードが`Process.Start(UseShellExecute: true)`
+（Win32の`ShellExecuteEx`経由）を使っていることが判明。MSIXパッケージ化されたアプリの
+AppContainerからこのAPIを呼ぶ挙動は実行環境（Windowsのバージョン・ビルド・ポリシー設定）に
+よって不安定になりうることが疑われる。同じアプリ内で既に`OutputPage.OpenOutputFolder_Click`
+（「8 出力設定」の保存先フォルダーを開くボタン）が`Windows.System.Launcher`（パッケージ化
+アプリ向けのWinRTランチャーAPI）を使っており、こちらは正常に動作している。
+- フォルダーを開く箇所（`QuestionnairePage.OpenFolder_Click`、
+  `HomePage.OpenRecentProjectFolder_Click`）を、共通ヘルパー`HomePage.OpenFolderAsync`
+  （新設）経由で`Windows.System.Launcher.LaunchFolderAsync`へ統一した。フォルダー不在時・
+  起動失敗時にも、実際のパスを含む明確なエラーメッセージを表示するようにした（以前は
+  `Process.Start`の戻り値を見ていなかったため、何も起きていないように見える無反応になり
+  得た）。
+- ファイルを開く箇所（`HomePage.EditSharedRoster_Click`・`NewSharedRosterTemplate_Click`、
+  共通名簿Excel関連）も、同じ理由で`Windows.System.Launcher.LaunchFileAsync`へ統一した。
+- この環境ではクライアントの実機（Windows 11）を再現できないため、修正後に実際に解消するかは
+  ユーザー・クライアント側での確認が必要と伝えた。
+
+②ホーム画面に3つの「開く」ボタンを追加した。
+- 「生徒講師基本情報・通常授業担当情報」カード: 「保存先フォルダーを開く」
+  （`OpenSharedRosterFolder_Click`、共通名簿Excelの保存先フォルダー）。
+- 「現在のプロジェクト」カード: 「フォルダーを開く」（`OpenCurrentProjectFolder_Click`、
+  現在開いているプロジェクトファイルの保存先フォルダー）・「バックアップフォルダーを開く」
+  （`OpenBackupFolder_Click`、`ProjectService.DefaultBackupDirectory`）。
+
+- `dotnet build`成功。既存の全テスト、合計278件がすべて通過（フォルダー/ファイルを開く機能
+  自体はUIの実操作が必要なためテスト対象外、既存のOutputPageの同種機能と同じ扱い）。
+- フォルダー/ファイルを開く機能は、この環境では実機確認ができていない（既知の制約。他の
+  UI機能と同様）。
+- v1.5.3として通常のbuild/test→commit/push→インストーラー作成→Release公開のサイクルを実行。
+
+---
+
+checkpoint 176（v1.5.0で追加した「他学年を含む」ページの科目名
 への学校区分付記（例:「物理（高校）」）を、ユーザーの実機デモ結果を受けて差し戻した。
 
 > この画像のように、山下太郎は、高校生ですが、中学生の理科を受けたいとなったときに、学校区分が

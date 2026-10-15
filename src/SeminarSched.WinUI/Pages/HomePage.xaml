@@ -32,6 +32,7 @@
                         <Button Click="NewSharedRosterTemplate_Click" Content="新規で基本情報を作成" />
                         <Button Click="ImportSharedRoster_Click" Content="別ファイルの基本情報を反映" />
                         <Button Click="AdvanceGrades_Click" Content="学年を一括で繰り上げる" />
+                        <Button Click="OpenSharedRosterFolder_Click" Content="保存先フォルダーを開く" />
                     </StackPanel>
                     <TextBlock x:Name="SharedRosterPathText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                     <TextBlock x:Name="SharedRosterLastModifiedText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
@@ -126,6 +127,8 @@
                         <Button Click="CreateBackup_Click" Content="バックアップを作成" />
                         <Button Click="RestoreBackup_Click" Content="バックアップから復元" />
                         <Button Click="SaveAs_Click" Content="複製して切り替え" />
+                        <Button Click="OpenCurrentProjectFolder_Click" Content="フォルダーを開く" />
+                        <Button Click="OpenBackupFolder_Click" Content="バックアップフォルダーを開く" />
                     </StackPanel>
                     <TextBlock
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
