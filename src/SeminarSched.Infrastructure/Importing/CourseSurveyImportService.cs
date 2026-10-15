@@ -196,13 +196,7 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
                     issues.Add(Issue(Error, "生徒回答", row.RowNumber, name, "受講教科と受講回数は組で入力してください。", "フォーム回答を修正"));
                     continue;
                 }
-                // 不具合修正（精査で発見）: 「他学年を含む」ページの「学校区分」は1教科目以外
-                // 必須回答ではないため、未回答（空欄）もあり得る。空欄はCanonicalQuestionnaireSubject
-                // が科目名の付記（「物理（高校）」）から学校区分を復元するフォールバックに任せ、
-                // ここでは小学校・中学校・高校のいずれでもない「値が入っている」ケースだけをエラーに
-                // する。以前は空欄も一律エラーにしていたため、学校区分を省略した回答はこのチェックに
-                // 必ず引っかかり、付記からの復元フォールバックが事実上到達不能になっていた。
-                if (schoolHeader.Length > 0 && schoolLevel.Length > 0 && schoolLevel is not ("小学校" or "中学校" or "高校"))
+                if (schoolHeader.Length > 0 && schoolLevel is not ("小学校" or "中学校" or "高校"))
                 {
                     issues.Add(Issue(Error, "生徒回答", row.RowNumber, name, "学校区分は小学校・中学校・高校から選択してください。", "フォーム回答を修正"));
                     continue;
@@ -248,24 +242,7 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
     private static string CanonicalQuestionnaireSubject(string value, string header, string schoolLevel)
     {
         var normalized = value.Replace("（中学受験以外）", "（中学受験以外なら可能）");
-
-        // 「他学年を含む」ページの科目選択肢は、ユーザー要望（「物理（高校）」のように学校区分を
-        // 科目名へ付記してほしい）によりQuestionnaireKitService側で末尾へ「（学校区分）」を付記
-        // している。この付記は「他学年を含む」ページの科目（studentSubjectChoices由来）にしか
-        // 現れないため、header（受講教科列の見出し）の内容に関わらず常に外してから既存の判定
-        // ロジックへ渡す（付記を残したまま前方へ学校区分を付け直すと「高校・物理（高校）」のような
-        // 不正な科目名になってしまうため）。schoolLevel（同じ教科目番号の「学校区分」列）は1教科目
-        // 以外は必須回答ではないため、未回答のときはこの付記から学校区分を復元する。
-        string? suffixSchoolLevel = null;
-        var suffixMatch = Regex.Match(normalized, "^(.+)[(（](小学校|中学校|高校)[)）]$");
-        if (suffixMatch.Success)
-        {
-            normalized = suffixMatch.Groups[1].Value;
-            suffixSchoolLevel = suffixMatch.Groups[2].Value;
-        }
-
-        var selectedPrefix = (schoolLevel switch { "小学校" => "小学校・", "中学校" => "中学校・", "高校" => "高校・", _ => null })
-            ?? (suffixSchoolLevel is not null ? suffixSchoolLevel + "・" : null);
+        var selectedPrefix = schoolLevel switch { "小学校" => "小学校・", "中学校" => "中学校・", "高校" => "高校・", _ => null };
         if (selectedPrefix is not null)
         {
             foreach (var existingPrefix in new[] { "小学校・", "中学校・", "高校・" })

@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-15（checkpoint175）
+最終更新: 2026-10-15（checkpoint176）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,8 +16,38 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.5.1`（Release・公開済み。checkpoint175参照）
-Latest Development Checkpoint: checkpoint 175（v1.5.0公開後、ユーザー指示「その他にも重大な
+Current Version: `v1.5.2`（Release・公開済み。checkpoint176参照）
+Latest Development Checkpoint: checkpoint 176（v1.5.0で追加した「他学年を含む」ページの科目名
+への学校区分付記（例:「物理（高校）」）を、ユーザーの実機デモ結果を受けて差し戻した。
+
+> この画像のように、山下太郎は、高校生ですが、中学生の理科を受けたいとなったときに、学校区分が
+> 「高校」、教科が「理科（中学校）」のようになっています。以前までは、学校区分「中学」、教科が
+> 「理科」のようになっていたはずなので、そうなるように修正してほしい。アンケートの中身は
+> 変えない。Ｖ１．０．０と同じｘｌｓｘになるようにしてください。
+
+- 原因: 「他学年を含む」ページは「学校区分」という独立した項目で「受けたい科目の学校区分」を
+  明示的に回答させる設計。科目名にも学校区分を付記したことで学校区分を2か所で尋ねる形になり、
+  回答者が「学校区分」欄には自分自身の学年を、科目名は付記付きのものを選んでしまう、という
+  矛盾した組み合わせが実際のデモで発生した。
+- `QuestionnaireKitService.cs`の`studentSubjectChoices`構築（付記の生成）を、v1.5.0以前の
+  単純な`rawSubjectsBySchoolLevel.Values.SelectMany(x => x).Distinct()`へ差し戻した。
+- `CourseSurveyImportService.CanonicalQuestionnaireSubject`の付記パーサー（`suffixMatch`・
+  `suffixSchoolLevel`）を削除し、v1.5.0以前の実装（`schoolLevel`パラメータだけを信頼する）へ
+  差し戻した。
+- v1.5.1で付記フォールバックのために緩和した「学校区分の空欄許容」検証も、その前提ごと差し戻した
+  （`schoolLevel.Length > 0 &&`の追加分を削除し、空欄も不正な値として一律エラーにする元の挙動へ）。
+- v1.5.1で見つけたもう1件の不具合修正（`automaticRequestNumbers`の到達不能コードを簡略化し、
+  学校区分だけ埋まった未使用の教科目を正しく無視する）は付記と無関係な独立した修正のため、
+  そのまま維持している。
+- `QuestionnaireKitServiceTests`・`CourseSurveyImportServiceTests`の付記関連テストを、差し戻し後の
+  挙動（学校区分は明示的ドロップダウンのみ、科目名に付記なし）を確認する内容へ更新。既存＋
+  更新分、合計278件がすべて通過。
+- 詳細はdocs/adr/0010-questionnaire-entrance-exam-question-toggle.mdのAmendment（v1.5.2）参照。
+- v1.5.2として通常のbuild/test→commit/push→インストーラー作成→Release公開のサイクルを実行。
+
+---
+
+checkpoint 175（v1.5.0公開後、ユーザー指示「その他にも重大な
 問題がないか精査してください」への対応。v1.5.0で見つけた「header.Contains("他学年")の
 到達不能コード」が、Signature()やrequestColumns周りにも同じ種類の問題（整形済み回答シートの
 見出し命名方式を前提にしない、古い設計の名残）が無いか`CourseSurveyImportService.cs`を

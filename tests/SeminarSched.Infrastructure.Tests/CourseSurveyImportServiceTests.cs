@@ -43,19 +43,20 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
         Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM TeacherUnavailability"));
     }
 
-    // ユーザー要望「他学年受講を行う場合に...科目(学校区分)のように科目を書いておいてほしい。
-    // 物理（高校）のような感じです」への対応後の挙動確認。QuestionnaireKitService側で「他学年を
-    // 含む」ページの科目選択肢へ付記するようになった「（学校区分）」付きの回答が、既存の
-    // 「学校区分」列（同じ教科目番号）と組み合わせて正しい科目（高校・物理）へ解決されることを
-    // 確認する。
+    // v1.5.0で「他学年を含む」ページの科目名へ「（学校区分）」を付記する変更を一度入れたが、
+    // ユーザーのデモで「学校区分」欄（回答者自身の学年）と科目名の付記（受けたい科目の学校区分）が
+    // 矛盾する回答（例: 高2の生徒が学校区分「高校」・科目「理科（中学校）」を選んでしまう）が
+    // 実際に発生したため差し戻した。差し戻し後は、学校区分は明示的なドロップダウン回答（同じ
+    // 教科目番号の「学校区分」列）だけを信頼し、科目名は付記の無い元の表記（「理科」）のまま
+    // 正しく解決できることを確認する。
     [Fact]
-    public async Task PreviewAndApply_OtherGradeSubjectWithSchoolLevelSuffix_ResolvesToCorrectSubject()
+    public async Task PreviewAndApply_OtherGradeSubjectWithExplicitSchoolLevel_ResolvesWithoutSuffix()
     {
         var state = await CreateStateAsync();
-        await new SqliteMasterDataRepository().SaveSubjectAsync(state.Path, new Subject(0, "HS_PHYSICS", "高校・物理", "物", "高校", 2));
+        await new SqliteMasterDataRepository().SaveSubjectAsync(state.Path, new Subject(0, "JH_SCIENCE", "中学校・理科", "理", "中学校", 2));
         var studentPath = Path.Combine(_directory, "student.csv");
         var teacherPath = Path.Combine(_directory, "teacher.csv");
-        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "在籍生", "高校", "物理（高校）", "2", "生徒備考",
+        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "在籍生", "中学校", "理科", "2", "生徒備考",
             [(state.Date1, "1 09:00-10:00"), (state.Date2, "")]);
         WriteTeacherCsv(teacherPath, "架空", "花子", "講師備考", [(state.Date1, ""), (state.Date2, "2 10:10-11:10")]);
 
@@ -68,52 +69,7 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
 
         await using var connection = new SqliteConnection($"Data Source={state.Path};Pooling=False");
         await connection.OpenAsync();
-        Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM LessonRequest r JOIN Subject s ON s.Id=r.SubjectId WHERE s.Code='HS_PHYSICS' AND r.RequiredSessions=2"));
-    }
-
-    // 「他学年を含む」ページでは2教科目以降の「学校区分」は必須回答ではないため、回答者が
-    // 学校区分を選ばずに受講教科・受講回数だけ入力することもあり得る。この場合でも、科目名への
-    // 付記（「物理（高校）」）から学校区分を復元できることを確認する（CanonicalQuestionnaireSubject
-    // のフォールバック経路）。
-    [Fact]
-    public async Task PreviewAndApply_OtherGradeSubjectWithSuffixButNoExplicitSchoolLevel_ResolvesViaFallback()
-    {
-        var state = await CreateStateAsync();
-        await new SqliteMasterDataRepository().SaveSubjectAsync(state.Path, new Subject(0, "HS_PHYSICS", "高校・物理", "物", "高校", 2));
-        var studentPath = Path.Combine(_directory, "student.csv");
-        var teacherPath = Path.Combine(_directory, "teacher.csv");
-        var headers = new List<string>
-        {
-            "Timestamp", "Email Address", "個人情報の利用目的への同意（必須）", "姓（苗字）（必須）", "名（必須）",
-            "学年（必須）", "在籍区分（必須）",
-            "学校区分（1教科目）", "受講教科（1教科目）（必須）", "受講回数（1教科目）（必須）",
-            "学校区分（2教科目）", "受講教科（2教科目）", "受講回数（2教科目）",
-            $"受講不可日時（チェックしたコマは受講不可） [{state.Date1:yyyy-MM-dd}（月）]",
-            $"受講不可日時（チェックしたコマは受講不可） [{state.Date2:yyyy-MM-dd}（火）]",
-            "特記事項",
-        };
-        var values = new List<string>
-        {
-            "2026-09-11 0:37:00", "dummy@example.com", "同意します", "架空", "太郎",
-            "中2", "在籍生",
-            "中学校", "英語", "2",
-            "", "物理（高校）", "1", // 学校区分は未回答だが、科目名の付記から学校区分を復元できるはず
-            "", "",
-            "生徒備考",
-        };
-        File.WriteAllText(studentPath, CsvLine(headers) + "\n" + CsvLine(values) + "\n", new UTF8Encoding(false));
-        WriteTeacherCsv(teacherPath, "架空", "花子", "講師備考", [(state.Date1, ""), (state.Date2, "")]);
-
-        var service = new CourseSurveyImportService();
-        var preview = await service.PreviewAsync(state.Path, studentPath, teacherPath);
-        Assert.False(preview.HasErrors, string.Join(Environment.NewLine, preview.Issues.Select(issue => issue.Message)));
-
-        var result = await service.ApplyAsync(state.Path, preview);
-        Assert.Equal(2, result.LessonRequests);
-
-        await using var connection = new SqliteConnection($"Data Source={state.Path};Pooling=False");
-        await connection.OpenAsync();
-        Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM LessonRequest r JOIN Subject s ON s.Id=r.SubjectId WHERE s.Code='HS_PHYSICS' AND r.RequiredSessions=1"));
+        Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM LessonRequest r JOIN Subject s ON s.Id=r.SubjectId WHERE s.Code='JH_SCIENCE' AND r.RequiredSessions=2"));
     }
 
     // 「精査してほしい」依頼を受けて発見した不具合の再現テスト。「他学年を含む」ページでは、

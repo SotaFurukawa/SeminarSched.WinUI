@@ -62,15 +62,13 @@ public sealed class QuestionnaireKitService
         };
         // 「他学年を含む」ページは学校区分を明示的に回答させるため、ここで使う一覧は
         // askEntranceExamQuestionの影響を受けず常に分割済みの科目名のままにする。
-        // ユーザー要望「科目(学校区分)のように科目を書いておいてほしい。物理（高校）のような
-        // 感じ」への対応。学校段階をまたいで同名の科目が並ぶと紛らわしいため、科目名の末尾へ
-        // 「（学校区分）」を付記する（CourseSurveyImportService.CanonicalQuestionnaireSubjectの
-        // 「他学年」専用の末尾付記パーサーと対応させている）。
-        var schoolLevelLabels = new Dictionary<string, string> { ["elementary"] = "小学校", ["juniorHigh"] = "中学校", ["highSchool"] = "高校" };
-        var studentSubjectChoices = rawSubjectsBySchoolLevel
-            .SelectMany(pair => pair.Value.Select(subject => $"{subject}（{schoolLevelLabels[pair.Key]}）"))
-            .Distinct()
-            .ToArray();
+        // v1.5.0で、科目名へ「（学校区分）」を付記する変更を一度入れたが、ユーザーから実際の
+        // デモで「学校区分」欄と科目名の付記が矛盾する回答（例: 高校生が中学理科を受講したい
+        // 場合に、学校区分は回答者自身の学年である「高校」、科目は付記付きの「理科（中学校）」を
+        // 選んでしまう）が実際に発生したとの報告があり、「以前（学校区分＝中学、科目＝理科）と
+        // 同じになるように」差し戻した。付記は学校区分欄と二重に学校区分を尋ねる形になり、
+        // 回答者にとって紛らわしかった。
+        var studentSubjectChoices = rawSubjectsBySchoolLevel.Values.SelectMany(x => x).Distinct().ToArray();
         // ユーザー要望（中学受験の有無を科目選択ではなく専用の質問で尋ねたい）への対応。
         // オンのときだけ、自動判定される小学校ページの算数・国語の選択肢を「算数（中学受験）」
         // 「算数（中学受験以外）」の2択から単一の「算数」へまとめ、代わりに専用の質問
