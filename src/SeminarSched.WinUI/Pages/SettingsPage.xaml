@@ -36,6 +36,14 @@
                  から固定幅へ変更し、見出しとボタンの間に意図的な余白を作ることで、ボタン列全体を
                  右へ押し出した（5cm≈189epx相当を目安に、元のAuto幅(約110px)へ加算した300pxとした）。
                  column1自体は変わらずAutoのままのため、左端・右端の揃いは維持される。 -->
+            <!-- ユーザー指摘「アップデートを行うのボタンがずれてしまう。ボタンはそろえてほしい。
+                 できれば、横の長さをすべて同じにして、ボタンの横が合うようにしてほしい」への対応。
+                 以前は「アップデートを行う」ボタンだけ、状態文言（UpdateStatusTextBlock）と同じ
+                 横並びのStackPanel内にあったため、状態文言の長さぶんだけボタンの開始位置が
+                 ずれ、幅も他の2つのボタンと揃っていなかった。他の2つのボタンと同じ
+                 Grid.Column="1"へ移し、状態文言はGrid.Column="0"へ収めることで、3つのボタンが
+                 同じAuto列幅（ButtonのHorizontalAlignment既定値Stretchにより、列内の最大幅へ
+                 自動的に揃う）を共有し、左端・右端とも一致するようにした。 -->
             <Grid Margin="0,16,0,0" ColumnSpacing="16" RowSpacing="8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="300" />
@@ -48,14 +56,12 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <TextBlock Grid.Row="0" Grid.Column="0" FontSize="16" FontWeight="SemiBold" Text="ライセンス" VerticalAlignment="Center" />
-                <Button Grid.Row="0" Grid.Column="1" x:Name="ReleaseLicenseButton" Content="ライセンスを解除" Click="ReleaseLicense_Click" />
+                <Button Grid.Row="0" Grid.Column="1" x:Name="ReleaseLicenseButton" Content="ライセンスを解除" Click="ReleaseLicense_Click" HorizontalAlignment="Stretch" />
                 <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" x:Name="LicenseStatusTextBlock" TextWrapping="Wrap" />
                 <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,16,0,0" FontSize="16" FontWeight="SemiBold" Text="アップデート" VerticalAlignment="Center" />
-                <Button Grid.Row="2" Grid.Column="1" Margin="0,16,0,0" x:Name="CheckUpdateButton" Content="アップデートを確認" Click="CheckUpdate_Click" />
-                <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8">
-                    <TextBlock x:Name="UpdateStatusTextBlock" MaxWidth="500" TextWrapping="Wrap" VerticalAlignment="Center" />
-                    <Button x:Name="PerformUpdateButton" Content="アップデートを行う" Click="PerformUpdate_Click" Visibility="Collapsed" />
-                </StackPanel>
+                <Button Grid.Row="2" Grid.Column="1" Margin="0,16,0,0" x:Name="CheckUpdateButton" Content="アップデートを確認" Click="CheckUpdate_Click" HorizontalAlignment="Stretch" />
+                <TextBlock Grid.Row="3" Grid.Column="0" x:Name="UpdateStatusTextBlock" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <Button Grid.Row="3" Grid.Column="1" x:Name="PerformUpdateButton" Content="アップデートを行う" Click="PerformUpdate_Click" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Center" />
             </Grid>
         </StackPanel>
     </Grid>

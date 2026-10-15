@@ -108,16 +108,23 @@
          ファイルを開く箇所（共通名簿Excel関連の2箇所）も、同じ理由でWindows.System.Launcherへ
          統一した。あわせてユーザー要望「保存先を開けてもいいものがいくつかある」への対応として、
          ホーム画面に「保存先フォルダーを開く」（共通名簿Excel）・「フォルダーを開く」（現在の
-         プロジェクト）・「バックアップフォルダーを開く」の3つのボタンを追加した。 -->
-    <VersionPrefix>1.5.3</VersionPrefix>
+         プロジェクト）・「バックアップフォルダーを開く」の3つのボタンを追加した。
+         v1.5.4は、ユーザー指摘「設定ページで『アップデートを行う』のボタンがずれる。ボタンは
+         そろえてほしい。横の長さをすべて同じにして、ボタンの横が合うようにしてほしい」への
+         対応。「アップデートを行う」ボタンだけ、状態文言（UpdateStatusTextBlock）と同じ横並びの
+         StackPanel内にあったため、状態文言の長さぶんだけ開始位置がずれ、幅も他の2つのボタン
+         （ライセンスを解除・アップデートを確認）と揃っていなかった。他の2つと同じGridの列へ
+         移し、3つのボタンが同じAuto列幅（ButtonのHorizontalAlignment既定値Stretchにより列内の
+         最大幅へ自動的に揃う）を共有するようにして、左端・右端とも一致させた。 -->
+    <VersionPrefix>1.5.4</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.5.3.0</AssemblyVersion>
-    <FileVersion>1.5.3.0</FileVersion>
+    <AssemblyVersion>1.5.4.0</AssemblyVersion>
+    <FileVersion>1.5.4.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.5.3.0</AppxPackageVersion>
+    <AppxPackageVersion>1.5.4.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>

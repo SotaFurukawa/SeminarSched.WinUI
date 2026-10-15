@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-16（checkpoint177）
+最終更新: 2026-10-16（checkpoint178）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,8 +16,21 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.5.3`（Release・公開済み。checkpoint177参照）
-Latest Development Checkpoint: checkpoint 177（ユーザー報告「クライアント環境（Windows 11）で、
+Current Version: `v1.5.4`（Release・公開済み。checkpoint178参照）
+Latest Development Checkpoint: checkpoint 178（ユーザー指摘「設定ページで『アップデートを行う』の
+ボタンがずれる。ボタンはそろえてほしい。横の長さをすべて同じにして、ボタンの横が合うように
+してほしい」への対応。`SettingsPage.xaml`で「アップデートを行う」ボタンだけ、状態文言
+（`UpdateStatusTextBlock`）と同じ横並びのStackPanel内にあったため、状態文言の長さぶんだけ
+開始位置がずれ、幅も他の2つのボタン（ライセンスを解除・アップデートを確認、同じGridの
+`Grid.Column="1"`を共有）と揃っていなかった。「アップデートを行う」ボタンも同じ
+`Grid.Column="1"`へ移し（状態文言は`Grid.Column="0"`へ）、3つのボタンが同じAuto列幅
+（ButtonのHorizontalAlignment既定値Stretchにより列内の最大幅へ自動的に揃う）を共有するように
+して、左端・右端とも一致させた。既存の全テスト、合計278件がすべて通過。v1.5.4として通常の
+build/test→commit/push→インストーラー作成→Release公開のサイクルを実行。
+
+---
+
+checkpoint 177（ユーザー報告「クライアント環境（Windows 11）で、
 ②アンケート作成の『保存先を開く』を押してもエクスプローラーが起動しない」への対応、および
 ユーザー要望「保存先を開けてもいいものがいくつかある。そういった箇所にフォルダを開くのボタンを
 さらに増やしてほしい」への対応。
