@@ -237,7 +237,24 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
     private static string CanonicalQuestionnaireSubject(string value, string header, string schoolLevel)
     {
         var normalized = value.Replace("（中学受験以外）", "（中学受験以外なら可能）");
-        var selectedPrefix = schoolLevel switch { "小学校" => "小学校・", "中学校" => "中学校・", "高校" => "高校・", _ => null };
+
+        // 「他学年を含む」ページの科目選択肢は、ユーザー要望（「物理（高校）」のように学校区分を
+        // 科目名へ付記してほしい）によりQuestionnaireKitService側で末尾へ「（学校区分）」を付記
+        // している。この付記は「他学年を含む」ページの科目（studentSubjectChoices由来）にしか
+        // 現れないため、header（受講教科列の見出し）の内容に関わらず常に外してから既存の判定
+        // ロジックへ渡す（付記を残したまま前方へ学校区分を付け直すと「高校・物理（高校）」のような
+        // 不正な科目名になってしまうため）。schoolLevel（同じ教科目番号の「学校区分」列）は1教科目
+        // 以外は必須回答ではないため、未回答のときはこの付記から学校区分を復元する。
+        string? suffixSchoolLevel = null;
+        var suffixMatch = Regex.Match(normalized, "^(.+)[(（](小学校|中学校|高校)[)）]$");
+        if (suffixMatch.Success)
+        {
+            normalized = suffixMatch.Groups[1].Value;
+            suffixSchoolLevel = suffixMatch.Groups[2].Value;
+        }
+
+        var selectedPrefix = (schoolLevel switch { "小学校" => "小学校・", "中学校" => "中学校・", "高校" => "高校・", _ => null })
+            ?? (suffixSchoolLevel is not null ? suffixSchoolLevel + "・" : null);
         if (selectedPrefix is not null)
         {
             foreach (var existingPrefix in new[] { "小学校・", "中学校・", "高校・" })
@@ -246,15 +263,6 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
         }
         if (normalized.StartsWith("小学校・", StringComparison.Ordinal) || normalized.StartsWith("中学校・", StringComparison.Ordinal) || normalized.StartsWith("高校・", StringComparison.Ordinal))
             return normalized;
-        if (header.Contains("他学年", StringComparison.Ordinal))
-        {
-            var match = Regex.Match(normalized, "^(.+)[(（]([小中高])[)）]$");
-            if (match.Success)
-            {
-                var prefix = match.Groups[2].Value switch { "小" => "小学校・", "中" => "中学校・", "高" => "高校・", _ => "" };
-                return prefix + match.Groups[1].Value;
-            }
-        }
         foreach (var (marker, prefix) in new[] { ("小学校", "小学校・"), ("中学校", "中学校・"), ("高校", "高校・") })
             if (header.Contains(marker, StringComparison.Ordinal)) return prefix + normalized;
         return normalized;

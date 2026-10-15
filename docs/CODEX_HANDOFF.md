@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-15（checkpoint173）
+最終更新: 2026-10-15（checkpoint174）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,8 +16,45 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.4.4`（Release・公開済み。checkpoint173参照）
-Latest Development Checkpoint: checkpoint 173（v1.4.3公開後、ユーザーから実際に生成した
+Current Version: `v1.5.0`（Release・公開済み。checkpoint174参照）
+Latest Development Checkpoint: checkpoint 174（v1.4.4公開後、ユーザーから実際に生成した
+Googleフォームの画面（学校区分・受講教科のリスト、夏期講習学力テストの設問）をもとに2件の
+要望があった。
+
+①「他学年受講を行う場合に、学校区分を選択させてから、科目を選ぶ形式ですが、科目(学校区分)の
+ように科目を書いておいてほしい。つまり物理（高校）のような感じです。」への対応。
+- `QuestionnaireKitService.GenerateAsync`の`studentSubjectChoices`（「他学年を含む」ページ専用の
+  科目一覧）へ、学校段階ごとに「（学校区分）」を末尾付記するようにした（例:「物理（高校）」
+  「算数（小学校）」）。自動判定される各校種ページの`subjectsBySchoolLevel`は対象外（このページ
+  では学校区分を別途選ばせないため付記不要）。
+- `CourseSurveyImportService.CanonicalQuestionnaireSubject`を、この付記（全角の「小学校」
+  「中学校」「高校」）から学校区分を復元できるよう更新した。実装中に重要な発見があった:
+  既存の`header.Contains("他学年"...)`によるゲート条件は、実際にはどのヘッダー文字列にも
+  「他学年」という文字列が現れないため、常に`false`になる到達不能コードだった（この関数の
+  旧実装の「他学年」専用分岐は、現在のGAS側の見出し命名方式ではそもそも発火しない設計だった）。
+  「他学年」フロー向けの処理はheaderの内容に関わらず常に行うよう修正した（これを見逃していた
+  ら、付記を付けたことで「他学年を含む」ページの科目が軒並み「未登録の科目です」エラーになる
+  regressionを生んでいた）。
+
+②「最後の質問は冬期講習なら冬期などになるように修正してください。」への対応。
+- `QuestionnaireKitService.GenerateAsync`に`seasonLabel`引数を追加し、「夏期講習学力テスト」の
+  設問タイトル・説明文・選択肢をプロジェクトの季節に応じた文言へ変更した。
+  `CourseSeasonExtensions.ToShortJapaneseName()`（春期・夏期・冬期、「講習」を含まない短い形）を
+  追加。`CourseSeason.Other`は`ProjectSummary`にCustomSeasonNameが含まれないため、呼び出し側
+  （`QuestionnairePage.xaml.cs`）で`Title`から「{年度}年度」接頭辞を除いた残りを使う。
+- 整形済み回答シートのこの列の見出しも、季節非依存の固定ラベル「学力テスト」へ一般化した
+  （`CourseSurveyImportService.cs`はこの列を読んでいないため、呼び出し元には影響なし）。
+
+- `QuestionnaireKitServiceTests`に3件追加（学校区分付記、既存テストの付記対応更新、季節文言）。
+  `CourseSurveyImportServiceTests`に1件追加（付記付き科目の取込みが正しい科目へ解決されることを
+  確認）。既存のテストのうち付記形式に依存していた2件のアサーションも更新。既存＋新規・更新分、
+  合計277件がすべて通過。
+- v1.5.0（新機能のためminorを上げてpatchを0へ戻した）として通常のbuild/test→commit/push→
+  インストーラー作成→Release公開のサイクルを実行。
+
+---
+
+checkpoint 173（v1.4.3公開後、ユーザーから実際に生成した
 Googleフォームのスクリーンショット（②アンケート作成の保存後の画面）とともに3件の指示が
 あった。
 

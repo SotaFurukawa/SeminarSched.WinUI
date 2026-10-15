@@ -43,6 +43,34 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
         Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM TeacherUnavailability"));
     }
 
+    // ユーザー要望「他学年受講を行う場合に...科目(学校区分)のように科目を書いておいてほしい。
+    // 物理（高校）のような感じです」への対応後の挙動確認。QuestionnaireKitService側で「他学年を
+    // 含む」ページの科目選択肢へ付記するようになった「（学校区分）」付きの回答が、既存の
+    // 「学校区分」列（同じ教科目番号）と組み合わせて正しい科目（高校・物理）へ解決されることを
+    // 確認する。
+    [Fact]
+    public async Task PreviewAndApply_OtherGradeSubjectWithSchoolLevelSuffix_ResolvesToCorrectSubject()
+    {
+        var state = await CreateStateAsync();
+        await new SqliteMasterDataRepository().SaveSubjectAsync(state.Path, new Subject(0, "HS_PHYSICS", "高校・物理", "物", "高校", 2));
+        var studentPath = Path.Combine(_directory, "student.csv");
+        var teacherPath = Path.Combine(_directory, "teacher.csv");
+        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "在籍生", "高校", "物理（高校）", "2", "生徒備考",
+            [(state.Date1, "1 09:00-10:00"), (state.Date2, "")]);
+        WriteTeacherCsv(teacherPath, "架空", "花子", "講師備考", [(state.Date1, ""), (state.Date2, "2 10:10-11:10")]);
+
+        var service = new CourseSurveyImportService();
+        var preview = await service.PreviewAsync(state.Path, studentPath, teacherPath);
+        Assert.False(preview.HasErrors, string.Join(Environment.NewLine, preview.Issues.Select(issue => issue.Message)));
+
+        var result = await service.ApplyAsync(state.Path, preview);
+        Assert.Equal(1, result.LessonRequests);
+
+        await using var connection = new SqliteConnection($"Data Source={state.Path};Pooling=False");
+        await connection.OpenAsync();
+        Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM LessonRequest r JOIN Subject s ON s.Id=r.SubjectId WHERE s.Code='HS_PHYSICS' AND r.RequiredSessions=2"));
+    }
+
     // ユーザー報告「アンケート取込時にこの優先度などの引継ぎが行われていない。設定にて、優先度が5に
     // なっているマッチングが、アンケート取り込み後に受講希望から生徒の優先度を見てみると変わって
     // いないことがわかる」を再現・検証する。「通常授業担当設定」（RegularLessonProfile）で

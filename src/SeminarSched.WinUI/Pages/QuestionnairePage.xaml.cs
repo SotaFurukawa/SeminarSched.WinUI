@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using SeminarSched.Domain.Projects;
 namespace SeminarSched_WinUI.Pages;
 public sealed partial class QuestionnairePage : WorkflowPageBase
 {
@@ -36,7 +37,13 @@ public sealed partial class QuestionnairePage : WorkflowPageBase
             var studentDeadline = StudentDeadlinePicker.Date.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             var teacherDeadline = TeacherDeadlinePicker.Date.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             var askEntranceExamQuestion = AskEntranceExamQuestionCheckBox.IsChecked ?? false;
-            var path = await App.QuestionnaireKit.GenerateAsync(current.Path, WorkspacePaths.Forms, current.Title, studentTitle, teacherTitle, studentDeadline, teacherDeadline, contact, askEntranceExamQuestion);
+            // ユーザー要望「最後の質問は冬期講習なら冬期などになるように」への対応。Otherは
+            // CourseProjectDefinition.CustomSeasonNameが正本だがProjectSummaryには含まれないため、
+            // Titleの「{年度}年度」接頭辞を取り除いた残りをその代わりとして使う。
+            var seasonLabel = current.Season == CourseSeason.Other
+                ? current.Title.Replace($"{current.AcademicYear}年度", "", StringComparison.Ordinal)
+                : current.Season.ToShortJapaneseName();
+            var path = await App.QuestionnaireKit.GenerateAsync(current.Path, WorkspacePaths.Forms, current.Title, studentTitle, teacherTitle, studentDeadline, teacherDeadline, contact, askEntranceExamQuestion, seasonLabel);
             _lastOutputDirectory = path;
             ResultPanel.Visibility = Visibility.Visible;
             ToastNotificationState.ShowSuccess("作成キットを保存しました");

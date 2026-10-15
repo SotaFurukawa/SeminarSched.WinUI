@@ -64,16 +64,25 @@
          残るため、結果的に他学年チェックより後に表示される状態へ戻る）。elementaryPageの
          遷移先指定漏れの不具合修正は差し戻し対象外として維持した。③「学校区分は...として
          自動的に扱います。」という、お客様向けには不自然な実装説明文をhelpTextから削除した。
-         docs/adr/0010-questionnaire-entrance-exam-question-toggle.mdのAmendment（v1.4.4）参照。 -->
-    <VersionPrefix>1.4.4</VersionPrefix>
+         docs/adr/0010-questionnaire-entrance-exam-question-toggle.mdのAmendment（v1.4.4）参照。
+         v1.5.0（新機能のためminorを上げてpatchを0へ戻した）は、アンケート作成キットに2件対応。
+         ①「他学年を含む」ページの科目選択肢へ、ユーザー要望（「物理（高校）」のように学校区分を
+         科目名へ付記してほしい）により「（学校区分）」を付記するようにした（studentSubjectChoices
+         経由、自動判定される各校種ページの選択肢には付記しない）。CourseSurveyImportService.
+         CanonicalQuestionnaireSubjectも、この付記を前提に学校区分を復元するよう対応した（従来の
+         単一文字「（高）」ではなく全角の学校区分語に合わせて正規表現を更新）。②最後の設問
+         「夏期講習学力テスト」を、プロジェクトの季節（春期・夏期・冬期・その他はカスタム名称）に
+         応じた文言へ変更した（QuestionnaireKitService.GenerateAsyncの新しいseasonLabel引数、
+         CourseSeasonExtensions.ToShortJapaneseName()）。 -->
+    <VersionPrefix>1.5.0</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.4.4.0</AssemblyVersion>
-    <FileVersion>1.4.4.0</FileVersion>
+    <AssemblyVersion>1.5.0.0</AssemblyVersion>
+    <FileVersion>1.5.0.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.4.4.0</AppxPackageVersion>
+    <AppxPackageVersion>1.5.0.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>

@@ -21,4 +21,16 @@ public static class CourseSeasonExtensions
         CourseSeason.Other => "その他",
         _ => throw new ArgumentOutOfRangeException(nameof(season), season, "Unknown course season."),
     };
+
+    // ユーザー要望（アンケート作成の「夏期講習学力テスト」設問を、冬期講習なら「冬期」のように
+    // 季節に応じて変えてほしい）への対応。ToJapaneseName()の「講習」を含まない短い形。
+    // Otherの場合は実際の名称（CourseProjectDefinition.CustomSeasonName）を呼び出し側で使う。
+    public static string ToShortJapaneseName(this CourseSeason season) => season switch
+    {
+        CourseSeason.Spring => "春期",
+        CourseSeason.Summer => "夏期",
+        CourseSeason.Winter => "冬期",
+        CourseSeason.Other => "",
+        _ => throw new ArgumentOutOfRangeException(nameof(season), season, "Unknown course season."),
+    };
 }

@@ -90,16 +90,17 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
         Assert.Contains("\"askEntranceExamQuestion\": true", studentScript);
         Assert.Contains("中学受験をしますか？（必須）", studentScript);
         // 自動判定される小学校ページの選択肢は分割前の「算数」「国語」だけにまとまる
-        // （「算数（中学受験）」は他学年ページ用のstudentSubjectChoicesにだけ残るので1回だけ出現する）。
+        // （分割済みの名前は他学年ページ用のstudentSubjectChoicesにだけ、学校区分の付記付きで残る）。
         Assert.Contains("\"算数\",", studentScript);
         Assert.Contains("\"国語\"", studentScript);
-        Assert.Single(Regex.Matches(studentScript, Regex.Escape("\"算数（中学受験）\"")));
-        Assert.Single(Regex.Matches(studentScript, Regex.Escape("\"算数（中学受験以外）\"")));
-        // 「他学年を含む」ページ用の一覧は、このオプションの影響を受けず分割済みのままにする。
-        Assert.Contains("\"算数（中学受験）\"", studentScript);
-        Assert.Contains("\"算数（中学受験以外）\"", studentScript);
-        Assert.Contains("\"国語（中学受験）\"", studentScript);
-        Assert.Contains("\"国語（中学受験以外）\"", studentScript);
+        Assert.Single(Regex.Matches(studentScript, Regex.Escape("\"算数（中学受験）（小学校）\"")));
+        Assert.Single(Regex.Matches(studentScript, Regex.Escape("\"算数（中学受験以外）（小学校）\"")));
+        // 「他学年を含む」ページ用の一覧は、このオプションの影響を受けず分割済みのままにする
+        // （学校区分の付記はaskEntranceExamQuestionの値に関わらず常に付く）。
+        Assert.Contains("\"算数（中学受験）（小学校）\"", studentScript);
+        Assert.Contains("\"算数（中学受験以外）（小学校）\"", studentScript);
+        Assert.Contains("\"国語（中学受験）（小学校）\"", studentScript);
+        Assert.Contains("\"国語（中学受験以外）（小学校）\"", studentScript);
     }
 
     [Fact]
@@ -124,6 +125,51 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
         Assert.DoesNotContain("学校区分は小学校として自動的に扱います", studentScript);
         Assert.DoesNotContain("学校区分は中学校として自動的に扱います", studentScript);
         Assert.DoesNotContain("学校区分は高校として自動的に扱います", studentScript);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_OtherGradeSubjectChoices_AreSuffixedWithSchoolLevel()
+    {
+        // ユーザー要望: 「他学年受講を行う場合に、学校区分を選択させてから、科目を選ぶ形式ですが、
+        // 科目(学校区分)のように科目を書いておいてほしい。つまり物理（高校）のような感じです。」
+        var path = Path.Combine(_directory, "project.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
+        var course = new SqliteCourseSettingsRepository();
+        var master = new SqliteMasterDataRepository();
+        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH", "小学校・算数", "算", "小学校", 1));
+        await master.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "中学校・数学", "数", "中学校", 2));
+        await master.SaveSubjectAsync(path, new Subject(0, "HS_PHYSICS", "高校・物理", "物", "高校", 3));
+
+        var output = await new QuestionnaireKitService(course, master).GenerateAsync(path, _directory, "2026夏期講習", "生徒用", "講師用", "2026-07-06", "2026-07-10", "問い合わせ先");
+
+        var studentScript = await File.ReadAllTextAsync(Path.Combine(output, "create_student_questionnaire.gs"));
+        Assert.Contains("\"物理（高校）\"", studentScript);
+        Assert.Contains("\"算数（小学校）\"", studentScript);
+        Assert.Contains("\"数学（中学校）\"", studentScript);
+        // 自動判定される高校ページ自体の選択肢は、今まで通り学校区分の付記無しのままにする
+        // （このページでは「学校区分」を別途選択させないため付記が不要）。
+        Assert.Contains("\"物理\"\n", studentScript.Replace("\r\n", "\n"));
+    }
+
+    [Fact]
+    public async Task GenerateAsync_SeasonLabel_ReplacesHardcodedSummerWordingInLastQuestion()
+    {
+        // ユーザー要望:「最後の質問は冬期講習なら冬期などになるように修正してください。」
+        var path = Path.Combine(_directory, "project.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Winter, new DateOnly(2026, 12, 20), new DateOnly(2026, 12, 20)));
+        var course = new SqliteCourseSettingsRepository();
+        var master = new SqliteMasterDataRepository();
+        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH", "小学校・算数", "算", "小学校", 1));
+        await master.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "中学校・数学", "数", "中学校", 2));
+        await master.SaveSubjectAsync(path, new Subject(0, "HS_MATH", "高校・数学IA", "数", "高校", 3));
+
+        var output = await new QuestionnaireKitService(course, master).GenerateAsync(path, _directory, "2026冬期講習", "生徒用", "講師用", "2026-12-06", "2026-12-10", "問い合わせ先", seasonLabel: "冬期");
+
+        var studentScript = await File.ReadAllTextAsync(Path.Combine(output, "create_student_questionnaire.gs"));
+        Assert.Contains("\"seasonLabel\": \"冬期\"", studentScript);
+        Assert.Contains("\"冬期学力テストを受験する\"", studentScript);
+        Assert.Contains("\"冬期学力テストを受験しない\"", studentScript);
+        Assert.DoesNotContain("夏期", studentScript);
     }
 
     [Fact]

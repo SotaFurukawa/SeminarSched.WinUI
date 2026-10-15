@@ -26,7 +26,7 @@ public sealed class QuestionnaireKitService
     public QuestionnaireKitService(ICourseSettingsRepository courseSettings, IMasterDataRepository masterData)
     { _courseSettings = courseSettings; _masterData = masterData; }
 
-    public async Task<string> GenerateAsync(string projectPath, string parentDirectory, string projectTitle, string studentTitle, string teacherTitle, string studentDeadline, string teacherDeadline, string contact, bool askEntranceExamQuestion = false, CancellationToken cancellationToken = default)
+    public async Task<string> GenerateAsync(string projectPath, string parentDirectory, string projectTitle, string studentTitle, string teacherTitle, string studentDeadline, string teacherDeadline, string contact, bool askEntranceExamQuestion = false, string seasonLabel = "夏期", CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectTitle);
         ArgumentException.ThrowIfNullOrWhiteSpace(studentTitle);
@@ -34,6 +34,7 @@ public sealed class QuestionnaireKitService
         ArgumentException.ThrowIfNullOrWhiteSpace(studentDeadline);
         ArgumentException.ThrowIfNullOrWhiteSpace(teacherDeadline);
         ArgumentException.ThrowIfNullOrWhiteSpace(contact);
+        ArgumentException.ThrowIfNullOrWhiteSpace(seasonLabel);
 
         var days = (await _courseSettings.GetCourseDaysAsync(projectPath, cancellationToken).ConfigureAwait(false)).Where(x => x.IsOpen).OrderBy(x => x.Date).ToArray();
         var slots = (await _courseSettings.GetTimeSlotsAsync(projectPath, cancellationToken).ConfigureAwait(false)).Where(x => x.Active).OrderBy(x => x.SortOrder).ToArray();
@@ -61,7 +62,15 @@ public sealed class QuestionnaireKitService
         };
         // 「他学年を含む」ページは学校区分を明示的に回答させるため、ここで使う一覧は
         // askEntranceExamQuestionの影響を受けず常に分割済みの科目名のままにする。
-        var studentSubjectChoices = rawSubjectsBySchoolLevel.Values.SelectMany(x => x).Distinct().ToArray();
+        // ユーザー要望「科目(学校区分)のように科目を書いておいてほしい。物理（高校）のような
+        // 感じ」への対応。学校段階をまたいで同名の科目が並ぶと紛らわしいため、科目名の末尾へ
+        // 「（学校区分）」を付記する（CourseSurveyImportService.CanonicalQuestionnaireSubjectの
+        // 「他学年」専用の末尾付記パーサーと対応させている）。
+        var schoolLevelLabels = new Dictionary<string, string> { ["elementary"] = "小学校", ["juniorHigh"] = "中学校", ["highSchool"] = "高校" };
+        var studentSubjectChoices = rawSubjectsBySchoolLevel
+            .SelectMany(pair => pair.Value.Select(subject => $"{subject}（{schoolLevelLabels[pair.Key]}）"))
+            .Distinct()
+            .ToArray();
         // ユーザー要望（中学受験の有無を科目選択ではなく専用の質問で尋ねたい）への対応。
         // オンのときだけ、自動判定される小学校ページの算数・国語の選択肢を「算数（中学受験）」
         // 「算数（中学受験以外）」の2択から単一の「算数」へまとめ、代わりに専用の質問
@@ -97,7 +106,8 @@ public sealed class QuestionnaireKitService
                 subjectsBySchoolLevel = studentSubjectsBySchoolLevel,
                 studentSubjectChoices,
                 sessionCounts = Enumerable.Range(1, 20).Select(x => x.ToString(CultureInfo.InvariantCulture)).ToArray(),
-                summerTestChoices = new[] { "夏期学力テストを受験する", "夏期学力テストを受験しない", "対象外（小1～小3・高校生）" },
+                seasonLabel,
+                summerTestChoices = new[] { $"{seasonLabel}学力テストを受験する", $"{seasonLabel}学力テストを受験しない", "対象外（小1～小3・高校生）" },
                 askEntranceExamQuestion,
             };
             var teacherConfig = new
@@ -397,8 +407,8 @@ public sealed class QuestionnaireKitService
             .setRequired(false);
           form
             .addMultipleChoiceItem()
-            .setTitle("夏期講習学力テスト")
-            .setHelpText("個別指導生の夏期学力テストは選択制です（小4～中3対象）。")
+            .setTitle(`${QUESTIONNAIRE_CONFIG.seasonLabel}学力テスト`)
+            .setHelpText(`個別指導生の${QUESTIONNAIRE_CONFIG.seasonLabel}学力テストは選択制です（小4～中3対象）。`)
             .setChoiceValues(QUESTIONNAIRE_CONFIG.summerTestChoices)
             .setRequired(false);
 
@@ -525,7 +535,7 @@ public sealed class QuestionnaireKitService
             headers.push(`受講教科（${index}教科目）${index === 1 ? "（必須）" : ""}`);
             headers.push(`受講回数（${index}教科目）${index === 1 ? "（必須）" : ""}`);
           }
-          headers.push("受講不可日時の確認（必須）", "特記事項", "夏期講習学力テスト");
+          headers.push("受講不可日時の確認（必須）", "特記事項", "学力テスト");
           QUESTIONNAIRE_CONFIG.openDates.forEach((isoDate) => {
             headers.push(
               `受講不可日時（チェックしたコマは受講不可） [${formatDateLabel_(isoDate)}]`,
@@ -661,7 +671,7 @@ public sealed class QuestionnaireKitService
           compactValues.push(
             responseValue_(headers, values, ["受講不可日時の確認（必須）"]),
             responseValue_(headers, values, ["特記事項"]),
-            responseValue_(headers, values, ["夏期講習学力テスト"]),
+            responseValue_(headers, values, [`${QUESTIONNAIRE_CONFIG.seasonLabel}学力テスト`]),
           );
           QUESTIONNAIRE_CONFIG.openDates.forEach((isoDate) => {
             compactValues.push(
