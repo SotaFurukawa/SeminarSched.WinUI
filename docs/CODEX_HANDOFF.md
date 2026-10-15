@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-16（checkpoint178）
+最終更新: 2026-10-16（checkpoint179）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,8 +16,48 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.5.4`（Release・公開済み。checkpoint178参照）
-Latest Development Checkpoint: checkpoint 178（ユーザー指摘「設定ページで『アップデートを行う』の
+Current Version: `v1.5.5`（Release・公開済み。checkpoint179参照）
+Latest Development Checkpoint: checkpoint 179（ユーザー報告「基本情報xlsxを反映すると通常授業の
+中身が明らかに変わる／全く異なる（生徒・講師・科目は完璧に一致する）」の原因究明と修正。
+
+調査は、AskUserQuestionでの段階的な絞り込み（G:ドライブの元ファイルとAppData上の正本の比較→
+「別ファイルの基本情報を反映」でGドライブのファイルを明示的に選んだことを確認→非侵襲的な
+診断ツール（`RosterInspect`、COUNT(*)とImportBatch履歴だけを読む使い捨てコンソールアプリ）で
+現在の件数（生徒82・講師21・科目26・通常授業203）を確認→「生徒・講師・科目は完璧に一致するが、
+通常授業がおかしい。全く異なる」という最終確認）により、問題がRegularLessonProfile（通常授業
+担当設定）の反映処理に限定されることを特定した。
+
+根本原因はv1.3.0（ADR 0009）で入れた変更の副作用。同ADRで一意キーへ`RegularTeacherId`を
+加え、同じ生徒・科目でも通常担当講師が異なれば複数行を許すようにしたが、反映処理はUPSERTの
+みでDELETEを一切行わない既存の設計との整合性を見落としていた。具体的には、ある生徒・科目の
+通常担当講師を講師Aから講師Bへ変更したExcelを反映しても、（生徒,科目,講師A）の一意キーに
+一致する既存行がそのまま残り、（生徒,科目,講師B）の新しい行が追加されるだけだった。削除の
+仕組みが無いため、担当講師の変更を反映のたびに繰り返すと古い行が際限なく蓄積し、通常授業の
+内容が実際のExcelの内容とはかけ離れていった（ユーザーの実運用ファイルは2026-09-18から6回
+反映を重ねており、v1.3.0適用後の直近2回の反映でこの不具合が顕在化したとみられる）。
+
+`SharedRosterImportService.UpsertRegularLessonsAsync`を、生徒・科目ごとに今回のファイルに
+含まれる通常担当講師の集合（講師未定＝NULLも1つの値として扱う）を求め、既存行のうちその
+集合に無いものを先に削除してからファイルの内容を反映する方式へ修正した。あわせて、SQLiteの
+UNIQUE制約はNULL同士を一致させないため通常担当講師未定の行がON CONFLICTで重複挿入されうる
+別の潜在的な不具合も、既存行をId付きで取得して明示的にUPDATE/INSERTを振り分ける方式で修正した。
+
+再現テスト（`SharedRosterStoreTests.
+ApplyImportAsync_WhenRegularTeacherChangedSinceLastReflect_RemovesStaleRowInsteadOfAccumulating`）
+を追加し、修正前のコードに対して実際に実行して2行（旧担当講師の幽霊行＋新担当講師の行）に
+膨れ上がって失敗することを確認してから修正を適用し、修正後は新担当講師の1行だけに正しく
+置き換わって成功することを確認した（本セッションで繰り返し実践してきた「再現してから直す」
+手法を踏襲）。詳細はADR 0009のAmendment（v1.5.5）参照。
+
+既にこの不具合で蓄積してしまった実運用データの幽霊行は、本バージョンへ更新したうえで現在の
+基本情報xlsxをもう一度反映すれば、ファイルに存在しない組み合わせの行が自動的に削除され自己
+修復される（別途クリーンアップツールは不要）。既存の全テスト、合計281件（新規2件を含む）が
+すべて通過。v1.5.5として通常のbuild/test→commit/push→インストーラー作成→Release公開の
+サイクルを実行。
+
+---
+
+checkpoint 178（ユーザー指摘「設定ページで『アップデートを行う』の
 ボタンがずれる。ボタンはそろえてほしい。横の長さをすべて同じにして、ボタンの横が合うように
 してほしい」への対応。`SettingsPage.xaml`で「アップデートを行う」ボタンだけ、状態文言
 （`UpdateStatusTextBlock`）と同じ横並びのStackPanel内にあったため、状態文言の長さぶんだけ

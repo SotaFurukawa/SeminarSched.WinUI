@@ -115,16 +115,32 @@
          StackPanel内にあったため、状態文言の長さぶんだけ開始位置がずれ、幅も他の2つのボタン
          （ライセンスを解除・アップデートを確認）と揃っていなかった。他の2つと同じGridの列へ
          移し、3つのボタンが同じAuto列幅（ButtonのHorizontalAlignment既定値Stretchにより列内の
-         最大幅へ自動的に揃う）を共有するようにして、左端・右端とも一致させた。 -->
-    <VersionPrefix>1.5.4</VersionPrefix>
+         最大幅へ自動的に揃う）を共有するようにして、左端・右端とも一致させた。
+         v1.5.5は、ユーザー報告「基本情報xlsxを反映すると通常授業の中身が明らかに変わる／全く
+         異なる（生徒・講師・科目は完璧に一致する）」の原因究明と修正。v1.3.0で通常授業担当設定
+         （RegularLessonProfile）の一意キーへ通常担当講師IDを加え、同じ生徒・科目でも担当講師が
+         異なれば複数行を許すようにしたが、反映処理はUPSERTのみでDELETEを一切行わない設計の
+         ため、Excel側である生徒・科目の通常担当講師を別の講師へ変更して反映しても、変更前の
+         （生徒,科目,旧担当講師）の組み合わせは一意キーが一致せず削除されずに残り、新しい
+         （生徒,科目,新担当講師）の行が別途追加されるだけだった。担当講師の変更を反映のたびに
+         繰り返すと古い行が際限なく蓄積し、通常授業の内容が実際のExcelとかけ離れていく不具合
+         だった（反映を重ねてきた実運用ファイルで顕在化）。UpsertRegularLessonsAsyncを、生徒・
+         科目ごとに今回のファイルに含まれる通常担当講師の集合（講師未定＝NULLも1つの値として
+         扱う）を求め、既存行のうちその集合に無いものを先に削除してからファイルの内容を反映する
+         方式へ修正した。あわせて、SQLiteのUNIQUE制約はNULL同士を一致させないため通常担当講師
+         未定の行がON CONFLICTで重複挿入されうる別の不具合も、既存行をId付きで取得して明示的に
+         UPDATE/INSERTを振り分ける方式で修正した。再現テスト（反映先に以前の反映由来の行が
+         残っている状態で担当講師を変更したExcelを反映するケース）を追加し、修正前は失敗・
+         修正後は成功することを確認した。 -->
+    <VersionPrefix>1.5.5</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.5.4.0</AssemblyVersion>
-    <FileVersion>1.5.4.0</FileVersion>
+    <AssemblyVersion>1.5.5.0</AssemblyVersion>
+    <FileVersion>1.5.5.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.5.4.0</AppxPackageVersion>
+    <AppxPackageVersion>1.5.5.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>

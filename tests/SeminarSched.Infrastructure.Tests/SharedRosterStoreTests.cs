@@ -239,6 +239,154 @@ public sealed class SharedRosterStoreTests : IDisposable
         workbook.SaveAs(path);
     }
 
+    // ユーザー報告「基本情報xlsxを反映すると、明らかに中身が変わってしまう」の調査用。
+    // 実際にDBへ保存→SharedRosterWorkbookWriterでExcelへ書き出し→(ユーザーの手編集を挟まず)
+    // そのままSharedRosterImportServiceで別のDBへ取り込み、という素のWriter→Importer往復だけでも
+    // 値が変化してしまう箇所が無いかを、各フィールドを個別に突き合わせて確認する。
+    [Fact]
+    public async Task WriteThenReimport_RoundTrip_PreservesAllFieldsExactly()
+    {
+        var master = new SqliteMasterDataRepository();
+        var sourceStoreDirectory = Path.Combine(_directory, "roundtrip_source");
+        var sourceStore = new SharedRosterStore(new SharedRosterImportService(), master, sourceStoreDirectory);
+        await sourceStore.EnsureWorkbookAsync();
+
+        var student1 = await master.SaveStudentAsync(sourceStore.DatabasePath, new Student(0, "S-0001", "架空", "太郎", "中2", 3, true, "生徒備考テスト", true));
+        var student2 = await master.SaveStudentAsync(sourceStore.DatabasePath, new Student(0, "S-0002", "架空", "花子", "小5", 2, false, "", false));
+        var teacher1 = await master.SaveTeacherAsync(sourceStore.DatabasePath, new Teacher(0, "T-0001", "架空", "次郎", true, "講師備考テスト", true));
+        var subject1 = await master.SaveSubjectAsync(sourceStore.DatabasePath, new Subject(0, "JH_MATH", "中学校・数学", "数", "中学校", 1, true));
+        var subject2 = await master.SaveSubjectAsync(sourceStore.DatabasePath, new Subject(0, "ES_JPN", "小学校・国語", "国", "小学校", 2, true));
+        await master.SaveQualificationAsync(sourceStore.DatabasePath, new TeacherQualification(teacher1.Id, subject1.Id, true, "資格備考テスト"));
+        await master.SaveRegularLessonAsync(sourceStore.DatabasePath, new RegularLessonProfile(0, student1.Id, subject1.Id, teacher1.Id, 5, true, "通常授業備考テスト"));
+
+        await sourceStore.RefreshWorkbookAsync();
+
+        var targetStoreDirectory = Path.Combine(_directory, "roundtrip_target");
+        var targetStore = new SharedRosterStore(new SharedRosterImportService(), master, targetStoreDirectory);
+        var preview = await targetStore.PreviewImportAsync(sourceStore.WorkbookPath);
+        Assert.False(preview.HasErrors, string.Join(Environment.NewLine, preview.Issues.Select(issue => issue.Message)));
+        await targetStore.ApplyImportAsync(preview);
+
+        var students = await master.GetStudentsAsync(targetStore.DatabasePath, includeInactive: true);
+        var reimportedStudent1 = students.Single(s => s.ExternalId == "S-0001");
+        Assert.Equal("架空", reimportedStudent1.FamilyName);
+        Assert.Equal("太郎", reimportedStudent1.GivenName);
+        Assert.Equal("中2", reimportedStudent1.Grade);
+        Assert.Equal(3, reimportedStudent1.DefaultMaxConsecutiveSlots);
+        Assert.True(reimportedStudent1.AllowGap);
+        Assert.Equal("生徒備考テスト", reimportedStudent1.Note);
+        Assert.True(reimportedStudent1.Active);
+        var reimportedStudent2 = students.Single(s => s.ExternalId == "S-0002");
+        Assert.Equal("小5", reimportedStudent2.Grade);
+        Assert.False(reimportedStudent2.AllowGap);
+        Assert.Equal("", reimportedStudent2.Note);
+        Assert.False(reimportedStudent2.Active);
+
+        var teachers = await master.GetTeachersAsync(targetStore.DatabasePath, includeInactive: true);
+        var reimportedTeacher1 = teachers.Single(t => t.ExternalId == "T-0001");
+        Assert.Equal("架空", reimportedTeacher1.FamilyName);
+        Assert.Equal("次郎", reimportedTeacher1.GivenName);
+        Assert.True(reimportedTeacher1.AllowGap);
+        Assert.Equal("講師備考テスト", reimportedTeacher1.Note);
+
+        var subjects = await master.GetSubjectsAsync(targetStore.DatabasePath, includeInactive: true);
+        var reimportedSubject1 = subjects.Single(s => s.Code == "JH_MATH");
+        Assert.Equal("中学校・数学", reimportedSubject1.DisplayName);
+        Assert.Equal("中学校", reimportedSubject1.SchoolLevel);
+        Assert.Equal(1, reimportedSubject1.SortOrder);
+
+        var qualifications = await master.GetQualificationsAsync(targetStore.DatabasePath);
+        var reimportedQualification = qualifications.Single();
+        Assert.True(reimportedQualification.CanTeach);
+        Assert.Equal("資格備考テスト", reimportedQualification.Note);
+
+        var regularLessons = await master.GetRegularLessonsAsync(targetStore.DatabasePath);
+        var reimportedRegularLesson = regularLessons.Single();
+        Assert.Equal(5, reimportedRegularLesson.RegularTeacherPriority);
+        Assert.True(reimportedRegularLesson.OneToOneRequired);
+        Assert.Equal("通常授業備考テスト", reimportedRegularLesson.Note);
+        Assert.NotNull(reimportedRegularLesson.RegularTeacherId);
+    }
+
+    // ユーザー報告「基本情報xlsxを反映すると、明らかに中身が変わってしまう」の調査用その2。
+    // このセッションで対応した「同じ生徒・科目でも通常担当講師が異なれば複数行を許す」機能
+    // （checkpoint167、v1.3.0）が、共通名簿Excel経由のWriter→Importer往復でも正しく2行とも
+    // 保たれるか（片方が消えたり、同じ行へ上書きされてしまったりしないか）を確認する。
+    [Fact]
+    public async Task WriteThenReimport_RoundTrip_PreservesMultipleRegularLessonRowsForSameStudentAndSubject()
+    {
+        var master = new SqliteMasterDataRepository();
+        var sourceStoreDirectory = Path.Combine(_directory, "roundtrip_regular_source");
+        var sourceStore = new SharedRosterStore(new SharedRosterImportService(), master, sourceStoreDirectory);
+        await sourceStore.EnsureWorkbookAsync();
+
+        var student = await master.SaveStudentAsync(sourceStore.DatabasePath, new Student(0, "S-0001", "架空", "太郎", "中2"));
+        var teacherA = await master.SaveTeacherAsync(sourceStore.DatabasePath, new Teacher(0, "T-0001", "架空", "花子"));
+        var teacherB = await master.SaveTeacherAsync(sourceStore.DatabasePath, new Teacher(0, "T-0002", "架空", "次郎"));
+        var subject = await master.SaveSubjectAsync(sourceStore.DatabasePath, new Subject(0, "JH_ENG", "中学校・英語", "英", "中学校", 1));
+        await master.SaveRegularLessonAsync(sourceStore.DatabasePath, new RegularLessonProfile(0, student.Id, subject.Id, teacherA.Id, 5, false, "火曜担当"));
+        await master.SaveRegularLessonAsync(sourceStore.DatabasePath, new RegularLessonProfile(0, student.Id, subject.Id, teacherB.Id, 4, false, "木曜担当"));
+
+        await sourceStore.RefreshWorkbookAsync();
+
+        var targetStoreDirectory = Path.Combine(_directory, "roundtrip_regular_target");
+        var targetStore = new SharedRosterStore(new SharedRosterImportService(), master, targetStoreDirectory);
+        var preview = await targetStore.PreviewImportAsync(sourceStore.WorkbookPath);
+        Assert.False(preview.HasErrors, string.Join(Environment.NewLine, preview.Issues.Select(issue => issue.Message)));
+        var result = await targetStore.ApplyImportAsync(preview);
+
+        var regularLessons = await master.GetRegularLessonsAsync(targetStore.DatabasePath);
+        Assert.Equal(2, regularLessons.Count);
+        Assert.Contains(regularLessons, r => r.RegularTeacherPriority == 5 && r.Note == "火曜担当");
+        Assert.Contains(regularLessons, r => r.RegularTeacherPriority == 4 && r.Note == "木曜担当");
+    }
+
+    // 不具合再現テスト（ユーザー報告「基本情報xlsxを反映すると通常授業の中身が明らかに変わる／
+    // 全く異なる」）。既存の反映先DBに「以前の反映」で入った通常授業行（生徒・科目・講師A）が
+    // 残っている状態で、同じ生徒・科目だが通常担当講師を講師Bへ変更した新しいExcelを反映すると、
+    // 修正前は(StudentId,SubjectId,RegularTeacherId)が一致しないため講師Aの行が削除されずに残り、
+    // 講師Bの行が追加されるだけで2行になってしまっていた（担当講師の変更のたびに古い行が
+    // 「幽霊」として蓄積する不具合）。修正後は、反映ファイルに書かれている内容へ正しく
+    // 置き換わり、講師Aの行は消えて講師Bの行だけが残ることを確認する。
+    [Fact]
+    public async Task ApplyImportAsync_WhenRegularTeacherChangedSinceLastReflect_RemovesStaleRowInsteadOfAccumulating()
+    {
+        var master = new SqliteMasterDataRepository();
+        var targetStoreDirectory = Path.Combine(_directory, "stale_regular_target");
+        var targetStore = new SharedRosterStore(new SharedRosterImportService(), master, targetStoreDirectory);
+        await targetStore.EnsureWorkbookAsync();
+
+        var student = await master.SaveStudentAsync(targetStore.DatabasePath, new Student(0, "S-0001", "架空", "太郎", "中2"));
+        var teacherA = await master.SaveTeacherAsync(targetStore.DatabasePath, new Teacher(0, "T-0001", "架空", "花子"));
+        var teacherB = await master.SaveTeacherAsync(targetStore.DatabasePath, new Teacher(0, "T-0002", "架空", "次郎"));
+        var subject = await master.SaveSubjectAsync(targetStore.DatabasePath, new Subject(0, "JH_ENG", "中学校・英語", "英", "中学校", 1));
+        // 「以前の反映」で入ったはずの、担当講師Aの通常授業行をあらかじめ作っておく。
+        await master.SaveRegularLessonAsync(targetStore.DatabasePath, new RegularLessonProfile(0, student.Id, subject.Id, teacherA.Id, 5, false, "旧担当"));
+
+        var sourceStoreDirectory = Path.Combine(_directory, "stale_regular_source");
+        var sourceStore = new SharedRosterStore(new SharedRosterImportService(), master, sourceStoreDirectory);
+        await sourceStore.EnsureWorkbookAsync();
+        await master.SaveStudentAsync(sourceStore.DatabasePath, new Student(0, "S-0001", "架空", "太郎", "中2"));
+        await master.SaveTeacherAsync(sourceStore.DatabasePath, new Teacher(0, "T-0002", "架空", "次郎"));
+        await master.SaveSubjectAsync(sourceStore.DatabasePath, new Subject(0, "JH_ENG", "中学校・英語", "英", "中学校", 1));
+        var sourceTeacherB = (await master.GetTeachersAsync(sourceStore.DatabasePath)).Single(t => t.ExternalId == "T-0002");
+        var sourceStudent = (await master.GetStudentsAsync(sourceStore.DatabasePath)).Single();
+        var sourceSubject = (await master.GetSubjectsAsync(sourceStore.DatabasePath)).Single();
+        // 新しいExcelでは、同じ生徒・科目の通常担当講師が講師Bへ変更されている（講師Aはもう登場しない）。
+        await master.SaveRegularLessonAsync(sourceStore.DatabasePath, new RegularLessonProfile(0, sourceStudent.Id, sourceSubject.Id, sourceTeacherB.Id, 3, false, "新担当"));
+        await sourceStore.RefreshWorkbookAsync();
+
+        var preview = await targetStore.PreviewImportAsync(sourceStore.WorkbookPath);
+        Assert.False(preview.HasErrors, string.Join(Environment.NewLine, preview.Issues.Select(issue => issue.Message)));
+        await targetStore.ApplyImportAsync(preview);
+
+        var regularLessons = await master.GetRegularLessonsAsync(targetStore.DatabasePath);
+        var single = Assert.Single(regularLessons);
+        Assert.Equal(teacherB.Id, single.RegularTeacherId);
+        Assert.Equal("新担当", single.Note);
+        Assert.DoesNotContain(regularLessons, r => r.RegularTeacherId == teacherA.Id);
+    }
+
     [Fact]
     public async Task CopyIntoProjectAsync_WhenCanonicalStoreEmpty_ReturnsNull()
     {

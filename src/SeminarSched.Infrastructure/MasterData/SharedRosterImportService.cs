@@ -272,19 +272,80 @@ public sealed class SharedRosterImportService : ISharedRosterImportService
 
     private static async Task UpsertRegularLessonsAsync(SqliteConnection connection, SqliteTransaction transaction, IEnumerable<RegularLessonRow> rows, IReadOnlyDictionary<string, long> students, IReadOnlyDictionary<string, long> teachers, IReadOnlyDictionary<string, long> subjects, CancellationToken cancellationToken)
     {
-        foreach (var row in rows)
+        // ユーザー指示「同じ生徒・科目でも重複を許してください」への対応。以前は(ProjectId,
+        // StudentId,SubjectId)だけで一意にしていたため、同じ生徒・科目の行は常に1行へ集約されて
+        // いた。通常担当講師も含めた組み合わせで一意にし、生徒・科目が同じでも通常担当講師が
+        // 異なれば別行として取り込めるようにする（講師まで完全一致する行だけ上書きする）。
+        //
+        // 不具合修正（ユーザー報告「基本情報xlsxを反映すると通常授業の中身が明らかに変わる／
+        // 全く異なる」）。上記の変更により一意キーに通常担当講師が加わった結果、反映ファイルで
+        // 誰かの通常担当講師を変更しても、変更前の講師との組み合わせの行は一致する一意キーが
+        // 無いため削除されず残り続け、新しい講師との組み合わせの行が別途追加されるだけだった。
+        // 反映はINSERT/UPDATEのみでDELETEを一切行わない仕組みのため、担当講師の変更を繰り返す
+        // たびに古い（幽霊）行が蓄積し、通常授業の内容が実際のExcelとかけ離れていった。
+        // 対応: 生徒・科目ごとに、今回のファイルに含まれる通常担当講師の集合（講師未定＝NULLも
+        // 1つの値として扱う）を求め、既存行のうちその集合に無いものだけを先に削除してから
+        // ファイルの内容をUPSERTする。これにより「ファイルに書かれている通りの状態」へ正しく
+        // 置き換えられる。
+        foreach (var group in rows.GroupBy(row => (row.StudentExternalId, row.SubjectCode)))
         {
-            await using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            // ユーザー指示「同じ生徒・科目でも重複を許してください」への対応。以前は(ProjectId,
-            // StudentId,SubjectId)だけで一意にしていたため、同じ生徒・科目の行は常に1行へ集約されて
-            // いた。通常担当講師も含めた組み合わせで一意にし、生徒・科目が同じでも通常担当講師が
-            // 異なれば別行として取り込めるようにする（講師まで完全一致する行だけ上書きする）。
-            command.CommandText = "INSERT INTO RegularLessonProfile(ProjectId,StudentId,SubjectId,RegularTeacherId,RegularTeacherPriority,OneToOneRequired,Note) VALUES(1,$student,$subject,$teacher,$priority,$one,$note) ON CONFLICT(ProjectId,StudentId,SubjectId,RegularTeacherId) DO UPDATE SET RegularTeacherPriority=excluded.RegularTeacherPriority,OneToOneRequired=excluded.OneToOneRequired,Note=excluded.Note;";
-            Bind(command, "$student", students[row.StudentExternalId]); Bind(command, "$subject", subjects[row.SubjectCode]);
-            Bind(command, "$teacher", row.RegularTeacherExternalId is null ? null : teachers[row.RegularTeacherExternalId]);
-            Bind(command, "$priority", row.Priority); Bind(command, "$one", row.OneToOne); Bind(command, "$note", row.Note);
-            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            if (!students.TryGetValue(group.Key.StudentExternalId, out var studentId) || !subjects.TryGetValue(group.Key.SubjectCode, out var subjectId))
+                continue;
+
+            // SQLiteの行IDは1から始まるため、通常担当講師が未定（NULL）であることを表す番兵として
+            // 0を使う（notnull制約のためlong?ではなくlongをキーに使う）。
+            const long NoTeacherSentinel = 0L;
+            long TeacherKey(string? externalId) => externalId is null ? NoTeacherSentinel : teachers[externalId];
+
+            var keptTeacherIds = group.Select(row => TeacherKey(row.RegularTeacherExternalId)).ToHashSet();
+
+            // SQLiteのUNIQUE制約はNULLどうしを一致させない（NULL同士は常に別物として扱われる）ため、
+            // 通常担当講師が未定（NULL）の行はON CONFLICTでは既存行に一致せず、そのままだと重複して
+            // 挿入されてしまう。既存行をId付きで取得しておき、通常担当講師（NULL込み）が一致する
+            // 既存行があれば明示的にUPDATEし、無ければINSERTする。
+            var existingIdByTeacher = new Dictionary<long, long>();
+            await using (var existingCommand = connection.CreateCommand())
+            {
+                existingCommand.Transaction = transaction;
+                existingCommand.CommandText = "SELECT Id, RegularTeacherId FROM RegularLessonProfile WHERE ProjectId=1 AND StudentId=$student AND SubjectId=$subject;";
+                Bind(existingCommand, "$student", studentId); Bind(existingCommand, "$subject", subjectId);
+                await using var reader = await existingCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    var existingTeacherId = reader.IsDBNull(1) ? NoTeacherSentinel : reader.GetInt64(1);
+                    existingIdByTeacher[existingTeacherId] = reader.GetInt64(0);
+                }
+            }
+
+            foreach (var (existingTeacherId, existingId) in existingIdByTeacher)
+            {
+                if (keptTeacherIds.Contains(existingTeacherId)) continue;
+                await using var deleteCommand = connection.CreateCommand();
+                deleteCommand.Transaction = transaction;
+                deleteCommand.CommandText = "DELETE FROM RegularLessonProfile WHERE Id=$id;";
+                Bind(deleteCommand, "$id", existingId);
+                await deleteCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            foreach (var row in group)
+            {
+                var teacherKey = TeacherKey(row.RegularTeacherExternalId);
+                var teacherId = teacherKey == NoTeacherSentinel ? (long?)null : teacherKey;
+                await using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+                if (existingIdByTeacher.TryGetValue(teacherKey, out var rowId))
+                {
+                    command.CommandText = "UPDATE RegularLessonProfile SET RegularTeacherPriority=$priority,OneToOneRequired=$one,Note=$note WHERE Id=$id;";
+                    Bind(command, "$id", rowId);
+                }
+                else
+                {
+                    command.CommandText = "INSERT INTO RegularLessonProfile(ProjectId,StudentId,SubjectId,RegularTeacherId,RegularTeacherPriority,OneToOneRequired,Note) VALUES(1,$student,$subject,$teacher,$priority,$one,$note);";
+                    Bind(command, "$student", studentId); Bind(command, "$subject", subjectId); Bind(command, "$teacher", teacherId);
+                }
+                Bind(command, "$priority", row.Priority); Bind(command, "$one", row.OneToOne); Bind(command, "$note", row.Note);
+                await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 
