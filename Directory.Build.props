@@ -73,16 +73,29 @@
          単一文字「（高）」ではなく全角の学校区分語に合わせて正規表現を更新）。②最後の設問
          「夏期講習学力テスト」を、プロジェクトの季節（春期・夏期・冬期・その他はカスタム名称）に
          応じた文言へ変更した（QuestionnaireKitService.GenerateAsyncの新しいseasonLabel引数、
-         CourseSeasonExtensions.ToShortJapaneseName()）。 -->
-    <VersionPrefix>1.5.0</VersionPrefix>
+         CourseSeasonExtensions.ToShortJapaneseName()）。
+         v1.5.1は、ユーザー指示「その他にも重大な問題がないか精査してください」を受けて
+         CourseSurveyImportService.csを再点検し、見つかった2件の不具合を修正した（いずれも
+         今回の変更とは独立した既存の問題で、「他学年を含む」ページで2教科目以降の学校区分が
+         必須回答ではないことに起因する）。①`automaticRequestNumbers`（学校区分だけ埋まった
+         未使用の教科目を無視するための仕組み）が、整形済み回答シートの見出しには学校区分の
+         文字列が含まれないため判定条件が常にfalseになる到達不能コードで、未使用の教科目を
+         回答者が学校区分だけ選んで提出すると「受講教科と受講回数は組で入力してください」という
+         誤ったエラーになっていた。学校区分の有無に関わらず受講教科・受講回数が両方空なら無視する
+         よう簡略化した。②学校区分の検証（「学校区分は小学校・中学校・高校から選択してください」）
+         が、未回答（空欄）も不正な値として一律エラーにしていたため、v1.5.0で追加した
+         「科目名の付記から学校区分を復元するフォールバック」が実際には到達不能だった。空欄は
+         フォールバックに任せ、小学校・中学校・高校のいずれでもない値が入っている場合だけ
+         エラーにするよう修正した。 -->
+    <VersionPrefix>1.5.1</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.5.0.0</AssemblyVersion>
-    <FileVersion>1.5.0.0</FileVersion>
+    <AssemblyVersion>1.5.1.0</AssemblyVersion>
+    <FileVersion>1.5.1.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.5.0.0</AppxPackageVersion>
+    <AppxPackageVersion>1.5.1.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>

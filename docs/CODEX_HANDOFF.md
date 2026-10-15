@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-15（checkpoint174）
+最終更新: 2026-10-15（checkpoint175）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,8 +16,40 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.5.0`（Release・公開済み。checkpoint174参照）
-Latest Development Checkpoint: checkpoint 174（v1.4.4公開後、ユーザーから実際に生成した
+Current Version: `v1.5.1`（Release・公開済み。checkpoint175参照）
+Latest Development Checkpoint: checkpoint 175（v1.5.0公開後、ユーザー指示「その他にも重大な
+問題がないか精査してください」への対応。v1.5.0で見つけた「header.Contains("他学年")の
+到達不能コード」が、Signature()やrequestColumns周りにも同じ種類の問題（整形済み回答シートの
+見出し命名方式を前提にしない、古い設計の名残）が無いか`CourseSurveyImportService.cs`を
+全文再点検し、独立した不具合を2件発見・修正した（いずれも「他学年を含む」ページで2教科目以降の
+学校区分が必須回答ではないことに起因する、既存の問題）。
+
+①`automaticRequestNumbers`（学校区分だけ埋まった未使用の教科目を無視するための仕組み、
+`SchoolLevelInHeader(column.SubjectHeader)`に依存）が、整形済み回答シートの受講教科列見出し
+（例:「受講教科（1教科目）」）には学校区分の文字列が含まれないため判定条件が常にfalseになる
+到達不能コードだった。未使用の教科目を回答者が学校区分だけ選んで提出すると
+「受講教科と受講回数は組で入力してください」という誤ったエラーになっていた。実際に修正前に
+失敗する再現テストを書いて確認してから、学校区分の有無に関わらず受講教科・受講回数が両方空
+なら無視するよう簡略化した。
+
+②`schoolLevel is not ("小学校" or "中学校" or "高校")`による検証が、未回答（空欄）も不正な値と
+して一律エラーにしていたため、v1.5.0で追加した「科目名の付記（「物理（高校）」）から学校区分を
+復元するフォールバック」に実際には一度も到達できていなかった（これも再現テストで確認）。
+空欄はフォールバックに任せ、3つのいずれでもない値が入っている場合だけエラーにするよう修正した。
+
+- `CourseSurveyImportServiceTests`に2件追加（①②それぞれの再現・検証）。既存277件＋新規2件＝
+  合計279件がすべて通過。
+- 他にも調査した観点（低優先度・今回は未対応、ユーザーへ報告のみ）:
+  Subject.DisplayNameにDB制約の一意性保証が無く、`subjectByName = subjects.ToDictionary(...)`が
+  重複時に未処理の例外で丸ごと取込みをクラッシュさせる可能性（Codeは一意だがDisplayNameは
+  一意ではない）。askEntranceExamQuestionをオンにしても、実際に算数・国語の中学受験／以外の
+  分割科目が存在しない場合、復元時に存在しない科目名へ変換されて「未登録の科目です」になる
+  （分割科目の存在を生成時に検証していない）。
+- v1.5.1として通常のbuild/test→commit/push→インストーラー作成→Release公開のサイクルを実行。
+
+---
+
+checkpoint 174（v1.4.4公開後、ユーザーから実際に生成した
 Googleフォームの画面（学校区分・受講教科のリスト、夏期講習学力テストの設問）をもとに2件の
 要望があった。
 

@@ -174,24 +174,35 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
 
             var requests = new List<(string Subject, int Count)>();
             var requestKeys = new HashSet<string>();
-            var automaticRequestNumbers = requestColumns
-                .Where(column => column.SchoolHeader.Length == 0 && SchoolLevelInHeader(column.SubjectHeader).Length > 0
-                    && (Text(values.GetValueOrDefault(column.SubjectHeader, "")).Length > 0 || Text(values.GetValueOrDefault(column.CountHeader, "")).Length > 0))
-                .Select(column => QuestionNumber(column.SubjectHeader))
-                .ToHashSet();
             foreach (var (subjectHeader, countHeader, schoolHeader) in requestColumns)
             {
                 var subjectName = Text(values.GetValueOrDefault(subjectHeader, ""));
                 var countText = Text(values.GetValueOrDefault(countHeader, ""));
                 var schoolLevel = schoolHeader.Length > 0 ? Text(values.GetValueOrDefault(schoolHeader, "")) : "";
-                if (subjectName.Length == 0 && countText.Length == 0 && schoolLevel.Length == 0) continue;
-                if (subjectName.Length == 0 && countText.Length == 0 && schoolLevel.Length > 0 && automaticRequestNumbers.Contains(QuestionNumber(subjectHeader))) continue;
+                // 不具合修正（精査で発見）: 「他学年を含む」ページでは1教科目以外の「学校区分」が
+                // 必須回答ではないため、回答者がその教科目を使わないことにして受講教科・受講回数を
+                // 空欄のまま提出すると、学校区分だけが埋まった状態になり得る（Googleフォームの
+                // リスト設問には選択を取り消す手段が無いため）。これは単に「その教科目は未使用」
+                // という意味であり、エラーにすべきではないため、学校区分の有無に関わらず受講教科・
+                // 受講回数が両方とも空なら無視する。
+                // 以前は「自動判定ページ（学校区分列が無い）かつ他の教科目が埋まっている」場合
+                // だけ無視する`automaticRequestNumbers`という仕組みがあったが、その判定が使っていた
+                // SchoolLevelInHeader(column.SubjectHeader)は、整形済み回答シートの受講教科列見出し
+                // （例:「受講教科（1教科目）」）には学校区分の文字列が含まれないため常に空文字列を
+                // 返し、事実上一度も発火しない到達不能コードだった。
+                if (subjectName.Length == 0 && countText.Length == 0) continue;
                 if (subjectName.Length == 0 || countText.Length == 0)
                 {
                     issues.Add(Issue(Error, "生徒回答", row.RowNumber, name, "受講教科と受講回数は組で入力してください。", "フォーム回答を修正"));
                     continue;
                 }
-                if (schoolHeader.Length > 0 && schoolLevel is not ("小学校" or "中学校" or "高校"))
+                // 不具合修正（精査で発見）: 「他学年を含む」ページの「学校区分」は1教科目以外
+                // 必須回答ではないため、未回答（空欄）もあり得る。空欄はCanonicalQuestionnaireSubject
+                // が科目名の付記（「物理（高校）」）から学校区分を復元するフォールバックに任せ、
+                // ここでは小学校・中学校・高校のいずれでもない「値が入っている」ケースだけをエラーに
+                // する。以前は空欄も一律エラーにしていたため、学校区分を省略した回答はこのチェックに
+                // 必ず引っかかり、付記からの復元フォールバックが事実上到達不能になっていた。
+                if (schoolHeader.Length > 0 && schoolLevel.Length > 0 && schoolLevel is not ("小学校" or "中学校" or "高校"))
                 {
                     issues.Add(Issue(Error, "生徒回答", row.RowNumber, name, "学校区分は小学校・中学校・高校から選択してください。", "フォーム回答を修正"));
                     continue;

@@ -71,6 +71,92 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
         Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM LessonRequest r JOIN Subject s ON s.Id=r.SubjectId WHERE s.Code='HS_PHYSICS' AND r.RequiredSessions=2"));
     }
 
+    // 「他学年を含む」ページでは2教科目以降の「学校区分」は必須回答ではないため、回答者が
+    // 学校区分を選ばずに受講教科・受講回数だけ入力することもあり得る。この場合でも、科目名への
+    // 付記（「物理（高校）」）から学校区分を復元できることを確認する（CanonicalQuestionnaireSubject
+    // のフォールバック経路）。
+    [Fact]
+    public async Task PreviewAndApply_OtherGradeSubjectWithSuffixButNoExplicitSchoolLevel_ResolvesViaFallback()
+    {
+        var state = await CreateStateAsync();
+        await new SqliteMasterDataRepository().SaveSubjectAsync(state.Path, new Subject(0, "HS_PHYSICS", "高校・物理", "物", "高校", 2));
+        var studentPath = Path.Combine(_directory, "student.csv");
+        var teacherPath = Path.Combine(_directory, "teacher.csv");
+        var headers = new List<string>
+        {
+            "Timestamp", "Email Address", "個人情報の利用目的への同意（必須）", "姓（苗字）（必須）", "名（必須）",
+            "学年（必須）", "在籍区分（必須）",
+            "学校区分（1教科目）", "受講教科（1教科目）（必須）", "受講回数（1教科目）（必須）",
+            "学校区分（2教科目）", "受講教科（2教科目）", "受講回数（2教科目）",
+            $"受講不可日時（チェックしたコマは受講不可） [{state.Date1:yyyy-MM-dd}（月）]",
+            $"受講不可日時（チェックしたコマは受講不可） [{state.Date2:yyyy-MM-dd}（火）]",
+            "特記事項",
+        };
+        var values = new List<string>
+        {
+            "2026-09-11 0:37:00", "dummy@example.com", "同意します", "架空", "太郎",
+            "中2", "在籍生",
+            "中学校", "英語", "2",
+            "", "物理（高校）", "1", // 学校区分は未回答だが、科目名の付記から学校区分を復元できるはず
+            "", "",
+            "生徒備考",
+        };
+        File.WriteAllText(studentPath, CsvLine(headers) + "\n" + CsvLine(values) + "\n", new UTF8Encoding(false));
+        WriteTeacherCsv(teacherPath, "架空", "花子", "講師備考", [(state.Date1, ""), (state.Date2, "")]);
+
+        var service = new CourseSurveyImportService();
+        var preview = await service.PreviewAsync(state.Path, studentPath, teacherPath);
+        Assert.False(preview.HasErrors, string.Join(Environment.NewLine, preview.Issues.Select(issue => issue.Message)));
+
+        var result = await service.ApplyAsync(state.Path, preview);
+        Assert.Equal(2, result.LessonRequests);
+
+        await using var connection = new SqliteConnection($"Data Source={state.Path};Pooling=False");
+        await connection.OpenAsync();
+        Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM LessonRequest r JOIN Subject s ON s.Id=r.SubjectId WHERE s.Code='HS_PHYSICS' AND r.RequiredSessions=1"));
+    }
+
+    // 「精査してほしい」依頼を受けて発見した不具合の再現テスト。「他学年を含む」ページでは、
+    // 1教科目以外の「学校区分」ドロップダウンは必須回答ではないため、回答者が一度選んだ後に
+    // その教科目を使わないことにして受講教科・受講回数を空欄のまま提出する、という状況が
+    // 起こり得る（Googleフォームのリスト設問は一度選択すると後から「未選択」へ戻す手段が無い）。
+    // この場合、学校区分だけが埋まっていて受講教科・受講回数が空の教科目は、エラーにせず
+    // 単純に無視されるべきだが、実際には「受講教科と受講回数は組で入力してください」という
+    // 誤ったエラーになっていた。
+    [Fact]
+    public async Task PreviewAndApply_OtherGradeUnusedSlotWithSchoolLevelOnly_IsIgnoredWithoutError()
+    {
+        var state = await CreateStateAsync();
+        var studentPath = Path.Combine(_directory, "student.csv");
+        var teacherPath = Path.Combine(_directory, "teacher.csv");
+        var headers = new List<string>
+        {
+            "Timestamp", "Email Address", "個人情報の利用目的への同意（必須）", "姓（苗字）（必須）", "名（必須）",
+            "学年（必須）", "在籍区分（必須）",
+            "学校区分（1教科目）", "受講教科（1教科目）（必須）", "受講回数（1教科目）（必須）",
+            "学校区分（2教科目）", "受講教科（2教科目）", "受講回数（2教科目）",
+            $"受講不可日時（チェックしたコマは受講不可） [{state.Date1:yyyy-MM-dd}（月）]",
+            $"受講不可日時（チェックしたコマは受講不可） [{state.Date2:yyyy-MM-dd}（火）]",
+            "特記事項",
+        };
+        var values = new List<string>
+        {
+            "2026-09-11 0:37:00", "dummy@example.com", "同意します", "架空", "太郎",
+            "中2", "在籍生",
+            "中学校", "英語", "2",
+            "高校", "", "", // 学校区分だけ選んで、受講教科・受講回数は未入力のまま提出した想定
+            "", "",
+            "生徒備考",
+        };
+        File.WriteAllText(studentPath, CsvLine(headers) + "\n" + CsvLine(values) + "\n", new UTF8Encoding(false));
+        WriteTeacherCsv(teacherPath, "架空", "花子", "講師備考", [(state.Date1, ""), (state.Date2, "")]);
+
+        var service = new CourseSurveyImportService();
+        var preview = await service.PreviewAsync(state.Path, studentPath, teacherPath);
+        Assert.False(preview.HasErrors, string.Join(Environment.NewLine, preview.Issues.Select(issue => issue.Message)));
+        Assert.Equal(1, preview.RequestCount);
+    }
+
     // ユーザー報告「アンケート取込時にこの優先度などの引継ぎが行われていない。設定にて、優先度が5に
     // なっているマッチングが、アンケート取り込み後に受講希望から生徒の優先度を見てみると変わって
     // いないことがわかる」を再現・検証する。「通常授業担当設定」（RegularLessonProfile）で
