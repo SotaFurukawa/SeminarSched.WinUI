@@ -64,6 +64,23 @@ Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
 [Tasks]
 Name: "desktopicon"; Description: "デスクトップにショートカットを作成する"; GroupDescription: "追加アイコン:"; Flags: unchecked
 
+; ユーザー報告「アンケート作成後に開こうとしても開けなかった」への対応。Workspace配下の各フォルダ
+; （Output/Forms等）は、以前はその機能を初めて使ったときに遅延して作られる仕様だった。インストール
+; 時にあらかじめ作っておくことで、「使う前にフォルダを探すとまだ無い」という状態を避ける。
+; uninsneveruninstallを付け、アンインストール時にこのフォルダを削除しないようにする（下記の
+; [UninstallRun]の直前のコメントにある「ユーザーデータはアンインストールしても消さない」方針と
+; 同じ）。実際の生成物（アンケート作成キット・出力一式）は、この中の都度新しいタイムスタンプ付き
+; サブフォルダへ保存される（この仕組み自体は変更していない）ため、フォルダそのものを事前に
+; 作っておいても、生成のたびにサブフォルダが新しく作られる挙動はそのまま。
+[Dirs]
+Name: "{localappdata}\SeminarSched.WinUI"; Flags: uninsneveruninstall
+Name: "{localappdata}\SeminarSched.WinUI\logs"; Flags: uninsneveruninstall
+Name: "{localappdata}\SeminarSched.WinUI\Workspace\Projects"; Flags: uninsneveruninstall
+Name: "{localappdata}\SeminarSched.WinUI\Workspace\Backups"; Flags: uninsneveruninstall
+Name: "{localappdata}\SeminarSched.WinUI\Workspace\Output"; Flags: uninsneveruninstall
+Name: "{localappdata}\SeminarSched.WinUI\Workspace\Forms"; Flags: uninsneveruninstall
+Name: "{localappdata}\SeminarSched.WinUI\Workspace\SharedRoster"; Flags: uninsneveruninstall
+
 [Files]
 Source: "{#SourceDirectory}\{#MyMsixFileName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDirectory}\SeminarSched.WinUI.cer"; DestDir: "{app}"; Flags: ignoreversion

@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-16（checkpoint181）
+最終更新: 2026-10-16（checkpoint182）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,8 +16,38 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.6.0`（Release・公開済み。checkpoint181参照）
-Latest Development Checkpoint: checkpoint 181（ユーザー要望「インストール時にデフォルトの保存先を
+Current Version: `v1.6.1`（Release・公開済み。checkpoint182参照）
+Latest Development Checkpoint: checkpoint 182（ユーザー報告「アンケート作成後に開こうとしても
+開けなかった」への対応（checkpoint181の「２アンケートで保存先を開けない」クライアント報告の続き。
+実際の経路を再調査した結果を本人へ説明した上での対応）。
+
+調査の結果、`WorkspacePaths.Output`/`Forms`の`Directory.CreateDirectory`は、静的プロパティの
+初回アクセス時にしか実行されないため、`OutputPage`/`QuestionnairePage`の各Generate_Clickで
+参照されるまで、Workspace配下の各フォルダ（Output/Forms）は作られないことを確認した（コードを
+grepしてこの2箇所以外に参照が無いことを確認済み）。「作成」ボタンを押す前にこれらのフォルダを
+探すと、まだ存在しない状態になり得る。
+
+対応として、インストーラー（Inno Setup、installer/SeminarSched.WinUI.iss）に`[Dirs]`セクションを
+追加し、Workspace配下の各フォルダ（Projects/Backups/Output/Forms/SharedRoster）とlogsフォルダを、
+インストール時にあらかじめ作っておくようにした。`uninsneveruninstall`フラグを全エントリーに付け、
+既存の「ユーザーデータはアンインストールしても消さない」方針（[UninstallRun]直前のコメント参照）
+を壊さないようにしている。
+
+なお、アンケート作成キット自体は、この中へ都度新しいタイムスタンプ付きサブフォルダ
+（`Googleフォーム_{タイトル}_{タイムスタンプ}`）を作って保存する仕組み自体は変更していない
+（`QuestionnaireKitService.GenerateAsync`の一時フォルダ→`Directory.Move`による原子的な生成は
+既存のまま、再確認済み）。この生成ごとのサブフォルダは、生成成功直後には必ず存在し、アプリ自身が
+後から削除する処理も無いため、生成後に無くなっていた場合は外部（ユーザー自身がGoogle Apps
+Scriptへのアップロード後に手動で片付けた、ウイルス対策ソフト等）による削除が原因と考えられる、
+という説明をユーザーへ行った。
+
+インストーラースクリプトのみの変更（コード側の変更は無し）のため新規テストは追加していないが、
+既存の全テスト、合計284件がすべて通過。Inno Setupでのコンパイル自体の成功も確認済み。v1.6.1として
+通常のbuild/test→commit/push→インストーラー作成→Release公開のサイクルを実行。
+
+---
+
+checkpoint 181（ユーザー要望「インストール時にデフォルトの保存先を
 指定しておき、workspaceを置く場所を変更できるようにする。デフォルトの場所はあなたが指定した
 場所です」への対応（checkpoint180の末尾で保留にしていた提案）。詳細はADR 0011参照。
 

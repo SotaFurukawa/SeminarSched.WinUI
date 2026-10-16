@@ -164,16 +164,27 @@
          保存先選択ウィザード画面は追加していない（設定ページの機能で実質的に同じことができ、
          この環境では対話的インストーラーの検証が難しいため。ADR 0011参照）。
          あわせてv1.5.6のアンインストールボタンの下に設けた「データの保存先」欄（現在の保存先の
-         表示・「保存先を変更する」ボタン）を追加した。 -->
-    <VersionPrefix>1.6.0</VersionPrefix>
+         表示・「保存先を変更する」ボタン）を追加した。
+         v1.6.1は、ユーザー報告「アンケート作成後に開こうとしても開けなかった」への対応。
+         `WorkspacePaths.Output`/`Forms`（Workspace配下の各フォルダ）は、以前はその機能を初めて
+         使ったとき（`OutputPage`/`QuestionnairePage`のGenerate_Clickで最初に参照されたとき）に
+         遅延して作られる仕様だったため、使う前に探すとまだ存在しない状態になり得た。インストーラー
+         （Inno Setup）に`[Dirs]`セクションを追加し、Workspace配下の各フォルダ（Projects/Backups/
+         Output/Forms/SharedRoster）とlogsフォルダを、インストール時にあらかじめ作っておくように
+         した（`uninsneveruninstall`フラグを付け、アンインストール時にはこれらを削除しない既存の
+         「ユーザーデータは消さない」方針を維持）。なお、アンケート作成キットや出力一式自体は、
+         この中に都度新しいタイムスタンプ付きサブフォルダを作って保存する仕組み自体は変更していない
+         （この生成ごとのサブフォルダが生成後に無くなっていた場合は、アプリ自身が削除する処理は
+         無いため、外部（ユーザー自身の後片付け・ウイルス対策ソフト等）による削除が原因と考えられる）。 -->
+    <VersionPrefix>1.6.1</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.6.0.0</AssemblyVersion>
-    <FileVersion>1.6.0.0</FileVersion>
+    <AssemblyVersion>1.6.1.0</AssemblyVersion>
+    <FileVersion>1.6.1.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.6.0.0</AppxPackageVersion>
+    <AppxPackageVersion>1.6.1.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
