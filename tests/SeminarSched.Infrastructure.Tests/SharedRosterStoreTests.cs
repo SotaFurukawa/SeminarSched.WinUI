@@ -122,10 +122,10 @@ public sealed class SharedRosterStoreTests : IDisposable
         var summary = await store.AdvanceStudentGradesAsync();
         Assert.Equal(2, summary.AdvancedCount);
         Assert.Equal(1, summary.GraduatedCount);
-        // 次回「Excelで編集」を開いたとき、繰り上げ後の内容から再生成させるためキャッシュを消す。
-        Assert.False(File.Exists(store.WorkbookPath));
+        // 不具合修正の確認: 以前は削除だけで次回「Excelで編集」を開くまでWorkbookPathが
+        // 存在しない状態になっていた。繰り上げ直後から、既に最新の内容で存在していること。
+        Assert.True(File.Exists(store.WorkbookPath));
 
-        await store.EnsureWorkbookAsync();
         using var workbook = new XLWorkbook(store.WorkbookPath);
         var sheet = workbook.Worksheet("生徒");
         var rows = sheet.RowsUsed().Skip(1).Select(r => (Id: r.Cell(2).GetString(), Grade: r.Cell(6).GetString(), Active: r.Cell(1).GetString())).ToArray();

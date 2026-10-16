@@ -131,16 +131,34 @@
          未定の行がON CONFLICTで重複挿入されうる別の不具合も、既存行をId付きで取得して明示的に
          UPDATE/INSERTを振り分ける方式で修正した。再現テスト（反映先に以前の反映由来の行が
          残っている状態で担当講師を変更したExcelを反映するケース）を追加し、修正前は失敗・
-         修正後は成功することを確認した。 -->
-    <VersionPrefix>1.5.5</VersionPrefix>
+         修正後は成功することを確認した。
+         v1.5.6は、ユーザー報告「以前フォルダが開けないという問題がクライアントで発生している
+         と話したが、そもそも指定された場所にフォルダがない状態であった。基本情報などが取り
+         込まれてはいるが、xlsxなどが存在しなくなっていたりします」から見つかった、
+         SharedRosterStoreの不具合修正と、ユーザー要望によるアンインストールボタンの追加。
+         ①`ApplyImportAsync`（基本情報xlsxの反映）・`AdvanceStudentGradesAsync`（学年繰り上げ）が、
+         更新後に共通名簿Excel（WorkbookPath）を削除するだけで、再生成は次に「Excelで編集」を
+         開いたとき（EnsureWorkbookAsync）まで遅延させていた。「編集中の古い内容を残さない」ための
+         削除だったが、その後一度も「Excelで編集」を開かなければWorkbookPathが存在しないまま
+         放置され、「反映・繰り上げ自体は成功しているのに共通名簿Excelが見当たらない」という
+         状態になっていた。削除だけでなく、その場で直ちに最新のDB内容から再生成するよう修正した
+         （既存のEnsureWorkbookAsync_... テストの前提も、この新しい挙動に合わせて更新した）。
+         ②ユーザー要望「こういう不具合が発生したときのためにアンインストールボタンを追加したい。
+         設定のアップデートの下にアンインストールを追加してください」への対応。新しい
+         `IAppUninstaller`/`WindowsAppUninstaller`（Infrastructure）が、インストーラー（Inno Setup）
+         がWindowsの「アプリと機能」へ登録した標準のアンインストーラー（unins000.exe）をレジストリ
+         経由で見つけて起動する。「設定」ページの「アップデート」の下に「アンインストール」の見出しと
+         ボタンを追加し、確認ダイアログ（プロジェクトファイル等のデータは削除されない旨を明記）を
+         経てから起動する。 -->
+    <VersionPrefix>1.5.6</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.5.5.0</AssemblyVersion>
-    <FileVersion>1.5.5.0</FileVersion>
+    <AssemblyVersion>1.5.6.0</AssemblyVersion>
+    <FileVersion>1.5.6.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.5.5.0</AppxPackageVersion>
+    <AppxPackageVersion>1.5.6.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>

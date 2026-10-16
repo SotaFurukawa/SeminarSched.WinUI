@@ -53,8 +53,13 @@ public sealed class SharedRosterStore : ISharedRosterStore
     {
         await EnsureDatabaseAsync(cancellationToken).ConfigureAwait(false);
         var result = await _importService.ApplyAsync(_databasePath, preview, cancellationToken).ConfigureAwait(false);
-        // 次に「Excelで編集」を開いたとき、今反映した最新の内容から再生成させる（編集中の古い内容を残さない）。
-        if (File.Exists(WorkbookPath)) File.Delete(WorkbookPath);
+        // 不具合修正（ユーザー報告「基本情報などが取り込まれてはいるが、xlsxなどが存在しなくなって
+        // いたりします」）。以前はここで既存のWorkbookPathを削除するだけで、再生成は次に
+        // 「Excelで編集」を開いたとき（EnsureWorkbookAsync）まで遅延させていた。「編集中の古い
+        // 内容を残さない」ための削除だったが、その後一度も「Excelで編集」を開かなければ
+        // WorkbookPathが存在しないまま放置され、「反映は成功しているのに共通名簿Excelが見当たらない」
+        // という状態になっていた。削除だけでなく、この場で直ちに最新のDB内容から再生成する。
+        await RefreshWorkbookAsync(cancellationToken).ConfigureAwait(false);
         return result;
     }
 
@@ -91,8 +96,9 @@ public sealed class SharedRosterStore : ISharedRosterStore
             advanced++;
             if (becameGraduate) graduated++;
         }
-        // 次に「Excelで編集」を開いたとき、繰り上げ後の最新の内容から再生成させる。
-        if (File.Exists(WorkbookPath)) File.Delete(WorkbookPath);
+        // 不具合修正（ApplyImportAsyncと同じ理由）。削除だけで済ませず、この場で直ちに
+        // 繰り上げ後の最新の内容から再生成し、WorkbookPathが存在しない状態を放置しない。
+        await RefreshWorkbookAsync(cancellationToken).ConfigureAwait(false);
         return new GradeAdvancementSummary(advanced, graduated);
     }
 

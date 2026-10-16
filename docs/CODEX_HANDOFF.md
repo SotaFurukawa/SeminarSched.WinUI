@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-16（checkpoint179）
+最終更新: 2026-10-16（checkpoint180）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,8 +16,44 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.5.5`（Release・公開済み。checkpoint179参照）
-Latest Development Checkpoint: checkpoint 179（ユーザー報告「基本情報xlsxを反映すると通常授業の
+Current Version: `v1.5.6`（Release・公開済み。checkpoint180参照）
+Latest Development Checkpoint: checkpoint 180（ユーザー報告「以前フォルダが開けないという問題が
+クライアントで発生していると話したが、そもそも指定された場所にフォルダがない状態であった。
+基本情報などが取り込まれてはいるが、xlsxなどが存在しなくなっていたりします」から見つかった
+不具合修正と、ユーザー要望によるアンインストールボタンの追加。
+
+①`SharedRosterStore.ApplyImportAsync`（基本情報xlsxの反映）・`AdvanceStudentGradesAsync`
+（学年繰り上げ）は、DBを更新したあと共通名簿Excel（WorkbookPath）を削除するだけで、再生成は
+次に「Excelで編集」を開いたとき（`EnsureWorkbookAsync`）まで遅延させていた。「編集中の古い
+内容を残さない」ための削除だったが、その後一度も「Excelで編集」を開かなければWorkbookPathが
+存在しないまま放置され、「反映・繰り上げ自体は成功しているのにExcelファイルが見当たらない」
+という状態になっていた。削除だけで済ませず、その場で直ちに最新のDB内容からExcelを再生成する
+よう修正した。既存の`AdvanceStudentGradesAsync_AdvancesActiveStudentsAndGraduatesHigh3`テスト
+（繰り上げ直後はWorkbookPathが存在しないことを前提にしていた）も、修正後の正しい挙動に
+合わせて更新した。
+
+②ユーザー要望「こういう不具合が発生したときのためにアンインストールボタンを追加したい。
+設定のアップデートの下にアンインストールを追加してください」への対応。新しい
+`IAppUninstaller`（Application）/`WindowsAppUninstaller`（Infrastructure）が、インストーラー
+（Inno Setup、installer/SeminarSched.WinUI.iss）がWindowsの「アプリと機能」へ登録した標準の
+アンインストーラー（unins000.exe）のパスをレジストリ（HKLM...Uninstall\{AppId}_is1の
+UninstallString）から見つけて起動する。「設定」ページの「アップデート」の下に「アンインストール」の
+見出しとボタンを追加し、確認ダイアログ（プロジェクトファイル・共通名簿等のデータは削除されない旨を
+明記、インストーラー側に[UninstallDelete]セクションが無いため実際にデータは消えない設計で
+あることをコードコメントでも確認済み）を経てから起動する。
+
+既存の全テスト、合計281件がすべて通過。v1.5.6として通常のbuild/test→commit/push→インストーラー
+作成→Release公開のサイクルを実行。
+
+なお、ユーザーからはこれに続けて「インストール時に保存先を指定できるようにすれば解決すると
+思う」という提案もあったが、上記①の実際の根本原因はコードのロジック不具合（削除後に
+再生成していなかっただけ）であり、保存先の位置自体が原因ではなかった。この提案（インストール
+時または設定画面でのデータ保存先カスタマイズ）は、スコープが大きい別機能として、ユーザーに
+意向を確認した上で別途対応する。
+
+---
+
+checkpoint 179（ユーザー報告「基本情報xlsxを反映すると通常授業の
 中身が明らかに変わる／全く異なる（生徒・講師・科目は完璧に一致する）」の原因究明と修正。
 
 調査は、AskUserQuestionでの段階的な絞り込み（G:ドライブの元ファイルとAppData上の正本の比較→

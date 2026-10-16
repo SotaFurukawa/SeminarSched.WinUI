@@ -132,4 +132,38 @@ public sealed partial class SettingsPage : Page
             PerformUpdateButton.IsEnabled = true;
         }
     }
+
+    // ユーザー要望「こういう不具合が発生したときのためにアンインストールボタンを追加したい」への
+    // 対応。インストーラー（Inno Setup）がWindowsへ登録した標準のアンインストーラーを起動する。
+    // プロジェクトファイルや共通名簿等のユーザーデータは{app}フォルダーの外（%LOCALAPPDATA%\
+    // SeminarSched.WinUI）にあり、インストーラー側に削除処理が無いため、アンインストールしても
+    // 消えない（installer/SeminarSched.WinUI.issの該当コメント参照）。
+    private async void Uninstall_Click(object sender, RoutedEventArgs e)
+    {
+        var confirmDialog = new ContentDialog
+        {
+            XamlRoot = Content.XamlRoot,
+            Title = "アンインストールしますか？",
+            Content = "Windows標準のアンインストーラーを起動します。プロジェクトファイルや共通名簿等のデータは削除されません（アプリ本体だけが削除されます）。このアプリは終了します。",
+            PrimaryButtonText = "アンインストールする",
+            CloseButtonText = "キャンセル",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        if (await confirmDialog.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        var uninstallCommand = App.AppUninstaller.FindUninstallCommand();
+        if (uninstallCommand is null)
+        {
+            UninstallStatusTextBlock.Text = "アンインストーラーが見つかりませんでした。「設定」の「アプリ」>「インストールされているアプリ」から手動でアンインストールしてください。";
+            return;
+        }
+
+        var started = App.AppUninstaller.Launch(uninstallCommand);
+        UninstallStatusTextBlock.Text = started
+            ? "アンインストーラーを起動しました。表示される画面の案内に従って進めてください。"
+            : "アンインストーラーを起動できませんでした。";
+    }
 }

@@ -54,6 +54,8 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <TextBlock Grid.Row="0" Grid.Column="0" FontSize="16" FontWeight="SemiBold" Text="ライセンス" VerticalAlignment="Center" />
                 <Button Grid.Row="0" Grid.Column="1" x:Name="ReleaseLicenseButton" Content="ライセンスを解除" Click="ReleaseLicense_Click" HorizontalAlignment="Stretch" />
@@ -62,6 +64,15 @@
                 <Button Grid.Row="2" Grid.Column="1" Margin="0,16,0,0" x:Name="CheckUpdateButton" Content="アップデートを確認" Click="CheckUpdate_Click" HorizontalAlignment="Stretch" />
                 <TextBlock Grid.Row="3" Grid.Column="0" x:Name="UpdateStatusTextBlock" TextWrapping="Wrap" VerticalAlignment="Center" />
                 <Button Grid.Row="3" Grid.Column="1" x:Name="PerformUpdateButton" Content="アップデートを行う" Click="PerformUpdate_Click" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+                <!-- ユーザー要望「こういう不具合が発生したときのためにアンインストールボタンを
+                     追加したい。設定のアップデートの下にアンインストールを追加してください」への
+                     対応。既存のInno Setupインストーラーが登録した標準のアンインストーラー
+                     （unins000.exe）をそのまま起動する（WindowsAppUninstaller参照）。プロジェクト
+                     ファイルや共通名簿等のユーザーデータは、インストーラー側の設計により
+                     アンインストールしても削除されない。 -->
+                <TextBlock Grid.Row="4" Grid.Column="0" Margin="0,16,0,0" FontSize="16" FontWeight="SemiBold" Text="アンインストール" VerticalAlignment="Center" />
+                <Button Grid.Row="4" Grid.Column="1" Margin="0,16,0,0" x:Name="UninstallButton" Content="アンインストールする" Click="Uninstall_Click" HorizontalAlignment="Stretch" />
+                <TextBlock Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" x:Name="UninstallStatusTextBlock" TextWrapping="Wrap" />
             </Grid>
         </StackPanel>
     </Grid>

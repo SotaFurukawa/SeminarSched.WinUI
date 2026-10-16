@@ -88,6 +88,8 @@ public partial class App : Application
 
     public static IUpdateInstaller UpdateInstaller { get; } = new GitHubUpdateInstaller();
 
+    public static IAppUninstaller AppUninstaller { get; } = new WindowsAppUninstaller();
+
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code
     /// executed, and as such is the logical equivalent of main() or WinMain().
