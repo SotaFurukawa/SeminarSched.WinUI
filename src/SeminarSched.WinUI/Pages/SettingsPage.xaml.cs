@@ -1,9 +1,13 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.Windows.Storage.Pickers;
 using SeminarSched.Application;
+using SeminarSched.Application.Settings;
+using WinRT.Interop;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -29,6 +33,60 @@ public sealed partial class SettingsPage : Page
         UpdateStatusTextBlock.Text = settings.LastUpdateCheckUtc is { } lastChecked
             ? $"前回確認: {lastChecked.ToLocalTime():yyyy-MM-dd HH:mm}"
             : "まだ確認していません。";
+
+        WorkspaceLocationTextBlock.Text = $"現在の保存先: {WorkspaceRootResolver.Current}";
+        // 前回の起動時に保存先の移動を要求していて、それが失敗していた場合は、起動後に一度だけ
+        // 知らせる（WorkspaceRootResolver.LastMoveError参照。元のデータは壊れていない）。
+        if (WorkspaceRootResolver.LastMoveError is { } moveError)
+        {
+            WorkspaceLocationStatusTextBlock.Text = moveError;
+        }
+    }
+
+    private static WindowId GetWindowId()
+    {
+        var window = App.MainWindow ?? throw new InvalidOperationException("The main window is not available.");
+        return Win32Interop.GetWindowIdFromWindow(WindowNative.GetWindowHandle(window));
+    }
+
+    // ユーザー要望「インストール時にデフォルトの保存先を指定しておき、workspaceを置く場所を
+    // 変更できるようにする」への対応。実行中のアプリ自身がログ・DB等のファイルを開いたまま
+    // コピーすると壊れる恐れがあるため、ここでは移動先フォルダーの検証と要求だけを行い、実際の
+    // コピーはアプリを終了して次回起動したとき（まだ何も開いていない状態）に行う
+    // （WorkspaceRootResolver.ApplyPendingMoveIfAny参照）。
+    private async void ChangeWorkspaceLocation_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new FolderPicker(GetWindowId());
+        var folder = await picker.PickSingleFolderAsync();
+        if (folder is null) return;
+
+        try
+        {
+            WorkspaceRootResolver.RequestMove(folder.Path);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            WorkspaceLocationStatusTextBlock.Text = $"保存先を変更できませんでした: {exception.Message}";
+            return;
+        }
+
+        var confirmDialog = new ContentDialog
+        {
+            XamlRoot = Content.XamlRoot,
+            Title = "アプリを終了します",
+            Content = $"次回このアプリを起動したときに、データを次の場所へ移動します。\n\n{folder.Path}\n\n移動が終わるまでは、今までの場所のデータは変更されません。今すぐアプリを終了して、移動を反映しますか？",
+            PrimaryButtonText = "終了する",
+            CloseButtonText = "後で",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        if (await confirmDialog.ShowAsync() == ContentDialogResult.Primary)
+        {
+            Microsoft.UI.Xaml.Application.Current.Exit();
+        }
+        else
+        {
+            WorkspaceLocationStatusTextBlock.Text = "次回このアプリを起動したときに移動します。";
+        }
     }
 
     // ユーザー要望（checkpoint129）「これは動作確認のためでもあるが、ライセンスの解除が

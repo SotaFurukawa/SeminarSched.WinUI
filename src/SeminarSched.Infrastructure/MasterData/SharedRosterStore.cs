@@ -1,4 +1,5 @@
 using SeminarSched.Application.MasterData;
+using SeminarSched.Application.Settings;
 using SeminarSched.Domain.MasterData;
 using SeminarSched.Domain.Projects;
 using SeminarSched.Infrastructure.Projects;
@@ -19,7 +20,7 @@ public sealed class SharedRosterStore : ISharedRosterStore
     {
         _importService = importService;
         _masterData = masterData;
-        directory ??= Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SeminarSched.WinUI", "Workspace", "SharedRoster");
+        directory ??= Path.Combine(WorkspaceRootResolver.Current, "Workspace", "SharedRoster");
         Directory.CreateDirectory(directory);
         _databasePath = Path.Combine(directory, "roster.db");
         WorkbookPath = Path.Combine(directory, "生徒・講師_基本情報.xlsx");

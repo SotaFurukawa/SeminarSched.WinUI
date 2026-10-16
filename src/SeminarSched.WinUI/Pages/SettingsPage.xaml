@@ -56,6 +56,9 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <TextBlock Grid.Row="0" Grid.Column="0" FontSize="16" FontWeight="SemiBold" Text="ライセンス" VerticalAlignment="Center" />
                 <Button Grid.Row="0" Grid.Column="1" x:Name="ReleaseLicenseButton" Content="ライセンスを解除" Click="ReleaseLicense_Click" HorizontalAlignment="Stretch" />
@@ -64,15 +67,24 @@
                 <Button Grid.Row="2" Grid.Column="1" Margin="0,16,0,0" x:Name="CheckUpdateButton" Content="アップデートを確認" Click="CheckUpdate_Click" HorizontalAlignment="Stretch" />
                 <TextBlock Grid.Row="3" Grid.Column="0" x:Name="UpdateStatusTextBlock" TextWrapping="Wrap" VerticalAlignment="Center" />
                 <Button Grid.Row="3" Grid.Column="1" x:Name="PerformUpdateButton" Content="アップデートを行う" Click="PerformUpdate_Click" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+                <!-- ユーザー要望「インストール時にデフォルトの保存先を指定しておき、workspaceを
+                     置く場所を変更できるようにする」への対応。既定の保存先（%LOCALAPPDATA%\
+                     SeminarSched.WinUI）は変えず、設定ページから別のフォルダーへ移動できるように
+                     する（WorkspaceRootResolver参照）。移動の実際のコピーは、ファイルが使用中に
+                     ならない次回起動時に行うため、ここでは要求して案内するだけ。 -->
+                <TextBlock Grid.Row="4" Grid.Column="0" Margin="0,16,0,0" FontSize="16" FontWeight="SemiBold" Text="データの保存先" VerticalAlignment="Center" />
+                <Button Grid.Row="4" Grid.Column="1" Margin="0,16,0,0" x:Name="ChangeWorkspaceLocationButton" Content="保存先を変更する" Click="ChangeWorkspaceLocation_Click" HorizontalAlignment="Stretch" />
+                <TextBlock Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" x:Name="WorkspaceLocationTextBlock" TextWrapping="Wrap" />
+                <TextBlock Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" x:Name="WorkspaceLocationStatusTextBlock" TextWrapping="Wrap" />
                 <!-- ユーザー要望「こういう不具合が発生したときのためにアンインストールボタンを
                      追加したい。設定のアップデートの下にアンインストールを追加してください」への
                      対応。既存のInno Setupインストーラーが登録した標準のアンインストーラー
                      （unins000.exe）をそのまま起動する（WindowsAppUninstaller参照）。プロジェクト
                      ファイルや共通名簿等のユーザーデータは、インストーラー側の設計により
                      アンインストールしても削除されない。 -->
-                <TextBlock Grid.Row="4" Grid.Column="0" Margin="0,16,0,0" FontSize="16" FontWeight="SemiBold" Text="アンインストール" VerticalAlignment="Center" />
-                <Button Grid.Row="4" Grid.Column="1" Margin="0,16,0,0" x:Name="UninstallButton" Content="アンインストールする" Click="Uninstall_Click" HorizontalAlignment="Stretch" />
-                <TextBlock Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" x:Name="UninstallStatusTextBlock" TextWrapping="Wrap" />
+                <TextBlock Grid.Row="7" Grid.Column="0" Margin="0,16,0,0" FontSize="16" FontWeight="SemiBold" Text="アンインストール" VerticalAlignment="Center" />
+                <Button Grid.Row="7" Grid.Column="1" Margin="0,16,0,0" x:Name="UninstallButton" Content="アンインストールする" Click="Uninstall_Click" HorizontalAlignment="Stretch" />
+                <TextBlock Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="2" x:Name="UninstallStatusTextBlock" TextWrapping="Wrap" />
             </Grid>
         </StackPanel>
     </Grid>

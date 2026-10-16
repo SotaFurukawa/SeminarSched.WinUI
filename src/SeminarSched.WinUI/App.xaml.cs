@@ -41,16 +41,10 @@ public partial class App : Application
     public static Window? MainWindow { get; private set; }
 
     public static IAppSettingsStore SettingsStore { get; } = new JsonAppSettingsStore(
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "SeminarSched.WinUI",
-            "settings.json"));
+        Path.Combine(WorkspaceRootResolver.Current, "settings.json"));
 
     public static IAppLogger Logger { get; } = new FileAppLogger(
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "SeminarSched.WinUI",
-            "logs"));
+        Path.Combine(WorkspaceRootResolver.Current, "logs"));
 
     public static ProjectService ProjectService { get; } = new(new SqliteProjectRepository());
 

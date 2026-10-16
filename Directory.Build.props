@@ -149,16 +149,31 @@
          がWindowsの「アプリと機能」へ登録した標準のアンインストーラー（unins000.exe）をレジストリ
          経由で見つけて起動する。「設定」ページの「アップデート」の下に「アンインストール」の見出しと
          ボタンを追加し、確認ダイアログ（プロジェクトファイル等のデータは削除されない旨を明記）を
-         経てから起動する。 -->
-    <VersionPrefix>1.5.6</VersionPrefix>
+         経てから起動する。
+         v1.6.0（新機能のためminorを上げてpatchを0へ戻した）は、ユーザー要望「インストール時に
+         デフォルトの保存先を指定しておき、workspaceを置く場所を変更できるようにする。デフォルト
+         の場所はあなたが指定した場所です」への対応。既定の保存先（%LOCALAPPDATA%\
+         SeminarSched.WinUI）は変えず、設定ページから別のフォルダーへ変更できるようにした
+         （新規`WorkspaceRootResolver`、ADR 0011参照）。固定パスの「目印ファイル」の中身で実際の
+         保存先を決め、ProjectService（Projects/Backups）・WorkspacePaths（Output/Forms）・
+         SharedRosterStore（SharedRoster）・App.xaml.cs（settings.json/logs）がすべてこれを
+         起点にパスを組み立てるようにした。実行中のアプリ自身がファイルを開いたままコピーする
+         リスクを避けるため、移動は即座には行わず、要求だけを書いておき次回起動時（まだ何も
+         開いていない状態）にコピー→目印ファイルの切替→元データ削除の順で反映する。コピー途中の
+         失敗では目印ファイルを書き換えないため、元のデータは壊れない。インストーラー側に新しい
+         保存先選択ウィザード画面は追加していない（設定ページの機能で実質的に同じことができ、
+         この環境では対話的インストーラーの検証が難しいため。ADR 0011参照）。
+         あわせてv1.5.6のアンインストールボタンの下に設けた「データの保存先」欄（現在の保存先の
+         表示・「保存先を変更する」ボタン）を追加した。 -->
+    <VersionPrefix>1.6.0</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.5.6.0</AssemblyVersion>
-    <FileVersion>1.5.6.0</FileVersion>
+    <AssemblyVersion>1.6.0.0</AssemblyVersion>
+    <FileVersion>1.6.0.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.5.6.0</AppxPackageVersion>
+    <AppxPackageVersion>1.6.0.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>

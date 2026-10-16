@@ -1,3 +1,4 @@
+using SeminarSched.Application.Settings;
 using SeminarSched.Domain.Projects;
 
 namespace SeminarSched.Application.Projects;
@@ -17,9 +18,7 @@ public sealed class ProjectService
 
     private static string EnsureDirectory(string name)
     {
-        var path = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "SeminarSched.WinUI", "Workspace", name);
+        var path = Path.Combine(WorkspaceRootResolver.Current, "Workspace", name);
         Directory.CreateDirectory(path);
         return path;
     }

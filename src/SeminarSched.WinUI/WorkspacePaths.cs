@@ -1,3 +1,5 @@
+using SeminarSched.Application.Settings;
+
 namespace SeminarSched_WinUI;
 
 // Fixed, centralized folders for output/forms generation, mirroring the Python reference app's
@@ -11,9 +13,7 @@ internal static class WorkspacePaths
 
     private static string EnsureDirectory(string name)
     {
-        var path = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "SeminarSched.WinUI", "Workspace", name);
+        var path = Path.Combine(WorkspaceRootResolver.Current, "Workspace", name);
         Directory.CreateDirectory(path);
         return path;
     }

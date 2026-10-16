@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-16（checkpoint180）
+最終更新: 2026-10-16（checkpoint181）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,8 +16,45 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.5.6`（Release・公開済み。checkpoint180参照）
-Latest Development Checkpoint: checkpoint 180（ユーザー報告「以前フォルダが開けないという問題が
+Current Version: `v1.6.0`（Release・公開済み。checkpoint181参照）
+Latest Development Checkpoint: checkpoint 181（ユーザー要望「インストール時にデフォルトの保存先を
+指定しておき、workspaceを置く場所を変更できるようにする。デフォルトの場所はあなたが指定した
+場所です」への対応（checkpoint180の末尾で保留にしていた提案）。詳細はADR 0011参照。
+
+既定の保存先（%LOCALAPPDATA%\SeminarSched.WinUI）は変えず、新規`WorkspaceRootResolver`
+（Application/Settings）が、固定パスの「目印ファイル」（workspace-root.txt）の中身で実際の
+保存先（Current）を決める仕組みを追加した。`ProjectService`（Projects/Backups）・
+`WorkspacePaths`（WinUI、Output/Forms）・`SharedRosterStore`（SharedRoster既定ディレクトリ）・
+`App.xaml.cs`（settings.json/logs）が、すべてこの`Current`を起点にパスを組み立てるよう変更した。
+
+実行中のアプリ自身がログファイルやSQLite DBを開いたまま移動（コピー）すると壊れる恐れがある
+ため、移動は即座には行わない設計にした。設定ページの「保存先を変更する」ボタンは、移動先
+フォルダーの検証（空のフォルダーであること等）と、別の「保留中」マーカーファイル
+（pending-workspace-move.txt）への書き込みだけを行い、実際のコピーはアプリを終了して次回
+起動した最初の瞬間（`WorkspaceRootResolver.Current`が最初に参照され、他の何もまだ開いていない
+状態）に行う（`ApplyPendingMoveIfAny`）。移動は「すべてコピーできたことを確認してから目印
+ファイルを書き換え、最後に元データを削除する」順序（`WorkspaceRootResolver.Move`）のため、
+コピーの途中で失敗しても目印ファイルはまだ古い値のままで、今までの場所が使われ続けるだけで
+データは壊れない。失敗時のエラーは`LastMoveError`に記録し、設定ページが次回起動後に一度だけ
+知らせる。
+
+「設定」ページに新しい「データの保存先」欄（現在の保存先の表示、「保存先を変更する」ボタン、
+`Microsoft.Windows.Storage.Pickers.FolderPicker`によるフォルダー選択、確認ダイアログ、アプリ
+終了）を、アップデート欄とアンインストール欄の間に追加した。
+
+インストーラー（Inno Setup）に保存先選択用の新しいウィザード画面は追加していない。設定ページの
+機能で、新規インストール直後（実データ取込み前）にその場で変更すれば実質的に同じ結果になる
+ことと、この開発環境では対話的インストーラー画面を実際に動かして確認する手段が無く、既存の
+自動更新フロー（Setup.exeの再実行）への影響も避けたいため（ADR 0011に判断の経緯を記録、
+ユーザーへ報告済み）。
+
+新規`WorkspaceRootResolverTests`（移動処理の中核となる経路に依存しない純粋なコピー処理を検証、
+3件）を追加。既存の全テスト、合計284件がすべて通過。v1.6.0（新機能のためminorを上げてpatchを
+0へ戻した）として通常のbuild/test→commit/push→インストーラー作成→Release公開のサイクルを実行。
+
+---
+
+checkpoint 180（ユーザー報告「以前フォルダが開けないという問題が
 クライアントで発生していると話したが、そもそも指定された場所にフォルダがない状態であった。
 基本情報などが取り込まれてはいるが、xlsxなどが存在しなくなっていたりします」から見つかった
 不具合修正と、ユーザー要望によるアンインストールボタンの追加。
