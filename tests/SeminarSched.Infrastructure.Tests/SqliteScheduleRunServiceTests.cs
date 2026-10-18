@@ -24,6 +24,38 @@ public sealed class SqliteScheduleRunServiceTests : IDisposable
         count.CommandText="SELECT COUNT(*) FROM OptimizationRun WHERE Status='completed' AND UnassignedCount=0;";Assert.Equal(1L,Convert.ToInt64(await count.ExecuteScalarAsync()));
         count.CommandText="SELECT SessionIndex FROM Assignment WHERE Source='cp-sat';";Assert.Equal(1L,Convert.ToInt64(await count.ExecuteScalarAsync()));
     }
+
+    // ユーザー要望「様々なスコアもあるはずなので、それを表示できるようにしてみたい」で追加した
+    // GetLatestRunEvaluationAsyncの検証。自動作成を一度も実行していないプロジェクトはnullを返し、
+    // 実行後は保存されたObjectiveSummaryJsonからScheduleEvaluationCalculatorと同じ内訳が
+    // 読み戻せること（未配置なしのシナリオなのでUnassignedLessons=0・HardConstraintViolations=0）
+    // を確認する。
+    [Fact]
+    public async Task GetLatestRunEvaluationAsync_WithoutPriorRun_ReturnsNull()
+    {
+        Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"no-run.jukuschedule");await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20)));
+
+        var evaluation=await new SqliteScheduleRunService().GetLatestRunEvaluationAsync(path);
+
+        Assert.Null(evaluation);
+    }
+
+    [Fact]
+    public async Task GetLatestRunEvaluationAsync_AfterSuccessfulRun_ReturnsPersistedEvaluation()
+    {
+        Directory.CreateDirectory(_directory);var path=Path.Combine(_directory,"scored.jukuschedule");await new SqliteProjectRepository().CreateAsync(path,CourseProjectDefinition.Create(2026,CourseSeason.Summer,new DateOnly(2026,7,20),new DateOnly(2026,7,20)));
+        var master=new SqliteMasterDataRepository();var student=await master.SaveStudentAsync(path,new Student(0,"S-003","架空", "採点生徒","中2"));var teacher=await master.SaveTeacherAsync(path,new Teacher(0,"T-003","架空", "採点講師"));var subject=await master.SaveSubjectAsync(path,new Subject(0,"JH_MATH","数学","数","中学",1));await master.SaveQualificationAsync(path,new TeacherQualification(teacher.Id,subject.Id,true));
+        var course=new SqliteCourseSettingsRepository();var slot=await course.SaveTimeSlotAsync(path,new TimeSlot(0,"1","1限",new TimeOnly(9,0),new TimeOnly(10,0),1));await course.SaveCourseDayAsync(path,new CourseDay(new DateOnly(2026,7,20),true,"",[slot.Id]));
+        await using(var c=new SqliteConnection($"Data Source={path};Pooling=False")){await c.OpenAsync();await using var q=c.CreateCommand();q.CommandText=$"INSERT INTO LessonRequest(ProjectId,StudentId,SubjectId,RequiredSessions) VALUES(1,{student.Id},{subject.Id},1);";await q.ExecuteNonQueryAsync();}
+        await new SqliteScheduleRunService().RunAsync(path,TimeSpan.FromSeconds(5));
+
+        var evaluation=await new SqliteScheduleRunService().GetLatestRunEvaluationAsync(path);
+
+        Assert.NotNull(evaluation);
+        Assert.Equal(0,evaluation.HardConstraintViolations);
+        Assert.Equal(0,evaluation.UnassignedLessons);
+    }
+
     [Fact]
     public async Task RunAsync_PreservesUnlockedManualPlacement()
     {

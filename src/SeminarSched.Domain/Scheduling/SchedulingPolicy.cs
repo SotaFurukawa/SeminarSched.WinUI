@@ -85,12 +85,15 @@ public sealed record SchedulingPolicy
         TeacherStudentConsecutivePreference teacherStudentConsecutivePreference = TeacherStudentConsecutivePreference.None,
         int maxConcurrentSeats = 0,
         bool continueBeyondNominalTimeIfIncomplete = true,
-        IReadOnlyList<SchedulingPolicyDimension>? preferenceOrder = null)
+        IReadOnlyList<SchedulingPolicyDimension>? preferenceOrder = null,
+        int minDailyLessonsPerTeacher = 1)
     {
         if (maxStudentsPerTeacher is < 1 or > 10)
             throw new ArgumentOutOfRangeException(nameof(maxStudentsPerTeacher), "1人の講師が同時に担当できる生徒数は1〜10で指定してください。");
         if (maxConcurrentSeats < 0)
             throw new ArgumentOutOfRangeException(nameof(maxConcurrentSeats), "同時に使える座席数は0以上で指定してください（0は考慮しない）。");
+        if (minDailyLessonsPerTeacher is < 1 or > 10)
+            throw new ArgumentOutOfRangeException(nameof(minDailyLessonsPerTeacher), "講師の一日最低コマ数は1〜10で指定してください。");
 
         preferenceOrder ??= DefaultPreferenceOrder;
         if (preferenceOrder.Count != DefaultPreferenceOrder.Count || preferenceOrder.Distinct().Count() != DefaultPreferenceOrder.Count)
@@ -107,6 +110,7 @@ public sealed record SchedulingPolicy
         MaxConcurrentSeats = maxConcurrentSeats;
         ContinueBeyondNominalTimeIfIncomplete = continueBeyondNominalTimeIfIncomplete;
         PreferenceOrder = preferenceOrder;
+        MinDailyLessonsPerTeacher = minDailyLessonsPerTeacher;
     }
 
     /// <summary>1人の講師が同時（同じ講師・日付・時間帯）に担当できる生徒数の上限。既定2（1対2）。
@@ -135,6 +139,12 @@ public sealed record SchedulingPolicy
     /// 内部的に固定されていた重み付けの大小関係と同じ順序にしてあるため、並び替えを一度も行って
     /// いない既存プロジェクト・新規プロジェクトの挙動は変わらない。</summary>
     public IReadOnlyList<SchedulingPolicyDimension> PreferenceOrder { get; }
+
+    /// <summary>ユーザー要望「講師の一日最低コマ数を設定できるようにしましょう。デフォルトは1で、
+    /// 2にすると、一日に2コマは確定で入れなければならない」への対応。ある講師がその日1コマでも
+    /// 配置されるなら、その日は必ずこの数以上を確定で配置しなければならないハード制約（その講師が
+    /// その日まったく配置されないこと自体は常に許される。既定1は「制約なし」と同義）。</summary>
+    public int MinDailyLessonsPerTeacher { get; }
 
     public static readonly IReadOnlyList<SchedulingPolicyDimension> DefaultPreferenceOrder =
     [
@@ -166,7 +176,8 @@ public sealed record SchedulingPolicy
         && TeacherStudentConsecutivePreference == other.TeacherStudentConsecutivePreference
         && MaxConcurrentSeats == other.MaxConcurrentSeats
         && ContinueBeyondNominalTimeIfIncomplete == other.ContinueBeyondNominalTimeIfIncomplete
-        && PreferenceOrder.SequenceEqual(other.PreferenceOrder);
+        && PreferenceOrder.SequenceEqual(other.PreferenceOrder)
+        && MinDailyLessonsPerTeacher == other.MinDailyLessonsPerTeacher;
 
     public override int GetHashCode()
     {
@@ -182,6 +193,7 @@ public sealed record SchedulingPolicy
         hash.Add(MaxConcurrentSeats);
         hash.Add(ContinueBeyondNominalTimeIfIncomplete);
         foreach (var dimension in PreferenceOrder) hash.Add(dimension);
+        hash.Add(MinDailyLessonsPerTeacher);
         return hash.ToHashCode();
     }
 }

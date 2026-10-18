@@ -625,6 +625,48 @@ public sealed class CpSatScheduleSolverTests
         Assert.Equal(1, solution.UnassignedLessons);
     }
 
+    // ユーザー要望「講師の一日最低コマ数を設定できるようにしましょう。デフォルトは1で、2にすると、
+    // 一日に2コマは確定で入れなければならない」を検証する。1講師・1生徒の受講希望が1回だけで、
+    // その講師がその日に埋められる候補が他に無い場合、MinDailyLessonsPerTeacher=2を満たす唯一の
+    // 方法は「その講師をその日まったく使わない」ことだけなので、1件だけのその配置は未配置のままに
+    // なるはず（2コマ目を作る手段が無いのに1コマだけ確定させることは許されない）。
+    [Fact]
+    public async Task SolveAsync_MinDailyLessonsPerTeacher_LeavesLoneSessionUnassignedWhenMinimumIsUnreachable()
+    {
+        var demand = new LessonDemand(1, 10, 1, 0);
+        var candidates = new[]
+        {
+            new PlacementCandidate(1, 10, 100, 1, 1),
+            new PlacementCandidate(1, 10, 100, 1, 2),
+        };
+        var policy = new SchedulingPolicy(minDailyLessonsPerTeacher: 2);
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem([demand], candidates, Policy: policy), TimeSpan.FromSeconds(5));
+
+        Assert.Empty(solution.Placements);
+        Assert.Equal(1, solution.UnassignedLessons);
+    }
+
+    // 同じ設定でも、同じ講師・同じ日に2件目の受講希望（別の生徒）が組み合わされば、合計でMin以上に
+    // 届くため、両方とも配置できるはず（最低数を満たせないから諦めるのではなく、満たせる組み合わせは
+    // 正しく見つけられることの確認）。
+    [Fact]
+    public async Task SolveAsync_MinDailyLessonsPerTeacher_SchedulesBothSessionsWhenCombinedDemandReachesMinimum()
+    {
+        var demands = new[] { new LessonDemand(1, 10, 1, 0), new LessonDemand(2, 20, 1, 0) };
+        var candidates = new[]
+        {
+            new PlacementCandidate(1, 10, 100, 1, 1),
+            new PlacementCandidate(2, 20, 100, 1, 2),
+        };
+        var policy = new SchedulingPolicy(minDailyLessonsPerTeacher: 2);
+
+        var solution = await new CpSatScheduleSolver().SolveAsync(new ScheduleProblem(demands, candidates, Policy: policy), TimeSpan.FromSeconds(5));
+
+        Assert.Equal(2, solution.Placements.Count);
+        Assert.Equal(0, solution.UnassignedLessons);
+    }
+
     // ユーザー要望⑤「時間帯をできるだけ遅くする」を検証する。1受講希望が同日の2コマ（早い/遅い）の
     // どちらでも配置可能で他の条件が同じとき、Lateを指定すれば遅いコマを、Earlyを指定すれば早いコマを
     // 選ぶはず。

@@ -219,6 +219,7 @@ public sealed partial class SetupPage : WorkflowPageBase
         PolicyMaxStudentsPerTeacher.Value = policy.MaxStudentsPerTeacher;
         _policyController.Load(policy);
         PolicyMaxConcurrentSeats.Value = policy.MaxConcurrentSeats;
+        PolicyMinDailyLessonsPerTeacher.Value = policy.MinDailyLessonsPerTeacher;
         PolicyContinueBeyondNominalTimeYes.IsChecked = policy.ContinueBeyondNominalTimeIfIncomplete;
         PolicyContinueBeyondNominalTimeNo.IsChecked = !policy.ContinueBeyondNominalTimeIfIncomplete;
     }
@@ -241,7 +242,8 @@ public sealed partial class SetupPage : WorkflowPageBase
         PolicyRows,
         checked((int)PolicyMaxStudentsPerTeacher.Value),
         checked((int)PolicyMaxConcurrentSeats.Value),
-        PolicyContinueBeyondNominalTimeNo.IsChecked != true);
+        PolicyContinueBeyondNominalTimeNo.IsChecked != true,
+        checked((int)PolicyMinDailyLessonsPerTeacher.Value));
 
     private async void SaveSchedulingPolicy_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(async path =>
     {

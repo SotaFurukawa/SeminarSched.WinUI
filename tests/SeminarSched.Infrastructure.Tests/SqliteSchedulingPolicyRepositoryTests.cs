@@ -38,11 +38,13 @@ public sealed class SqliteSchedulingPolicyRepositoryTests : IDisposable
             pairingSizePreference: PairingSizePreference.Minimize,
             timeOfDayPreference: TimeOfDayPreference.Late,
             teacherStudentConsecutivePreference: TeacherStudentConsecutivePreference.PreferConsecutive,
-            maxConcurrentSeats: 12);
+            maxConcurrentSeats: 12,
+            minDailyLessonsPerTeacher: 3);
         await repository.SaveAsync(path, custom);
         var reloaded = await repository.GetAsync(path);
 
         Assert.Equal(custom, reloaded);
+        Assert.Equal(3, reloaded.MinDailyLessonsPerTeacher);
 
         // 2回目の保存は上書き（新規行を作らない）。
         var updated = new SchedulingPolicy(

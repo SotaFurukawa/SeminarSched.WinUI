@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-16（checkpoint182）
+最終更新: 2026-10-19（checkpoint183）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,8 +16,41 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.6.1`（Release・公開済み。checkpoint182参照）
-Latest Development Checkpoint: checkpoint 182（ユーザー報告「アンケート作成後に開こうとしても
+Current Version: `v1.7.0`（Release・公開済み。checkpoint183参照）
+Latest Development Checkpoint: checkpoint 183（ユーザー要望①「講師の一日最低コマ数を設定できる
+ようにしましょう。デフォルトは1で、2にすると、一日に2コマは確定で入れなければならない」と②
+「様々なスコアもあるはずなので、それを表示できるようにしてみたい。今既にある出力の機能のボタンや
+ファイルを開くボタンなどの下に追加したい」への対応（ADR 0012参照）。「面白いが演出ではなく便利な
+機能」のブレインストーミング（空きコマ・キャパシティ可視化／講師別実働コマ数集計／シーズン間
+比較を提案し、前者2つを選定）の流れから出た要望。
+
+①`SchedulingPolicy.MinDailyLessonsPerTeacher`（既定1、1〜10）を追加し、「1 プロジェクト設定」の
+「スケジュール設定」タブへ「同時に使える座席数上限」の下に新しいNumberBoxとして追加した。
+CP-SATのハード制約として実装したが、既存の`AddRegularTeacherMinimums`と同じ理由（最低数を
+無条件のハード制約にすると他の制約との組み合わせでInfeasibleになる余地が生まれる）で、「ある
+講師がその日1コマでも配置されるなら、その日はこの数以上を確定で配置しなければならない（その
+講師がその日まったく配置されないこと自体は常に許される）」という条件付きの形にした。
+`AddMaxEquality`で作る「その日働くかどうか」の指標変数と`sum(free) >= Min * dayUsed`という
+片方向の線形制約だけで表現でき、`.OnlyEnforceIf()`を使わずとも既存の記法だけで実装できた。
+
+②既存の`ScheduleEvaluationCalculator`（`HardConstraintViolations`・`UnassignedLessons`・
+`ImportantPreferenceViolations`・`MajorPenalty`・`TeacherGapSlots`・`DistributionPenalty`・
+`SpacingPenalty`・`OtherSoftPenalty`・`ObjectiveValue`の9項目、戦略同士の比較にしか使っていな
+かった内部実装）が実はユーザーの言う「様々なスコア」そのものだった。`OptimizationRun.
+ObjectiveSummaryJson`（以前は`ObjectiveValue`・`UnassignedLessons`の2項目のみ）へ全項目を保存
+するよう`SqliteScheduleRunService.SaveValidatedAsync`を拡張し、新しい`IScheduleRunService.
+GetLatestRunEvaluationAsync`で直近の完了済み自動作成のスコアを読み戻せるようにした。「6 出力」
+ページの、既存の出力ボタン・ファイルを開くボタンの下に「直近の自動作成の評価スコア」欄を追加
+した（常に0のまま変化しない`HardConstraintViolations`・`TeacherGapSlots`の2項目はUIから外した）。
+
+新規テスト5件（`CpSatScheduleSolverTests`2件・`SqliteScheduleRunServiceTests`2件・
+`SqliteSchedulingPolicyRepositoryTests`の既存ラウンドトリップへの追加1件）を含め、既存の全テスト、
+合計288件がすべて通過。v1.7.0（新機能のためminorを上げてpatchを0へ戻した）として通常の
+build/test→commit/push→インストーラー作成→Release公開のサイクルを実行。
+
+---
+
+checkpoint 182（ユーザー報告「アンケート作成後に開こうとしても
 開けなかった」への対応（checkpoint181の「２アンケートで保存先を開けない」クライアント報告の続き。
 実際の経路を再調査した結果を本人へ説明した上での対応）。
 

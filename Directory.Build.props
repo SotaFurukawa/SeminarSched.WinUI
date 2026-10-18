@@ -175,16 +175,37 @@
          「ユーザーデータは消さない」方針を維持）。なお、アンケート作成キットや出力一式自体は、
          この中に都度新しいタイムスタンプ付きサブフォルダを作って保存する仕組み自体は変更していない
          （この生成ごとのサブフォルダが生成後に無くなっていた場合は、アプリ自身が削除する処理は
-         無いため、外部（ユーザー自身の後片付け・ウイルス対策ソフト等）による削除が原因と考えられる）。 -->
-    <VersionPrefix>1.6.1</VersionPrefix>
+         無いため、外部（ユーザー自身の後片付け・ウイルス対策ソフト等）による削除が原因と考えられる）。
+         v1.7.0（新機能のためminorを上げてpatchを0へ戻した）は、ユーザー要望①「講師の一日最低
+         コマ数を設定できるようにしましょう。デフォルトは1で、2にすると、一日に2コマは確定で入れ
+         なければならない」と②「様々なスコアもあるはずなので、それを表示できるようにしてみたい。
+         今既にある出力の機能のボタンやファイルを開くボタンなどの下に追加したい」への対応
+         （ADR 0012参照）。
+         ①`SchedulingPolicy.MinDailyLessonsPerTeacher`（既定1、1〜10）を追加し、「1 プロジェクト
+         設定」の「スケジュール設定」タブへ「同時に使える座席数上限」の下に追加した。CP-SATの
+         ハード制約として実装したが、「ある講師がその日1コマでも配置されるなら、その日はこの数
+         以上を確定で配置しなければならない（その講師がその日まったく配置されないこと自体は常に
+         許される）」という条件付きの形にし、既存のAddRegularTeacherMinimumsと同じ理由
+         （最低数を無条件のハード制約にすると他の制約との組み合わせでInfeasibleになる余地が
+         生まれる）でInfeasibleを避けた。
+         ②既存のScheduleEvaluationCalculator（戦略同士の比較にしか使っていなかった内部実装）が
+         実はユーザーの言う「様々なスコア」そのものだったため、これをOptimizationRunの
+         ObjectiveSummaryJsonへ全項目（以前はObjectiveValue・UnassignedLessonsの2項目だけ）保存
+         するよう拡張し、新しいIScheduleRunService.GetLatestRunEvaluationAsyncで読み戻せるように
+         した。「6 出力」ページの、既存の出力ボタン・ファイルを開くボタンの下に「直近の自動作成の
+         評価スコア」欄を追加した（未配置コマ数・通常担当講師等の希望を満たせなかった件数・講師
+         希望との不一致ペナルティ・生徒の授業日の集中度・授業間隔の乱れ具合・その他のソフト制約
+         ペナルティ・総合スコア）。常に0のまま変化しない2項目（HardConstraintViolations・
+         TeacherGapSlots）はUIからは外した。 -->
+    <VersionPrefix>1.7.0</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.6.1.0</AssemblyVersion>
-    <FileVersion>1.6.1.0</FileVersion>
+    <AssemblyVersion>1.7.0.0</AssemblyVersion>
+    <FileVersion>1.7.0.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.6.1.0</AppxPackageVersion>
+    <AppxPackageVersion>1.7.0.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>

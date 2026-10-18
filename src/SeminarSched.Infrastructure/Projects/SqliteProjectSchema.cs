@@ -315,6 +315,11 @@ internal static class SqliteProjectSchema
         // 既存プロジェクトにも同じ理由でALTER TABLEで届ける。
         await AddColumnIfMissingAsync(connection, transaction, "GroupLessonClass", "TeacherMinGapMinutes", "INTEGER NOT NULL DEFAULT 0", cancellationToken);
         await AddColumnIfMissingAsync(connection, transaction, "GroupLessonClass", "StudentMinGapMinutes", "INTEGER NOT NULL DEFAULT 0", cancellationToken);
+
+        // ユーザー要望「講師の一日最低コマ数を設定できるようにしましょう。デフォルトは1で、2にすると、
+        // 一日に2コマは確定で入れなければならない」への対応。既存プロジェクトにも同じ理由でALTER
+        // TABLEで届ける（既定1は「制約なし」と同義のため、既存プロジェクトの挙動は変わらない）。
+        await AddColumnIfMissingAsync(connection, transaction, "SchedulingPolicy", "MinDailyLessonsPerTeacher", "INTEGER NOT NULL DEFAULT 1 CHECK(MinDailyLessonsPerTeacher BETWEEN 1 AND 10)", cancellationToken);
     }
 
     // 旧MinGapMinutes（checkpoint155、講師側にしか効果が無かった）に値が入ったまま運用していた
@@ -598,7 +603,8 @@ internal static class SqliteProjectSchema
             TeacherStudentConsecutivePreference INTEGER NOT NULL DEFAULT 0 CHECK(TeacherStudentConsecutivePreference BETWEEN 0 AND 1),
             MaxConcurrentSeats INTEGER NOT NULL DEFAULT 0 CHECK(MaxConcurrentSeats >= 0),
             ContinueBeyondNominalTimeIfIncomplete INTEGER NOT NULL DEFAULT 1 CHECK(ContinueBeyondNominalTimeIfIncomplete IN(0,1)),
-            PreferenceOrder TEXT NOT NULL DEFAULT '2,3,4,6,0,1,5'
+            PreferenceOrder TEXT NOT NULL DEFAULT '2,3,4,6,0,1,5',
+            MinDailyLessonsPerTeacher INTEGER NOT NULL DEFAULT 1 CHECK(MinDailyLessonsPerTeacher BETWEEN 1 AND 10)
         );
         CREATE INDEX IF NOT EXISTS IX_AuditLog_Project_Timestamp ON AuditLog(ProjectId,TimestampUtc);
         CREATE INDEX IF NOT EXISTS IX_ValidationIssue_Project_Resolved ON ValidationIssue(ProjectId,Resolved,Severity);

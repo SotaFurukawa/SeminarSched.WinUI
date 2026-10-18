@@ -1,4 +1,5 @@
 using SeminarSched.Domain.Scheduling;
+using SeminarSched.Optimization.Evaluation;
 using SeminarSched.Optimization.Execution;
 using SeminarSched.Optimization.Profiles;
 
@@ -39,4 +40,9 @@ public interface IScheduleRunService
         CancellationToken cancellationToken = default,
         SchedulingPolicy? policyOverride = null,
         bool keepExistingPlacements = false);
+
+    // ユーザー要望「様々なスコアもあるはずなので、それを表示できるようにしてみたい」への対応。
+    // 直近に完了した自動作成（OptimizationRun）が保存した詳細スコアを読み戻す。一度も自動作成を
+    // 実行していないプロジェクトではnullを返す。
+    Task<ScheduleEvaluation?> GetLatestRunEvaluationAsync(string projectPath, CancellationToken cancellationToken = default);
 }

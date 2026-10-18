@@ -133,7 +133,8 @@ public sealed class SchedulingPolicyRowViewModel(
         IReadOnlyList<SchedulingPolicyRowViewModel> rows,
         int maxStudentsPerTeacher,
         int maxConcurrentSeats,
-        bool continueBeyondNominalTimeIfIncomplete)
+        bool continueBeyondNominalTimeIfIncomplete,
+        int minDailyLessonsPerTeacher = 1)
     {
         var valueByDimension = rows.ToDictionary(row => row.Dimension, row => row.SelectedOptionValue);
         var order = rows.Select(row => row.Dimension).ToArray();
@@ -148,6 +149,7 @@ public sealed class SchedulingPolicyRowViewModel(
             (TeacherStudentConsecutivePreference)valueByDimension[SchedulingPolicyDimension.TeacherStudentConsecutive],
             maxConcurrentSeats,
             continueBeyondNominalTimeIfIncomplete,
-            order);
+            order,
+            minDailyLessonsPerTeacher);
     }
 }

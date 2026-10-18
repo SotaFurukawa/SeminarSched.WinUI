@@ -15,7 +15,7 @@ public sealed class SqliteSchedulingPolicyRepository : ISchedulingPolicyReposito
             SELECT MaxStudentsPerTeacher,TeacherCountPerDayPreference,TeacherLoadBalancePreference,
                    StudentAttendanceDaysPreference,TeacherAttendanceDaysPreference,PairingSizePreference,
                    TimeOfDayPreference,TeacherStudentConsecutivePreference,MaxConcurrentSeats,ContinueBeyondNominalTimeIfIncomplete,
-                   PreferenceOrder
+                   PreferenceOrder,MinDailyLessonsPerTeacher
             FROM SchedulingPolicy WHERE ProjectId=1;
             """;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -32,7 +32,8 @@ public sealed class SqliteSchedulingPolicyRepository : ISchedulingPolicyReposito
             (TeacherStudentConsecutivePreference)reader.GetInt32(7),
             reader.GetInt32(8),
             reader.GetBoolean(9),
-            ParsePreferenceOrder(reader.GetString(10)));
+            ParsePreferenceOrder(reader.GetString(10)),
+            reader.GetInt32(11));
     }
 
     // ユーザー要望（checkpoint123）「探索方針の優先度を変えられるようにしたい」。カンマ区切りの
@@ -62,8 +63,8 @@ public sealed class SqliteSchedulingPolicyRepository : ISchedulingPolicyReposito
         await using var connection = await OpenAsync(projectPath, cancellationToken); await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            INSERT INTO SchedulingPolicy(ProjectId,MaxStudentsPerTeacher,TeacherCountPerDayPreference,TeacherLoadBalancePreference,StudentAttendanceDaysPreference,TeacherAttendanceDaysPreference,PairingSizePreference,TimeOfDayPreference,TeacherStudentConsecutivePreference,MaxConcurrentSeats,ContinueBeyondNominalTimeIfIncomplete,PreferenceOrder)
-            VALUES(1,@maxStudents,@teacherCountPerDay,@teacherLoadBalance,@studentAttendanceDays,@teacherAttendanceDays,@pairingSize,@timeOfDay,@teacherStudentConsecutive,@maxSeats,@continueBeyond,@preferenceOrder)
+            INSERT INTO SchedulingPolicy(ProjectId,MaxStudentsPerTeacher,TeacherCountPerDayPreference,TeacherLoadBalancePreference,StudentAttendanceDaysPreference,TeacherAttendanceDaysPreference,PairingSizePreference,TimeOfDayPreference,TeacherStudentConsecutivePreference,MaxConcurrentSeats,ContinueBeyondNominalTimeIfIncomplete,PreferenceOrder,MinDailyLessonsPerTeacher)
+            VALUES(1,@maxStudents,@teacherCountPerDay,@teacherLoadBalance,@studentAttendanceDays,@teacherAttendanceDays,@pairingSize,@timeOfDay,@teacherStudentConsecutive,@maxSeats,@continueBeyond,@preferenceOrder,@minDailyLessons)
             ON CONFLICT(ProjectId) DO UPDATE SET
                 MaxStudentsPerTeacher=excluded.MaxStudentsPerTeacher,
                 TeacherCountPerDayPreference=excluded.TeacherCountPerDayPreference,
@@ -75,7 +76,8 @@ public sealed class SqliteSchedulingPolicyRepository : ISchedulingPolicyReposito
                 TeacherStudentConsecutivePreference=excluded.TeacherStudentConsecutivePreference,
                 MaxConcurrentSeats=excluded.MaxConcurrentSeats,
                 ContinueBeyondNominalTimeIfIncomplete=excluded.ContinueBeyondNominalTimeIfIncomplete,
-                PreferenceOrder=excluded.PreferenceOrder;
+                PreferenceOrder=excluded.PreferenceOrder,
+                MinDailyLessonsPerTeacher=excluded.MinDailyLessonsPerTeacher;
             """;
         command.Parameters.AddWithValue("@maxStudents", policy.MaxStudentsPerTeacher);
         command.Parameters.AddWithValue("@teacherCountPerDay", (int)policy.TeacherCountPerDayPreference);
@@ -88,6 +90,7 @@ public sealed class SqliteSchedulingPolicyRepository : ISchedulingPolicyReposito
         command.Parameters.AddWithValue("@maxSeats", policy.MaxConcurrentSeats);
         command.Parameters.AddWithValue("@continueBeyond", policy.ContinueBeyondNominalTimeIfIncomplete);
         command.Parameters.AddWithValue("@preferenceOrder", SerializePreferenceOrder(policy.PreferenceOrder));
+        command.Parameters.AddWithValue("@minDailyLessons", policy.MinDailyLessonsPerTeacher);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

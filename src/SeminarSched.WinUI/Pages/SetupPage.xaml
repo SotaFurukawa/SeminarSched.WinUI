@@ -278,6 +278,10 @@
                          探索方針の上に、一人の講師が担当できる生徒数の下に並べて書いてほしい」への対応。 -->
                     <TextBlock Margin="0,8,0,0" Text="同時に使える座席数上限（0であれば無制限）" TextWrapping="Wrap"/>
                     <NumberBox x:Name="PolicyMaxConcurrentSeats" Minimum="0" SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" Width="140"/>
+                    <!-- ユーザー要望「講師の一日最低コマ数を設定できるようにしましょう。デフォルトは1で、
+                         2にすると、一日に2コマは確定で入れなければならない」への対応。 -->
+                    <TextBlock Margin="0,8,0,0" Text="講師の一日最低コマ数（既定は1。2以上にすると、その日に出勤する講師は必ずその数以上のコマが確定で入ります）" TextWrapping="Wrap"/>
+                    <NumberBox x:Name="PolicyMinDailyLessonsPerTeacher" Minimum="1" Maximum="10" SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" Width="140"/>
 
                     <!-- ユーザー要望（checkpoint123）「自動作成のオプション機能（探索方針）について、
                          この優先度を変えられるようにしたい。校舎によっては、一日に入るコマ数＞遅めの

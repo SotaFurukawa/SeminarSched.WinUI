@@ -7,7 +7,29 @@ public sealed partial class OutputPage : WorkflowPageBase
 {
     private string? _outputDirectory;
     public OutputPage()=>InitializeComponent();
-    private void Page_Loaded(object sender,RoutedEventArgs e)=>GenerateButton.IsEnabled=EnsureProject(ProjectRequired);
+    private async void Page_Loaded(object sender,RoutedEventArgs e)
+    {
+        GenerateButton.IsEnabled=EnsureProject(ProjectRequired);
+        if(GenerateButton.IsEnabled) await LoadLatestScoresAsync();
+    }
+
+    // ユーザー要望「様々なスコアもあるはずなので、それを表示できるようにしてみたい」への対応。
+    // 直近に完了した自動作成の評価スコア（ScheduleEvaluationCalculatorが既に戦略同士の比較に
+    // 使っている内訳）を読み出して表示する。自動作成を一度も実行していないプロジェクトでは
+    // nullが返るため、パネルごと非表示のままにする。
+    private async Task LoadLatestScoresAsync()
+    {
+        var evaluation = await App.ScheduleRun.GetLatestRunEvaluationAsync(App.ProjectService.Current!.Path);
+        if(evaluation is null){ScorePanel.Visibility=Visibility.Collapsed;return;}
+        ScoreUnassigned.Text=evaluation.UnassignedLessons.ToString();
+        ScoreImportantPreferenceViolations.Text=evaluation.ImportantPreferenceViolations.ToString();
+        ScoreMajorPenalty.Text=evaluation.MajorPenalty.ToString();
+        ScoreDistributionPenalty.Text=evaluation.DistributionPenalty.ToString();
+        ScoreSpacingPenalty.Text=evaluation.SpacingPenalty.ToString();
+        ScoreOtherSoftPenalty.Text=evaluation.OtherSoftPenalty.ToString();
+        ScoreObjectiveValue.Text=evaluation.ObjectiveValue.ToString();
+        ScorePanel.Visibility=Visibility.Visible;
+    }
     private async void Generate_Click(object sender,RoutedEventArgs e)
     {
         try{IsEnabled=false;Progress.IsActive=true;ProgressText.Visibility=Visibility.Visible;var result=await App.OutputPackage.GenerateAsync(App.ProjectService.Current!.Path,WorkspacePaths.Output);ToastNotificationState.ShowSuccess($"出力しました（授業{result.AssignmentCount}件・未配置{result.UnassignedCount}件）");App.Logger.Info($"Output generated: assignments={result.AssignmentCount} unassigned={result.UnassignedCount}");

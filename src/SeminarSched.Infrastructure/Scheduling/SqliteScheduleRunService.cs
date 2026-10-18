@@ -5,6 +5,7 @@ using SeminarSched.Application.Scheduling;
 using SeminarSched.Domain.Scheduling;
 using SeminarSched.Infrastructure.Projects;
 using SeminarSched.Optimization.Core;
+using SeminarSched.Optimization.Evaluation;
 using SeminarSched.Optimization.Execution;
 using SeminarSched.Optimization.Profiles;
 
@@ -96,7 +97,8 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         command.CommandText = """
             SELECT MaxStudentsPerTeacher,TeacherCountPerDayPreference,TeacherLoadBalancePreference,
                    StudentAttendanceDaysPreference,TeacherAttendanceDaysPreference,PairingSizePreference,
-                   TimeOfDayPreference,TeacherStudentConsecutivePreference,MaxConcurrentSeats,ContinueBeyondNominalTimeIfIncomplete
+                   TimeOfDayPreference,TeacherStudentConsecutivePreference,MaxConcurrentSeats,ContinueBeyondNominalTimeIfIncomplete,
+                   MinDailyLessonsPerTeacher
             FROM SchedulingPolicy WHERE ProjectId=1;
             """;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -112,7 +114,8 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
             (TimeOfDayPreference)reader.GetInt32(6),
             (TeacherStudentConsecutivePreference)reader.GetInt32(7),
             reader.GetInt32(8),
-            reader.GetBoolean(9));
+            reader.GetBoolean(9),
+            minDailyLessonsPerTeacher: reader.GetInt32(10));
     }
 
     // ユーザー要望（checkpoint151）「既に配置したものを動かさないようにするか、つまり未配置のみを
@@ -331,7 +334,12 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
         run.Parameters.AddWithValue("$started", started.ToString("O", CultureInfo.InvariantCulture));
         run.Parameters.AddWithValue("$finished", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
         run.Parameters.AddWithValue("$limit", Math.Max(1, (int)Math.Ceiling(timeLimit.TotalSeconds)));
-        run.Parameters.AddWithValue("$objective", JsonSerializer.Serialize(new { solution.ObjectiveValue, solution.UnassignedLessons }));
+        // ユーザー要望「様々なスコアもあるはずなので、それを表示できるようにしてみたい」への対応。
+        // 以前はObjectiveValue・UnassignedLessonsだけの簡易な内容だったが、戦略同士の比較に既に
+        // 使っているScheduleEvaluationCalculator（希望講師との不一致・生徒の授業日の集中度・間隔の
+        // 均等さ等の内訳）をそのまま流用し、全項目を保存する（GetLatestRunEvaluationAsyncで読み戻す）。
+        var evaluation = ScheduleEvaluationCalculator.Evaluate(problem, solution);
+        run.Parameters.AddWithValue("$objective", JsonSerializer.Serialize(evaluation));
         run.Parameters.AddWithValue("$unassigned", solution.UnassignedLessons);
         run.Parameters.AddWithValue("$input", JsonSerializer.Serialize(new { DemandCount = problem.Demands.Count, CandidateCount = problem.Candidates.Count }));
         run.Parameters.AddWithValue("$result", JsonSerializer.Serialize(new { PlacementCount = solution.Placements.Count }));
@@ -386,6 +394,22 @@ public sealed class SqliteScheduleRunService : IScheduleRunService
             """;
         var invalid = Convert.ToInt64(await validate.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture);
         if (invalid > 0) throw new InvalidDataException("保存前validatorが制約違反を検出しました。");
+    }
+
+    public async Task<ScheduleEvaluation?> GetLatestRunEvaluationAsync(string projectPath, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(projectPath, cancellationToken).ConfigureAwait(false);
+        await SqliteProjectSchema.EnsureCurrentAsync(connection, cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT ObjectiveSummaryJson FROM OptimizationRun WHERE ProjectId=1 AND Status='completed' ORDER BY Id DESC LIMIT 1;";
+        var json = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string;
+        if (string.IsNullOrEmpty(json)) return null;
+        // v1.6.1以前に保存された簡易な内容（ObjectiveValue・UnassignedLessonsのみ）は、無い項目が
+        // すべて既定値0として復元される（レコードの対応するコンストラクター引数に既定値が無いため
+        // 例外にはならない）。それ自体は古い実行結果の内訳を正確に表さないが、次に自動作成を実行
+        // すれば以降は完全な内訳が保存されるため、ここでは無理に区別しない。
+        try { return JsonSerializer.Deserialize<ScheduleEvaluation>(json); }
+        catch (JsonException) { return null; }
     }
 
     private static async Task<SqliteConnection> OpenAsync(string path, CancellationToken cancellationToken)

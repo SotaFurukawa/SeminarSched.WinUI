@@ -4,4 +4,32 @@
         <ListView x:Name="GeneratedFiles" SelectionMode="Single" MaxHeight="240"/>
         <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="選択したファイルを開く" Click="OpenSelectedFile_Click"/><Button Content="出力フォルダーを開く" Click="OpenOutputFolder_Click"/></StackPanel>
     </StackPanel>
+    <!-- ユーザー要望「様々なスコアもあるはずなので、それを表示できるようにしてみたい。今既にある
+         出力の機能のボタンやファイルを開くボタンなどの下に追加したい」への対応。直近に完了した
+         自動作成（5 時間割自動作成）の評価スコアをここで確認できる（自動作成を一度も実行していない
+         プロジェクトでは非表示）。 -->
+    <StackPanel x:Name="ScorePanel" Spacing="8" Visibility="Collapsed">
+        <TextBlock FontWeight="SemiBold" Text="直近の自動作成の評価スコア"/>
+        <TextBlock Text="値が小さいほど、その項目について質の高い時間割になっています（0が理想）。「未配置コマ数」は特に確認してください。「5 時間割自動作成」を実行し直すと更新されます。" TextWrapping="Wrap"/>
+        <Grid ColumnSpacing="16" RowSpacing="4">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="未配置コマ数"/>
+            <TextBlock Grid.Row="0" Grid.Column="1" x:Name="ScoreUnassigned"/>
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="通常担当講師等の希望を満たせなかった件数"/>
+            <TextBlock Grid.Row="1" Grid.Column="1" x:Name="ScoreImportantPreferenceViolations"/>
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="講師希望との不一致ペナルティ"/>
+            <TextBlock Grid.Row="2" Grid.Column="1" x:Name="ScoreMajorPenalty"/>
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="生徒の授業日の集中度（延べ重複回数）"/>
+            <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ScoreDistributionPenalty"/>
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="授業間隔の乱れ具合"/>
+            <TextBlock Grid.Row="4" Grid.Column="1" x:Name="ScoreSpacingPenalty"/>
+            <TextBlock Grid.Row="5" Grid.Column="0" Text="その他のソフト制約ペナルティ"/>
+            <TextBlock Grid.Row="5" Grid.Column="1" x:Name="ScoreOtherSoftPenalty"/>
+            <TextBlock Grid.Row="6" Grid.Column="0" FontWeight="SemiBold" Text="総合スコア（内部計算用の目安）"/>
+            <TextBlock Grid.Row="6" Grid.Column="1" FontWeight="SemiBold" x:Name="ScoreObjectiveValue"/>
+        </Grid>
+    </StackPanel>
 </StackPanel></ScrollViewer></local:WorkflowPageBase>

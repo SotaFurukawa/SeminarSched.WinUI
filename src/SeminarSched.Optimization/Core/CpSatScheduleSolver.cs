@@ -144,6 +144,7 @@ public sealed class CpSatScheduleSolver
             }
         }
 
+        AddMinimumDailyLessonsPerTeacherConstraint(model, problem, variables);
         var regularTeacherShortfallTerms = AddRegularTeacherMinimums(model, problem, variables).ToArray();
         AddStudentConsecutiveAndGapConstraints(model, problem, variables);
         ApplyHintAndNeighborhoodFreeze(model, variables, options);
@@ -756,6 +757,58 @@ public sealed class CpSatScheduleSolver
             var shortfall = model.NewIntVar(0, achievable, $"regular_shortfall_{demand.RequestId}");
             model.Add(LinearExpr.Sum(regular) + shortfall >= achievable);
             yield return LinearExpr.Term(shortfall, -RegularTeacherShortfallWeight);
+        }
+    }
+
+    /// <summary>
+    /// ユーザー要望「講師の一日最低コマ数を設定できるようにしましょう。デフォルトは1で、2にすると、
+    /// 一日に2コマは確定で入れなければならない」への対応。ある講師がその日1コマでも配置されるなら、
+    /// その日はこの数以上を確定で配置しなければならないハード制約（その講師がその日まったく配置
+    /// されないこと自体は常に許される）。problem.Policy.MinDailyLessonsPerTeacherが1以下（既定）
+    /// なら、この条件は常に自明に満たされるため項自体を生成しない。
+    ///
+    /// 既に確定済みの配置（problem.ExistingPlacements）が1件でもある（講師,日付）の組は、その講師が
+    /// その日「働く」こと自体が既に確定しているため、残り必要数（最低数-確定済み数）をソルバーが
+    /// 自由に選べる変数だけで無条件に満たさせる（下回ると即Infeasible）。確定済みが0件の組だけ、
+    /// AddMaxEqualityで作る「その日働くかどうか」の変数dayUsedを使い、`sum(free) >= Min * dayUsed`
+    /// という片方向の関係式にする。dayUsed=0のときは0>=0で常に成立し（AddMaxEqualityの定義上dayUsed=0
+    /// ならfreeは全部0なので整合）、dayUsed=1（＝free側で1件でも配置される）になった瞬間だけ
+    /// Min以上を要求する。どちらの経路でも「その講師がその日まったく配置されない」という選択肢は
+    /// 常に残るため、この制約単体が原因でInfeasibleになることはない
+    /// （AddRegularTeacherMinimumsのコメント参照、同じ理由で「最低数」をソフトな減点ではなくハードに
+    /// しても、確定済みの配置が極端に少ない日に限ってInfeasibleの余地が残る）。
+    /// </summary>
+    private static void AddMinimumDailyLessonsPerTeacherConstraint(
+        CpModel model,
+        ScheduleProblem problem,
+        IReadOnlyList<(PlacementCandidate candidate, BoolVar variable)> variables)
+    {
+        var minDaily = problem.Policy.MinDailyLessonsPerTeacher;
+        if (minDaily <= 1) return;
+
+        var teacherDays = variables.Select(item => (item.candidate.TeacherId, item.candidate.OpenDateId))
+            .Concat(problem.ExistingPlacements.Select(item => (item.TeacherId, item.OpenDateId)))
+            .Distinct();
+        var index = 0;
+        foreach (var (teacherId, openDateId) in teacherDays)
+        {
+            var freeVariables = variables
+                .Where(item => item.candidate.TeacherId == teacherId && item.candidate.OpenDateId == openDateId)
+                .Select(item => item.variable)
+                .ToArray();
+            var fixedCount = problem.ExistingPlacements.Count(item => item.TeacherId == teacherId && item.OpenDateId == openDateId);
+
+            if (fixedCount > 0)
+            {
+                if (freeVariables.Length == 0) continue; // 確定済みだけで既にMin以上なら必要なし、不足していても補う手段が無ければ何もできない。
+                model.Add(LinearExpr.Sum(freeVariables) >= minDaily - fixedCount);
+                continue;
+            }
+
+            if (freeVariables.Length == 0) continue;
+            var dayUsed = model.NewBoolVar($"min_daily_day_used_{index++}");
+            model.AddMaxEquality(dayUsed, freeVariables);
+            model.Add(LinearExpr.Sum(freeVariables) >= LinearExpr.Term(dayUsed, minDaily));
         }
     }
 
