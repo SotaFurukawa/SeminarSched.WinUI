@@ -87,4 +87,35 @@ public sealed class ProductKeyServiceTests
         Assert.True(ProductKeyService.TryParseKey(reformatted, out var value));
         Assert.Equal(2026, value);
     }
+
+    // ユーザー要望「このプロダクトキーはできればいくつも出せるような仕様にしてほしい」への対応。
+    // 同じ年度でも、saltを変えれば異なる文字列のキーを発行できること、かつどちらも同じ年度として
+    // 正しく検証できることを確認する。
+    [Fact]
+    public void GenerateKey_WithDifferentSalts_ProducesDistinctKeysThatBothValidateForSameYear()
+    {
+        var now = new DateTimeOffset(2026, 10, 2, 0, 0, 0, TimeSpan.Zero);
+        var first = ProductKeyService.GenerateKey(2026, salt: 1);
+        var second = ProductKeyService.GenerateKey(2026, salt: 2);
+
+        Assert.NotEqual(first, second);
+        Assert.True(ProductKeyService.Validate(first, now).IsValid);
+        Assert.True(ProductKeyService.Validate(second, now).IsValid);
+        Assert.Equal(2026, ProductKeyService.Validate(first, now).Year);
+        Assert.Equal(2026, ProductKeyService.Validate(second, now).Year);
+    }
+
+    // 互換性の確認。saltの仕組みを追加する前（本セッション中に実際に配布目的で生成した2026年版
+    // キー）が、仕様変更後も引き続き有効であること（既に配布済みのキーを失効させない）を確認する。
+    [Fact]
+    public void Validate_AcceptsPreviouslyIssuedLegacyFormatKey()
+    {
+        var now = new DateTimeOffset(2026, 10, 21, 0, 0, 0, TimeSpan.Zero);
+
+        var result = ProductKeyService.Validate("FD98-3C5A-E685", now);
+
+        Assert.True(result.IsValid);
+        Assert.False(result.IsMaster);
+        Assert.Equal(2026, result.Year);
+    }
 }

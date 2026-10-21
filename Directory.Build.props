@@ -196,16 +196,25 @@
          評価スコア」欄を追加した（未配置コマ数・通常担当講師等の希望を満たせなかった件数・講師
          希望との不一致ペナルティ・生徒の授業日の集中度・授業間隔の乱れ具合・その他のソフト制約
          ペナルティ・総合スコア）。常に0のまま変化しない2項目（HardConstraintViolations・
-         TeacherGapSlots）はUIからは外した。 -->
-    <VersionPrefix>1.7.0</VersionPrefix>
+         TeacherGapSlots）はUIからは外した。
+         v1.7.1は、ユーザー要望「このプロダクトキーはできればいくつも出せるような仕様にして
+         ほしい」への対応（ADR 0006のAmendment参照）。以前は値（年度またはmaster）から決定的に
+         計算するだけで、同じ値には常に同じキーしか生成できなかった。検証には関与しない2バイトの
+         乱数saltをチェックサムの対象へ加え、GenerateKeyを呼ぶたびに（saltを明示指定しない限り）
+         自動的に異なるキーを生成するようにした。tools/SeminarSched.ProductKeyToolを同じ引数で
+         複数回実行するだけで、校舎ごとに別々のキーを配れるようになる。TryParseKeyは新形式
+         （16進16桁）と既存配布済みの旧形式（16進12桁、saltなし）の両方を受け付けるため、
+         本セッション中に実際に生成・配布した2026年版キー（FD98-3C5A-E685）を含め、過去に発行
+         済みのキーは引き続き有効（回帰テストで固定）。 -->
+    <VersionPrefix>1.7.1</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.7.0.0</AssemblyVersion>
-    <FileVersion>1.7.0.0</FileVersion>
+    <AssemblyVersion>1.7.1.0</AssemblyVersion>
+    <FileVersion>1.7.1.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.7.0.0</AppxPackageVersion>
+    <AppxPackageVersion>1.7.1.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>

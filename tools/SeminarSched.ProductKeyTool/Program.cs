@@ -19,7 +19,12 @@ else if (!int.TryParse(args[0], out value))
     return 1;
 }
 
+// ユーザー要望「このプロダクトキーはできればいくつも出せるような仕様にしてほしい」への対応。
+// GenerateKeyは乱数saltを含めるようになったため、同じ年度・masterでもこのコマンドを実行する
+// たびに毎回異なる（しかしどれも正当に検証が通る）キーを発行できる。校舎ごとに別々のキーを
+// 配りたい場合は、同じ引数でこのコマンドを必要な回数だけ実行すればよい。
 var key = ProductKeyService.GenerateKey(value);
 var label = value == ProductKeyService.MasterKeyValue ? "マスターキー（完全版・無期限）" : $"{value}年版（2/1〜翌1/31まで有効）";
 Console.WriteLine($"{label}: {key}");
+Console.WriteLine("同じ引数でもう一度実行すると、別の（これとは異なる文字列の）有効なキーを発行できます。");
 return 0;

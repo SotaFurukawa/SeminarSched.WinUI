@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-19（checkpoint183）
+最終更新: 2026-10-21（checkpoint184）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,8 +16,33 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.7.0`（Release・公開済み。checkpoint183参照）
-Latest Development Checkpoint: checkpoint 183（ユーザー要望①「講師の一日最低コマ数を設定できる
+Current Version: `v1.7.1`（Release・公開済み。checkpoint184参照）
+Latest Development Checkpoint: checkpoint 184（ユーザー要望「このプロダクトキーはできればいくつも
+出せるような仕様にしてほしい」への対応（ADR 0006のAmendment参照）。
+
+以前は年度（またはmaster）という値から決定的にキーを計算するだけで、同じ値には常に同じキーしか
+生成できなかった。検証には関与しない2バイトの乱数saltを`HMACSHA256`チェックサムの対象へ加え、
+`ProductKeyService.GenerateKey`を呼ぶたび（saltを明示指定しない限り）自動的に異なるキーを生成
+するようにした。`tools/SeminarSched.ProductKeyTool`を同じ引数で複数回実行するだけで、校舎ごとに
+別々のキーを配れる。`TryParseKey`は新形式（16進16桁、4グループ）と既存配布済みの旧形式（16進12桁、
+3グループ、saltなし）の両方の長さを受け付け、それぞれ元のアルゴリズムでチェックサムを検証する
+ため、形式が混在しても破綻しない。本セッション中に実際に生成・配布した2026年版キー
+（`FD98-3C5A-E685`）が、この変更後も引き続き有効であることを回帰テストで固定した。
+
+新規テスト2件（同じ年度でも異なるsaltなら異なるキーになり両方とも正しく検証できること、既存
+配布済みキーが引き続き有効であること）を含め、既存の全テスト、合計290件がすべて通過。v1.7.1
+として通常のbuild/test→commit/push→インストーラー作成→Release公開のサイクルを実行。
+
+なお、同じユーザーメッセージでもう1件、Google Apps Script初回利用時の認証（YouTubeアプリでの
+確認が必要になるとの報告、本社でログイン済みで校舎から確認できない）について相談があった。
+ウェブ検索でも「YouTubeアプリでの確認」という具体的な仕組みは確認が取れず、Googleの2段階認証
+（Google Prompt、本人確認が必要なデバイスに依存する方式）である可能性が高いと推測して回答した
+が、断定はしておらず、実際の画面・エラー文言の確認が次のアクションとして残っている。コードの
+変更は行っていない。
+
+---
+
+checkpoint 183（ユーザー要望①「講師の一日最低コマ数を設定できる
 ようにしましょう。デフォルトは1で、2にすると、一日に2コマは確定で入れなければならない」と②
 「様々なスコアもあるはずなので、それを表示できるようにしてみたい。今既にある出力の機能のボタンや
 ファイルを開くボタンなどの下に追加したい」への対応（ADR 0012参照）。「面白いが演出ではなく便利な
