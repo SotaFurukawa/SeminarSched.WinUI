@@ -9,6 +9,17 @@
         <ListView x:Name="SurveyIssues" MaxHeight="240"/>
     </StackPanel>
 </Border>
+<!-- ユーザー要望「入力が間違い（誤字など）があった場合には、アンケート取得後の確認できる場所で、
+     存在しない生徒を表示するようにしてほしい」への対応。検証時の警告一覧（SurveyIssues）は
+     ページを離れると見返せないため、基本情報に一致せず体験生として自動登録された生徒を、
+     ページを開くたびDBから読み直して常設表示する（ImportPage.xaml.cs LoadUnmatchedStudentsAsync）。 -->
+<Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" x:Name="UnmatchedStudentsCard" Visibility="Collapsed">
+    <StackPanel Spacing="10">
+        <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorCautionBrush}" Text="基本情報に一致しなかった生徒（体験生として自動登録・要確認）"/>
+        <TextBlock TextWrapping="Wrap" Text="アンケート回答の氏名・学年が共通名簿の基本情報と一致しなかったため、体験生としてプロジェクト内だけに自動登録された生徒です。氏名や学年の入力ミスの可能性があれば、基本情報またはアンケート回答を確認してください。実際の体験生であれば、このままで問題ありません。"/>
+        <ListView x:Name="UnmatchedStudents" MaxHeight="200"/>
+    </StackPanel>
+</Border>
 <Border Padding="24" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
     <StackPanel Spacing="10">
         <TextBlock FontSize="18" FontWeight="SemiBold" Text="受講希望"/>

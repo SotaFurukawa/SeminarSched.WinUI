@@ -220,16 +220,33 @@
          「学校区分」ドロップダウン自体を廃止した点（尋ねる項目が1つしか無いため、回答者自身の
          学年と科目の学校区分が矛盾するという従来の問題が構造的に起こり得ない）。整形済み回答
          シートの列構成は変更していないため、CourseSurveyImportService.cs側は無改修（GAS側の
-         新設関数splitOtherGradeSubjectAnswer_が付記を元の2列へ分解してから書き込む）。 -->
-    <VersionPrefix>1.8.0</VersionPrefix>
+         新設関数splitOtherGradeSubjectAnswer_が付記を元の2列へ分解してから書き込む）。
+         v1.9.0（新機能のためminorを上げてpatchを0へ戻した）は、ユーザー報告の不具合修正1件と
+         要望1件への対応。①v1.8.0で②アンケート作成（生徒用.gs）を初めて実行すると
+         「Exception: これらの列は範囲外にあります。」でcreateStudentQuestionnaireが失敗する
+         不具合を修正した。原因はstyleStudentCompactSheet_内のwidths配列（整形済み回答シートの
+         列幅指定）で、v1.8.0で在籍区分アンケートを削除してstudentCompactResponseHeaders_の
+         固定列数が8列から7列に減ったのに、widths配列側の固定列分（8要素）を更新し忘れ、
+         実在しない8列目へsetColumnWidthしていたため。widths配列を7要素へ修正し、今後また
+         両者がズレても確実に検出できるよう、両配列の要素数が一致することを直接検証する回帰
+         テストを追加した（QuestionnaireKitServiceTests.
+         GenerateAsync_CompactSheetColumnWidthCountMatchesFixedHeaderCount）。
+         ②ユーザー要望「入力が間違い（誤字など）があった場合には、アンケート取得後の確認できる
+         場所で、存在しない生徒を表示するようにしてほしい」への対応。基本情報に一致せず体験生
+         として自動登録された生徒（v1.8.0で一律警告＋自動登録に変更した結果、検証時の警告
+         一覧（画面を離れると見返せない）でしか気付けなかった）を、「3 アンケート取込」ページに
+         常設の確認用カードとして追加した。ExternalIdが"TRIAL-"で始まる（NextTrialId参照）
+         在籍中の生徒をDBから都度読み直して一覧表示するため、ページを開くたび・反映操作の
+         直後に確認でき、アプリを再起動しても消えない。該当が無ければカード自体を非表示にする。 -->
+    <VersionPrefix>1.9.0</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.8.0.0</AssemblyVersion>
-    <FileVersion>1.8.0.0</FileVersion>
+    <AssemblyVersion>1.9.0.0</AssemblyVersion>
+    <FileVersion>1.9.0.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.8.0.0</AppxPackageVersion>
+    <AppxPackageVersion>1.9.0.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>

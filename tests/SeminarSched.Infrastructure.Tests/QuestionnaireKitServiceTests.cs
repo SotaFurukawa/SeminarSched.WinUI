@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using SeminarSched.Application.Questionnaires;
 using SeminarSched.Domain.CourseSettings;
 using SeminarSched.Domain.MasterData;
@@ -69,6 +70,34 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
         Assert.DoesNotContain("中高一貫などで他学年の授業を受講される際はこちらにチェックを入れてください", studentScript);
         Assert.DoesNotContain("在籍区分", studentScript);
         Assert.DoesNotContain("enrollmentTypes", studentScript);
+    }
+
+    // ユーザー報告バグ修正: 在籍区分アンケートの削除でstudentCompactResponseHeaders_()の固定列数が
+    // 1つ減ったのに、styleStudentCompactSheet_内のwidths配列を更新し忘れ、GAS実行時に
+    // 「これらの列は範囲外にあります」で例外になっていた（setColumnWidthが実在しない列を指定）。
+    // 個別の列数を決め打ちで検証すると今後また同じズレが起き得るため、見出し配列とwidths配列の
+    // 要素数が常に一致することを直接検証する回帰テストにする。
+    [Fact]
+    public async Task GenerateAsync_CompactSheetColumnWidthCountMatchesFixedHeaderCount()
+    {
+        var path = Path.Combine(_directory, "project.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
+        var course = new SqliteCourseSettingsRepository();
+        var master = new SqliteMasterDataRepository();
+        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH", "小学校・算数", "算", "小学校", 1));
+        await master.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "中学校・数学", "数", "中学校", 2));
+        await master.SaveSubjectAsync(path, new Subject(0, "HS_MATH", "高校・数学IA", "数", "高校", 3));
+
+        var output = await new QuestionnaireKitService(course, master).GenerateAsync(path, _directory, "2026夏期講習", "生徒用", "講師用", "2026-07-06", "2026-07-10", "問い合わせ先");
+        var studentScript = await File.ReadAllTextAsync(Path.Combine(output, "create_student_questionnaire.gs"));
+
+        var headersLiteral = Regex.Match(studentScript, @"const headers = \[(.*?)\];", RegexOptions.Singleline);
+        var widthsLiteral = Regex.Match(studentScript, @"const widths = \[(.*?)\];", RegexOptions.Singleline);
+        Assert.True(headersLiteral.Success, "studentCompactResponseHeaders_の固定headers配列が見つかりません。");
+        Assert.True(widthsLiteral.Success, "styleStudentCompactSheet_のwidths配列が見つかりません。");
+
+        static int CountElements(string literal) => literal.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
+        Assert.Equal(CountElements(headersLiteral.Groups[1].Value), CountElements(widthsLiteral.Groups[1].Value));
     }
 
     [Fact]

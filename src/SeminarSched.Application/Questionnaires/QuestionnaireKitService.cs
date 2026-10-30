@@ -578,7 +578,7 @@ public sealed class QuestionnaireKitService
             .build();
           sheet.setConditionalFormatRules([stripeRule]);
 
-          const widths = [135, 180, 220, 110, 110, 90, 110, 240];
+          const widths = [135, 180, 220, 110, 110, 90, 240];
           for (let index = 1; index <= 4; index += 1) {
             widths.push(120, 160, 130);
           }

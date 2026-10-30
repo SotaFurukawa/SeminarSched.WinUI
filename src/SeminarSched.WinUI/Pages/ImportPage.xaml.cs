@@ -29,7 +29,24 @@ public sealed partial class ImportPage : WorkflowPageBase
         // ユーザー指摘（checkpoint122）「選択していないときに空白になるのは違和感がある」への対応。
         // ファイル未選択時も「未選択」のプレースホルダー文言を最初から表示し、空行にならないようにする。
         UpdateSurveySelectedFilesText();
-        if(ready){await ReloadMatrixAsync();await ReloadLessonRequestsAsync();}
+        if(ready){await ReloadMatrixAsync();await ReloadLessonRequestsAsync();await LoadUnmatchedStudentsAsync();}
+    }
+
+    // ユーザー要望「入力が間違い（誤字など）があった場合には、アンケート取得後の確認できる
+    // 場所で、存在しない生徒を表示するようにしてほしい」への対応。基本情報に一致せず体験生
+    // として自動登録された生徒（ExternalIdが"TRIAL-"始まり。CourseSurveyImportService.
+    // NextTrialId参照）をDBから読み直して一覧表示する。ページを開くたびに読み直すため、
+    // アプリを再起動したり他の画面へ移動して戻ってきたりしても確認できる。
+    private async Task LoadUnmatchedStudentsAsync()
+    {
+        var path=App.ProjectService.Current?.Path;if(path is null)return;
+        var students=await App.MasterData.GetStudentsAsync(path);
+        var trial=students.Where(x=>x.Active&&x.ExternalId.StartsWith("TRIAL-",StringComparison.OrdinalIgnoreCase))
+            .OrderBy(x=>x.ExternalId,StringComparer.OrdinalIgnoreCase)
+            .Select(x=>$"{x.ExternalId}　{x.FullName}（{x.Grade}）").ToArray();
+        UnmatchedStudents.ItemsSource=trial;
+        var visible=trial.Length>0?Visibility.Visible:Visibility.Collapsed;
+        UnmatchedStudentsCard.Visibility=visible;
     }
 
     private async void SurveySelectStudent_Click(object sender,RoutedEventArgs e)
@@ -83,6 +100,7 @@ public sealed partial class ImportPage : WorkflowPageBase
             // ReloadLessonRequestsAsync）をここでは呼んでいなかったため、反映直後に同じ画面上で
             // 見ると古い表示のまま（別画面へ移動して戻れば正しい値が見える）だった。
             await ReloadLessonRequestsAsync();
+            await LoadUnmatchedStudentsAsync();
             Status.Severity=InfoBarSeverity.Success;
             Status.Title="アンケート回答を反映しました";
             Status.Message=$"生徒{result.Students}件（体験生{result.TrialStudents}件を新規登録）・講師{result.Teachers}件・受講希望{result.LessonRequests}件";
