@@ -56,6 +56,16 @@ public sealed partial class QuestionnairePage : WorkflowPageBase
 
     private async void Guide_Click(object sender, RoutedEventArgs e) => await GoogleFormsGuide.ShowAsync(XamlRoot);
 
+    // ユーザー要望「apps scriptのwebページへ飛べるボタンをアンケート作成ページに追加して」への対応。
+    // 以前は「作成手順」モーダルの手順4に埋め込まれたリンク（GoogleFormsGuide.cs）からしか
+    // たどり着けなかった。作成キットの保存有無によらず使えるよう、常時表示の上段ボタン列に追加した。
+    private async void OpenAppsScript_Click(object sender, RoutedEventArgs e)
+    {
+        var opened = await Launcher.LaunchUriAsync(new Uri("https://script.google.com/home"));
+        if (!opened)
+        { Status.Severity = InfoBarSeverity.Error; Status.Title = "開けませんでした"; Status.Message = "ブラウザーを起動できませんでした。手動で https://script.google.com/home を開いてください。"; Status.IsOpen = true; }
+    }
+
     // ユーザー報告「2 アンケート作成で保存先を開こうとしてもエクスプローラーが起動しない
     // （クライアント環境、Windows 11）」への対応。Process.Start(UseShellExecute: true)は
     // Win32のShellExecuteEx経由で、MSIXパッケージ化されたアプリのAppContainerから呼び出した

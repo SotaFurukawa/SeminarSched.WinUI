@@ -1,6 +1,6 @@
 # SeminarSched Codex引き継ぎ書
 
-最終更新: 2026-10-31（checkpoint186）
+最終更新: 2026-10-31（checkpoint187）
 Python参照版: v1.9.5 / commit `1d323a4`
 Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 
@@ -16,8 +16,24 @@ Pythonリポジトリ: `https://github.com/SotaFurukawa/SeminarSched`
 <version>.exe`）は例外なく毎回実行すること。**checkpoint164でユーザー指示によりDraftではなく
 毎回公開（Publish）することが既定になった（下記参照、AGENTS.mdも更新済み）。**
 
-Current Version: `v1.9.0`（Release・公開済み。checkpoint186参照）
-Latest Development Checkpoint: checkpoint 186（ユーザー報告の不具合修正1件と要望1件への対応。
+Current Version: `v1.9.1`（Release・公開済み。checkpoint187参照）
+Latest Development Checkpoint: checkpoint 187（ユーザー要望「apps scriptのwebページへ飛べる
+ボタンをアンケート作成ページに追加して」への対応。docs/releases/v1.9.1.md参照）。
+
+以前、Google Apps Script（https://script.google.com/home）へは、「作成手順」モーダルの手順4に
+埋め込まれたリンク（`GoogleFormsGuide.cs`）からしかたどり着けなかった。「2 アンケート作成」
+ページの常時表示の上段ボタン列（「作成キットを保存」「作成手順」の隣）に「Google Apps Script
+を開く」ボタンを追加し（`QuestionnairePage.xaml`/`.xaml.cs`の`OpenAppsScript_Click`）、作成
+キットの保存有無によらずいつでも直接開けるようにした。既存の`OpenFolder_Click`等と同じ
+`Windows.System.Launcher`（WinRTのランチャーAPI）経由で開く。UIのみの変更のため新規テストは
+追加していない。既存の全テスト、合計292件がすべて通過。v1.9.1（UI利便性向上のためpatchを
+上げた）として通常のbuild/test→commit/push→インストーラー作成→Release公開のサイクルを実行。
+実機（dev-run）での画面確認は、この開発環境のスクリーンショット手段が意図しないセッションの
+画面を捉えてしまう既知の制約（本書内の複数のcheckpointで既出）により今回も行っていない。
+
+---
+
+checkpoint 186（ユーザー報告の不具合修正1件と要望1件への対応。
 docs/releases/v1.9.0.md参照）。
 
 ①v1.8.0で生成した生徒用アンケート作成スクリプト（create_student_questionnaire.gs）を実行すると
@@ -54,6 +70,37 @@ patchを0へ戻した）として通常のbuild/test→commit/push→インス�
 の画面を捉えてしまう既知の制約（本書内の複数のcheckpointで既出）により今回も行っていない。
 XAML側は`x:Bind`を使わない名前付き要素＋コードビハインドからの直接代入のみで構成しており、
 ビルド成功（0警告0エラー）の時点でXAML生成コード・コードビハインド間の名前解決は済んでいる。
+
+---
+
+checkpoint 185（ユーザー指示3点への対応（ADR
+0010のAmendment参照）: ①「他学年を含む」チェックボックスのタイトルを「中高一貫などで他学年の
+授業を受講される際はこちらにチェックを入れてください」から「私立中学の中高一貫の生徒はこちらに
+チェックを入れてください」へ変更。②「在籍区分（在籍生／体験生）」アンケートを廃止。③「他学年を
+含む」ページの「学校区分」ドロップダウンと「受講教科」を、数学（中学範囲）のように科目名への
+付記へ統合。
+
+②は想定より影響が大きかった。`CourseSurveyImportService.ParseStudentResponses`は、基本情報に
+一致しない生徒の在籍区分自己申告が「在籍生」ならエラーでimportをブロックし、「体験生」なら
+警告のうえプロジェクト内だけに自動登録する、という判定にこの質問を使っていた。質問自体の廃止で
+判定材料が無くなったため、基本情報に一致しない生徒は理由を区別せず一律で警告のうえ自動登録する
+方式へ統一した（意図的な挙動変更。`PreviewAsync_UnknownRegularStudent_ReportsErrorAndBlocksApply`
+を、新しい挙動を検証する
+`PreviewAndApply_UnmatchedStudentWithoutEnrollmentTypeQuestion_WarnsAndAutoRegistersInsteadOfBlocking`
+へ置き換えた）。`findStudentRawResponseSheet_`の生シート判定も「学年（必須）」＋「在籍区分
+（必須）」から「学年（必須）」＋「姓（苗字）（必須）」へ変更した。
+
+③はv1.5.0で一度導入しv1.5.2で差し戻した付記機能と似ているが、決定的に異なる。v1.5.0は別途の
+「学校区分」ドロップダウンを残したまま科目名にも付記し、2つの質問が矛盾する回答（回答者自身の
+学年と科目の学校区分の食い違い）が実際に発生した。今回は別途のドロップダウン自体を廃止し、
+付記付き科目名だけを尋ねるため、同じ矛盾は構造的に起こり得ない。整形済み回答シートの列構成
+（「学校区分」「受講教科」の2列）は変更しておらず、GAS側の新設関数
+`splitOtherGradeSubjectAnswer_`が付記（例:「数学（中学範囲）」）を正規表現で元の科目名と
+学校区分へ分解してから従来通り2列へ書き込むため、`CourseSurveyImportService.cs`は無改修。
+
+新規テスト1件・既存テストの置き換え2件を含め、既存の全テスト、合計291件がすべて通過。v1.8.0
+（新機能のためminorを上げてpatchを0へ戻した）として通常のbuild/test→commit/push→インストーラー
+作成→Release公開のサイクルを実行。
 
 ---
 

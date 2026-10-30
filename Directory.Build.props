@@ -237,16 +237,23 @@
          一覧（画面を離れると見返せない）でしか気付けなかった）を、「3 アンケート取込」ページに
          常設の確認用カードとして追加した。ExternalIdが"TRIAL-"で始まる（NextTrialId参照）
          在籍中の生徒をDBから都度読み直して一覧表示するため、ページを開くたび・反映操作の
-         直後に確認でき、アプリを再起動しても消えない。該当が無ければカード自体を非表示にする。 -->
-    <VersionPrefix>1.9.0</VersionPrefix>
+         直後に確認でき、アプリを再起動しても消えない。該当が無ければカード自体を非表示にする。
+         v1.9.1は、ユーザー要望「apps scriptのwebページへ飛べるボタンをアンケート作成ページに
+         追加して」への対応（UI利便性向上のためpatchを上げた）。以前はhttps://script.google.com/home
+         へは「作成手順」モーダルの手順4に埋め込まれたリンク（GoogleFormsGuide.cs）からしか
+         たどり着けなかった。「2 アンケート作成」ページの常時表示の上段ボタン列（作成キットを
+         保存／作成手順の隣）に「Google Apps Scriptを開く」ボタンを追加し、作成キットの保存
+         有無によらずいつでも直接開けるようにした。既存のOpenFolder_Click等と同じ
+         Windows.System.Launcher（WinRTのランチャーAPI）経由で開く。 -->
+    <VersionPrefix>1.9.1</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.9.0.0</AssemblyVersion>
-    <FileVersion>1.9.0.0</FileVersion>
+    <AssemblyVersion>1.9.1.0</AssemblyVersion>
+    <FileVersion>1.9.1.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.9.0.0</AppxPackageVersion>
+    <AppxPackageVersion>1.9.1.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
