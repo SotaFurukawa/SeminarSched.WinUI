@@ -21,7 +21,7 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
         var state = await CreateStateAsync();
         var studentPath = Path.Combine(_directory, "student.csv");
         var teacherPath = Path.Combine(_directory, "teacher.csv");
-        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "在籍生", "中学校", "英語", "2", "生徒備考",
+        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "中学校", "英語", "2", "生徒備考",
             [(state.Date1, "1 09:00-10:00"), (state.Date2, "")]);
         WriteTeacherCsv(teacherPath, "架空", "花子", "講師備考",
             [(state.Date1, ""), (state.Date2, "2 10:10-11:10")]);
@@ -56,7 +56,7 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
         await new SqliteMasterDataRepository().SaveSubjectAsync(state.Path, new Subject(0, "JH_SCIENCE", "中学校・理科", "理", "中学校", 2));
         var studentPath = Path.Combine(_directory, "student.csv");
         var teacherPath = Path.Combine(_directory, "teacher.csv");
-        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "在籍生", "中学校", "理科", "2", "生徒備考",
+        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "中学校", "理科", "2", "生徒備考",
             [(state.Date1, "1 09:00-10:00"), (state.Date2, "")]);
         WriteTeacherCsv(teacherPath, "架空", "花子", "講師備考", [(state.Date1, ""), (state.Date2, "2 10:10-11:10")]);
 
@@ -88,7 +88,7 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
         var headers = new List<string>
         {
             "Timestamp", "Email Address", "個人情報の利用目的への同意（必須）", "姓（苗字）（必須）", "名（必須）",
-            "学年（必須）", "在籍区分（必須）",
+            "学年（必須）",
             "学校区分（1教科目）", "受講教科（1教科目）（必須）", "受講回数（1教科目）（必須）",
             "学校区分（2教科目）", "受講教科（2教科目）", "受講回数（2教科目）",
             $"受講不可日時（チェックしたコマは受講不可） [{state.Date1:yyyy-MM-dd}（月）]",
@@ -98,7 +98,7 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
         var values = new List<string>
         {
             "2026-09-11 0:37:00", "dummy@example.com", "同意します", "架空", "太郎",
-            "中2", "在籍生",
+            "中2",
             "中学校", "英語", "2",
             "高校", "", "", // 学校区分だけ選んで、受講教科・受講回数は未入力のまま提出した想定
             "", "",
@@ -127,7 +127,7 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
 
         var studentPath = Path.Combine(_directory, "student.csv");
         var teacherPath = Path.Combine(_directory, "teacher.csv");
-        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "在籍生", "中学校", "英語", "2", "",
+        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "中学校", "英語", "2", "",
             [(state.Date1, ""), (state.Date2, "")]);
         WriteTeacherCsv(teacherPath, "架空", "花子", "", [(state.Date1, ""), (state.Date2, "")]);
 
@@ -158,7 +158,7 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
 
         var studentPath = Path.Combine(_directory, "student.csv");
         var teacherPath = Path.Combine(_directory, "teacher.csv");
-        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "在籍生", "中学校", "英語", "2", "",
+        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "中学校", "英語", "2", "",
             [(state.Date1, ""), (state.Date2, "")]);
         WriteTeacherCsv(teacherPath, "架空", "花子", "", [(state.Date1, ""), (state.Date2, "")]);
 
@@ -180,7 +180,7 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
         var state = await CreateStateAsync();
         var studentPath = Path.Combine(_directory, "student.csv");
         var teacherPath = Path.Combine(_directory, "teacher.csv");
-        WriteStudentCsv(studentPath, "新規", "次郎", "中1", "体験生", "中学校", "英語", "1", "", [(state.Date1, ""), (state.Date2, "")]);
+        WriteStudentCsv(studentPath, "新規", "次郎", "中1", "中学校", "英語", "1", "", [(state.Date1, ""), (state.Date2, "")]);
         WriteTeacherCsv(teacherPath, "架空", "花子", "", [(state.Date1, ""), (state.Date2, "")]);
 
         var service = new CourseSurveyImportService();
@@ -196,20 +196,28 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
         Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM Student WHERE ExternalId='TRIAL-0001' AND Grade='中1' AND Active=1"));
     }
 
+    // ユーザー指示「在校生かそうでないかのアンケートは削除します」への対応。以前はこのケース
+    // （基本情報に一致しない生徒）を、在籍区分の自己申告が「在籍生」ならエラーにしてimportを
+    // ブロックしていた（データ入力ミスを早期に検出するため）。その自己申告の質問自体が無くなり、
+    // 「入力ミスなのか本当の体験生なのか」を区別する材料が無くなったため、一律で警告のうえ
+    // プロジェクト内だけに自動登録する方式へ変更した（意図的な挙動変更。スタッフは反映前に
+    // Previewの警告一覧で気付ける）。
     [Fact]
-    public async Task PreviewAsync_UnknownRegularStudent_ReportsErrorAndBlocksApply()
+    public async Task PreviewAndApply_UnmatchedStudentWithoutEnrollmentTypeQuestion_WarnsAndAutoRegistersInsteadOfBlocking()
     {
         var state = await CreateStateAsync();
         var studentPath = Path.Combine(_directory, "student.csv");
         var teacherPath = Path.Combine(_directory, "teacher.csv");
-        WriteStudentCsv(studentPath, "未登録", "三郎", "中1", "在籍生", "中学校", "英語", "1", "", [(state.Date1, ""), (state.Date2, "")]);
+        WriteStudentCsv(studentPath, "未登録", "三郎", "中1", "中学校", "英語", "1", "", [(state.Date1, ""), (state.Date2, "")]);
         WriteTeacherCsv(teacherPath, "架空", "花子", "", [(state.Date1, ""), (state.Date2, "")]);
 
         var service = new CourseSurveyImportService();
         var preview = await service.PreviewAsync(state.Path, studentPath, teacherPath);
-        Assert.True(preview.HasErrors);
-        Assert.Contains(preview.Issues, issue => issue.Severity == CourseSurveyIssueSeverity.Error && issue.Message.Contains("在籍生がいません"));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.ApplyAsync(state.Path, preview));
+        Assert.False(preview.HasErrors, string.Join(Environment.NewLine, preview.Issues.Select(issue => issue.Message)));
+        Assert.Contains(preview.Issues, issue => issue.Severity == CourseSurveyIssueSeverity.Warning && issue.Message.Contains("基本情報に一致する生徒がいません"));
+
+        var result = await service.ApplyAsync(state.Path, preview);
+        Assert.Equal(1, result.TrialStudents);
     }
 
     [Fact]
@@ -218,7 +226,7 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
         var state = await CreateStateAsync();
         var studentPath = Path.Combine(_directory, "student.csv");
         var teacherPath = Path.Combine(_directory, "teacher.csv");
-        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "在籍生", "中学校", "英語", "2", "", [(state.Date1, ""), (state.Date2, "")]);
+        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "中学校", "英語", "2", "", [(state.Date1, ""), (state.Date2, "")]);
         WriteTeacherCsv(teacherPath, "架空", "花子", "", [(state.Date1, ""), (state.Date2, "")]);
 
         await using (var connection = new SqliteConnection($"Data Source={state.Path};Pooling=False"))
@@ -249,11 +257,11 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
         var teacherPath = Path.Combine(_directory, "teacher.csv");
         var service = new CourseSurveyImportService();
 
-        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "在籍生", "中学校", "英語", "2", "", [(state.Date1, "1 09:00-10:00"), (state.Date2, "")]);
+        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "中学校", "英語", "2", "", [(state.Date1, "1 09:00-10:00"), (state.Date2, "")]);
         WriteTeacherCsv(teacherPath, "架空", "花子", "", [(state.Date1, ""), (state.Date2, "")]);
         await service.ApplyAsync(state.Path, await service.PreviewAsync(state.Path, studentPath, teacherPath));
 
-        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "在籍生", "中学校", "英語", "3", "", [(state.Date1, ""), (state.Date2, "2 10:10-11:10")]);
+        WriteStudentCsv(studentPath, "架空", "太郎", "中2", "中学校", "英語", "3", "", [(state.Date1, ""), (state.Date2, "2 10:10-11:10")]);
         await service.ApplyAsync(state.Path, await service.PreviewAsync(state.Path, studentPath, teacherPath));
 
         await using var connection = new SqliteConnection($"Data Source={state.Path};Pooling=False");
@@ -264,12 +272,12 @@ public sealed class CourseSurveyImportServiceTests : IDisposable
         Assert.Equal(0L, await ScalarAsync(connection, $"SELECT AvailabilityLevel FROM StudentAvailability WHERE StudentId={state.StudentId} AND OpenDateId=(SELECT Id FROM OpenDate WHERE Date='{state.Date2:yyyy-MM-dd}') AND TimeSlotId={state.Slot2Id}"));
     }
 
-    private static void WriteStudentCsv(string path, string surname, string given, string grade, string enrollment, string schoolLevel, string subject, string count, string note, (DateOnly Date, string Cell)[] unavailability)
+    private static void WriteStudentCsv(string path, string surname, string given, string grade, string schoolLevel, string subject, string count, string note, (DateOnly Date, string Cell)[] unavailability)
     {
-        var headers = new List<string> { "Timestamp", "Email Address", "個人情報の利用目的への同意（必須）", "姓（苗字）（必須）", "名（必須）", "学年（必須）", "在籍区分（必須）", "学校区分（1教科目）", "受講教科（1教科目）（必須）", "受講回数（1教科目）（必須）" };
+        var headers = new List<string> { "Timestamp", "Email Address", "個人情報の利用目的への同意（必須）", "姓（苗字）（必須）", "名（必須）", "学年（必須）", "学校区分（1教科目）", "受講教科（1教科目）（必須）", "受講回数（1教科目）（必須）" };
         headers.AddRange(unavailability.Select(entry => $"受講不可日時（チェックしたコマは受講不可） [{entry.Date:yyyy-MM-dd}（月）]"));
         headers.Add("特記事項");
-        var values = new List<string> { "2026-09-11 0:37:00", "dummy@example.com", "同意します", surname, given, grade, enrollment, schoolLevel, subject, count };
+        var values = new List<string> { "2026-09-11 0:37:00", "dummy@example.com", "同意します", surname, given, grade, schoolLevel, subject, count };
         values.AddRange(unavailability.Select(entry => entry.Cell));
         values.Add(note);
         File.WriteAllText(path, CsvLine(headers) + "\n" + CsvLine(values) + "\n", new UTF8Encoding(false));

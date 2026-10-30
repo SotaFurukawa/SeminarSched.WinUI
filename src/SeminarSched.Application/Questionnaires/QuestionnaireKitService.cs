@@ -11,8 +11,8 @@ namespace SeminarSched.Application.Questionnaires;
 /// <summary>
 /// Python版questionnaire_script_service.pyの移植。生成したGoogleフォームの回答は
 /// <see cref="Importing.ICourseSurveyImportService"/>がそのまま取り込める列構成になる
-/// （姓・名の分割、学年、在籍区分、教科ごとの学校区分・受講教科・受講回数、日付ごとの
-/// 受講/出勤不可日時列）。生徒用・講師用の2つのApps Scriptは共通の本体テンプレートを種類ごとの
+/// （姓・名の分割、学年、教科ごとの学校区分・受講教科・受講回数、日付ごとの受講/出勤不可日時列）。
+/// 生徒用・講師用の2つのApps Scriptは共通の本体テンプレートを種類ごとの
 /// 設定値（kind・関数名・プロパティキー）だけ差し替えて生成する。
 /// ユーザー指示（v0.3.2）により、講師指導可能科目用のGoogleフォーム作成キットは廃止した
 /// （講師指導可能科目は③アンケート取込みでは使用しないため。共通名簿Excelの「講師対応科目」で
@@ -62,13 +62,20 @@ public sealed class QuestionnaireKitService
         };
         // 「他学年を含む」ページは学校区分を明示的に回答させるため、ここで使う一覧は
         // askEntranceExamQuestionの影響を受けず常に分割済みの科目名のままにする。
-        // v1.5.0で、科目名へ「（学校区分）」を付記する変更を一度入れたが、ユーザーから実際の
-        // デモで「学校区分」欄と科目名の付記が矛盾する回答（例: 高校生が中学理科を受講したい
-        // 場合に、学校区分は回答者自身の学年である「高校」、科目は付記付きの「理科（中学校）」を
-        // 選んでしまう）が実際に発生したとの報告があり、「以前（学校区分＝中学、科目＝理科）と
-        // 同じになるように」差し戻した。付記は学校区分欄と二重に学校区分を尋ねる形になり、
-        // 回答者にとって紛らわしかった。
-        var studentSubjectChoices = rawSubjectsBySchoolLevel.Values.SelectMany(x => x).Distinct().ToArray();
+        // v1.5.0で、科目名へ「（学校区分）」を付記しつつ別途「学校区分」ドロップダウンも残す
+        // 変更を一度入れたが、ユーザーから実際のデモで両者が矛盾する回答（例: 高校生が中学理科を
+        // 受講したい場合に、学校区分ドロップダウンは回答者自身の学年である「高校」、科目は付記
+        // 付きの「理科（中学校）」を選んでしまう）が実際に発生したとの報告があり、付記無しへ
+        // 一度差し戻した（v1.5.2）。
+        // ユーザー要望「中高一貫などのチェックを入れた場合に、教科と学校区分を分けていますが、
+        // これを統合し、数学（中学範囲）のように書くようにしたい」への対応で、再度付記を導入
+        // する。v1.5.0との違いは、別途の「学校区分」ドロップダウン自体を廃止し、この付記付き
+        // 科目名だけを質問にする点（addSubjectRequestSection_参照）。尋ねる項目が1つしか無く
+        // なるため、2つの回答が矛盾するという従来の問題は構造的に起こり得ない。
+        var studentSubjectChoices = rawSubjectsBySchoolLevel
+            .SelectMany(pair => pair.Value.Select(subject => $"{subject}（{SchoolLevelRangeLabel(pair.Key)}範囲）"))
+            .Distinct()
+            .ToArray();
         // ユーザー要望（中学受験の有無を科目選択ではなく専用の質問で尋ねたい）への対応。
         // オンのときだけ、自動判定される小学校ページの算数・国語の選択肢を「算数（中学受験）」
         // 「算数（中学受験以外）」の2択から単一の「算数」へまとめ、代わりに専用の質問
@@ -99,7 +106,6 @@ public sealed class QuestionnaireKitService
                 openDates,
                 timeSlots,
                 gradeGroups = new { elementary = GradeGroupElementary, juniorHigh = GradeGroupJuniorHigh, highSchool = GradeGroupHighSchool },
-                enrollmentTypes = new[] { "在籍生", "体験生" },
                 schoolLevels = new[] { "小学校", "中学校", "高校" },
                 subjectsBySchoolLevel = studentSubjectsBySchoolLevel,
                 studentSubjectChoices,
@@ -145,6 +151,16 @@ public sealed class QuestionnaireKitService
         if (schoolLevel.Contains('高')) return SchoolLevelGroup.SeniorHigh;
         return SchoolLevelGroup.Other;
     }
+
+    // 「他学年を含む」ページの受講教科選択肢へ付記する学校区分の短縮表記
+    // （例: 数学（中学範囲）のように使う。rawSubjectsBySchoolLevelのキーと対応）。
+    private static string SchoolLevelRangeLabel(string rawSubjectsBySchoolLevelKey) => rawSubjectsBySchoolLevelKey switch
+    {
+        "elementary" => "小学",
+        "juniorHigh" => "中学",
+        "highSchool" => "高校",
+        _ => throw new ArgumentOutOfRangeException(nameof(rawSubjectsBySchoolLevelKey), rawSubjectsBySchoolLevelKey, "Unknown school level key."),
+    };
 
     // 生徒フォームでは学校段階の接頭辞を省き、選択肢を簡潔にする（Python版_student_subject_label相当）。
     private static string StudentSubjectLabel(string displayName)
@@ -334,14 +350,9 @@ public sealed class QuestionnaireKitService
             .addListItem()
             .setTitle("学年（必須）")
             .setRequired(true);
-          form
-            .addListItem()
-            .setTitle("在籍区分（必須）")
-            .setChoiceValues(QUESTIONNAIRE_CONFIG.enrollmentTypes)
-            .setRequired(true);
           const otherGradeItem = form
             .addMultipleChoiceItem()
-            .setTitle("中高一貫などで他学年の授業を受講される際はこちらにチェックを入れてください")
+            .setTitle("私立中学の中高一貫の生徒はこちらにチェックを入れてください")
             .setHelpText("他学年の科目も選ぶ場合だけ選択してください。該当しない場合は未回答のまま進んでください。")
             .setRequired(false);
 
@@ -386,7 +397,7 @@ public sealed class QuestionnaireKitService
           const otherGradePage = form
             .addPageBreakItem()
             .setTitle("受講教科・回数（他学年を含む）")
-            .setHelpText("最大4教科まで、各教科の学校区分・受講教科・受講回数を回答してください。");
+            .setHelpText("最大4教科まで回答してください。受講教科の選択肢には学年の目安（小学範囲・中学範囲・高校範囲）が付いています。");
           addSubjectRequestSection_(form, QUESTIONNAIRE_CONFIG.studentSubjectChoices);
 
           const availabilityPage = addAvailabilityPage_(form, "受講");
@@ -452,15 +463,13 @@ public sealed class QuestionnaireKitService
         }
 
         function addSubjectRequestSection_(form, subjects, automaticSchoolLevel = "") {
+          // ユーザー要望「中高一貫などのチェックを入れた場合に、教科と学校区分を分けていますが、
+          // これを統合し、数学（中学範囲）のように書くようにしたい」への対応。以前はここで
+          // automaticSchoolLevelが空（＝「他学年を含む」ページ）のときだけ、別途「学校区分」の
+          // 質問を追加していたが、学校区分は選択肢（subjects）自体に付記されるようになった
+          // （studentSubjectChoices参照）ため、この質問自体を廃止した。
           for (let index = 1; index <= 4; index += 1) {
             const required = index === 1;
-            if (!automaticSchoolLevel) {
-              form
-                .addListItem()
-                .setTitle(`学校区分（${index}教科目）`)
-                .setChoiceValues(QUESTIONNAIRE_CONFIG.schoolLevels)
-                .setRequired(required);
-            }
             const schoolLabel = automaticSchoolLevel ? `${automaticSchoolLevel}・` : "";
             form
               .addListItem()
@@ -509,7 +518,7 @@ public sealed class QuestionnaireKitService
               const lastColumn = sheet.getLastColumn();
               if (lastColumn < 1) return false;
               const headers = sheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0];
-              return headers.includes("学年（必須）") && headers.includes("在籍区分（必須）");
+              return headers.includes("学年（必須）") && headers.includes("姓（苗字）（必須）");
             });
             if (rawSheet) return rawSheet;
             Utilities.sleep(500);
@@ -525,8 +534,7 @@ public sealed class QuestionnaireKitService
             "姓（苗字）（必須）",
             "名（必須）",
             "学年（必須）",
-            "在籍区分（必須）",
-            "中高一貫などで他学年の授業を受講される際はこちらにチェックを入れてください",
+            "私立中学の中高一貫の生徒はこちらにチェックを入れてください",
           ];
           for (let index = 1; index <= 4; index += 1) {
             headers.push(`学校区分（${index}教科目）`);
@@ -607,6 +615,21 @@ public sealed class QuestionnaireKitService
             .create();
         }
 
+        /**
+         * 「他学年を含む」ページの受講教科選択肢（例: 数学（中学範囲）、
+         * studentSubjectChoices/SchoolLevelRangeLabel参照）を、元の科目名と学校区分へ分解する。
+         * 選択肢はフォームが提示したものしか選べないため、末尾が「（小学範囲）」「（中学範囲）」
+         * 「（高校範囲）」のいずれかで必ず終わる想定だが、万一一致しなければ学校区分を空文字列の
+         * ままにする（空欄は無視される仕様のため、整形済み回答シート側でエラーにはならない）。
+         */
+        function splitOtherGradeSubjectAnswer_(answer) {
+          if (!answer) return { subject: "", schoolLevel: "" };
+          const match = String(answer).match(/^(.*)（(小学|中学|高校)範囲）$/);
+          if (!match) return { subject: String(answer), schoolLevel: "" };
+          const schoolLevel = match[2] === "小学" ? "小学校" : match[2] === "中学" ? "中学校" : "高校";
+          return { subject: match[1], schoolLevel };
+        }
+
         function writeCompactStudentResponse_(event) {
           const rawSheet = event.range.getSheet();
           if (rawSheet.getName() !== STUDENT_RAW_SHEET_NAME) return;
@@ -617,8 +640,7 @@ public sealed class QuestionnaireKitService
             .getRange(1, 1, 1, rawSheet.getLastColumn())
             .getDisplayValues()[0];
           const values = event.range.getValues()[0];
-          const otherGradeTitle =
-            "中高一貫などで他学年の授業を受講される際はこちらにチェックを入れてください";
+          const otherGradeTitle = "私立中学の中高一貫の生徒はこちらにチェックを入れてください";
           const otherGradeAnswer = responseValue_(headers, values, [otherGradeTitle]);
           const grade = String(responseValue_(headers, values, ["学年（必須）"])).trim();
           const automaticSchoolLevel = schoolLevelForStudentGrade_(grade);
@@ -632,17 +654,23 @@ public sealed class QuestionnaireKitService
             responseValue_(headers, values, ["姓（苗字）（必須）"]),
             responseValue_(headers, values, ["名（必須）"]),
             grade,
-            responseValue_(headers, values, ["在籍区分（必須）"]),
             otherGradeAnswer,
           ];
 
           for (let index = 1; index <= 4; index += 1) {
             const prefix = otherGradeAnswer ? "" : `${automaticSchoolLevel}・`;
-            let subject = responseValueStartingWith_(
+            const rawSubjectAnswer = responseValueStartingWith_(
               headers,
               values,
               `受講教科（${prefix}${index}教科目）`,
             );
+            // 「他学年を含む」ページの受講教科選択肢は、学校区分を付記した1つの質問に統合した
+            // （例: 数学（中学範囲）、addSubjectRequestSection_/studentSubjectChoices参照）ため、
+            // ここで元の科目名と学校区分へ分解し直す。
+            const split = otherGradeAnswer
+              ? splitOtherGradeSubjectAnswer_(rawSubjectAnswer)
+              : null;
+            let subject = split ? split.subject : rawSubjectAnswer;
             if (
               QUESTIONNAIRE_CONFIG.askEntranceExamQuestion &&
               !otherGradeAnswer &&
@@ -659,7 +687,9 @@ public sealed class QuestionnaireKitService
               `受講回数（${prefix}${index}教科目）`,
             );
             const schoolLevel = otherGradeAnswer
-              ? responseValue_(headers, values, [`学校区分（${index}教科目）`])
+              ? split
+                ? split.schoolLevel
+                : ""
               : subject
                 ? automaticSchoolLevel
                 : "";

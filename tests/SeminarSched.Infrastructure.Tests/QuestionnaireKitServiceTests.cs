@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using SeminarSched.Application.Questionnaires;
 using SeminarSched.Domain.CourseSettings;
 using SeminarSched.Domain.MasterData;
@@ -50,6 +49,28 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
         Assert.Empty(Directory.GetDirectories(_directory, "*.tmp-*"));
     }
 
+    // ユーザー指示「私立中学の中高一貫の生徒はこちらにチェックを入れてください、に変更」
+    // 「在校生かそうでないかのアンケートは削除します」への対応。
+    [Fact]
+    public async Task GenerateAsync_RenamesOtherGradeCheckboxAndRemovesEnrollmentTypeQuestion()
+    {
+        var path = Path.Combine(_directory, "project.jukuschedule");
+        await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
+        var course = new SqliteCourseSettingsRepository();
+        var master = new SqliteMasterDataRepository();
+        await master.SaveSubjectAsync(path, new Subject(0, "ES_MATH", "小学校・算数", "算", "小学校", 1));
+        await master.SaveSubjectAsync(path, new Subject(0, "JH_MATH", "中学校・数学", "数", "中学校", 2));
+        await master.SaveSubjectAsync(path, new Subject(0, "HS_MATH", "高校・数学IA", "数", "高校", 3));
+
+        var output = await new QuestionnaireKitService(course, master).GenerateAsync(path, _directory, "2026夏期講習", "生徒用", "講師用", "2026-07-06", "2026-07-10", "問い合わせ先");
+
+        var studentScript = await File.ReadAllTextAsync(Path.Combine(output, "create_student_questionnaire.gs"));
+        Assert.Contains("私立中学の中高一貫の生徒はこちらにチェックを入れてください", studentScript);
+        Assert.DoesNotContain("中高一貫などで他学年の授業を受講される際はこちらにチェックを入れてください", studentScript);
+        Assert.DoesNotContain("在籍区分", studentScript);
+        Assert.DoesNotContain("enrollmentTypes", studentScript);
+    }
+
     [Fact]
     public async Task GenerateAsync_AskEntranceExamQuestionOff_KeepsSplitElementarySubjectChoicesUnchanged()
     {
@@ -89,17 +110,20 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
         var studentScript = await File.ReadAllTextAsync(Path.Combine(output, "create_student_questionnaire.gs"));
         Assert.Contains("\"askEntranceExamQuestion\": true", studentScript);
         Assert.Contains("中学受験をしますか？（必須）", studentScript);
-        // 自動判定される小学校ページの選択肢は分割前の「算数」「国語」だけにまとまる
-        // （「算数（中学受験）」は他学年ページ用のstudentSubjectChoicesにだけ残るので1回だけ出現する）。
+        // 自動判定される小学校ページの選択肢は分割前の「算数」「国語」だけにまとまる。
         Assert.Contains("\"算数\",", studentScript);
         Assert.Contains("\"国語\"", studentScript);
-        Assert.Single(Regex.Matches(studentScript, Regex.Escape("\"算数（中学受験）\"")));
-        Assert.Single(Regex.Matches(studentScript, Regex.Escape("\"算数（中学受験以外）\"")));
-        // 「他学年を含む」ページ用の一覧は、このオプションの影響を受けず分割済みのままにする。
-        Assert.Contains("\"算数（中学受験）\"", studentScript);
-        Assert.Contains("\"算数（中学受験以外）\"", studentScript);
-        Assert.Contains("\"国語（中学受験）\"", studentScript);
-        Assert.Contains("\"国語（中学受験以外）\"", studentScript);
+        // 分割前の裸の表記（「算数（中学受験）」単体）は、自動判定ページ側では統合されて消え、
+        // 「他学年を含む」ページ側では学校区分の付記（小学範囲）が付くため、どちらにも単独の
+        // 裸の表記（付記無し）としては一切出現しない。
+        Assert.DoesNotContain("\"算数（中学受験）\"", studentScript);
+        Assert.DoesNotContain("\"算数（中学受験以外）\"", studentScript);
+        // 「他学年を含む」ページ用の一覧は、このオプションの影響を受けず分割済みのままにし、
+        // 学校区分の付記（小学範囲）が付くことを確認する。
+        Assert.Contains("\"算数（中学受験）（小学範囲）\"", studentScript);
+        Assert.Contains("\"算数（中学受験以外）（小学範囲）\"", studentScript);
+        Assert.Contains("\"国語（中学受験）（小学範囲）\"", studentScript);
+        Assert.Contains("\"国語（中学受験以外）（小学範囲）\"", studentScript);
     }
 
     [Fact]
@@ -127,13 +151,19 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GenerateAsync_OtherGradeSubjectChoices_HaveNoSchoolLevelSuffix()
+    public async Task GenerateAsync_OtherGradeSubjectChoices_HaveSchoolLevelRangeSuffixAndNoSeparateDropdown()
     {
-        // v1.5.0で科目名へ「（学校区分）」を付記する変更を一度入れたが、ユーザーから実際の
-        // デモで「学校区分」欄と科目名の付記が矛盾する回答（例: 高校生が「他学年を含む」ページで
-        // 中学理科を受けたい場合に、学校区分は回答者自身の学年である「高校」、科目は付記付きの
-        // 「理科（中学校）」を選んでしまう）が発生したとの報告を受け、差し戻した
-        // （docs/adr/0010-questionnaire-entrance-exam-question-toggle.mdのAmendment参照）。
+        // v1.5.0で科目名へ「（学校区分）」を付記しつつ、別途「学校区分」ドロップダウンも残す
+        // 変更を一度入れたが、ユーザーから実際のデモで両者が矛盾する回答（例: 高校生が
+        // 「他学年を含む」ページで中学理科を受けたい場合に、学校区分ドロップダウンは回答者自身の
+        // 学年である「高校」、科目は付記付きの「理科（中学校）」を選んでしまう）が発生したとの
+        // 報告を受け、付記無しへ一度差し戻した（v1.5.2、docs/adr/
+        // 0010-questionnaire-entrance-exam-question-toggle.mdのAmendment参照）。
+        // その後のユーザー要望「中高一貫などのチェックを入れた場合に、教科と学校区分を分けて
+        // いますが、これを統合し、数学（中学範囲）のように書くようにしたい」への対応で、
+        // 別途の「学校区分」ドロップダウン自体を廃止し、科目名への付記だけに統合した
+        // （docs/adr/0012-...のAmendment参照）。質問が1つしか無いため、以前のような矛盾は
+        // 構造的に起こり得ない。
         var path = Path.Combine(_directory, "project.jukuschedule");
         await new SqliteProjectRepository().CreateAsync(path, CourseProjectDefinition.Create(2026, CourseSeason.Summer, new DateOnly(2026, 7, 20), new DateOnly(2026, 7, 20)));
         var course = new SqliteCourseSettingsRepository();
@@ -145,9 +175,12 @@ public sealed class QuestionnaireKitServiceTests : IDisposable
         var output = await new QuestionnaireKitService(course, master).GenerateAsync(path, _directory, "2026夏期講習", "生徒用", "講師用", "2026-07-06", "2026-07-10", "問い合わせ先");
 
         var studentScript = await File.ReadAllTextAsync(Path.Combine(output, "create_student_questionnaire.gs"));
-        Assert.DoesNotContain("理科（中学校）", studentScript);
-        Assert.DoesNotContain("物理（高校）", studentScript);
-        Assert.DoesNotContain("算数（小学校）", studentScript);
+        Assert.Contains("\"理科（中学範囲）\"", studentScript);
+        Assert.Contains("\"物理（高校範囲）\"", studentScript);
+        Assert.Contains("\"算数（小学範囲）\"", studentScript);
+        // 「他学年を含む」ページ専用の明示的な「学校区分」ドロップダウンは廃止した。
+        Assert.DoesNotContain("setTitle(`学校区分", studentScript);
+        // 自動判定される各校種ページ自身の選択肢は、引き続き付記の無い元の表記のまま。
         Assert.Contains("\"理科\"", studentScript);
         Assert.Contains("\"物理\"", studentScript);
     }

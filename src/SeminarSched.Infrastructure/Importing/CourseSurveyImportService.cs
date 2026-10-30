@@ -78,7 +78,6 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
                 var key = (NameKey(response.Name), response.Grade);
                 if (!studentByKey.TryGetValue(key, out var student))
                 {
-                    if (response.EnrollmentType != "体験生") throw new InvalidOperationException($"未登録の在籍生です: {response.Name}");
                     var externalId = NextTrialId(connection, transaction);
                     var id = InsertTrialStudent(connection, transaction, externalId, response.FamilyName, response.GivenName, response.Grade);
                     student = new StudentEntity(id, response.Name, response.Grade);
@@ -142,7 +141,6 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
         var surnameHeader = FindHeader(table.Headers, "姓（苗字）");
         var givenHeader = FindHeader(table.Headers, "名（必須）");
         var gradeHeader = FindHeader(table.Headers, "学年（必須）");
-        var enrollmentHeader = FindHeader(table.Headers, "在籍区分");
         RequireHeaders([(surnameHeader, "姓"), (givenHeader, "名"), (gradeHeader, "学年")], "生徒回答");
         var requestColumns = StudentRequestColumns(table.Headers);
         var dateHeaders = DateHeaders(table.Headers, "受講不可日時");
@@ -160,17 +158,17 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
             var givenName = Text(values.GetValueOrDefault(givenHeader, ""));
             var name = FullName(familyName, givenName);
             var grade = ConvertGrade(Text(values.GetValueOrDefault(gradeHeader, "")));
-            var enrollment = Text(values.GetValueOrDefault(enrollmentHeader, ""));
-            if (enrollment.Length == 0) enrollment = "在籍生";
             var identity = (NameKey(name), grade);
             if (!seen.Add(identity))
                 issues.Add(Issue(Error, "生徒回答", row.RowNumber, name, "同じ生徒の回答が重複しています。", "Googleフォーム側で正しい1回答だけを残す"));
+            // ユーザー指示「在校生かそうでないかのアンケートは削除します」への対応。以前は
+            // 在籍区分（アンケートの自己申告）が「在籍生」なのに基本情報に一致しない場合だけ
+            // エラーにしていたが、この自己申告自体が無くなったため、基本情報に一致しない生徒は
+            // 名前の入力ミスなのか本当の体験生なのか区別できない。反映を止めずプロジェクト内だけ
+            // 自動登録しつつ、警告として残しスタッフが反映前に気付けるようにする（従来の「体験生」
+            // ケースと同じ扱いへ統一）。
             if (!knownStudents.Contains(identity))
-            {
-                issues.Add(enrollment == "体験生"
-                    ? Issue(Warning, "生徒回答", row.RowNumber, name, "基本情報にない体験生です。プロジェクト内だけに自動登録します。", "体験生として登録")
-                    : Issue(Error, "生徒回答", row.RowNumber, name, "生徒・講師の基本情報に一致する在籍生がいません。", "共通名簿へ追加して再反映、または回答を体験生へ修正"));
-            }
+                issues.Add(Issue(Warning, "生徒回答", row.RowNumber, name, "基本情報に一致する生徒がいません。体験生としてプロジェクト内だけに自動登録します。", "基本情報を確認のうえ体験生として登録"));
 
             var requests = new List<(string Subject, int Count)>();
             var requestKeys = new HashSet<string>();
@@ -210,7 +208,7 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
                 requests.Add((canonical, count));
             }
             if (requests.Count == 0) issues.Add(Issue(Error, "生徒回答", row.RowNumber, name, "受講教科が1件もありません。", "少なくとも1教科を回答"));
-            result.Add(new StudentResponse(row.RowNumber, name, familyName, givenName, grade, enrollment, requests, Unavailable(values, dateHeaders, slotCodes), FindNote(table.Headers, values, ["特記事項"])));
+            result.Add(new StudentResponse(row.RowNumber, name, familyName, givenName, grade, requests, Unavailable(values, dateHeaders, slotCodes), FindNote(table.Headers, values, ["特記事項"])));
         }
         return result;
     }
@@ -472,7 +470,7 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = "INSERT INTO Student(ExternalId,Name,FamilyName,GivenName,Grade,DefaultMaxConsecutiveSlots,AllowGap,Note,Active) VALUES($id,$name,$family,$given,$grade,2,0,$note,1) RETURNING Id;";
-        Bind(command, "$id", externalId); Bind(command, "$name", FullName(familyName, givenName)); Bind(command, "$family", familyName); Bind(command, "$given", givenName); Bind(command, "$grade", grade); Bind(command, "$note", "在籍区分: 体験生（アンケート取込で作成）");
+        Bind(command, "$id", externalId); Bind(command, "$name", FullName(familyName, givenName)); Bind(command, "$family", familyName); Bind(command, "$given", givenName); Bind(command, "$grade", grade); Bind(command, "$note", "体験生（アンケート取込で自動登録）");
         return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
     }
 
@@ -691,6 +689,6 @@ public sealed class CourseSurveyImportService : ICourseSurveyImportService
     private sealed record OpenDateInfo(long Id, DateOnly Date);
     private sealed record RegularProfile(long? RegularTeacherId, int Priority, bool OneToOne, string Note);
 
-    private sealed record StudentResponse(int RowNumber, string Name, string FamilyName, string GivenName, string Grade, string EnrollmentType, List<(string Subject, int Count)> Requests, HashSet<(DateOnly Date, string Slot)> Unavailable, string Note);
+    private sealed record StudentResponse(int RowNumber, string Name, string FamilyName, string GivenName, string Grade, List<(string Subject, int Count)> Requests, HashSet<(DateOnly Date, string Slot)> Unavailable, string Note);
     private sealed record TeacherResponse(int RowNumber, string Name, HashSet<(DateOnly Date, string Slot)> Unavailable, string Note);
 }

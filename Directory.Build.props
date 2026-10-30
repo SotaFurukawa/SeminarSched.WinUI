@@ -205,16 +205,31 @@
          複数回実行するだけで、校舎ごとに別々のキーを配れるようになる。TryParseKeyは新形式
          （16進16桁）と既存配布済みの旧形式（16進12桁、saltなし）の両方を受け付けるため、
          本セッション中に実際に生成・配布した2026年版キー（FD98-3C5A-E685）を含め、過去に発行
-         済みのキーは引き続き有効（回帰テストで固定）。 -->
-    <VersionPrefix>1.7.1</VersionPrefix>
+         済みのキーは引き続き有効（回帰テストで固定）。
+         v1.8.0（新機能のためminorを上げてpatchを0へ戻した）は、ユーザー指示3点への対応
+         （docs/adr/0010-questionnaire-entrance-exam-question-toggle.mdのAmendment参照）。
+         ①「他学年を含む」チェックボックスのタイトルを「中高一貫などで他学年の授業を受講される
+         際はこちらにチェックを入れてください」から「私立中学の中高一貫の生徒はこちらに
+         チェックを入れてください」へ変更した。②「在籍区分（在籍生／体験生）」アンケートを
+         廃止した。この質問は、基本情報に一致しない生徒が「在籍生」の自己申告ならエラーで
+         importをブロックし「体験生」なら警告のうえ自動登録する、という判定材料だったが、質問
+         自体の廃止によりこの判定材料が無くなったため、基本情報に一致しない生徒は理由を区別せず
+         一律で警告のうえ自動登録する方式へ統一した（意図的な挙動変更）。③「他学年を含む」
+         ページで別々だった「学校区分」ドロップダウンと「受講教科」を、数学（中学範囲）のように
+         科目名への付記へ統合した。v1.5.0時点の付記（v1.5.2で差し戻し済み）との違いは、別途の
+         「学校区分」ドロップダウン自体を廃止した点（尋ねる項目が1つしか無いため、回答者自身の
+         学年と科目の学校区分が矛盾するという従来の問題が構造的に起こり得ない）。整形済み回答
+         シートの列構成は変更していないため、CourseSurveyImportService.cs側は無改修（GAS側の
+         新設関数splitOtherGradeSubjectAnswer_が付記を元の2列へ分解してから書き込む）。 -->
+    <VersionPrefix>1.8.0</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
-    <AssemblyVersion>1.7.1.0</AssemblyVersion>
-    <FileVersion>1.7.1.0</FileVersion>
+    <AssemblyVersion>1.8.0.0</AssemblyVersion>
+    <FileVersion>1.8.0.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AppxPackageVersion>1.7.1.0</AppxPackageVersion>
+    <AppxPackageVersion>1.8.0.0</AppxPackageVersion>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
